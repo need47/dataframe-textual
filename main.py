@@ -578,7 +578,7 @@ class DataFrameApp(App):
                 input=cell_str,
                 text=True,
             )
-            self.notify(cell_str[:50], title="Clipboard")
+            self.notify(f"Copied: {cell_str[:50]}", title="Clipboard")
         except FileNotFoundError:
             self.notify("clipboard tool not available", title="FileNotFound")
 
@@ -914,14 +914,18 @@ class DataFrameApp(App):
         col_dtype = self.df.dtypes[col_idx]
 
         # Get current cell value as default search term
-        current_value = self.df.item(row_idx, col_idx)
-        default_search = str(current_value) if current_value is not None else ""
+        cell_value = self.df.item(row_idx, col_idx)
+        if cell_value is None:
+            self.notify("Cannot use null value for search", title="Error")
+            return
+
+        search_term = str(cell_value)
         if col_dtype == pl.Boolean:
-            default_search = default_search.lower()
+            search_term = search_term.lower()
 
         # Push the search modal screen
         self.push_screen(
-            SearchScreen(col_name, default_search),
+            SearchScreen(col_name, search_term),
             callback=self._on_search_screen,
         )
 
@@ -981,7 +985,11 @@ class DataFrameApp(App):
             self.notify("Cannot search with null value", title="Error")
             return
 
+        col_dtype = self.df.dtypes[col_idx]
         search_term = str(cell_value)
+        if col_dtype == pl.Boolean:
+            search_term = search_term.lower()
+
         self._on_search_screen(search_term)
 
     def _highlight_rows(self) -> None:
