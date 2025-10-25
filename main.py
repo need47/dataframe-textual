@@ -507,7 +507,7 @@ class DataFrameApp(App):
             self._view_row_detail()
         elif event.key == "minus":
             # Remove the current column
-            self._remove_column()
+            self._delete_column()
         elif event.key == "left_square_bracket":  # '['
             # Sort by current column in ascending order
             self._sort_by_column(descending=False)
@@ -582,6 +582,7 @@ class DataFrameApp(App):
         except FileNotFoundError:
             self.notify("clipboard tool not available", title="FileNotFound")
 
+    # Load
     def _setup_table(self, reset: bool = False) -> None:
         """Setup the table for display."""
         # Reset to original dataframe
@@ -653,6 +654,7 @@ class DataFrameApp(App):
         if count != INITIAL_BATCH_SIZE:
             self.notify(f"Loaded {self.loaded_rows}/{len(self.df)} rows", title="Load")
 
+    # View
     def _view_row_detail(self) -> None:
         """Open a modal screen to view the selected row's details."""
         row_idx = self.table.cursor_row
@@ -662,7 +664,17 @@ class DataFrameApp(App):
         # Push the modal screen
         self.push_screen(RowDetailScreen(row_idx, self.df))
 
-    def _remove_column(self) -> None:
+    def _show_frequency(self) -> None:
+        """Show frequency distribution for the current column."""
+        col_idx = self.table.cursor_column
+        if col_idx >= len(self.df.columns):
+            return
+
+        # Push the frequency modal screen
+        self.push_screen(FrequencyScreen(col_idx, self.df))
+
+    # Delete
+    def _delete_column(self) -> None:
         """Remove the currently selected column from the table."""
         col_idx = self.table.cursor_column
         if col_idx >= len(self.df.columns):
@@ -692,6 +704,40 @@ class DataFrameApp(App):
             title="Column",
         )
 
+    def _delete_row(self) -> None:
+        """Delete the current row from the table and dataframe."""
+        row_idx = self.table.cursor_row
+
+        if row_idx >= len(self.df):
+            self.notify("Cannot delete row: invalid row index", title="Error")
+            return
+
+        # Add to history
+        self._add_history(f"Deleted row [on $primary]{row_idx + 1}[/]")
+
+        # Get the row key for removal from table
+        row_key = str(row_idx + 1)
+
+        # Add to deleted rows list
+        self.deleted_rows.append(row_idx)
+
+        # Remove from table
+        self.table.remove_row(row_key)
+
+        # Remove from dataframe
+        self.df = self.df.slice(0, row_idx).vstack(self.df.slice(row_idx + 1))
+
+        # Update selected_rows list to maintain alignment
+        if row_idx < len(self.selected_rows):
+            self.selected_rows.pop(row_idx)
+
+        # Adjust loaded_rows counter
+        if self.loaded_rows > 0:
+            self.loaded_rows -= 1
+
+        self.notify(f"Row [on $primary]{row_idx + 1}[/] deleted", title="Delete")
+
+    # Sort
     def _sort_by_column(self, descending: bool = False) -> None:
         """Sort the dataframe by the currently selected column.
 
@@ -754,6 +800,7 @@ class DataFrameApp(App):
         )
         self.notify(f"Sorted by: {sort_by}", title="Sort")
 
+    # Save
     def _save_to_file(self) -> None:
         """Open save file dialog."""
         self.push_screen(
@@ -799,15 +846,7 @@ class DataFrameApp(App):
             self.notify(f"Failed to save: {str(e)}", title="Error")
             raise e
 
-    def _show_frequency(self) -> None:
-        """Show frequency distribution for the current column."""
-        col_idx = self.table.cursor_column
-        if col_idx >= len(self.df.columns):
-            return
-
-        # Push the frequency modal screen
-        self.push_screen(FrequencyScreen(col_idx, self.df))
-
+    # Edit
     def _edit_cell(self) -> None:
         """Open modal to edit the selected cell."""
         row_idx = self.table.cursor_row
@@ -862,6 +901,7 @@ class DataFrameApp(App):
             self.notify(f"Failed to update cell: {str(e)}", title="Error")
             raise e
 
+    # Search & Highlight
     def _search_column(self) -> None:
         """Open modal to search in the selected column."""
         row_idx = self.table.cursor_row
@@ -1040,39 +1080,7 @@ class DataFrameApp(App):
             title="Filter",
         )
 
-    def _delete_row(self) -> None:
-        """Delete the current row from the table and dataframe."""
-        row_idx = self.table.cursor_row
-
-        if row_idx >= len(self.df):
-            self.notify("Cannot delete row: invalid row index", title="Error")
-            return
-
-        # Add to history
-        self._add_history(f"Deleted row [on $primary]{row_idx + 1}[/]")
-
-        # Get the row key for removal from table
-        row_key = str(row_idx + 1)
-
-        # Add to deleted rows list
-        self.deleted_rows.append(row_idx)
-
-        # Remove from table
-        self.table.remove_row(row_key)
-
-        # Remove from dataframe
-        self.df = self.df.slice(0, row_idx).vstack(self.df.slice(row_idx + 1))
-
-        # Update selected_rows list to maintain alignment
-        if row_idx < len(self.selected_rows):
-            self.selected_rows.pop(row_idx)
-
-        # Adjust loaded_rows counter
-        if self.loaded_rows > 0:
-            self.loaded_rows -= 1
-
-        self.notify(f"Row [on $primary]{row_idx + 1}[/] deleted", title="Delete")
-
+    # History
     def _add_history(self, description: Text | str) -> None:
         """Add the current state to the history stack.
 
