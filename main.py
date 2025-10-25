@@ -1,5 +1,6 @@
 import os
 import sys
+from collections import deque
 from dataclasses import dataclass
 from io import StringIO
 
@@ -435,8 +436,22 @@ INITIAL_BATCH_SIZE = 100  # Load this many rows initially
 BATCH_SIZE = 50  # Load this many rows when scrolling
 
 
-class DataFrameViewer(App):
-    """A Textual app to view dataframe interactively."""
+@dataclass
+class History:
+    """Class to track history of dataframe states for undo/redo functionality."""
+
+    description: str
+    df: pl.DataFrame
+    filename: str
+    loaded_rows: int
+    sorted_columns: dict[str, bool]
+    selected_rows: list[bool]
+    deleted_rows: list[int]
+    deleted_cols: list[str]
+
+
+class DataFrameApp(App):
+    """A Textual app to interact with a Polars DataFrame."""
 
     BINDINGS = [
         ("q", "quit", "Quit"),
@@ -453,6 +468,11 @@ class DataFrameViewer(App):
         self.loaded_rows = 0  # Track how many rows are currently loaded
         self.sorted_columns = {}  # Track sort keys as dict of col_name -> descending
         self.selected_rows = [False] * len(self.df)  # Track selected rows
+        self.deleted_rows = []  # Track deleted row indices (0-based)
+        self.deleted_cols = []  # Track deleted columns
+
+        # History stack for undo/redo
+        self.histories: deque[History] = deque()
 
         # Reopen stdin to /dev/tty for proper terminal interaction
         if not sys.stdin.isatty():
@@ -477,9 +497,7 @@ class DataFrameViewer(App):
             self.table.move_cursor(row=0)
         elif event.key == "G":
             # Load all remaining rows before jumping to end
-            remaining = len(self.df) - self.loaded_rows
-            if remaining > 0:
-                self._load_rows(remaining)
+            self._load_rows()
             self.table.move_cursor(row=self.table.row_count - 1)
         elif event.key in ("pagedown", "down"):
             # Let the table handle the navigation first
@@ -489,7 +507,7 @@ class DataFrameViewer(App):
             self._view_row_detail()
         elif event.key == "minus":
             # Remove the current column
-            self._remove_current_column()
+            self._remove_column()
         elif event.key == "left_square_bracket":  # '['
             # Sort by current column in ascending order
             self._sort_by_column(descending=False)
@@ -498,10 +516,9 @@ class DataFrameViewer(App):
             self._sort_by_column(descending=True)
         elif event.key == "r":
             # Restore original display
-            self._setup_table()
+            self._setup_table(reset=True)
             # Hide labels by default after initial load
-            # self.call_later(lambda: setattr(self.table, "show_row_labels", False))
-            self.log(f"{self.table.show_row_labels = }")
+            self.call_later(lambda: setattr(self.table, "show_row_labels", False))
 
             self.notify("Restored original display", title="Reset")
         elif event.key == "s":
@@ -521,18 +538,16 @@ class DataFrameViewer(App):
             self._toggle_selected_rows()
         elif event.key == "quotation_mark":  # '"' key
             # Display selected rows only
-            # Check if any rows are currently selected
-            selected_count = sum(self.selected_rows)
-
-            if selected_count == 0:
-                self.notify("No rows selected to display", title="Filter")
-                return
-
-            # Display only selected rows and update the internal dataframe
-            self._highlight_rows(rm_unselected=True)
+            self._filter_selected_rows()
         elif event.key == "d":
             # Delete the current row
             self._delete_row()
+        elif event.key == "u":
+            # Undo last action
+            self._undo()
+        elif event.key == "backslash":  # '\' key
+            # Search with current cell value and highlight matched rows
+            self._search_with_cell_value()
 
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
@@ -567,12 +582,15 @@ class DataFrameViewer(App):
         except FileNotFoundError:
             self.notify("clipboard tool not available", title="FileNotFound")
 
-    def _setup_table(self) -> None:
+    def _setup_table(self, reset: bool = False) -> None:
         """Setup the table for display."""
         # Reset to original dataframe
-        self.df = self.dataframe
-        self.loaded_rows = 0
-        self.sorted_columns = {}
+        if reset:
+            self.df = self.dataframe
+            self.sorted_columns = {}
+            self.selected_rows = [False] * len(self.df)
+            self.deleted_rows = []
+            self.deleted_cols = []
 
         self._setup_columns()
         self._load_rows(INITIAL_BATCH_SIZE)
@@ -602,8 +620,17 @@ class DataFrameViewer(App):
         if bottom_visible_row >= self.loaded_rows - 10:
             self._load_rows(BATCH_SIZE)
 
-    def _load_rows(self, count: int) -> None:
-        """Load a batch of rows into the table."""
+    def _load_rows(self, count: int | None = None) -> None:
+        """Load a batch of rows into the table.
+
+        Args:
+            count: Number of rows to load. If None, load all remaining rows.
+        """
+        if count is None:
+            count = len(self.df) - self.loaded_rows
+        elif count <= 0:
+            return
+
         start_idx = self.loaded_rows
         if start_idx >= len(self.df):
             return
@@ -635,7 +662,7 @@ class DataFrameViewer(App):
         # Push the modal screen
         self.push_screen(RowDetailScreen(row_idx, self.df))
 
-    def _remove_current_column(self) -> None:
+    def _remove_column(self) -> None:
         """Remove the currently selected column from the table."""
         col_idx = self.table.cursor_column
         if col_idx >= len(self.df.columns):
@@ -643,6 +670,12 @@ class DataFrameViewer(App):
 
         # Get the column name to remove
         col_to_remove = self.df.columns[col_idx]
+
+        # Add to history
+        self._add_history(f"Removed column [on $primary]{col_to_remove}[/]")
+
+        # Add to deleted columns list
+        self.deleted_cols.append(col_to_remove)
 
         # Remove the column from the table display using the column name as key
         self.table.remove_column(col_to_remove)
@@ -674,6 +707,9 @@ class DataFrameViewer(App):
             return
 
         col_to_sort = self.df.columns[col_idx]
+
+        # Add to history
+        self._add_history(f"Sorted dataframe on column [on $primary]{col_to_sort}[/]")
 
         # Check if this column is already in the sort keys
         old_desc = self.sorted_columns.get(col_to_sort)
@@ -761,6 +797,7 @@ class DataFrameViewer(App):
             self.notify(f"Saved to [on $primary]{filename}[/]", title="Save")
         except Exception as e:
             self.notify(f"Failed to save: {str(e)}", title="Error")
+            raise e
 
     def _show_frequency(self) -> None:
         """Show frequency distribution for the current column."""
@@ -778,6 +815,10 @@ class DataFrameViewer(App):
 
         if row_idx >= len(self.df) or col_idx >= len(self.df.columns):
             return
+        col_name = self.df.columns[col_idx]
+
+        # Save current state to history
+        self._add_history(f"Edited cell [on $primary]({row_idx}, {col_name})[/]")
 
         # Push the edit modal screen
         self.push_screen(
@@ -819,6 +860,7 @@ class DataFrameViewer(App):
             self.notify(f"Cell updated to [on $primary]{cell_value}[/]", title="Edit")
         except Exception as e:
             self.notify(f"Failed to update cell: {str(e)}", title="Error")
+            raise e
 
     def _search_column(self) -> None:
         """Open modal to search in the selected column."""
@@ -827,10 +869,6 @@ class DataFrameViewer(App):
 
         if col_idx >= len(self.df.columns):
             return
-
-        # Ensure all rows are loaded for searching
-        if self.loaded_rows < len(self.df):
-            self._load_rows(len(self.df) - self.loaded_rows)
 
         col_name = self.df.columns[col_idx]
         col_dtype = self.df.dtypes[col_idx]
@@ -863,41 +901,61 @@ class DataFrameViewer(App):
             # Returns a boolean Series, convert to list
             # Add to existing selected rows
             matches = col_series.str.contains(search_term).to_list()
+            match_count = matches.count(True)
+            if match_count == 0:
+                self.notify(f"No matches found for: {search_term}", title="Search")
+                return
+
+            # Add to history
+            self._add_history(
+                f"Searched and highlighted [on $primary]{search_term}[/] in column [on $primary]{col_name}[/]"
+            )
+
             self.selected_rows = [
                 old or new for old, new in zip(self.selected_rows, matches)
             ]
 
-            # Highlight selected rows and get count
-            match_count = self._highlight_rows()
-
-            if match_count == 0:
-                self.notify(f"No matches found for: {search_term}", title="Search")
-                return
+            # Highlight selected rows
+            self._highlight_rows()
 
             self.notify(
                 f"Found [on $primary]{match_count}[/] matches for [on $primary]{search_term}[/]",
                 title="Search",
             )
         except Exception as e:
-            self.notify(f"Search failed: {str(e)}", title="Error")
+            self.notify(f"Search failed for {search_term}: {str(e)}", title="Error")
+            raise e
 
-    def _highlight_rows(self, rm_unselected: bool = False) -> int:
-        """Update all rows, highlighting selected ones in red and restoring others to default.
+    def _search_with_cell_value(self) -> None:
+        """Search in the current column using the value of the currently selected cell."""
+        row_idx = self.table.cursor_row
+        col_idx = self.table.cursor_column
 
-        Args:
-            rm_unselected: If True, remove unselected rows from the table display and from internal df. Defaults to False.
+        if col_idx >= len(self.df.columns) or row_idx >= len(self.df):
+            self.notify("Invalid cell position", title="Error")
+            return
 
-        Returns:
-            The count of highlighted rows.
-        """
-        highlighted_count = 0
+        # Get the value of the currently selected cell
+        cell_value = self.df.item(row_idx, col_idx)
+        if cell_value is None:
+            self.notify("Cannot search with null value", title="Error")
+            return
+
+        search_term = str(cell_value)
+        self._on_search_screen(search_term)
+
+    def _highlight_rows(self) -> None:
+        """Update all rows, highlighting selected ones in red and restoring others to default."""
+        selected_count = self.selected_rows.count(True)
+        if selected_count == 0:
+            return
+
+        # Ensure all rows are loaded
+        self._load_rows()
 
         # Update all rows based on selected state
-        for row_idx in range(len(self.df)):
+        for row_idx in range(self.loaded_rows):
             is_selected = self.selected_rows[row_idx]
-            if rm_unselected and not is_selected:
-                self.table.remove_row(str(row_idx + 1))
-                continue
 
             # Update all cells in this row
             for col_idx in range(len(self.df.columns)):
@@ -919,38 +977,30 @@ class DataFrameViewer(App):
 
                 row_key = str(row_idx + 1)
                 col_key = col_name_cell
-                self.table.update_cell(row_key, col_key, formatted_value)
-
-            if is_selected:
-                highlighted_count += 1
-
-        if rm_unselected and highlighted_count > 0:
-            # Update internal dataframe to only selected rows
-            self.df = self.df.filter(pl.Series(self.selected_rows))
-
-            # Reset selected rows tracking
-            self.selected_rows = [True] * len(self.df)
-
-            self.notify(
-                f"Removed unselected rows. Now showing [on $primary]{highlighted_count}[/] rows",
-                title="Filter",
-            )
-        return highlighted_count
+                try:
+                    self.table.update_cell(row_key, col_key, formatted_value)
+                except Exception as e:
+                    self.notify(
+                        f"Failed to update cell [{row_key}, {col_key}]: {cell_value}",
+                        title="Highlight",
+                    )
+                    raise e
 
     def _toggle_selected_rows(self) -> None:
         """Toggle selected rows highlighting on/off."""
         # Check if any rows are currently selected
-        selected_count = sum(self.selected_rows)
-
+        selected_count = self.selected_rows.count(True)
         if selected_count == 0:
-            self.notify("No rows selected to toggle", title="Toggle")
             return
+
+        # Save current state to history
+        self._add_history("Toggled row selection")
 
         # Invert all selected rows
         self.selected_rows = [not match for match in self.selected_rows]
 
         # Check if we're highlighting or un-highlighting
-        new_selected_count = sum(self.selected_rows)
+        new_selected_count = self.selected_rows.count(True)
 
         if new_selected_count == 0:
             self.notify("Selection cleared", title="Toggle")
@@ -963,6 +1013,33 @@ class DataFrameViewer(App):
         # Refresh the highlighting (also restores default styles for unselected rows)
         self._highlight_rows()
 
+    def _filter_selected_rows(self) -> None:
+        """Display only the selected rows."""
+        selected_count = self.selected_rows.count(True)
+        if selected_count == 0:
+            return
+
+        # Save current state to history
+        self._add_history("Filtered to selected rows")
+
+        # Update all rows based on selected state
+        for row_idx in range(len(self.df)):
+            is_selected = self.selected_rows[row_idx]
+            if not is_selected:
+                self.table.remove_row(str(row_idx + 1))
+                continue
+
+        # Update internal dataframe to only selected rows
+        self.df = self.df.filter(pl.Series(self.selected_rows))
+
+        # Reset selected rows tracking
+        self.selected_rows = [True] * len(self.df)
+
+        self.notify(
+            f"Removed unselected rows. Now showing [on $primary]{selected_count}[/] rows",
+            title="Filter",
+        )
+
     def _delete_row(self) -> None:
         """Delete the current row from the table and dataframe."""
         row_idx = self.table.cursor_row
@@ -971,8 +1048,14 @@ class DataFrameViewer(App):
             self.notify("Cannot delete row: invalid row index", title="Error")
             return
 
+        # Add to history
+        self._add_history(f"Deleted row [on $primary]{row_idx + 1}[/]")
+
         # Get the row key for removal from table
         row_key = str(row_idx + 1)
+
+        # Add to deleted rows list
+        self.deleted_rows.append(row_idx)
 
         # Remove from table
         self.table.remove_row(row_key)
@@ -989,6 +1072,51 @@ class DataFrameViewer(App):
             self.loaded_rows -= 1
 
         self.notify(f"Row [on $primary]{row_idx + 1}[/] deleted", title="Delete")
+
+    def _add_history(self, description: Text | str) -> None:
+        """Add the current state to the history stack.
+
+        Args:
+            description: Description of the action for this history entry.
+        """
+        history = History(
+            description=description,
+            df=self.df,
+            filename=self.filename,
+            loaded_rows=self.loaded_rows,
+            sorted_columns=self.sorted_columns.copy(),
+            selected_rows=self.selected_rows.copy(),
+            deleted_rows=self.deleted_rows.copy(),
+            deleted_cols=self.deleted_cols.copy(),
+        )
+        self.histories.append(history)
+
+        self.notify(f"Saved: {description}", title="History")
+        self.log(self.histories[-1], description)
+
+    def _undo(self) -> None:
+        """Undo the last action."""
+        if not self.histories:
+            self.notify("No actions to undo", title="Undo")
+            return
+
+        history = self.histories.pop()
+        self.log(history, f"Restoring history: {history.description}")
+
+        # Restore state
+        self.df = history.df
+        self.filename = history.filename
+        self.loaded_rows = history.loaded_rows
+        self.sorted_columns = history.sorted_columns.copy()
+        self.selected_rows = history.selected_rows.copy()
+        self.deleted_rows = history.deleted_rows.copy()
+        self.deleted_cols = history.deleted_cols.copy()
+
+        # Recreate the table for display
+        self._setup_table()
+        self._highlight_rows()
+
+        self.notify(f"Reverted: {history.description}", title="Undo")
 
 
 if __name__ == "__main__":
@@ -1023,5 +1151,5 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Run the app
-    app = DataFrameViewer(df, filename)
+    app = DataFrameApp(df, filename)
     app.run()
