@@ -64,6 +64,14 @@ def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
     return formatted_row
 
 
+def _rindex(lst: list, value) -> int:
+    """Return the last index of value in lst. Raise ValueError if not found."""
+    for i, item in enumerate(reversed(lst)):
+        if item == value:
+            return len(lst) - 1 - i
+    raise ValueError(f"{value} is not in list")
+
+
 class YesNoScreen(ModalScreen):
     """Reusable modal screen with Yes/No buttons and customizable label and input.
 
@@ -556,7 +564,7 @@ class DataFrameApp(App):
         """Set up the DataTable when app starts."""
         self._setup_table()
         # Hide labels by default after initial load
-        self.call_later(lambda: setattr(self.table, "show_row_labels", False))
+        # self.call_later(lambda: setattr(self.table, "show_row_labels", False))
 
     def on_key(self, event) -> None:
         """Handle key events."""
@@ -585,8 +593,7 @@ class DataFrameApp(App):
         elif event.key == "r":
             # Restore original display
             self._setup_table(reset=True)
-            # Hide labels by default after initial load
-            self.call_later(lambda: setattr(self.table, "show_row_labels", False))
+            self.table.show_row_labels = True
 
             self.notify("Restored original display", title="Reset")
         elif event.key == "s":
@@ -616,6 +623,12 @@ class DataFrameApp(App):
         elif event.key == "backslash":  # '\' key
             # Search with current cell value and highlight matched rows
             self._search_with_cell_value()
+        elif event.key == "less_than_sign":  # '<' key
+            # Move current column to the left
+            self._move_column("left")
+        elif event.key == "greater_than_sign":  # '>' key
+            # Move current column to the right
+            self._move_column("right")
 
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
@@ -664,10 +677,12 @@ class DataFrameApp(App):
 
         self._setup_columns()
         self._load_rows(INITIAL_BATCH_SIZE)
+        self._highlight_rows()
 
     def _setup_columns(self) -> None:
         """Clear table and setup columns."""
         self.table.clear(columns=True)
+        self.loaded_rows = 0
 
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
@@ -803,6 +818,55 @@ class DataFrameApp(App):
 
         self.notify(f"Row [on $primary]{row_idx + 1}[/] deleted", title="Delete")
 
+    def _move_column(self, direction: str) -> None:
+        """Move the current column left or right.
+
+        Args:
+            direction: "left" to move left, "right" to move right.
+        """
+        row_idx, col_idx = self.table.cursor_coordinate
+        num_cols = len(self.df.columns)
+
+        # Validate move is possible
+        if direction == "left":
+            if col_idx <= 0:
+                self.notify("Cannot move column left", title="Move")
+                return
+            swap_idx = col_idx - 1
+        elif direction == "right":
+            if col_idx >= num_cols - 1:
+                self.notify("Cannot move column right", title="Move")
+                return
+            swap_idx = col_idx + 1
+        else:
+            self.notify(f"Invalid direction: {direction}", title="Move")
+            return
+
+        # Get column keys to swap
+        col_key = self.df.columns[col_idx]
+        swap_key = self.df.columns[swap_idx]
+
+        # Add to history
+        self._add_history(
+            f"Moved column [on $primary]{col_key}[/] {direction} (swapped with [on $primary]{swap_key}[/])"
+        )
+
+        # Swap columns in the dataframe
+        cols = list(self.df.columns)
+        cols[col_idx], cols[swap_idx] = cols[swap_idx], cols[col_idx]
+        self.df = self.df.select(cols)
+
+        # Recreate the table for display (not efficient but simple)
+        self._setup_table()
+
+        # Restore cursor position on the moved column
+        self.table.move_cursor(row=row_idx, column=swap_idx)
+
+        self.notify(
+            f"Moved column [on $primary]{col_key}[/] {direction}",
+            title="Column",
+        )
+
     # Sort
     def _sort_by_column(self, descending: bool = False) -> None:
         """Sort the dataframe by the currently selected column.
@@ -922,7 +986,7 @@ class DataFrameApp(App):
         col_name = self.df.columns[col_idx]
 
         # Save current state to history
-        self._add_history(f"Edit cell [on $primary]({row_idx + 1}, {col_name})[/]")
+        self._add_history(f"Edited cell [on $primary]({row_idx + 1}, {col_name})[/]")
 
         # Push the edit modal screen
         self.push_screen(
@@ -1062,8 +1126,9 @@ class DataFrameApp(App):
         if selected_count == 0:
             return
 
-        # Ensure all rows are loaded
-        self._load_rows()
+        # Ensure all highlighted rows are loaded
+        stop = _rindex(self.selected_rows, True) + 1
+        self._load_rows(stop)
 
         # Update all rows based on selected state
         for row_idx in range(self.loaded_rows):
@@ -1135,7 +1200,7 @@ class DataFrameApp(App):
         self._add_history("Filtered to selected rows")
 
         # Update all rows based on selected state
-        for row_idx in range(len(self.df)):
+        for row_idx in range(self.loaded_rows):
             is_selected = self.selected_rows[row_idx]
             if not is_selected:
                 self.table.remove_row(str(row_idx + 1))
@@ -1143,9 +1208,6 @@ class DataFrameApp(App):
 
         # Update internal dataframe to only selected rows
         self.df = self.df.filter(pl.Series(self.selected_rows))
-
-        # Reset selected rows tracking
-        self.selected_rows = [True] * len(self.df)
 
         self.notify(
             f"Removed unselected rows. Now showing [on $primary]{selected_count}[/] rows",
@@ -1171,7 +1233,6 @@ class DataFrameApp(App):
         )
         self.histories.append(history)
 
-        self.notify(f"Saved: {description}", title="History")
         self.log(self.histories[-1], description)
 
     def _undo(self) -> None:
@@ -1194,7 +1255,6 @@ class DataFrameApp(App):
 
         # Recreate the table for display
         self._setup_table()
-        self._highlight_rows()
 
         self.notify(f"Reverted: {history.description}", title="Undo")
 
