@@ -106,6 +106,7 @@ class YesNoScreen(ModalScreen):
         title: str = None,
         label: str = None,
         input: str = None,
+        input_type: str = "text",
         on_yes_callback=None,
     ):
         """Initialize the modal screen.
@@ -120,6 +121,7 @@ class YesNoScreen(ModalScreen):
         self.modal_title = title
         self.modal_label = label
         self.modal_input = input
+        self.input_type = input_type
         self.on_yes_callback = on_yes_callback
 
     def compose(self) -> ComposeResult:
@@ -131,7 +133,9 @@ class YesNoScreen(ModalScreen):
                 yield Label(self.modal_label, id="label")
 
             if self.modal_input:
-                self.input = Input(value=self.modal_input, id="input")
+                self.input = Input(
+                    value=self.modal_input, id="input", type=self.input_type
+                )
                 self.input.select_all()
                 yield self.input
 
@@ -167,7 +171,7 @@ class SaveFileScreen(YesNoScreen):
 
     CSS = YesNoScreen.CSS.replace("YesNoScreen", "SaveFileScreen")
 
-    def __init__(self, filename: str = "dataframe.csv"):
+    def __init__(self, filename: str):
         super().__init__(
             title="Save DataFrame",
             input=filename,
@@ -275,6 +279,10 @@ class FrequencyScreen(ModalScreen):
         super().__init__()
         self.col_idx = col_idx
         self.df = df
+        self.sorted_columns = {
+            1: True,  # Count
+            2: True,  # %
+        }
 
     def compose(self) -> ComposeResult:
         """Create the frequency table."""
@@ -284,13 +292,12 @@ class FrequencyScreen(ModalScreen):
 
         # Create frequency table
         freq_table = DataTable(zebra_stripes=True)
-        freq_table.add_column(Text(column, justify=ds.justify))
-        freq_table.add_column(Text("Count", justify="right"))
-        freq_table.add_column(Text("%", justify="right"))
+        freq_table.add_column(Text(column, justify=ds.justify), key=column)
+        freq_table.add_column(Text("Count", justify="right"), key="Count")
+        freq_table.add_column(Text("%", justify="right"), key="%")
 
         # Calculate frequencies using Polars
         freq_df = self.df[column].value_counts(sort=True).sort("count", descending=True)
-
         total_count = len(self.df)
 
         # Get style config for Int64 and Float64
@@ -322,6 +329,64 @@ class FrequencyScreen(ModalScreen):
 
         yield freq_table
 
+    def _on_key(self, event):
+        if event.key == "left_square_bracket":  # '['
+            # Sort by current column in ascending order
+            self._sort_by_column(descending=False)
+            event.stop()
+        elif event.key == "right_square_bracket":  # ']'
+            # Sort by current column in descending order
+            self._sort_by_column(descending=True)
+            event.stop()
+
+    def _sort_by_column(self, descending: bool) -> None:
+        """Sort the dataframe by the selected column and refresh the main table."""
+        freq_table = self.query_one(DataTable)
+
+        col_idx = freq_table.cursor_column
+        col_dtype = "String"
+
+        sort_dir = self.sorted_columns.get(col_idx)
+        if sort_dir is not None:
+            # If already sorted in the same direction, do nothing
+            if sort_dir == descending:
+                self.notify("Already sorted in that order", title="Sort")
+                return
+
+        self.sorted_columns.clear()
+        self.sorted_columns[col_idx] = descending
+
+        if col_idx == 0:
+            col_name = self.df.columns[self.col_idx]
+            col_dtype = str(self.df.dtypes[self.col_idx])
+        elif col_idx == 1:
+            col_name = "Count"
+            col_dtype = "Int64"
+        elif col_idx == 2:
+            col_name = "%"
+            col_dtype = "Float64"
+
+        def key_fun(freq_col):
+            col_value = freq_col.plain
+
+            if col_dtype == "Int64":
+                return int(col_value)
+            elif col_dtype == "Float64":
+                return float(col_value)
+            elif col_dtype == "Boolean":
+                return eval(col_value)
+            else:
+                return col_value
+
+        # Sort the table
+        freq_table.sort(
+            col_name, key=lambda freq_col: key_fun(freq_col), reverse=descending
+        )
+
+        # Notify the user
+        order = "desc" if descending else "asc"
+        self.notify(f"Sorted by [on $primary]{col_name}[/] ({order})", title="Sort")
+
 
 class EditCellScreen(YesNoScreen):
     """Modal screen to edit a single cell value."""
@@ -329,21 +394,29 @@ class EditCellScreen(YesNoScreen):
     CSS = YesNoScreen.CSS.replace("YesNoScreen", "EditCellScreen")
 
     def __init__(self, row_idx: int, col_idx: int, df: pl.DataFrame):
-        super().__init__()
         self.row_idx = row_idx
         self.col_idx = col_idx
         self.df = df
         self.col_name = df.columns[col_idx]
-        self.col_dtype = df.dtypes[col_idx]
+        self.col_dtype = str(df.dtypes[col_idx])
         self.original_value = df.item(row_idx, col_idx)
 
         content = f"{self.col_name} ({self.col_dtype})"
         input = str(self.original_value) if self.original_value is not None else ""
 
+        # For input validation
+        if self.col_dtype == "Int64":
+            input_type = "integer"
+        elif self.col_dtype == "Float64":
+            input_type = "number"
+        else:
+            input_type = "text"
+
         super().__init__(
             title="Edit Cell",
             label=content,
             input=input,
+            input_type=input_type,
             on_yes_callback=self._save_edit,
         )
 
@@ -371,39 +444,34 @@ class EditCellScreen(YesNoScreen):
         # Dismiss with the new value
         self.dismiss((self.row_idx, self.col_idx, new_value))
 
-    def _parse_value(self, value_str: str):
+    def _parse_value(self, value: str):
         """Parse string value based on column dtype."""
-        dtype_str = str(self.col_dtype)
+        dtype = self.col_dtype
 
-        if dtype_str == "Int64":
-            return int(value_str)
-        elif dtype_str == "Float64":
-            return float(value_str)
-        elif dtype_str == "String":
-            return value_str
-        elif dtype_str == "Boolean":
-            if value_str.lower() in ("true", "1", "yes"):
+        if dtype == "Int64":
+            return int(value)
+        elif dtype == "Float64":
+            return float(value)
+        elif dtype == "String":
+            return value
+        elif dtype == "Boolean":
+            if value.lower() in ("true", "t", "yes", "y", "1"):
                 return True
-            elif value_str.lower() in ("false", "0", "no"):
+            elif value.lower() in ("false", "f", "no", "n", "0"):
                 return False
             else:
                 raise ValueError(
-                    "Boolean must be 'true', 'false', 'yes', 'no', '1', or '0'"
+                    "Boolean must be 'true', 'false', 't', 'f', 'yes', 'no', 'y', 'n', '1', or '0'"
                 )
-        elif dtype_str == "Date":
+        elif dtype == "Date":
             # Try to parse ISO date format (YYYY-MM-DD)
-            return pl.col(self.col_name).str.to_date().to_list()[0].__class__(value_str)
-        elif dtype_str == "Datetime":
+            return pl.col(self.col_name).str.to_date().to_list()[0].__class__(value)
+        elif dtype == "Datetime":
             # Try to parse ISO datetime format
-            return (
-                pl.col(self.col_name)
-                .str.to_datetime()
-                .to_list()[0]
-                .__class__(value_str)
-            )
+            return pl.col(self.col_name).str.to_datetime().to_list()[0].__class__(value)
         else:
             # For unknown types, return as string
-            return value_str
+            return value
 
 
 class SearchScreen(YesNoScreen):
@@ -857,7 +925,7 @@ class DataFrameApp(App):
         col_name = self.df.columns[col_idx]
 
         # Save current state to history
-        self._add_history(f"Edited cell [on $primary]({row_idx}, {col_name})[/]")
+        self._add_history(f"Edit cell [on $primary]({row_idx + 1}, {col_name})[/]")
 
         # Push the edit modal screen
         self.push_screen(
@@ -871,12 +939,10 @@ class DataFrameApp(App):
             return
 
         row_idx, col_idx, new_value = result
-        self.log(f"Editing cell at ({row_idx}, {col_idx}) to {new_value}")
-
-        # Update the dataframe
         col_name = self.df.columns[col_idx]
+
+        # Update the cell in the dataframe
         try:
-            # Update the cell in the dataframe
             self.df = self.df.with_columns(
                 pl.when(pl.arange(0, len(self.df)) == row_idx)
                 .then(pl.lit(new_value))
@@ -894,11 +960,9 @@ class DataFrameApp(App):
             col_key = str(col_name)
             self.table.update_cell(row_key, col_key, formatted_value)
 
-            self.log(f"{self.table.get_cell(row_key, col_key) = }")
-
             self.notify(f"Cell updated to [on $primary]{cell_value}[/]", title="Edit")
         except Exception as e:
-            self.notify(f"Failed to update cell: {str(e)}", title="Error")
+            self.notify(f"Failed to update cell: {str(e)}", title="Edit")
             raise e
 
     # Search & Highlight
@@ -1088,7 +1152,7 @@ class DataFrameApp(App):
             title="Filter",
         )
 
-    # History
+    # History & Undo
     def _add_history(self, description: Text | str) -> None:
         """Add the current state to the history stack.
 
