@@ -592,7 +592,7 @@ class DataFrameApp(App):
         elif event.key == "s":
             # Save dataframe to CSV
             self._save_to_file()
-        elif event.key == "f":
+        elif event.key == "F":  # shift+f
             # Open frequency modal for current column
             self._show_frequency()
         elif event.key == "e":
@@ -656,6 +656,7 @@ class DataFrameApp(App):
         # Reset to original dataframe
         if reset:
             self.df = self.dataframe
+            self.loaded_rows = 0
             self.sorted_columns = {}
             self.selected_rows = [False] * len(self.df)
             self.deleted_rows = []
@@ -667,7 +668,6 @@ class DataFrameApp(App):
     def _setup_columns(self) -> None:
         """Clear table and setup columns."""
         self.table.clear(columns=True)
-        self.loaded_rows = 0
 
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
@@ -687,27 +687,24 @@ class DataFrameApp(App):
 
         # If visible area is close to the end of loaded rows, load more
         if bottom_visible_row >= self.loaded_rows - 10:
-            self._load_rows(BATCH_SIZE)
+            self._load_rows(self.loaded_rows + BATCH_SIZE)
 
-    def _load_rows(self, count: int | None = None) -> None:
+    def _load_rows(self, stop: int | None = None) -> None:
         """Load a batch of rows into the table.
 
         Args:
-            count: Number of rows to load. If None, load all remaining rows.
+            stop: Stop loading rows when this index is reached. If None, load until the end of the dataframe.
         """
-        if count is None:
-            count = len(self.df) - self.loaded_rows
-        elif count <= 0:
+        if stop is None or stop > len(self.df):
+            stop = len(self.df)
+
+        if stop <= self.loaded_rows:
             return
 
-        start_idx = self.loaded_rows
-        if start_idx >= len(self.df):
-            return
+        start = self.loaded_rows
+        df_slice = self.df.slice(start, stop - start)
 
-        end_idx = min(start_idx + count, len(self.df))
-        df_slice = self.df.slice(start_idx, end_idx - start_idx)
-
-        for row_idx, row in enumerate(df_slice.rows(), start_idx):
+        for row_idx, row in enumerate(df_slice.rows(), start):
             vals, dtypes = [], []
             for val, dtype in zip(row, self.df.dtypes):
                 vals.append(val)
@@ -717,9 +714,10 @@ class DataFrameApp(App):
             rid = str(row_idx + 1)
             self.table.add_row(*formatted_row, key=rid, label=rid)
 
-        self.loaded_rows = end_idx
+        # Update loaded rows count
+        self.loaded_rows = stop
 
-        if count != INITIAL_BATCH_SIZE:
+        if stop != INITIAL_BATCH_SIZE:
             self.notify(f"Loaded {self.loaded_rows}/{len(self.df)} rows", title="Load")
 
     # View
@@ -856,8 +854,7 @@ class DataFrameApp(App):
             )
 
         # Recreate the table for display
-        self._setup_columns()
-        self._load_rows(INITIAL_BATCH_SIZE)
+        self._setup_table()
 
         # Restore cursor position on the sorted column
         self.table.move_cursor(column=col_idx, row=0)
@@ -1011,7 +1008,10 @@ class DataFrameApp(App):
             matches = col_series.str.contains(search_term).to_list()
             match_count = matches.count(True)
             if match_count == 0:
-                self.notify(f"No matches found for: {search_term}", title="Search")
+                self.notify(
+                    f"No matches found for: [on $primary]{search_term}[/]",
+                    title="Search",
+                )
                 return
 
             # Add to history
