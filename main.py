@@ -65,11 +65,11 @@ def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
 
 
 def _rindex(lst: list, value) -> int:
-    """Return the last index of value in lst. Raise ValueError if not found."""
+    """Return the last index of value in lst. Return -1 if not found."""
     for i, item in enumerate(reversed(lst)):
         if item == value:
             return len(lst) - 1 - i
-    raise ValueError(f"{value} is not in list")
+    return -1
 
 
 class YesNoScreen(ModalScreen):
@@ -523,7 +523,6 @@ class History:
     sorted_columns: dict[str, bool]
     selected_rows: list[bool]
     deleted_rows: list[int]
-    deleted_cols: list[str]
 
 
 class DataFrameApp(App):
@@ -545,7 +544,6 @@ class DataFrameApp(App):
         self.sorted_columns = {}  # Track sort keys as dict of col_name -> descending
         self.selected_rows = [False] * len(self.df)  # Track selected rows
         self.deleted_rows = []  # Track deleted row indices (0-based)
-        self.deleted_cols = []  # Track deleted columns
 
         # History stack for undo/redo
         self.histories: deque[History] = deque()
@@ -629,6 +627,9 @@ class DataFrameApp(App):
         elif event.key == "greater_than_sign":  # '>' key
             # Move current column to the right
             self._move_column("right")
+        elif event.key == "C":  # shift+c
+            # Clear all selected rows
+            self._clear_selected_rows()
 
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
@@ -673,7 +674,6 @@ class DataFrameApp(App):
             self.sorted_columns = {}
             self.selected_rows = [False] * len(self.df)
             self.deleted_rows = []
-            self.deleted_cols = []
 
         self._setup_columns()
         self._load_rows(INITIAL_BATCH_SIZE)
@@ -720,14 +720,17 @@ class DataFrameApp(App):
         df_slice = self.df.slice(start, stop - start)
 
         for row_idx, row in enumerate(df_slice.rows(), start):
+            rid = row_idx + 1
+            if rid in self.deleted_rows:
+                continue  # Skip deleted rows
+
             vals, dtypes = [], []
             for val, dtype in zip(row, self.df.dtypes):
                 vals.append(val)
                 dtypes.append(dtype)
             formatted_row = _format_row(vals, dtypes)
             # Always add labels so they can be shown/hidden via CSS
-            rid = str(row_idx + 1)
-            self.table.add_row(*formatted_row, key=rid, label=rid)
+            self.table.add_row(*formatted_row, key=str(rid), label=str(rid))
 
         # Update loaded rows count
         self.loaded_rows = stop
@@ -767,9 +770,6 @@ class DataFrameApp(App):
         # Add to history
         self._add_history(f"Removed column [on $primary]{col_to_remove}[/]")
 
-        # Add to deleted columns list
-        self.deleted_cols.append(col_to_remove)
-
         # Remove the column from the table display using the column name as key
         self.table.remove_column(col_to_remove)
 
@@ -787,17 +787,15 @@ class DataFrameApp(App):
 
     def _delete_row(self) -> None:
         """Delete the current row from the table and dataframe."""
-        row_idx = self.table.cursor_row
+        row_key, _ = self.table.coordinate_to_cell_key(self.table.cursor_coordinate)
+        row_idx = int(row_key.value) - 1  # Convert to 0-based index
 
         if row_idx >= len(self.df):
             self.notify("Cannot delete row: invalid row index", title="Error")
             return
 
         # Add to history
-        self._add_history(f"Deleted row [on $primary]{row_idx + 1}[/]")
-
-        # Get the row key for removal from table
-        row_key = str(row_idx + 1)
+        self._add_history(f"Deleted row [on $primary]{row_key.value}[/]")
 
         # Add to deleted rows list
         self.deleted_rows.append(row_idx)
@@ -805,18 +803,14 @@ class DataFrameApp(App):
         # Remove from table
         self.table.remove_row(row_key)
 
-        # Remove from dataframe
-        self.df = self.df.slice(0, row_idx).vstack(self.df.slice(row_idx + 1))
+        # Do not remove from dataframe so it can be restored via undo
+        # self.df = self.df.slice(0, row_idx).vstack(self.df.slice(row_idx + 1))
 
         # Update selected_rows list to maintain alignment
         if row_idx < len(self.selected_rows):
-            self.selected_rows.pop(row_idx)
+            self.selected_rows[row_idx] = False
 
-        # Adjust loaded_rows counter
-        if self.loaded_rows > 0:
-            self.loaded_rows -= 1
-
-        self.notify(f"Row [on $primary]{row_idx + 1}[/] deleted", title="Delete")
+        self.notify(f"Row [on $primary]{row_key.value}[/] deleted", title="Delete")
 
     def _move_column(self, direction: str) -> None:
         """Move the current column left or right.
@@ -968,8 +962,16 @@ class DataFrameApp(App):
         else:
             separator = ","
         try:
+            if self.deleted_rows:
+                self.df = (
+                    self.df.with_row_index(offset=1)
+                    .filter(~pl.col("index").is_in(self.deleted_rows))
+                    .select(pl.exclude("index"))
+                )
             self.df.write_csv(filename, separator=separator)
-            self.filename = filename
+
+            self.dataframe = self.df  # Update original dataframe
+            self.filename = filename  # Update current filename
             self.notify(f"Saved to [on $primary]{filename}[/]", title="Save")
         except Exception as e:
             self.notify(f"Failed to save: {str(e)}", title="Error")
@@ -1120,11 +1122,18 @@ class DataFrameApp(App):
 
         self._on_search_screen(search_term)
 
-    def _highlight_rows(self) -> None:
-        """Update all rows, highlighting selected ones in red and restoring others to default."""
+    def _highlight_rows(self, clear: bool = False) -> None:
+        """Update all rows, highlighting selected ones in red and restoring others to default.
+
+        Args:
+            clear: If True, clear all highlights.
+        """
         selected_count = self.selected_rows.count(True)
         if selected_count == 0:
             return
+
+        if clear:
+            self.selected_rows = [False] * len(self.df)
 
         # Ensure all highlighted rows are loaded
         stop = _rindex(self.selected_rows, True) + 1
@@ -1190,6 +1199,24 @@ class DataFrameApp(App):
         # Refresh the highlighting (also restores default styles for unselected rows)
         self._highlight_rows()
 
+    def _clear_selected_rows(self) -> None:
+        """Clear all selected rows without removing them from the dataframe."""
+        # Check if any rows are currently selected
+        selected_count = self.selected_rows.count(True)
+        if selected_count == 0:
+            self.notify("No rows selected to clear", title="Clear")
+            return
+
+        # Save current state to history
+        self._add_history("Cleared all selected rows")
+
+        # Clear all selections and refresh highlighting
+        self._highlight_rows(clear=True)
+
+        self.notify(
+            f"Cleared [on $primary]{selected_count}[/] selected rows", title="Clear"
+        )
+
     def _filter_selected_rows(self) -> None:
         """Display only the selected rows."""
         selected_count = self.selected_rows.count(True)
@@ -1207,7 +1234,7 @@ class DataFrameApp(App):
                 continue
 
         # Update internal dataframe to only selected rows
-        self.df = self.df.filter(pl.Series(self.selected_rows))
+        self.df = self.df.filter(self.selected_rows)
 
         self.notify(
             f"Removed unselected rows. Now showing [on $primary]{selected_count}[/] rows",
@@ -1229,7 +1256,6 @@ class DataFrameApp(App):
             sorted_columns=self.sorted_columns.copy(),
             selected_rows=self.selected_rows.copy(),
             deleted_rows=self.deleted_rows.copy(),
-            deleted_cols=self.deleted_cols.copy(),
         )
         self.histories.append(history)
 
@@ -1251,7 +1277,6 @@ class DataFrameApp(App):
         self.sorted_columns = history.sorted_columns.copy()
         self.selected_rows = history.selected_rows.copy()
         self.deleted_rows = history.deleted_rows.copy()
-        self.deleted_cols = history.deleted_cols.copy()
 
         # Recreate the table for display
         self._setup_table()
