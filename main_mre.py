@@ -38,9 +38,8 @@ class DataFrameViewer(App):
 
         table.clear(columns=True)
 
-        # Hide labels by default after initial load
-        # table.show_row_labels = False
-        self.call_later(lambda: setattr(table, "show_row_labels", False))
+        # Always set show row labels during setup
+        table.show_row_labels = True
 
         for col in ROWS[0]:
             table.add_column(str(col))
@@ -48,6 +47,9 @@ class DataFrameViewer(App):
         for row_idx, row in enumerate(ROWS[1:]):
             rid = str(row_idx + 1)
             table.add_row(*row, label=rid)
+
+        # Hide labels by default after initial load
+        table.show_row_labels = False
 
 
 if __name__ == "__main__":

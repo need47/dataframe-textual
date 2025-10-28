@@ -1,6 +1,7 @@
 import os
 import sys
 from collections import deque
+from copy import deepcopy
 from dataclasses import dataclass
 from io import StringIO
 
@@ -114,7 +115,8 @@ class YesNoScreen(ModalScreen):
         title: str = None,
         label: str = None,
         input: str = None,
-        input_type: str = "text",
+        yes: str = "Yes",
+        no: str = "No",
         on_yes_callback=None,
     ):
         """Initialize the modal screen.
@@ -122,34 +124,42 @@ class YesNoScreen(ModalScreen):
         Args:
             title: The title to display in the border
             label: Optional label to display below title as a Label
-            input: Optional input value to pre-fill an Input widget
+            input: Optional input value to pre-fill an Input widget. If None, no Input is shown. If it is a 2-value tuple, the first value is the pre-filled input, and the second value is the type of input (e.g., "integer", "number", "text")
+            yes: Text for the Yes button. If None, hides the Yes button
+            no: Text for the No button. If None, hides the No button
             on_yes_callback: Optional callable that takes no args and returns the value to dismiss with
         """
         super().__init__()
-        self.modal_title = title
-        self.modal_label = label
-        self.modal_input = input
-        self.input_type = input_type
+        self.title = title
+        self.label = label
+        self.input = input
+        self.yes = yes
+        self.no = no
         self.on_yes_callback = on_yes_callback
 
     def compose(self) -> ComposeResult:
         with Static(id="modal-container") as container:
-            if self.modal_title:
-                container.border_title = self.modal_title
+            if self.title:
+                container.border_title = self.title
 
-            if self.modal_label:
-                yield Label(self.modal_label, id="label")
+            if self.label:
+                yield Label(self.label, id="label")
 
-            if self.modal_input:
-                self.input = Input(
-                    value=self.modal_input, id="input", type=self.input_type
-                )
+            if self.input:
+                if isinstance(self.input, tuple) and len(self.input) == 2:
+                    self.input, self.input_type = self.input
+                else:
+                    self.input_type = "text"
+                self.input = Input(value=self.input, id="input", type=self.input_type)
                 self.input.select_all()
                 yield self.input
 
-            with Horizontal(id="button-container"):
-                yield Button("Yes", id="yes", variant="success")
-                yield Button("No", id="no", variant="error")
+            if self.yes or self.no:
+                with Horizontal(id="button-container"):
+                    if self.yes:
+                        yield Button(self.yes, id="yes", variant="success")
+                    if self.no:
+                        yield Button(self.no, id="no", variant="error")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "yes":
@@ -404,7 +414,6 @@ class EditCellScreen(YesNoScreen):
     def __init__(self, row_idx: int, col_idx: int, df: pl.DataFrame):
         self.row_idx = row_idx
         self.col_idx = col_idx
-        self.df = df
         self.col_name = df.columns[col_idx]
         self.col_dtype = str(df.dtypes[col_idx])
         self.original_value = df.item(row_idx, col_idx)
@@ -423,8 +432,7 @@ class EditCellScreen(YesNoScreen):
         super().__init__(
             title="Edit Cell",
             label=content,
-            input=input,
-            input_type=input_type,
+            input=(input, input_type),
             on_yes_callback=self._save_edit,
         )
 
@@ -507,6 +515,62 @@ class SearchScreen(YesNoScreen):
         self.dismiss(search_term)
 
 
+class PinScreen(YesNoScreen):
+    """Modal screen to pin rows and columns.
+
+    Accepts one value for fixed rows, or two space-separated values for fixed rows and columns.
+    """
+
+    CSS = YesNoScreen.CSS.replace("YesNoScreen", "PinScreen")
+
+    def __init__(self):
+        super().__init__(
+            title="Pin Rows and Columns",
+            label="Enter number of fixed rows and columns (space-separated)",
+            input="1",
+            on_yes_callback=self._parse_pin_input,
+        )
+
+    def _parse_pin_input(self) -> tuple[int, int] | None:
+        """Parse and validate the pin input.
+
+        Returns:
+            Tuple of (fixed_rows, fixed_columns) or None if invalid.
+        """
+        input_str = self.input.value.strip()
+
+        if not input_str:
+            self.notify("Input cannot be empty", title="Error")
+            return None
+
+        parts = input_str.split()
+
+        if len(parts) == 1:
+            # Only fixed rows provided
+            try:
+                fixed_rows = int(parts[0])
+                if fixed_rows < 0:
+                    raise ValueError("must be non-negative")
+                return (fixed_rows, 0)
+            except ValueError as e:
+                self.notify(f"Invalid fixed rows value: {str(e)}", title="Error")
+                return None
+        elif len(parts) == 2:
+            # Both fixed rows and columns provided
+            try:
+                fixed_rows = int(parts[0])
+                fixed_cols = int(parts[1])
+                if fixed_rows < 0 or fixed_cols < 0:
+                    raise ValueError("values must be non-negative")
+                return (fixed_rows, fixed_cols)
+            except ValueError as e:
+                self.notify(f"Invalid input values: {str(e)}", title="Error")
+                return None
+        else:
+            self.notify("Provide one or two space-separated integers", title="Error")
+            return None
+
+
 # Pagination settings
 INITIAL_BATCH_SIZE = 100  # Load this many rows initially
 BATCH_SIZE = 50  # Load this many rows when scrolling
@@ -522,7 +586,9 @@ class History:
     loaded_rows: int
     sorted_columns: dict[str, bool]
     selected_rows: list[bool]
-    deleted_rows: list[int]
+    deleted_rows: list[bool]
+    fixed_rows: int
+    fixed_columns: int
 
 
 class DataFrameApp(App):
@@ -539,11 +605,13 @@ class DataFrameApp(App):
         super().__init__()
         self.dataframe = df  # Original dataframe
         self.df = df  # Internal dataframe
-        self.filename = filename
+        self.filename = filename  # Current filename
         self.loaded_rows = 0  # Track how many rows are currently loaded
         self.sorted_columns = {}  # Track sort keys as dict of col_name -> descending
-        self.selected_rows = [False] * len(self.df)  # Track selected rows
-        self.deleted_rows = []  # Track deleted row indices (0-based)
+        self.selected_rows = [False] * len(df)  # Track selected rows (0-based)
+        self.deleted_rows = [False] * len(df)  # Track deleted row indices (0-based)
+        self.fixed_rows = 0  # Number of fixed rows
+        self.fixed_columns = 0  # Number of fixed columns
 
         # History stack for undo/redo
         self.histories: deque[History] = deque()
@@ -562,7 +630,7 @@ class DataFrameApp(App):
         """Set up the DataTable when app starts."""
         self._setup_table()
         # Hide labels by default after initial load
-        # self.call_later(lambda: setattr(self.table, "show_row_labels", False))
+        self.call_later(lambda: setattr(self.table, "show_row_labels", False))
 
     def on_key(self, event) -> None:
         """Handle key events."""
@@ -591,10 +659,11 @@ class DataFrameApp(App):
         elif event.key == "r":
             # Restore original display
             self._setup_table(reset=True)
-            self.table.show_row_labels = True
+            # Hide labels by default after initial load
+            self.call_later(lambda: setattr(self.table, "show_row_labels", False))
 
             self.notify("Restored original display", title="Reset")
-        elif event.key == "s":
+        elif event.key == "ctrl+s":
             # Save dataframe to CSV
             self._save_to_file()
         elif event.key == "F":  # shift+f
@@ -630,6 +699,9 @@ class DataFrameApp(App):
         elif event.key == "C":  # shift+c
             # Clear all selected rows
             self._clear_selected_rows()
+        elif event.key == "p":
+            # Open pin screen to set fixed rows and columns
+            self._open_pin_screen()
 
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
@@ -673,11 +745,16 @@ class DataFrameApp(App):
             self.loaded_rows = 0
             self.sorted_columns = {}
             self.selected_rows = [False] * len(self.df)
-            self.deleted_rows = []
+            self.deleted_rows = [False] * len(self.df)
+            self.fixed_rows = 0
+            self.fixed_columns = 0
 
         self._setup_columns()
         self._load_rows(INITIAL_BATCH_SIZE)
         self._highlight_rows()
+
+        self.table.fixed_rows = self.fixed_rows
+        self.table.fixed_columns = self.fixed_columns
 
     def _setup_columns(self) -> None:
         """Clear table and setup columns."""
@@ -720,8 +797,7 @@ class DataFrameApp(App):
         df_slice = self.df.slice(start, stop - start)
 
         for row_idx, row in enumerate(df_slice.rows(), start):
-            rid = row_idx + 1
-            if rid in self.deleted_rows:
+            if self.deleted_rows[row_idx]:
                 continue  # Skip deleted rows
 
             vals, dtypes = [], []
@@ -730,7 +806,9 @@ class DataFrameApp(App):
                 dtypes.append(dtype)
             formatted_row = _format_row(vals, dtypes)
             # Always add labels so they can be shown/hidden via CSS
-            self.table.add_row(*formatted_row, key=str(rid), label=str(rid))
+            self.table.add_row(
+                *formatted_row, key=str(row_idx + 1), label=str(row_idx + 1)
+            )
 
         # Update loaded rows count
         self.loaded_rows = stop
@@ -756,6 +834,41 @@ class DataFrameApp(App):
 
         # Push the frequency modal screen
         self.push_screen(FrequencyScreen(col_idx, self.df))
+
+    def _open_pin_screen(self) -> None:
+        """Open the pin screen to set fixed rows and columns."""
+        self.push_screen(PinScreen(), callback=self._on_pin_screen)
+
+    def _on_pin_screen(self, result: tuple[int, int] | None) -> None:
+        """Handle result from PinScreen.
+
+        Args:
+            result: Tuple of (fixed_rows, fixed_columns) or None if cancelled.
+        """
+        if result is None:
+            return
+
+        fixed_rows, fixed_columns = result
+
+        # Add to history
+        self._add_history(
+            f"Pinned [on $primary]{fixed_rows}[/] rows and [on $primary]{fixed_columns}[/] columns"
+        )
+
+        # Apply the pin settings to the table
+        if fixed_rows > 0:
+            self.table.fixed_rows = fixed_rows
+        if fixed_columns > 0:
+            self.table.fixed_columns = fixed_columns
+
+        # Update internal state
+        self.fixed_rows = fixed_rows
+        self.fixed_columns = fixed_columns
+
+        self.notify(
+            f"Pinned [on $primary]{fixed_rows}[/] rows and [on $primary]{fixed_columns}[/] columns",
+            title="Pin",
+        )
 
     # Delete
     def _delete_column(self) -> None:
@@ -786,31 +899,54 @@ class DataFrameApp(App):
         )
 
     def _delete_row(self) -> None:
-        """Delete the current row from the table and dataframe."""
-        row_key, _ = self.table.coordinate_to_cell_key(self.table.cursor_coordinate)
-        row_idx = int(row_key.value) - 1  # Convert to 0-based index
+        """Delete rows from the table and dataframe.
 
-        if row_idx >= len(self.df):
-            self.notify("Cannot delete row: invalid row index", title="Error")
-            return
+        Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.
 
-        # Add to history
-        self._add_history(f"Deleted row [on $primary]{row_key.value}[/]")
+        Do not remove rows from the dataframe to allow for undo functionality (especially for row labels).
+        """
+        # Delete all selected rows
+        if selected_count := self.selected_rows.count(True):
+            # Add to history
+            self._add_history(f"Deleted {selected_count} selected row(s)")
 
-        # Add to deleted rows list
-        self.deleted_rows.append(row_idx)
+            for row_idx, is_selected in enumerate(self.selected_rows):
+                if not is_selected:
+                    continue
 
-        # Remove from table
-        self.table.remove_row(row_key)
+                # Add to deleted rows list
+                self.deleted_rows[row_idx] = True
 
-        # Do not remove from dataframe so it can be restored via undo
-        # self.df = self.df.slice(0, row_idx).vstack(self.df.slice(row_idx + 1))
+                # Update selected_rows list to maintain alignment
+                self.selected_rows[row_idx] = False
 
-        # Update selected_rows list to maintain alignment
-        if row_idx < len(self.selected_rows):
+                # Remove from table
+                row_key = str(row_idx + 1)  # Convert to 1-based key
+                self.table.remove_row(row_key)
+
+            self.notify(f"Deleted {selected_count} selected row(s)", title="Delete")
+        # Delete the row at the cursor
+        else:
+            row_key, _ = self.table.coordinate_to_cell_key(self.table.cursor_coordinate)
+            row_idx = int(row_key.value) - 1  # Convert to 0-based index
+
+            if row_idx >= len(self.df):
+                self.notify("Cannot delete row: invalid row index", title="Error")
+                return
+
+            # Add to history
+            self._add_history(f"Deleted row [on $primary]{row_key.value}[/]")
+
+            # Add to deleted rows list
+            self.deleted_rows[row_idx] = True
+
+            # Update selected_rows list to maintain alignment
             self.selected_rows[row_idx] = False
 
-        self.notify(f"Row [on $primary]{row_key.value}[/] deleted", title="Delete")
+            # Remove from table
+            self.table.remove_row(row_key)
+
+            self.notify(f"Row [on $primary]{row_key.value}[/] deleted", title="Delete")
 
     def _move_column(self, direction: str) -> None:
         """Move the current column left or right.
@@ -819,7 +955,9 @@ class DataFrameApp(App):
             direction: "left" to move left, "right" to move right.
         """
         row_idx, col_idx = self.table.cursor_coordinate
-        num_cols = len(self.df.columns)
+        _, col_key = self.table.coordinate_to_cell_key(self.table.cursor_coordinate)
+
+        num_cols = len(self.table.columns)
 
         # Validate move is possible
         if direction == "left":
@@ -836,28 +974,39 @@ class DataFrameApp(App):
             self.notify(f"Invalid direction: {direction}", title="Move")
             return
 
-        # Get column keys to swap
-        col_key = self.df.columns[col_idx]
-        swap_key = self.df.columns[swap_idx]
+        # Get column names to swap
+        col_name = self.df.columns[col_idx]
+        swap_name = self.df.columns[swap_idx]
 
         # Add to history
         self._add_history(
-            f"Moved column [on $primary]{col_key}[/] {direction} (swapped with [on $primary]{swap_key}[/])"
+            f"Moved column [on $primary]{col_name}[/] {direction} (swapped with [on $primary]{swap_name}[/])"
         )
+
+        # Swap columns in the table's internal column locations
+        self.table.check_idle()
+        swap_key = self.df.columns[swap_idx]  # str as column key
+
+        new_column_locations = deepcopy(self.table._column_locations)
+        new_column_locations[col_key], new_column_locations[swap_key] = (
+            new_column_locations.get(swap_key),
+            new_column_locations.get(col_key),
+        )
+        self.table._column_locations = new_column_locations
+
+        self.table._update_count += 1
+        self.table.refresh(layout=True)
+
+        # Restore cursor position on the moved column
+        self.table.move_cursor(row=row_idx, column=swap_idx)
 
         # Swap columns in the dataframe
         cols = list(self.df.columns)
         cols[col_idx], cols[swap_idx] = cols[swap_idx], cols[col_idx]
         self.df = self.df.select(cols)
 
-        # Recreate the table for display (not efficient but simple)
-        self._setup_table()
-
-        # Restore cursor position on the moved column
-        self.table.move_cursor(row=row_idx, column=swap_idx)
-
         self.notify(
-            f"Moved column [on $primary]{col_key}[/] {direction}",
+            f"Moved column [on $primary]{col_name}[/] {direction}",
             title="Column",
         )
 
@@ -962,12 +1111,9 @@ class DataFrameApp(App):
         else:
             separator = ","
         try:
-            if self.deleted_rows:
-                self.df = (
-                    self.df.with_row_index(offset=1)
-                    .filter(~pl.col("index").is_in(self.deleted_rows))
-                    .select(pl.exclude("index"))
-                )
+            if True in self.deleted_rows:
+                rows_to_keep = [not deleted for deleted in self.deleted_rows]
+                self.df = self.df.filter(rows_to_keep)
             self.df.write_csv(filename, separator=separator)
 
             self.dataframe = self.df  # Update original dataframe
@@ -1085,6 +1231,7 @@ class DataFrameApp(App):
                 f"Searched and highlighted [on $primary]{search_term}[/] in column [on $primary]{col_name}[/]"
             )
 
+            # Update selected rows to include new matches
             self.selected_rows = [
                 old or new for old, new in zip(self.selected_rows, matches)
             ]
@@ -1128,8 +1275,7 @@ class DataFrameApp(App):
         Args:
             clear: If True, clear all highlights.
         """
-        selected_count = self.selected_rows.count(True)
-        if selected_count == 0:
+        if True not in self.selected_rows:
             return
 
         if clear:
@@ -1140,13 +1286,12 @@ class DataFrameApp(App):
         self._load_rows(stop)
 
         # Update all rows based on selected state
-        for row_idx in range(self.loaded_rows):
+        for row_idx, row in enumerate(self.table.ordered_rows):
             is_selected = self.selected_rows[row_idx]
 
             # Update all cells in this row
-            for col_idx in range(len(self.df.columns)):
-                col_name_cell = self.df.columns[col_idx]
-                cell_value = self.df.item(row_idx, col_idx)
+            for col_idx, col in enumerate(self.table.ordered_columns):
+                cell_text: Text = self.table.get_cell(row.key, col.key)
                 dtype = self.df.dtypes[col_idx]
 
                 # Get style config based on dtype
@@ -1154,29 +1299,25 @@ class DataFrameApp(App):
 
                 # Use red for selected rows, default style for others
                 style = "red" if is_selected else ds.style
+                cell_text.style = style
 
-                formatted_value = Text(
-                    str(cell_value) if cell_value is not None else "-",
-                    style=style,
-                    justify=ds.justify,
-                )
+                # cell_value = cell_text.plain
+                # formatted_value = Text(
+                #     str(cell_value) if cell_value is not None else "-",
+                #     style=style,
+                #     justify=ds.justify,
+                # )
 
-                row_key = str(row_idx + 1)
-                col_key = col_name_cell
-                try:
-                    self.table.update_cell(row_key, col_key, formatted_value)
-                except Exception as e:
-                    self.notify(
-                        f"Failed to update cell [{row_key}, {col_key}]: {cell_value}",
-                        title="Highlight",
-                    )
-                    raise e
+                # Update the cell in the table
+                self.table.update_cell(row.key, col.key, cell_text)
 
     def _toggle_selected_rows(self) -> None:
         """Toggle selected rows highlighting on/off."""
         # Check if any rows are currently selected
-        selected_count = self.selected_rows.count(True)
-        if selected_count == 0:
+        if True not in self.selected_rows:
+            self.notify(
+                "No rows selected to toggle", title="Toggle", severity="warning"
+            )
             return
 
         # Save current state to history
@@ -1186,11 +1327,7 @@ class DataFrameApp(App):
         self.selected_rows = [not match for match in self.selected_rows]
 
         # Check if we're highlighting or un-highlighting
-        new_selected_count = self.selected_rows.count(True)
-
-        if new_selected_count == 0:
-            self.notify("Selection cleared", title="Toggle")
-        else:
+        if new_selected_count := self.selected_rows.count(True):
             self.notify(
                 f"Toggled selection - now showing [on $primary]{new_selected_count}[/] rows",
                 title="Toggle",
@@ -1204,7 +1341,7 @@ class DataFrameApp(App):
         # Check if any rows are currently selected
         selected_count = self.selected_rows.count(True)
         if selected_count == 0:
-            self.notify("No rows selected to clear", title="Clear")
+            self.notify("No rows selected to clear", title="Clear", severity="warning")
             return
 
         # Save current state to history
@@ -1221,6 +1358,9 @@ class DataFrameApp(App):
         """Display only the selected rows."""
         selected_count = self.selected_rows.count(True)
         if selected_count == 0:
+            self.notify(
+                "No rows selected to filter", title="Filter", severity="warning"
+            )
             return
 
         # Save current state to history
@@ -1233,8 +1373,11 @@ class DataFrameApp(App):
                 self.table.remove_row(str(row_idx + 1))
                 continue
 
-        # Update internal dataframe to only selected rows
-        self.df = self.df.filter(self.selected_rows)
+        # Update deleted rows list to maintain alignment
+        self.deleted_rows = [not selected for selected in self.selected_rows]
+
+        # Do not actually remove from the dataframe so it can be restored via undo
+        # self.df = self.df.filter(self.selected_rows)
 
         self.notify(
             f"Removed unselected rows. Now showing [on $primary]{selected_count}[/] rows",
@@ -1256,6 +1399,8 @@ class DataFrameApp(App):
             sorted_columns=self.sorted_columns.copy(),
             selected_rows=self.selected_rows.copy(),
             deleted_rows=self.deleted_rows.copy(),
+            fixed_rows=self.fixed_rows,
+            fixed_columns=self.fixed_columns,
         )
         self.histories.append(history)
 
@@ -1277,6 +1422,8 @@ class DataFrameApp(App):
         self.sorted_columns = history.sorted_columns.copy()
         self.selected_rows = history.selected_rows.copy()
         self.deleted_rows = history.deleted_rows.copy()
+        self.fixed_rows = history.fixed_rows
+        self.fixed_columns = history.fixed_columns
 
         # Recreate the table for display
         self._setup_table()
