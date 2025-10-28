@@ -8,6 +8,8 @@ import polars as pl
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
+from textual.coordinate import Coordinate
+from textual.reactive import Reactive
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, Static
 
@@ -15,7 +17,7 @@ STYLES = {
     "Int64": {"style": "cyan", "justify": "right"},
     "Float64": {"style": "magenta", "justify": "right"},
     "String": {"style": "green", "justify": "left"},
-    "Boolean": {"style": "yellow", "justify": "center"},
+    "Boolean": {"style": "blue", "justify": "center"},
     "Date": {"style": "blue", "justify": "center"},
     "Datetime": {"style": "blue", "justify": "center"},
 }
@@ -600,6 +602,9 @@ class DataFrameApp(App):
         ("c", "copy_cell", "Copy Cell"),
     ]
 
+    # Reactive cursor coordinate to highlight row label and column header
+    cursor_coordinate: Reactive[Coordinate] = Reactive(None)
+
     def __init__(self, df: pl.DataFrame, filename: str = ""):
         super().__init__()
         self.dataframe = df  # Original dataframe
@@ -711,6 +716,27 @@ class DataFrameApp(App):
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
         self._check_and_load_more()
+
+    def on_data_table_cell_highlighted(self, event: DataTable.CellHighlighted) -> None:
+        """Handle cell highlight changes."""
+        self.cursor_coordinate = event.coordinate
+
+    def watch_cursor_coordinate(self, old: Coordinate, new: Coordinate) -> None:
+        """Update highlighted cell styles."""
+        # Reset old cell style
+        if old is not None:
+            old_row_key, old_col_key = self.table.coordinate_to_cell_key(old)
+            self.table.rows[old_row_key].label.style = ""
+            self.table.columns[old_col_key].label.style = ""
+
+        # Set new cell style
+        new_row_key, new_col_key = self.table.coordinate_to_cell_key(new)
+        self.table.rows[new_row_key].label.style = "yellow"
+        self.table.columns[new_col_key].label.style = "yellow"
+
+        # Force table refresh to show updated styles
+        self.table._update_count += 1
+        self.table.refresh()
 
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility using CSS property."""
