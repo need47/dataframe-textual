@@ -1,7 +1,6 @@
 import os
 import sys
 from collections import deque
-from copy import deepcopy
 from dataclasses import dataclass
 from io import StringIO
 
@@ -629,8 +628,8 @@ class DataFrameApp(App):
     def on_mount(self) -> None:
         """Set up the DataTable when app starts."""
         self._setup_table()
-        # Hide labels by default after initial load
-        self.call_later(lambda: setattr(self.table, "show_row_labels", False))
+        # # Hide labels by default after initial load
+        # self.call_later(lambda: setattr(self.table, "show_row_labels", False))
 
     def on_key(self, event) -> None:
         """Handle key events."""
@@ -690,12 +689,18 @@ class DataFrameApp(App):
         elif event.key == "backslash":  # '\' key
             # Search with current cell value and highlight matched rows
             self._search_with_cell_value()
-        elif event.key == "less_than_sign":  # '<' key
+        elif event.key == "shift+left":  # shift + left arrow
             # Move current column to the left
             self._move_column("left")
-        elif event.key == "greater_than_sign":  # '>' key
+        elif event.key == "shift+right":  # shift + right arrow
             # Move current column to the right
             self._move_column("right")
+        elif event.key == "shift+up":  # shift + up arrow
+            # Move current row up
+            self._move_row("up")
+        elif event.key == "shift+down":  # shift + down arrow
+            # Move current row down
+            self._move_row("down")
         elif event.key == "C":  # shift+c
             # Clear all selected rows
             self._clear_selected_rows()
@@ -957,8 +962,6 @@ class DataFrameApp(App):
         row_idx, col_idx = self.table.cursor_coordinate
         _, col_key = self.table.coordinate_to_cell_key(self.table.cursor_coordinate)
 
-        num_cols = len(self.table.columns)
-
         # Validate move is possible
         if direction == "left":
             if col_idx <= 0:
@@ -966,7 +969,7 @@ class DataFrameApp(App):
                 return
             swap_idx = col_idx - 1
         elif direction == "right":
-            if col_idx >= num_cols - 1:
+            if col_idx >= len(self.table.columns) - 1:
                 self.notify("Cannot move column right", title="Move")
                 return
             swap_idx = col_idx + 1
@@ -987,15 +990,16 @@ class DataFrameApp(App):
         self.table.check_idle()
         swap_key = self.df.columns[swap_idx]  # str as column key
 
-        new_column_locations = deepcopy(self.table._column_locations)
-        new_column_locations[col_key], new_column_locations[swap_key] = (
-            new_column_locations.get(swap_key),
-            new_column_locations.get(col_key),
+        (
+            self.table._column_locations[col_key],
+            self.table._column_locations[swap_key],
+        ) = (
+            self.table._column_locations.get(swap_key),
+            self.table._column_locations.get(col_key),
         )
-        self.table._column_locations = new_column_locations
 
         self.table._update_count += 1
-        self.table.refresh(layout=True)
+        self.table.refresh()
 
         # Restore cursor position on the moved column
         self.table.move_cursor(row=row_idx, column=swap_idx)
@@ -1007,7 +1011,58 @@ class DataFrameApp(App):
 
         self.notify(
             f"Moved column [on $primary]{col_name}[/] {direction}",
-            title="Column",
+            title="Move",
+        )
+
+    def _move_row(self, direction: str) -> None:
+        """Move the current row up or down.
+
+        Args:
+            direction: "up" to move up, "down" to move down.
+        """
+        row_idx, col_idx = self.table.cursor_coordinate
+
+        # Validate move is possible
+        if direction == "up":
+            if row_idx <= 0:
+                self.notify("Cannot move row up", title="Move")
+                return
+            swap_idx = row_idx - 1
+        elif direction == "down":
+            if row_idx >= len(self.table.rows) - 1:
+                self.notify("Cannot move row down", title="Move")
+                return
+            swap_idx = row_idx + 1
+        else:
+            self.notify(f"Invalid direction: {direction}", title="Move")
+            return
+
+        # Add to history
+        self._add_history(
+            f"Moved row [on $primary]{row_idx + 1}[/] {direction} (swapped with row [on $primary]{swap_idx + 1}[/])"
+        )
+
+        # Swap rows in the dataframe
+        row_key = str(row_idx + 1)  # Convert to 1-based key
+        swap_key = str(swap_idx + 1)  # Convert to 1-based key
+
+        self.table.check_idle()
+        (
+            self.table._row_locations[row_key],
+            self.table._row_locations[swap_key],
+        ) = (
+            self.table._row_locations.get(swap_key),
+            self.table._row_locations.get(row_key),
+        )
+
+        self.table._update_count += 1
+        self.table.refresh()
+
+        # Restore cursor position on the moved row
+        self.table.move_cursor(row=swap_idx, column=col_idx)
+
+        self.notify(
+            f"Moved row [on $primary]{row_idx + 1}[/] {direction}", title="Move"
         )
 
     # Sort
