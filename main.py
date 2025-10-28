@@ -663,8 +663,8 @@ class DataFrameApp(App):
         elif event.key == "r":
             # Restore original display
             self._setup_table(reset=True)
-            # Hide labels by default after initial load
-            self.call_later(lambda: setattr(self.table, "show_row_labels", False))
+            # # Hide labels by default after initial load
+            # self.call_later(lambda: setattr(self.table, "show_row_labels", False))
 
             self.notify("Restored original display", title="Reset")
         elif event.key == "ctrl+s":
@@ -722,19 +722,27 @@ class DataFrameApp(App):
         self.cursor_coordinate = event.coordinate
 
     def watch_cursor_coordinate(self, old: Coordinate, new: Coordinate) -> None:
-        """Update highlighted cell styles."""
-        # Reset old cell style
+        """Update the style of row label and column label for highlighted cell."""
+        # Reset old style
         if old is not None:
-            old_row_key, old_col_key = self.table.coordinate_to_cell_key(old)
+            old_row_idx, old_col_idx = old
+            # e.g., the last row/column might have been deleted
+            if old_row_idx >= len(self.table.rows):
+                old_row_idx = len(self.table.rows) - 1
+            if old_col_idx >= len(self.table.columns):
+                old_col_idx = len(self.table.columns) - 1
+            old_row_key, old_col_key = self.table.coordinate_to_cell_key(
+                Coordinate(old_row_idx, old_col_idx)
+            )
             self.table.rows[old_row_key].label.style = ""
             self.table.columns[old_col_key].label.style = ""
 
-        # Set new cell style
+        # Set new style
         new_row_key, new_col_key = self.table.coordinate_to_cell_key(new)
         self.table.rows[new_row_key].label.style = "yellow"
         self.table.columns[new_col_key].label.style = "yellow"
 
-        # Force table refresh to show updated styles
+        # Refresh table to show updated styles
         self.table._update_count += 1
         self.table.refresh()
 
@@ -789,8 +797,9 @@ class DataFrameApp(App):
 
     def _setup_columns(self) -> None:
         """Clear table and setup columns."""
-        self.table.clear(columns=True)
         self.loaded_rows = 0
+        self.table.clear(columns=True)
+        self.table.show_row_labels = True
 
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
@@ -917,6 +926,10 @@ class DataFrameApp(App):
         # Remove the column from the table display using the column name as key
         self.table.remove_column(col_to_remove)
 
+        # Move cursor left if we deleted the last column
+        if col_idx >= len(self.table.columns):
+            self.table.move_cursor(column=len(self.table.columns) - 1)
+
         # Remove from sorted columns if present
         if col_to_remove in self.sorted_columns:
             del self.sorted_columns[col_to_remove]
@@ -976,6 +989,10 @@ class DataFrameApp(App):
 
             # Remove from table
             self.table.remove_row(row_key)
+
+            # Move cursor up if we deleted the last row
+            if row_idx >= len(self.table.rows):
+                self.table.move_cursor(row=len(self.table.rows) - 1)
 
             self.notify(f"Row [on $primary]{row_key.value}[/] deleted", title="Delete")
 
