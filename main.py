@@ -590,6 +590,7 @@ class History:
     deleted_rows: list[bool]
     fixed_rows: int
     fixed_columns: int
+    cursor_coordinate: Coordinate
 
 
 class DataFrameApp(App):
@@ -794,6 +795,12 @@ class DataFrameApp(App):
 
         self.table.fixed_rows = self.fixed_rows
         self.table.fixed_columns = self.fixed_columns
+
+        # Restore cursor position
+        if self.cursor_coordinate is not None:
+            row_idx, col_idx = self.cursor_coordinate
+            if row_idx < len(self.table.rows) and col_idx < len(self.table.columns):
+                self.table.move_cursor(row=row_idx, column=col_idx)
 
     def _setup_columns(self) -> None:
         """Clear table and setup columns."""
@@ -1499,6 +1506,7 @@ class DataFrameApp(App):
             deleted_rows=self.deleted_rows.copy(),
             fixed_rows=self.fixed_rows,
             fixed_columns=self.fixed_columns,
+            cursor_coordinate=self.cursor_coordinate,
         )
         self.histories.append(history)
 
@@ -1522,6 +1530,7 @@ class DataFrameApp(App):
         self.deleted_rows = history.deleted_rows.copy()
         self.fixed_rows = history.fixed_rows
         self.fixed_columns = history.fixed_columns
+        self.cursor_coordinate = history.cursor_coordinate
 
         # Recreate the table for display
         self._setup_table()
