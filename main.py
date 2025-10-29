@@ -24,6 +24,20 @@ STYLES = {
     "Datetime": {"style": "blue", "justify": "center"},
 }
 
+# Subscript digits mapping for sort indicators
+SUBSCRIPT_DIGITS = {
+    0: "₀",
+    1: "₁",
+    2: "₂",
+    3: "₃",
+    4: "₄",
+    5: "₅",
+    6: "₆",
+    7: "₇",
+    8: "₈",
+    9: "₉",
+}
+
 CURSOR_TYPES = ["row", "column", "cell"]
 LABEL_STYLE = "on yellow"  # Style for highlighted row/column labels
 
@@ -603,6 +617,7 @@ class History:
 class MyDataTable(DataTable):
     """Custom DataTable to highlight row/column labels based on cursor position."""
 
+    # Help text for the DataTable which will be shown in the HelpPanel
     HELP = textwrap.dedent("""
         # DataFrame Viewer - Quick Help
 
@@ -952,7 +967,25 @@ class DataFrameApp(App):
 
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
-            self.table.add_column(Text(col, justify=DtypeStyle(dtype).justify), key=col)
+            for idx, c in enumerate(self.sorted_columns, 1):
+                if c == col:
+                    # Add sort indicator to column header
+                    descending = self.sorted_columns[col]
+                    sort_indicator = (
+                        f" ▼{SUBSCRIPT_DIGITS.get(idx, '')}"
+                        if descending
+                        else f" ▲{SUBSCRIPT_DIGITS.get(idx, '')}"
+                    )
+                    header_text = col + sort_indicator
+                    self.table.add_column(
+                        Text(header_text, justify=DtypeStyle(dtype).justify), key=col
+                    )
+
+                    break
+            else:  # No break occurred, so column is not sorted
+                self.table.add_column(
+                    Text(col, justify=DtypeStyle(dtype).justify), key=col
+                )
 
         self.table.cursor_type = "cell"
         self.table.focus()
@@ -1259,7 +1292,7 @@ class DataFrameApp(App):
 
     # Sort
     def _sort_by_column(self, descending: bool = False) -> None:
-        """Sort the dataframe by the currently selected column.
+        """Sort by the currently selected column.
 
         Supports multi-column sorting:
         - First press on a column: sort by that column only
@@ -1274,26 +1307,25 @@ class DataFrameApp(App):
 
         col_to_sort = self.df.columns[col_idx]
 
-        # Add to history
-        self._add_history(f"Sorted dataframe on column [on $primary]{col_to_sort}[/]")
-
         # Check if this column is already in the sort keys
         old_desc = self.sorted_columns.get(col_to_sort)
-        if old_desc is not None:
-            del self.sorted_columns[col_to_sort]
+        if old_desc == descending:
+            # Same direction - remove this column from sort
+            self.notify(
+                f"Already sorted by [on $primary]{col_to_sort}[/] ({'desc' if descending else 'asc'})",
+                title="Sort",
+                severity="warning",
+            )
+            return
 
-            if old_desc == descending:
-                # Same direction - remove this column from sort
-                self.notify(
-                    f"Already sorted. Removed [on $primary]{col_to_sort}[/] from the sorted list",
-                    title="Sort",
-                )
-                return
-            else:
-                # Toggle direction
-                self.sorted_columns[col_to_sort] = descending
-        else:
+        # Add to history
+        self._add_history(f"Sorted on column [on $primary]{col_to_sort}[/]")
+        if old_desc is None:
             # Add new column to sort
+            self.sorted_columns[col_to_sort] = descending
+        else:
+            # Toggle direction
+            del self.sorted_columns[col_to_sort]
             self.sorted_columns[col_to_sort] = descending
 
         # If no sort keys, reset to original order
@@ -1639,7 +1671,6 @@ class DataFrameApp(App):
         current_type = self.table.cursor_type
         next_type = CURSOR_TYPES[(CURSOR_TYPES.index(current_type) + 1) % 3]
         self.table.cursor_type = next_type
-        self.cursor_coordinate = self.table.cursor_coordinate  # Trigger watch
 
         self.notify(f"Cursor type: [on $primary]{next_type}[/]", title="Cursor")
 
