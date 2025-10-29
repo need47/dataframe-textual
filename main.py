@@ -38,6 +38,20 @@ SUBSCRIPT_DIGITS = {
     9: "₉",
 }
 
+# Boolean string mappings
+BOOLS = {
+    "true": True,
+    "t": True,
+    "yes": True,
+    "y": True,
+    "1": True,
+    "false": False,
+    "f": False,
+    "no": False,
+    "n": False,
+    "0": False,
+}
+
 CURSOR_TYPES = ["row", "column", "cell"]
 LABEL_STYLE = "on yellow"  # Style for highlighted row/column labels
 
@@ -412,7 +426,7 @@ class FrequencyScreen(ModalScreen):
             elif col_dtype == "Float64":
                 return float(col_value)
             elif col_dtype == "Boolean":
-                return eval(col_value)
+                return BOOLS[col_value]
             else:
                 return col_value
 
@@ -472,9 +486,9 @@ class EditCellScreen(YesNoScreen):
         # Parse and validate based on column dtype
         try:
             new_value = self._parse_value(new_value_str)
-        except ValueError as e:
-            self.dismiss(None)
-            self.notify(f"Invalid value: {str(e)}", title="Error", severity="error")
+        except Exception as e:
+            self.dismiss(None)  # Dismiss without changes
+            self.notify(f"Invalid value: {str(e)}", title="Edit", severity="error")
             return
 
         # Dismiss with the new value
@@ -493,14 +507,10 @@ class EditCellScreen(YesNoScreen):
         elif dtype == "String":
             return value
         elif dtype == "Boolean":
-            if value.lower() in ("true", "t", "yes", "y", "1"):
-                return True
-            elif value.lower() in ("false", "f", "no", "n", "0"):
-                return False
-            else:
-                raise ValueError(
-                    "Boolean must be 'true', 'false', 't', 'f', 'yes', 'no', 'y', 'n', '1', or '0'"
-                )
+            try:
+                return BOOLS[value.lower()]
+            except KeyError:
+                raise ValueError(f"Invalid boolean value: [on $primary]{value}[/]")
         elif dtype == "Date":
             # Try to parse ISO date format (YYYY-MM-DD)
             return pl.col(self.col_name).str.to_date().to_list()[0].__class__(value)
