@@ -107,6 +107,90 @@ def _rindex(lst: list, value) -> int:
     return -1
 
 
+def _parse_filter_expression(
+    expression: str, df: pl.DataFrame, current_col_idx: int
+) -> str:
+    """Parse and convert a filter expression to Polars syntax.
+
+    Supports:
+    - $_ - Current selected column
+    - $1, $2, etc. - Column by 1-based index
+    - $col_name - Column by name
+    - Comparison operators: ==, !=, <, >, <=, >=
+    - Logical operators: &&, ||
+    - String literals: 'text', "text"
+    - Numeric literals: integers and floats
+
+    Examples:
+    - "$_ > 50" -> "pl.col('current_col') > 50"
+    - "$1 > 50" -> "pl.col('col0') > 50"
+    - "$name == 'Alex'" -> "pl.col('name') == 'Alex'"
+    - "$1 > 3 && $name == 'Alex'" -> "(pl.col('col0') > 3) & (pl.col('name') == 'Alex')"
+    - "$age < $salary" -> "pl.col('age') < pl.col('salary')"
+
+    Args:
+        expression: The filter expression as a string.
+        df: The DataFrame to validate column references.
+        current_col_idx: The index of the currently selected column (0-based). Used for $_ reference.
+
+    Returns:
+        A Python expression string that can be eval'd with Polars symbols.
+
+    Raises:
+        ValueError: If the expression contains invalid column references.
+        SyntaxError: If the expression has invalid syntax.
+    """
+    import re
+
+    # Tokenize the expression
+    # Pattern matches: $_, $index, $identifier, strings, operators, numbers, etc.
+    token_pattern = r'\$_|\$\d+|\$\w+|\'[^\']*\'|"[^"]*"|&&|\|\||<=|>=|!=|==|[+\-*/%<>=()]|\d+\.?\d*|\w+|.'
+
+    tokens = re.findall(token_pattern, expression)
+
+    if not tokens:
+        raise ValueError("Expression is empty")
+
+    # Convert tokens to Polars expression syntax
+    converted_tokens = []
+    for token in tokens:
+        if token.startswith("$"):
+            # Column reference
+            col_ref = token[1:]
+
+            # Special case: $_ refers to the current selected column
+            if col_ref == "_":
+                col_name = df.columns[current_col_idx]
+            # Check if it's a numeric index
+            elif col_ref.isdigit():
+                col_idx = int(col_ref) - 1  # Convert to 0-based index
+                if col_idx < 0 or col_idx >= len(df.columns):
+                    raise ValueError(f"Column index out of range: ${col_ref}")
+                col_name = df.columns[col_idx]
+            else:
+                # It's a column name
+                if col_ref not in df.columns:
+                    raise ValueError(f"Column not found: ${col_ref}")
+                col_name = col_ref
+
+            converted_tokens.append(f"pl.col('{col_name}')")
+
+        elif token in ("&&", "||"):
+            # Convert logical operators and wrap surrounding expressions in parentheses
+            if token == "&&":
+                converted_tokens.append(") & (")
+            else:
+                converted_tokens.append(") | (")
+
+        else:
+            # Keep as-is (operators, numbers, strings, parentheses)
+            converted_tokens.append(token)
+
+    # Join tokens with space to ensure proper separation
+    result = "(" + " ".join(converted_tokens) + ")"
+    return result
+
+
 class YesNoScreen(ModalScreen):
     """Reusable modal screen with Yes/No buttons and customizable label and input.
 
@@ -547,6 +631,56 @@ class SearchScreen(YesNoScreen):
         self.dismiss(search_term)
 
 
+class FilterScreen(YesNoScreen):
+    """Modal screen to filter rows by column expression."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "FilterScreen")
+
+    def __init__(
+        self,
+        df: pl.DataFrame,
+        current_col_idx: int | None = None,
+        current_cell_value: str | None = None,
+    ):
+        self.df = df
+        self.current_col_idx = current_col_idx
+        super().__init__(
+            title="Filter by Expression",
+            label="Enter filter expression, e.g., $1 > 50, $name == 'text', $_ > 100, $a < $b",
+            input=f"$_ == {current_cell_value}",
+            on_yes_callback=self._validate_filter,
+        )
+
+    def _validate_filter(self) -> pl.Expr | None:
+        """Validate and return the filter expression."""
+        expression = self.input.value.strip()
+
+        try:
+            # Try to parse the expression to ensure it's valid
+            expr_str = _parse_filter_expression(
+                expression, self.df, self.current_col_idx
+            )
+
+            try:
+                # Test the expression by evaluating it
+                expr = eval(expr_str, {"pl": pl})
+
+                # Dismiss with the expression
+                self.dismiss((expr, expr_str))
+            except Exception as e:
+                self.notify(
+                    f"Error evaluating expression: {str(e)}",
+                    title="Filter",
+                    severity="error",
+                )
+                self.dismiss(None)
+        except ValueError as ve:
+            self.notify(
+                f"Invalid expression: {str(ve)}", title="Filter", severity="error"
+            )
+            self.dismiss(None)
+
+
 class PinScreen(YesNoScreen):
     """Modal screen to pin rows and columns.
 
@@ -618,7 +752,6 @@ class History:
     loaded_rows: int
     sorted_columns: dict[str, bool]
     selected_rows: list[bool]
-    deleted_rows: list[bool]
     fixed_rows: int
     fixed_columns: int
     cursor_coordinate: Coordinate
@@ -653,6 +786,7 @@ class MyDataTable(DataTable):
         - **t** - Toggle highlight
         - **"** - Filter to selected
         - **T** - Clear selection
+        - **f** - Filter by expression ($1, $name, $_, etc.)
 
         ## Sort & Reorder
         - **[** - Sort ascending
@@ -788,7 +922,6 @@ class DataFrameApp(App):
         self.loaded_rows = 0  # Track how many rows are currently loaded
         self.sorted_columns = {}  # Track sort keys as dict of col_name -> descending
         self.selected_rows = [False] * len(df)  # Track selected rows (0-based)
-        self.deleted_rows = [False] * len(df)  # Track deleted row indices (0-based)
         self.fixed_rows = 0  # Number of fixed rows
         self.fixed_columns = 0  # Number of fixed columns
 
@@ -842,6 +975,9 @@ class DataFrameApp(App):
         elif event.key == "F":  # shift+f
             # Open frequency modal for current column
             self._show_frequency()
+        elif event.key == "f":
+            # Open filter screen for current column
+            self._open_filter_screen()
         elif event.key == "e":
             # Open edit modal for current cell
             self._edit_cell()
@@ -901,13 +1037,9 @@ class DataFrameApp(App):
         """Toggle the HelpPanel on/off."""
         if self.help_panel:
             # Toggle display
-            self.log(
-                f"======= HelpPanel toggled (display: {self.help_panel.display} -> {not self.help_panel.display}) ========"
-            )
             self.help_panel.display = not self.help_panel.display
         else:
             # Add HelpPanel
-            self.log("======= HelpPanel created =======")
             self.help_panel = HelpPanel()
             self.mount(self.help_panel, after=self.table)
 
@@ -952,7 +1084,6 @@ class DataFrameApp(App):
             self.loaded_rows = 0
             self.sorted_columns = {}
             self.selected_rows = [False] * len(self.df)
-            self.deleted_rows = [False] * len(self.df)
             self.fixed_rows = 0
             self.fixed_columns = 0
 
@@ -1029,9 +1160,6 @@ class DataFrameApp(App):
         df_slice = self.df.slice(start, stop - start)
 
         for row_idx, row in enumerate(df_slice.rows(), start):
-            if self.deleted_rows[row_idx]:
-                continue  # Skip deleted rows
-
             vals, dtypes = [], []
             for val, dtype in zip(row, self.df.dtypes):
                 vals.append(val)
@@ -1138,55 +1266,37 @@ class DataFrameApp(App):
         """Delete rows from the table and dataframe.
 
         Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.
-
-        Do not remove rows from the dataframe to allow for undo functionality (especially for row labels).
         """
+        prev_count = len(self.df)
+        filter_expr = [True] * len(self.df)
+
         # Delete all selected rows
         if selected_count := self.selected_rows.count(True):
-            # Add to history
-            self._add_history(f"Deleted {selected_count} selected row(s)")
+            history_desc = f"Deleted {selected_count} selected row(s)"
 
             for row_idx, is_selected in enumerate(self.selected_rows):
-                if not is_selected:
-                    continue
-
-                # Add to deleted rows list
-                self.deleted_rows[row_idx] = True
-
-                # Update selected_rows list to maintain alignment
-                self.selected_rows[row_idx] = False
-
-                # Remove from table
-                row_key = str(row_idx + 1)  # Convert to 1-based key
-                self.table.remove_row(row_key)
-
-            self.notify(f"Deleted {selected_count} selected row(s)", title="Delete")
+                if is_selected:
+                    filter_expr[row_idx] = False
         # Delete the row at the cursor
         else:
             row_key = self.table.cursor_row_key
             row_idx = int(row_key.value) - 1  # Convert to 0-based index
 
-            if row_idx >= len(self.df):
-                self.notify("Cannot delete row: invalid row index", title="Error")
-                return
+            filter_expr[row_idx] = False
+            history_desc = f"Deleted row [on $primary]{row_key.value}[/]"
 
-            # Add to history
-            self._add_history(f"Deleted row [on $primary]{row_key.value}[/]")
+        # Add to history
+        self._add_history(history_desc)
 
-            # Add to deleted rows list
-            self.deleted_rows[row_idx] = True
+        # Update dataframe to filter out deleted rows
+        self.df = self.df.filter(filter_expr)
+        self.selected_rows = [False] * len(self.df)  # Clear selection
 
-            # Update selected_rows list to maintain alignment
-            self.selected_rows[row_idx] = False
+        # Recreate the table display
+        self._setup_table()
 
-            # Remove from table
-            self.table.remove_row(row_key)
-
-            # Move cursor up if we deleted the last row
-            if row_idx >= len(self.table.rows):
-                self.table.move_cursor(row=len(self.table.rows) - 1)
-
-            self.notify(f"Row [on $primary]{row_key.value}[/] deleted", title="Delete")
+        deleted_count = prev_count - len(self.df)
+        self.notify(f"Deleted {deleted_count} row(s)", title="Delete")
 
     def _move_column(self, direction: str) -> None:
         """Move the current column left or right.
@@ -1338,16 +1448,10 @@ class DataFrameApp(App):
             del self.sorted_columns[col_to_sort]
             self.sorted_columns[col_to_sort] = descending
 
-        # If no sort keys, reset to original order
-        if not self.sorted_columns:
-            self.df = self.dataframe
-        else:
-            # Apply multi-column sort
-            sort_cols = list(self.sorted_columns.keys())
-            descending_flags = list(self.sorted_columns.values())
-            self.df = self.dataframe.sort(
-                sort_cols, descending=descending_flags, nulls_last=True
-            )
+        # Apply multi-column sort
+        sort_cols = list(self.sorted_columns.keys())
+        descending_flags = list(self.sorted_columns.values())
+        self.df = self.df.sort(sort_cols, descending=descending_flags, nulls_last=True)
 
         # Recreate the table for display
         self._setup_table()
@@ -1400,11 +1504,7 @@ class DataFrameApp(App):
         else:
             separator = ","
         try:
-            if True in self.deleted_rows:
-                rows_to_keep = [not deleted for deleted in self.deleted_rows]
-                self.df = self.df.filter(rows_to_keep)
             self.df.write_csv(filename, separator=separator)
-
             self.dataframe = self.df  # Update original dataframe
             self.filename = filename  # Update current filename
             self.notify(f"Saved to [on $primary]{filename}[/]", title="Save")
@@ -1657,21 +1757,67 @@ class DataFrameApp(App):
         # Save current state to history
         self._add_history("Filtered to selected rows")
 
-        # Update all rows based on selected state
-        for row_idx in range(self.loaded_rows):
-            is_selected = self.selected_rows[row_idx]
-            if not is_selected:
-                self.table.remove_row(str(row_idx + 1))
-                continue
+        # Update dataframe to only include selected rows
+        self.df = self.df.filter(self.selected_rows)
+        self.selected_rows = [True] * len(self.df)
 
-        # Update deleted rows list to maintain alignment
-        self.deleted_rows = [not selected for selected in self.selected_rows]
-
-        # Do not actually remove from the dataframe so it can be restored via undo
-        # self.df = self.df.filter(self.selected_rows)
+        # Recreate the table for display
+        self._setup_table()
 
         self.notify(
             f"Removed unselected rows. Now showing [on $primary]{selected_count}[/] rows",
+            title="Filter",
+        )
+
+    def _open_filter_screen(self) -> None:
+        """Open the filter screen to enter a filter expression."""
+        row_idx, col_idx = self.table.cursor_coordinate
+
+        cell_value = self.df.item(row_idx, col_idx)
+        if self.df.dtypes[col_idx] == pl.String and cell_value is not None:
+            cell_value = repr(cell_value)
+
+        self.push_screen(
+            FilterScreen(
+                self.df, current_col_idx=col_idx, current_cell_value=cell_value
+            ),
+            callback=self._on_filter_screen,
+        )
+
+    def _on_filter_screen(self, result) -> None:
+        """Handle result from FilterScreen.
+
+        Args:
+            expression: The filter expression or None if cancelled.
+        """
+        if result is None:
+            return
+
+        expr, expr_str = result
+
+        # Apply the filter expression
+        df_filtered = self.df.filter(expr)
+        matched_count = len(df_filtered)
+        if not matched_count:
+            self.notify(
+                f"No rows match the expression: [on $primary]{expr_str}[/]",
+                title="Filter",
+                severity="warning",
+            )
+            return
+
+        # Add to history
+        self._add_history(f"Filtered by expression [on $primary]{expr_str}[/]")
+
+        # Update the dataframe to only include matching rows
+        self.df = df_filtered
+        self.selected_rows = [False] * len(self.df)
+
+        # Recreate the table for display
+        self._setup_table()
+
+        self.notify(
+            f"Filtered to [on $primary]{matched_count}[/] matching rows",
             title="Filter",
         )
 
@@ -1698,14 +1844,11 @@ class DataFrameApp(App):
             loaded_rows=self.loaded_rows,
             sorted_columns=self.sorted_columns.copy(),
             selected_rows=self.selected_rows.copy(),
-            deleted_rows=self.deleted_rows.copy(),
             fixed_rows=self.fixed_rows,
             fixed_columns=self.fixed_columns,
             cursor_coordinate=self.table.cursor_coordinate,
         )
         self.histories.append(history)
-
-        # self.log(self.histories[-1], description)
 
     def _undo(self) -> None:
         """Undo the last action."""
@@ -1714,7 +1857,6 @@ class DataFrameApp(App):
             return
 
         history = self.histories.pop()
-        self.log(history, f"Restoring history: {history.description}")
 
         # Restore state
         self.df = history.df
@@ -1722,7 +1864,6 @@ class DataFrameApp(App):
         self.loaded_rows = history.loaded_rows
         self.sorted_columns = history.sorted_columns.copy()
         self.selected_rows = history.selected_rows.copy()
-        self.deleted_rows = history.deleted_rows.copy()
         self.fixed_rows = history.fixed_rows
         self.fixed_columns = history.fixed_columns
         self.cursor_coordinate = history.cursor_coordinate

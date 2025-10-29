@@ -91,6 +91,7 @@ python main.py < data.csv
 | `t` | Toggle highlighting of selected rows |
 | `T` (Shift+T) | Clear all selected rows |
 | `"` (quote) | Filter to show only selected rows |
+| `f` | Filter by expression (powerful syntax for complex filters) |
 
 ### Sorting
 
@@ -152,7 +153,30 @@ Press `Enter` on any row to open a modal showing all column values for that row.
 - Other rows are hidden but preserved
 - Use undo (`u`) to restore
 
-### 4. Sorting
+### 4. Filter by Expression
+
+Press `f` to open a powerful filter expression dialog. This allows you to write complex filter conditions using a special syntax:
+
+**Column References:**
+- `$_` - Current column (based on cursor position)
+- `$1`, `$2`, etc. - Column by 1-based index
+- `$age`, `$salary` - Column by name
+
+**Operators:**
+- Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
+- Logical: `&&` (AND), `||` (OR)
+- Arithmetic: `+`, `-`, `*`, `/`, `%`
+
+**Examples:**
+- `$_ > 50` - Current column greater than 50
+- `$salary >= 100000` - Salary at least 100,000
+- `$age < 30 && $status == 'active'` - Age less than 30 AND status is active
+- `$name == 'Alice' || $name == 'Bob'` - Name is Alice or Bob
+- `$salary / 1000 >= 50` - Salary divided by 1,000 is at least 50
+
+See [FILTER_EXPRESSION_GUIDE.md](FILTER_EXPRESSION_GUIDE.md) for comprehensive syntax documentation.
+
+### 5. Sorting
 
 - Press `[` to sort current column ascending
 - Press `]` to sort current column descending
@@ -160,14 +184,14 @@ Press `Enter` on any row to open a modal showing all column values for that row.
 - Press same key twice to toggle direction
 - Frequency view (`F`) shows value distribution with optional sorting
 
-### 5. Frequency Distribution
+### 6. Frequency Distribution
 
 Press `F` to see how many times each value appears in the current column. The modal shows:
 - Value
 - Count
 - Percentage of total
 
-### 6. Data Editing
+### 7. Data Editing
 
 **Edit Cell** (`e`):
 - Opens modal for editing current cell
@@ -184,7 +208,7 @@ Press `F` to see how many times each value appears in the current column. The mo
 - Removes the entire column from view and dataframe
 - Cannot be undone directly (use undo feature)
 
-### 7. Column & Row Reordering
+### 8. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
 - Swaps adjacent columns
@@ -194,14 +218,14 @@ Press `F` to see how many times each value appears in the current column. The mo
 - Swaps adjacent rows
 - Visual reordering without affecting data
 
-### 8. Pin Rows and Columns
+### 9. Pin Rows and Columns
 
 Press `p` to open the pin dialog:
 - Enter number of fixed rows: keeps top rows visible while scrolling
 - Enter two numbers: `<rows> <columns>` (space-separated)
 - Example: `2 3` pins top 2 rows and left 3 columns
 
-### 9. Save to CSV
+### 10. Save to CSV
 
 Press `Ctrl+S` to save:
 - Save filtered, edited, or sorted data back to CSV
@@ -209,14 +233,14 @@ Press `Ctrl+S` to save:
 - Confirm if file already exists
 - Automatic .tsv or .csv detection
 
-### 10. Undo/Redo
+### 11. Undo/Redo
 
 Press `u` to undo:
 - Reverts last action with full state restoration
 - Works for edits, deletions, sorts, searches, etc.
 - Shows description of reverted action
 
-### 11. Cursor Type Cycling
+### 12. Cursor Type Cycling
 
 Press `C` to cycle through selection modes:
 1. **Cell mode**: Highlight individual cell (and its row/column headers)
@@ -225,7 +249,7 @@ Press `C` to cycle through selection modes:
 
 Visual feedback shows which mode is active.
 
-### 12. Clipboard Operations
+### 13. Clipboard Operations
 
 Press `c` to copy:
 - Copies current cell value to system clipboard
