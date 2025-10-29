@@ -12,6 +12,7 @@ from textual.coordinate import Coordinate
 from textual.reactive import Reactive
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, Static
+from textual.widgets._data_table import CursorType
 
 STYLES = {
     "Int64": {"style": "cyan", "justify": "right"},
@@ -21,6 +22,9 @@ STYLES = {
     "Date": {"style": "blue", "justify": "center"},
     "Datetime": {"style": "blue", "justify": "center"},
 }
+
+CURSOR_TYPES = ["row", "column", "cell"]
+LABEL_STYLE = "on yellow"  # Style for highlighted row/column labels
 
 
 @dataclass
@@ -593,6 +597,82 @@ class History:
     cursor_coordinate: Coordinate
 
 
+class MyDataTable(DataTable):
+    """Custom DataTable to highlight row/column labels based on cursor position."""
+
+    def _should_highlight(
+        self,
+        cursor: Coordinate,
+        target_cell: Coordinate,
+        type_of_cursor: CursorType,
+    ) -> bool:
+        """Determine if the given cell should be highlighted because of the cursor.
+
+        In "cell" mode, also highlights the row and column headers. In "row" and "column"
+        modes, highlights the entire row or column respectively.
+
+        Args:
+            cursor: The current position of the cursor.
+            target_cell: The cell we're checking for the need to highlight.
+            type_of_cursor: The type of cursor that is currently active.
+
+        Returns:
+            Whether or not the given cell should be highlighted.
+        """
+        if type_of_cursor == "cell":
+            # Return true if the cursor is over the target cell
+            # This includes the case where the cursor is in the same row or column
+            return (
+                cursor == target_cell
+                or (target_cell.row == -1 and target_cell.column == cursor.column)
+                or (target_cell.column == -1 and target_cell.row == cursor.row)
+            )
+        elif type_of_cursor == "row":
+            cursor_row, _ = cursor
+            cell_row, _ = target_cell
+            return cursor_row == cell_row
+        elif type_of_cursor == "column":
+            _, cursor_column = cursor
+            _, cell_column = target_cell
+            return cursor_column == cell_column
+        else:
+            return False
+
+    def watch_cursor_coordinate(
+        self, old_coordinate: Coordinate, new_coordinate: Coordinate
+    ) -> None:
+        """Refresh highlighting when cursor coordinate changes.
+
+        This explicitly refreshes cells that need to change their highlight state
+        to fix the delay issue with column label highlighting.
+        """
+        if old_coordinate != new_coordinate:
+            # For cell cursor type, refresh old and new row/column headers
+            if self.cursor_type == "cell":
+                old_row, old_col = old_coordinate
+                new_row, new_col = new_coordinate
+
+                # Refresh entire column (not just header) to ensure proper highlighting
+                self.refresh_column(old_col)
+                self.refresh_column(new_col)
+
+                # Refresh entire row (not just header) to ensure proper highlighting
+                self.refresh_row(old_row)
+                self.refresh_row(new_row)
+            elif self.cursor_type == "row":
+                self.refresh_row(old_coordinate.row)
+                self.refresh_row(new_coordinate.row)
+            elif self.cursor_type == "column":
+                self.refresh_column(old_coordinate.column)
+                self.refresh_column(new_coordinate.column)
+
+            # Handle scrolling if needed
+            if self._require_update_dimensions:
+                self.call_after_refresh(self._scroll_cursor_into_view)
+            else:
+                self._scroll_cursor_into_view()
+
+
 class DataFrameApp(App):
     """A Textual app to interact with a Polars DataFrame."""
 
@@ -604,7 +684,7 @@ class DataFrameApp(App):
     ]
 
     # Reactive cursor coordinate to highlight row label and column header
-    cursor_coordinate: Reactive[Coordinate] = Reactive(None)
+    cursor_coordinate: Reactive[Coordinate] = Reactive(None, always_update=True)
 
     def __init__(self, df: pl.DataFrame, filename: str = ""):
         super().__init__()
@@ -628,7 +708,7 @@ class DataFrameApp(App):
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
-        self.table = DataTable(zebra_stripes=True)
+        self.table = MyDataTable(zebra_stripes=True)
         yield self.table
 
     def on_mount(self) -> None:
@@ -707,9 +787,12 @@ class DataFrameApp(App):
         elif event.key == "shift+down":  # shift + down arrow
             # Move current row down
             self._move_row("down")
-        elif event.key == "C":  # shift+c
+        elif event.key == "T":  # shift+t
             # Clear all selected rows
             self._clear_selected_rows()
+        elif event.key == "C":  # shift+c
+            # Cycle through cursor types
+            self._cycle_cursor_type()
         elif event.key == "p":
             # Open pin screen to set fixed rows and columns
             self._open_pin_screen()
@@ -717,35 +800,6 @@ class DataFrameApp(App):
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
         self._check_and_load_more()
-
-    def on_data_table_cell_highlighted(self, event: DataTable.CellHighlighted) -> None:
-        """Handle cell highlight changes."""
-        self.cursor_coordinate = event.coordinate
-
-    def watch_cursor_coordinate(self, old: Coordinate, new: Coordinate) -> None:
-        """Update the style of row label and column label for highlighted cell."""
-        # Reset old style
-        if old is not None:
-            old_row_idx, old_col_idx = old
-            # e.g., the last row/column might have been deleted
-            if old_row_idx >= len(self.table.rows):
-                old_row_idx = len(self.table.rows) - 1
-            if old_col_idx >= len(self.table.columns):
-                old_col_idx = len(self.table.columns) - 1
-            old_row_key, old_col_key = self.table.coordinate_to_cell_key(
-                Coordinate(old_row_idx, old_col_idx)
-            )
-            self.table.rows[old_row_key].label.style = ""
-            self.table.columns[old_col_key].label.style = ""
-
-        # Set new style
-        new_row_key, new_col_key = self.table.coordinate_to_cell_key(new)
-        self.table.rows[new_row_key].label.style = "yellow"
-        self.table.columns[new_col_key].label.style = "yellow"
-
-        # Refresh table to show updated styles
-        self.table._update_count += 1
-        self.table.refresh()
 
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility using CSS property."""
@@ -1488,6 +1542,16 @@ class DataFrameApp(App):
             f"Removed unselected rows. Now showing [on $primary]{selected_count}[/] rows",
             title="Filter",
         )
+
+    # Misc
+    def _cycle_cursor_type(self) -> None:
+        """Cycle through cursor types: cell -> row -> column -> cell."""
+        current_type = self.table.cursor_type
+        next_type = CURSOR_TYPES[(CURSOR_TYPES.index(current_type) + 1) % 3]
+        self.table.cursor_type = next_type
+        self.cursor_coordinate = self.table.cursor_coordinate  # Trigger watch
+
+        self.notify(f"Cursor type: [on $primary]{next_type}[/]", title="Cursor")
 
     # History & Undo
     def _add_history(self, description: Text | str) -> None:
