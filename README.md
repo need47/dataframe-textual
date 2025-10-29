@@ -99,7 +99,6 @@ python main.py < data.csv
 | `[` | Sort current column ascending |
 | `]` | Sort current column descending |
 | `F` (Shift+F) | Show frequency distribution for column |
-| `r` | Reset to original order and clear edits |
 
 ### Reordering
 
@@ -118,6 +117,7 @@ python main.py < data.csv
 | `c` | Copy current cell to clipboard |
 | `Ctrl+S` | Save dataframe to CSV file |
 | `u` | Undo last action |
+| `U` | Reset or reload entire table |
 | `q` | Quit viewer |
 
 ## Features in Detail

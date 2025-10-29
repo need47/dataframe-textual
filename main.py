@@ -1,5 +1,6 @@
 import os
 import sys
+import textwrap
 from collections import deque
 from dataclasses import dataclass
 from io import StringIO
@@ -11,7 +12,7 @@ from textual.containers import Horizontal
 from textual.coordinate import Coordinate
 from textual.reactive import Reactive
 from textual.screen import ModalScreen
-from textual.widgets import Button, DataTable, Input, Label, Static
+from textual.widgets import Button, DataTable, HelpPanel, Input, Label, Markdown, Static
 from textual.widgets._data_table import CursorType
 
 STYLES = {
@@ -87,7 +88,7 @@ class YesNoScreen(ModalScreen):
     - Optional callback function for Yes action
     """
 
-    CSS = """
+    DEFAULT_CSS = """
     YesNoScreen {
         align: center middle;
     }
@@ -192,7 +193,7 @@ class YesNoScreen(ModalScreen):
 class SaveFileScreen(YesNoScreen):
     """Modal screen to save the dataframe to a CSV file."""
 
-    CSS = YesNoScreen.CSS.replace("YesNoScreen", "SaveFileScreen")
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SaveFileScreen")
 
     def __init__(self, filename: str):
         super().__init__(
@@ -215,7 +216,7 @@ class SaveFileScreen(YesNoScreen):
 class OverwriteFileScreen(YesNoScreen):
     """Modal screen to confirm file overwrite."""
 
-    CSS = YesNoScreen.CSS.replace("YesNoScreen", "OverwriteFileScreen")
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "OverwriteFileScreen")
 
     def __init__(self):
         super().__init__(
@@ -414,7 +415,7 @@ class FrequencyScreen(ModalScreen):
 class EditCellScreen(YesNoScreen):
     """Modal screen to edit a single cell value."""
 
-    CSS = YesNoScreen.CSS.replace("YesNoScreen", "EditCellScreen")
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "EditCellScreen")
 
     def __init__(self, row_idx: int, col_idx: int, df: pl.DataFrame):
         self.row_idx = row_idx
@@ -498,7 +499,7 @@ class EditCellScreen(YesNoScreen):
 class SearchScreen(YesNoScreen):
     """Modal screen to search for values in a column."""
 
-    CSS = YesNoScreen.CSS.replace("YesNoScreen", "SearchScreen")
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen")
 
     def __init__(self, col_name: str, default_value: str = ""):
         super().__init__(
@@ -526,7 +527,7 @@ class PinScreen(YesNoScreen):
     Accepts one value for fixed rows, or two space-separated values for fixed rows and columns.
     """
 
-    CSS = YesNoScreen.CSS.replace("YesNoScreen", "PinScreen")
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "PinScreen")
 
     def __init__(self):
         super().__init__(
@@ -599,6 +600,46 @@ class History:
 
 class MyDataTable(DataTable):
     """Custom DataTable to highlight row/column labels based on cursor position."""
+
+    HELP = textwrap.dedent("""
+        # DataFrame Viewer - Quick Help
+
+        ## Navigation
+        - **g** - First row
+        - **G** - Last row
+        - **PgUp/Dn** - Scroll
+
+        ## View & Cursor
+        - **Enter** - Row details
+        - **C** - Cycle cursor type (cell/row/col)
+        - **#** - Toggle labels
+        - **k** - Toggle dark mode
+
+        ## Editing
+        - **e** - Edit cell
+        - **d** - Delete row
+        - **-** - Delete column
+
+        ## Search & Filter
+        - **|** - Search column
+        - **\\** - Search cell value
+        - **t** - Toggle highlight
+        - **"** - Filter to selected
+        - **T** - Clear selection
+
+        ## Sort & Reorder
+        - **[** - Sort ascending
+        - **]** - Sort descending
+        - **F** - Frequency table of column
+        - **Shift+↑↓←→** - Move row/column
+
+        ## Data Management
+        - **p** - Pin rows/cols
+        - **c** - Copy cell
+        - **Ctrl+S** - Save
+        - **u** - Undo
+        - **U** - Reset all
+    """).strip()
 
     def _should_highlight(
         self,
@@ -678,10 +719,21 @@ class DataFrameApp(App):
 
     BINDINGS = [
         ("q", "quit", "Quit"),
+        ("h,?", "toggle_help_panel", "Help"),
         ("k", "toggle_dark", "Toggle Dark Mode"),
         ("number_sign", "toggle_row_labels", "Toggle Row Labels"),
         ("c", "copy_cell", "Copy Cell"),
     ]
+
+    CSS = """
+        /* Make it scrollable */
+        Markdown {
+            height: 1fr;          /* Fill available vertical space */
+            width: 1fr;           /* Fill available horizontal space */
+            overflow-y: auto;     /* Enable vertical scrolling */
+            overflow-x: auto;     /* (optional) Enable horizontal scrolling */
+        }
+    """
 
     # Reactive cursor coordinate to highlight row label and column header
     cursor_coordinate: Reactive[Coordinate] = Reactive(None, always_update=True)
@@ -710,6 +762,7 @@ class DataFrameApp(App):
         """Create child widgets for the app."""
         self.table = MyDataTable(zebra_stripes=True)
         yield self.table
+        self.help_panel = None
 
     def on_mount(self) -> None:
         """Set up the DataTable when app starts."""
@@ -741,13 +794,6 @@ class DataFrameApp(App):
         elif event.key == "right_square_bracket":  # ']'
             # Sort by current column in descending order
             self._sort_by_column(descending=True)
-        elif event.key == "r":
-            # Restore original display
-            self._setup_table(reset=True)
-            # # Hide labels by default after initial load
-            # self.call_later(lambda: setattr(self.table, "show_row_labels", False))
-
-            self.notify("Restored original display", title="Reset")
         elif event.key == "ctrl+s":
             # Save dataframe to CSV
             self._save_to_file()
@@ -772,6 +818,10 @@ class DataFrameApp(App):
         elif event.key == "u":
             # Undo last action
             self._undo()
+        elif event.key == "U":
+            # Undo all changes and restore original dataframe
+            self._setup_table(reset=True)
+            self.notify("Restored original display", title="Reset")
         elif event.key == "backslash":  # '\' key
             # Search with current cell value and highlight matched rows
             self._search_with_cell_value()
@@ -804,6 +854,27 @@ class DataFrameApp(App):
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility using CSS property."""
         self.table.show_row_labels = not self.table.show_row_labels
+
+    def action_toggle_help_panel(self) -> None:
+        """Toggle the HelpPanel on/off."""
+        if self.help_panel:
+            # Toggle display
+            self.log(
+                f"======= HelpPanel toggled (display: {self.help_panel.display} -> {not self.help_panel.display}) ========"
+            )
+            self.help_panel.display = not self.help_panel.display
+        else:
+            # Add HelpPanel
+            self.log("======= HelpPanel created =======")
+            self.help_panel = HelpPanel()
+            self.mount(self.help_panel, after=self.table)
+
+            # Schedule the update for the next iteration of the event loop
+            def update_markdown():
+                markdown = self.query_one(Markdown)
+                markdown.update(self.table.HELP)
+
+            self.call_later(update_markdown)
 
     def action_copy_cell(self) -> None:
         """Copy the current cell to clipboard."""
