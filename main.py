@@ -422,10 +422,13 @@ class EditCellScreen(YesNoScreen):
         self.col_idx = col_idx
         self.col_name = df.columns[col_idx]
         self.col_dtype = str(df.dtypes[col_idx])
-        self.original_value = df.item(row_idx, col_idx)
 
+        # Label
         content = f"{self.col_name} ({self.col_dtype})"
-        input = str(self.original_value) if self.original_value is not None else ""
+
+        # Input
+        df_value = df.item(row_idx, col_idx)
+        self.input_value = str(df_value) if df_value is not None else ""
 
         # For input validation
         if self.col_dtype == "Int64":
@@ -438,7 +441,7 @@ class EditCellScreen(YesNoScreen):
         super().__init__(
             title="Edit Cell",
             label=content,
-            input=(input, input_type),
+            input=(self.input_value, input_type),
             on_yes_callback=self._save_edit,
         )
 
@@ -447,12 +450,9 @@ class EditCellScreen(YesNoScreen):
         new_value_str = self.input.value.strip()
 
         # Check if value changed
-        old_value_str = (
-            str(self.original_value) if self.original_value is not None else ""
-        )
-        if new_value_str == old_value_str:
+        if new_value_str == self.input_value:
             self.dismiss(None)
-            self.notify("No changes made", title="Edit")
+            self.notify("No changes made", title="Edit", severity="warning")
             return
 
         # Parse and validate based on column dtype
@@ -460,7 +460,7 @@ class EditCellScreen(YesNoScreen):
             new_value = self._parse_value(new_value_str)
         except ValueError as e:
             self.dismiss(None)
-            self.notify(f"Invalid value: {str(e)}", title="Error")
+            self.notify(f"Invalid value: {str(e)}", title="Error", severity="error")
             return
 
         # Dismiss with the new value
@@ -470,7 +470,9 @@ class EditCellScreen(YesNoScreen):
         """Parse string value based on column dtype."""
         dtype = self.col_dtype
 
-        if dtype == "Int64":
+        if value == "":
+            return None
+        elif dtype == "Int64":
             return int(value)
         elif dtype == "Float64":
             return float(value)
@@ -1391,6 +1393,8 @@ class DataFrameApp(App):
 
             # Update the display
             cell_value = self.df.item(row_idx, col_idx)
+            if cell_value is None:
+                cell_value = "-"
             dtype = self.df.dtypes[col_idx]
             ds = DtypeStyle(dtype)
             formatted_value = Text(str(cell_value), style=ds.style, justify=ds.justify)
