@@ -679,7 +679,7 @@ class DataFrameApp(App):
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("k", "toggle_dark", "Toggle Dark Mode"),
-        ("l", "toggle_row_labels", "Toggle Row Labels"),
+        ("number_sign", "toggle_row_labels", "Toggle Row Labels"),
         ("c", "copy_cell", "Copy Cell"),
     ]
 
@@ -1574,12 +1574,12 @@ class DataFrameApp(App):
         )
         self.histories.append(history)
 
-        self.log(self.histories[-1], description)
+        # self.log(self.histories[-1], description)
 
     def _undo(self) -> None:
         """Undo the last action."""
         if not self.histories:
-            self.notify("No actions to undo", title="Undo")
+            self.notify("No actions to undo", title="Undo", severity="warning")
             return
 
         history = self.histories.pop()
