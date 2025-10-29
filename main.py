@@ -898,7 +898,7 @@ class DataFrameApp(App):
         ("h,?", "toggle_help_panel", "Help"),
         ("k", "toggle_dark", "Toggle Dark Mode"),
         ("number_sign", "toggle_row_labels", "Toggle Row Labels"),
-        ("c", "copy_cell", "Copy Cell"),
+        # ("c", "copy_cell", "Copy Cell"),
     ]
 
     CSS = """
@@ -1230,7 +1230,7 @@ class DataFrameApp(App):
             title="Pin",
         )
 
-    # Delete
+    # Delete & Move
     def _delete_column(self) -> None:
         """Remove the currently selected column from the table."""
         col_idx = self.table.cursor_column
@@ -1310,17 +1310,16 @@ class DataFrameApp(App):
         # Validate move is possible
         if direction == "left":
             if col_idx <= 0:
-                self.notify("Cannot move column left", title="Move")
+                self.notify("Cannot move column left", title="Move", severity="warning")
                 return
             swap_idx = col_idx - 1
         elif direction == "right":
             if col_idx >= len(self.table.columns) - 1:
-                self.notify("Cannot move column right", title="Move")
+                self.notify(
+                    "Cannot move column right", title="Move", severity="warning"
+                )
                 return
             swap_idx = col_idx + 1
-        else:
-            self.notify(f"Invalid direction: {direction}", title="Move")
-            return
 
         # Get column names to swap
         col_name = self.df.columns[col_idx]
@@ -1349,7 +1348,7 @@ class DataFrameApp(App):
         # Restore cursor position on the moved column
         self.table.move_cursor(row=row_idx, column=swap_idx)
 
-        # Swap columns in the dataframe
+        # Update the dataframe column order
         cols = list(self.df.columns)
         cols[col_idx], cols[swap_idx] = cols[swap_idx], cols[col_idx]
         self.df = self.df.select(cols)
@@ -1469,8 +1468,7 @@ class DataFrameApp(App):
     def _save_to_file(self) -> None:
         """Open save file dialog."""
         self.push_screen(
-            SaveFileScreen(self.filename or "dataframe.csv"),
-            callback=self._on_save_file_screen,
+            SaveFileScreen(self.filename), callback=self._on_save_file_screen
         )
 
     def _on_save_file_screen(self, filename: str | None) -> None:
@@ -1887,7 +1885,7 @@ if __name__ == "__main__":
     parser.add_argument("file", nargs="?", help="CSV file to view (or read from stdin)")
 
     args = parser.parse_args()
-    filename = ""
+    filename = "stdin.csv"
 
     # Check if reading from stdin (pipe or redirect)
     if not sys.stdin.isatty():

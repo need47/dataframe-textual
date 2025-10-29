@@ -2,6 +2,8 @@
 
 A powerful, interactive terminal-based CSV viewer built with Python, Polars, and Textual. Inspired by VisiData, this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring CSV data directly in your terminal.
 
+![Screenshot](screenshot.png)
+
 ## Features
 
 - 🚀 **Fast CSV Loading** - Powered by Polars for efficient data handling with lazy pagination
