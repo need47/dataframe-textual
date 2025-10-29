@@ -13,7 +13,7 @@ from textual.coordinate import Coordinate
 from textual.reactive import Reactive
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, HelpPanel, Input, Label, Markdown, Static
-from textual.widgets._data_table import CursorType
+from textual.widgets._data_table import CellKey, ColumnKey, CursorType, RowKey
 
 STYLES = {
     "Int64": {"style": "cyan", "justify": "right"},
@@ -643,6 +643,21 @@ class MyDataTable(DataTable):
         - **U** - Reset all
     """).strip()
 
+    @property
+    def cursor_key(self) -> CellKey:
+        """Get the current cursor position as a CellKey."""
+        return self.coordinate_to_cell_key(self.cursor_coordinate)
+
+    @property
+    def cursor_row_key(self) -> RowKey:
+        """Get the current cursor row as a CellKey."""
+        return self.cursor_key.row_key
+
+    @property
+    def cursor_column_key(self) -> ColumnKey:
+        """Get the current cursor column as a ColumnKey."""
+        return self.cursor_key.column_key
+
     def _should_highlight(
         self,
         cursor: Coordinate,
@@ -1105,7 +1120,7 @@ class DataFrameApp(App):
             self.notify(f"Deleted {selected_count} selected row(s)", title="Delete")
         # Delete the row at the cursor
         else:
-            row_key, _ = self.table.coordinate_to_cell_key(self.table.cursor_coordinate)
+            row_key = self.table.cursor_row_key
             row_idx = int(row_key.value) - 1  # Convert to 0-based index
 
             if row_idx >= len(self.df):
@@ -1137,7 +1152,7 @@ class DataFrameApp(App):
             direction: "left" to move left, "right" to move right.
         """
         row_idx, col_idx = self.table.cursor_coordinate
-        _, col_key = self.table.coordinate_to_cell_key(self.table.cursor_coordinate)
+        col_key = self.table.cursor_column_key
 
         # Validate move is possible
         if direction == "left":
@@ -1645,7 +1660,7 @@ class DataFrameApp(App):
             deleted_rows=self.deleted_rows.copy(),
             fixed_rows=self.fixed_rows,
             fixed_columns=self.fixed_columns,
-            cursor_coordinate=self.cursor_coordinate,
+            cursor_coordinate=self.table.cursor_coordinate,
         )
         self.histories.append(history)
 
