@@ -1,18 +1,20 @@
 import os
 import sys
-import textwrap
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from io import StringIO
+from textwrap import dedent
 
 import polars as pl
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
 from textual.coordinate import Coordinate
+from textual.css.query import NoMatches
 from textual.reactive import Reactive
 from textual.screen import ModalScreen
-from textual.widgets import Button, DataTable, HelpPanel, Input, Label, Markdown, Static
+from textual.widget import Widget
+from textual.widgets import Button, DataTable, Input, Label, Markdown, Static
 from textual.widgets._data_table import CellKey, ColumnKey, CursorType, RowKey
 
 STYLES = {
@@ -22,6 +24,15 @@ STYLES = {
     "Boolean": {"style": "blue", "justify": "center"},
     "Date": {"style": "blue", "justify": "center"},
     "Datetime": {"style": "blue", "justify": "center"},
+}
+
+TYPES = {
+    "Int64": "integer",
+    "Float64": "float",
+    "String": "string",
+    "Boolean": "boolean",
+    "Date": "date",
+    "Datetime": "datetime",
 }
 
 # Subscript digits mapping for sort indicators
@@ -107,7 +118,7 @@ def _rindex(lst: list, value) -> int:
     return -1
 
 
-def _parse_filter_expression(
+def parse_filter_expression(
     expression: str, df: pl.DataFrame, current_col_idx: int
 ) -> str:
     """Parse and convert a filter expression to Polars syntax.
@@ -201,31 +212,31 @@ class YesNoScreen(ModalScreen):
     """
 
     DEFAULT_CSS = """
-    YesNoScreen {
-        align: center middle;
-    }
+        YesNoScreen {
+            align: center middle;
+        }
 
-    YesNoScreen > Static {
-        width: 60;
-        height: auto;
-        border: solid $primary;
-        background: $surface;
-        padding: 2;
-    }
+        YesNoScreen > Static {
+            width: 60;
+            height: auto;
+            border: solid $primary;
+            background: $surface;
+            padding: 2;
+        }
 
-    YesNoScreen Input {
-        margin: 1 0;
-    }
+        YesNoScreen Input {
+            margin: 1 0;
+        }
 
-    YesNoScreen #button-container {
-        width: 100%;
-        height: 3;
-        align: center middle;
-    }
+        YesNoScreen #button-container {
+            width: 100%;
+            height: 3;
+            align: center middle;
+        }
 
-    YesNoScreen Button {
-        margin: 0 1;
-    }
+        YesNoScreen Button {
+            margin: 0 1;
+        }
     """
 
     def __init__(
@@ -348,14 +359,14 @@ class RowDetailScreen(ModalScreen):
     ]
 
     CSS = """
-    RowDetailScreen {
-        align: center middle;
-    }
+        RowDetailScreen {
+            align: center middle;
+        }
 
-    RowDetailScreen > DataTable {
-        width: 80;
-        border: solid $primary;
-    }
+        RowDetailScreen > DataTable {
+            width: 80;
+            border: solid $primary;
+        }
     """
 
     def __init__(
@@ -400,15 +411,15 @@ class FrequencyScreen(ModalScreen):
     ]
 
     CSS = """
-    FrequencyScreen {
-        align: center middle;
-    }
+        FrequencyScreen {
+            align: center middle;
+        }
 
-    FrequencyScreen > DataTable {
-        width: 60;
-        height: auto;
-        border: solid $primary;
-    }
+        FrequencyScreen > DataTable {
+            width: 60;
+            height: auto;
+            border: solid $primary;
+        }
     """
 
     def __init__(self, col_idx: int, df: pl.DataFrame):
@@ -543,11 +554,8 @@ class EditCellScreen(YesNoScreen):
         self.input_value = str(df_value) if df_value is not None else ""
 
         # For input validation
-        if self.col_dtype == "Int64":
-            input_type = "integer"
-        elif self.col_dtype == "Float64":
-            input_type = "number"
-        else:
+        input_type = TYPES.get(self.col_dtype)
+        if input_type not in ("integer", "number", "float"):
             input_type = "text"
 
         super().__init__(
@@ -611,24 +619,36 @@ class SearchScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen")
 
-    def __init__(self, col_name: str, default_value: str = ""):
+    def __init__(
+        self,
+        term,
+        col_dtype: pl.DataType,
+        col_name: str | None = None,
+    ):
+        col_dtype = col_dtype if col_name else pl.String
+        label = f"Search [$primary]{term}[/] ([$accent]{col_dtype}[/])"
+        self.col_name = col_name
+        self.col_dtype = col_dtype
+        input_type = TYPES.get(str(col_dtype))
+        if input_type not in ("integer", "number", "text"):
+            input_type = "text"
         super().__init__(
-            title="Search",
-            label=f"Search in: {col_name}",
-            input=default_value,
+            title="Search" if col_name else "Global Search",
+            label=f"{label} in [$primary]{col_name}[/]" if col_name else label,
+            input=(term, input_type),
             on_yes_callback=self._do_search,
         )
 
     def _do_search(self) -> None:
         """Perform the search."""
-        search_term = self.input.value.strip()
+        term = self.input.value.strip()
 
-        if not search_term:
-            self.notify("Search term cannot be empty", title="Error")
+        if not term:
+            self.notify("Search term cannot be empty", title="Search", severity="error")
             return
 
         # Dismiss with the search term
-        self.dismiss(search_term)
+        self.dismiss((term, self.col_dtype, self.col_name))
 
 
 class FilterScreen(YesNoScreen):
@@ -657,7 +677,7 @@ class FilterScreen(YesNoScreen):
 
         try:
             # Try to parse the expression to ensure it's valid
-            expr_str = _parse_filter_expression(
+            expr_str = parse_filter_expression(
                 expression, self.df, self.current_col_idx
             )
 
@@ -761,45 +781,48 @@ class MyDataTable(DataTable):
     """Custom DataTable to highlight row/column labels based on cursor position."""
 
     # Help text for the DataTable which will be shown in the HelpPanel
-    HELP = textwrap.dedent("""
-        # DataFrame Viewer - Quick Help
+    HELP = dedent("""
+        # 📊 DataFrame Viewer - Quick Help
 
-        ## Navigation
-        - **g** - First row
-        - **G** - Last row
-        - **PgUp/Dn** - Scroll
+        ## ⬆️ Navigation
+        - **q** - 🚪 Quit
+        - **Arrow Keys** - 🎯 Move cursor
+        - **g** - ⬆️ First row
+        - **G** - ⬇️ Last row
+        - **PgUp/Dn** - 📜 Scroll
 
-        ## View & Cursor
-        - **Enter** - Row details
-        - **C** - Cycle cursor type (cell/row/col)
-        - **#** - Toggle labels
-        - **k** - Toggle dark mode
+        ## 👁️ View & Cursor
+        - **Enter** - 📋 Row details
+        - **C** - 🔄 Cycle cursor type (cell/row/col)
+        - **#** - 🏷️ Toggle labels
+        - **k** - 🌙 Toggle dark mode
 
-        ## Editing
-        - **e** - Edit cell
-        - **d** - Delete row
-        - **-** - Delete column
+        ## ✏️ Editing
+        - **e** - ✍️ Edit cell
+        - **d** - 🗑️ Delete row
+        - **-** - ❌ Delete column
 
-        ## Search & Filter
-        - **|** - Search column
-        - **\\** - Search cell value
-        - **t** - Toggle highlight
-        - **"** - Filter to selected
-        - **T** - Clear selection
-        - **f** - Filter by expression ($1, $name, $_, etc.)
+        ## 🔍 Search & Filter
+        - **|** - 🔎 Search column
+        - **\\\\** - 🎯 Search cell value
+        - **/** - 🌐 Global search (all columns)
+        - **t** - 💡 Toggle selection
+        - **"** - 📍 Filter to selected
+        - **T** - 🧹 Clear selection
+        - **f** - 🔧 Filter by Polars expression
 
-        ## Sort & Reorder
-        - **[** - Sort ascending
-        - **]** - Sort descending
-        - **F** - Frequency table of column
-        - **Shift+↑↓←→** - Move row/column
+        ## 📊 Sort & Reorder
+        - **[** - 🔼 Sort ascending
+        - **]** - 🔽 Sort descending
+        - **F** - 📈 Frequency table of column
+        - **Shift+↑↓←→** - 🔀 Move row/column
 
-        ## Data Management
-        - **p** - Pin rows/cols
-        - **c** - Copy cell
-        - **Ctrl+S** - Save
-        - **u** - Undo
-        - **U** - Reset all
+        ## 💾 Data Management
+        - **p** - 📌 Pin rows/cols
+        - **c** - 📋 Copy cell
+        - **Ctrl+S** - 💾 Save
+        - **u** - ↩️ Undo
+        - **U** - 🔄 Reset all
     """).strip()
 
     @property
@@ -890,6 +913,96 @@ class MyDataTable(DataTable):
                 self._scroll_cursor_into_view()
 
 
+class MyHelpPanel(Widget):
+    """
+    Shows context sensitive help for the currently focused widget.
+
+    Modified from Textual's built-in HelpPanel with KeyPanel removed.
+    """
+
+    DEFAULT_CSS = """
+        MyHelpPanel {
+            split: right;
+            width: 33%;
+            min-width: 30;
+            max-width: 60;
+            border-left: vkey $foreground 30%;
+            padding: 0 1;
+            height: 1fr;
+            padding-right: 1;
+            layout: vertical;
+            height: 100%;
+
+            &:ansi {
+                background: ansi_default;
+                border-left: vkey ansi_black;
+
+                Markdown {
+                    background: ansi_default;
+                }
+                .bindings-table--divide {
+                    color: transparent;
+                }
+            }
+
+            #widget-help {
+                height: auto;
+                width: 1fr;
+                padding: 0;
+                margin: 0;
+                padding: 1 0;
+                margin-top: 1;
+                display: none;
+                background: $panel;
+
+                &:ansi {
+                    background: ansi_default;
+                }
+
+                MarkdownBlock {
+                    padding-left: 2;
+                    padding-right: 2;
+                }
+            }
+
+            &.-show-help #widget-help {
+                display: block;
+            }
+        }
+    """
+
+    DEFAULT_CLASSES = "-textual-system"
+
+    def on_mount(self):
+        def update_help(focused_widget: Widget | None):
+            self.update_help(focused_widget)
+
+        self.watch(self.screen, "focused", update_help)
+
+    def update_help(self, focused_widget: Widget | None) -> None:
+        """Update the help for the focused widget.
+
+        Args:
+            focused_widget: The currently focused widget, or `None` if no widget was focused.
+        """
+        if not self.app.app_focus:
+            return
+        if not self.screen.is_active:
+            return
+        self.set_class(focused_widget is not None, "-show-help")
+        if focused_widget is not None:
+            help = focused_widget.HELP or ""
+            if not help:
+                self.remove_class("-show-help")
+            try:
+                self.query_one(Markdown).update(dedent(help))
+            except NoMatches:
+                pass
+
+    def compose(self) -> ComposeResult:
+        yield Markdown(id="widget-help")
+
+
 class DataFrameApp(App):
     """A Textual app to interact with a Polars DataFrame."""
 
@@ -898,7 +1011,7 @@ class DataFrameApp(App):
         ("h,?", "toggle_help_panel", "Help"),
         ("k", "toggle_dark", "Toggle Dark Mode"),
         ("number_sign", "toggle_row_labels", "Toggle Row Labels"),
-        # ("c", "copy_cell", "Copy Cell"),
+        ("c", "copy_cell", "Copy Cell"),
     ]
 
     CSS = """
@@ -984,6 +1097,9 @@ class DataFrameApp(App):
         elif event.key == "vertical_line":  # '|' key
             # Open search modal for current column
             self._search_column()
+        elif event.key == "slash":  # '/' key
+            # Open search modal for all columns
+            self._search_column(all_columns=True)
         elif event.key == "t":
             # Toggle selected rows highlighting
             self._toggle_selected_rows()
@@ -1040,7 +1156,7 @@ class DataFrameApp(App):
             self.help_panel.display = not self.help_panel.display
         else:
             # Add HelpPanel
-            self.help_panel = HelpPanel()
+            self.help_panel = MyHelpPanel()
             self.mount(self.help_panel, after=self.table)
 
             # Schedule the update for the next iteration of the event loop
@@ -1564,99 +1680,172 @@ class DataFrameApp(App):
             raise e
 
     # Search & Highlight
-    def _search_column(self) -> None:
+    def _search_column(self, all_columns: bool = False) -> None:
         """Open modal to search in the selected column."""
-        row_idx = self.table.cursor_row
-        col_idx = self.table.cursor_column
-
+        row_idx, col_idx = self.table.cursor_coordinate
         if col_idx >= len(self.df.columns):
+            self.notify("Invalid column selected", title="Search", severity="error")
             return
 
-        col_name = self.df.columns[col_idx]
+        col_name = None if all_columns else self.df.columns[col_idx]
         col_dtype = self.df.dtypes[col_idx]
 
         # Get current cell value as default search term
-        cell_value = self.df.item(row_idx, col_idx)
-        if cell_value is None:
-            self.notify("Cannot use null value for search", title="Error")
-            return
-
-        search_term = str(cell_value)
-        if col_dtype == pl.Boolean:
-            search_term = search_term.lower()
+        term = self.df.item(row_idx, col_idx)
+        term = "NULL" if term is None else str(term)
 
         # Push the search modal screen
         self.push_screen(
-            SearchScreen(col_name, search_term),
+            SearchScreen(term, col_dtype, col_name),
             callback=self._on_search_screen,
         )
 
-    def _on_search_screen(self, search_term: str | None) -> None:
+    def _on_search_screen(self, result) -> None:
         """Handle result from SearchScreen."""
-        if search_term is None:
+        if result is None:
             return
 
-        col_idx = self.table.cursor_column
-        col_name = self.df.columns[col_idx]
+        term, col_dtype, col_name = result
+        if col_name:
+            # Perform search in the specified column
+            self._search_single_column(term, col_dtype, col_name)
+        else:
+            # Perform search in all columns
+            self._search_all_columns(term)
 
-        try:
-            # Convert column to string for searching
-            col_series = self.df[col_name].cast(pl.String)
+    def _search_single_column(
+        self, term: str, col_dtype: pl.DataType, col_name: str
+    ) -> None:
+        """Search for a term in a single column and update selected rows.
 
-            # Use Polars str.contains() to find matching rows
-            # Returns a boolean Series, convert to list
-            # Add to existing selected rows
-            matches = col_series.str.contains(search_term).to_list()
-            match_count = matches.count(True)
-            if match_count == 0:
-                self.notify(
-                    f"No matches found for: [on $primary]{search_term}[/]",
-                    title="Search",
-                )
-                return
-
-            # Add to history
-            self._add_history(
-                f"Searched and highlighted [on $primary]{search_term}[/] in column [on $primary]{col_name}[/]"
-            )
-
-            # Update selected rows to include new matches
-            self.selected_rows = [
-                old or new for old, new in zip(self.selected_rows, matches)
-            ]
-
-            # Highlight selected rows
-            self._highlight_rows()
-
+        Args:
+            term: The search term to find
+            col_dtype: The data type of the column
+            col_name: The name of the column to search in
+        """
+        # Perform type-aware search based on column dtype
+        if term.lower() == "null":
+            matches = self.df[col_name].is_null()
+        elif col_dtype == pl.String:
+            matches = self.df[col_name].str.contains(term)
+        elif col_dtype == pl.Boolean:
+            matches = self.df[col_name] == BOOLS[term.lower()]
+        elif col_dtype in (pl.Int32, pl.Int64):
+            matches = self.df[col_name] == int(term)
+        elif col_dtype in (pl.Float32, pl.Float64):
+            matches = self.df[col_name] == float(term)
+        else:
             self.notify(
-                f"Found [on $primary]{match_count}[/] matches for [on $primary]{search_term}[/]",
+                f"Search not yet supported for column type: [on $primary]{col_dtype}[/]",
+                title="Search",
+                severity="warning",
+            )
+            return
+
+        # Returns a boolean Series, convert to list
+        # Add to existing selected rows
+        match_count = matches.to_list().count(True)
+        if match_count == 0:
+            self.notify(
+                f"No matches found for: [on $primary]{term}[/]",
                 title="Search",
             )
-        except Exception as e:
-            self.notify(f"Search failed for {search_term}: {str(e)}", title="Error")
-            raise e
+            return
+
+        # Add to history
+        self._add_history(
+            f"Searched and highlighted [on $primary]{term}[/] in column [on $primary]{col_name}[/]"
+        )
+
+        # Update selected rows to include new matches
+        self.selected_rows = [
+            old or new for old, new in zip(self.selected_rows, matches)
+        ]
+
+        # Highlight selected rows
+        self._highlight_rows()
+
+        self.notify(
+            f"Found [on $success]{match_count}[/] matches for [on $primary]{term}[/]",
+            title="Search",
+        )
+
+    def _search_all_columns(self, term: str) -> None:
+        """Search for a term across all columns and highlight matching cells.
+
+        Args:
+            term: The search term to find
+        """
+        matches: dict[int, set[int]] = defaultdict(set)
+        match_count = 0
+        if term.lower() == "null":
+            # Search for NULL values across all columns
+            for col_idx, col in enumerate(self.df.columns):
+                masks = self.df[col].is_null().to_list()
+                for row_idx, is_match in enumerate(masks):
+                    if is_match:
+                        matches[row_idx].add(col_idx)
+                        match_count += 1
+        else:
+            # Search for the term in all columns
+            for col_idx, col in enumerate(self.df.columns):
+                col_series = self.df[col].cast(pl.String)
+                masks = col_series.str.contains(term).to_list()
+                for row_idx, is_match in enumerate(masks):
+                    if is_match:
+                        matches[row_idx].add(col_idx)
+                        match_count += 1
+
+        if match_count == 0:
+            self.notify(
+                f"No matches found for: [on $primary]{term}[/] in any column",
+                title="Global Search",
+            )
+            return
+
+        # Ensure all matching rows are loaded
+        self._load_rows(max(matches.keys()) + 1)
+
+        # Add to history
+        self._add_history(
+            f"Searched and highlighted [on $primary]{term}[/] across all columns"
+        )
+
+        # Highlight matching cells directly
+        for row_idx, row in enumerate(self.table.ordered_rows):
+            # Only process rows that are loaded
+            if row_idx not in matches:
+                continue
+
+            for col_idx in matches[row_idx]:
+                row_key, col_key = self.table.coordinate_to_cell_key(
+                    Coordinate(row_idx, col_idx)
+                )
+                cell_text: Text = self.table.get_cell(row_key, col_key)
+                cell_text.style = "red"
+
+                # Update the cell in the table
+                self.table.update_cell(row_key, col_key, cell_text)
+
+        self.notify(
+            f"Found [on $success]{match_count}[/] matches for [on $primary]{term}[/] across all columns",
+            title="Global Search",
+        )
 
     def _search_with_cell_value(self) -> None:
         """Search in the current column using the value of the currently selected cell."""
-        row_idx = self.table.cursor_row
-        col_idx = self.table.cursor_column
-
+        row_idx, col_idx = self.table.cursor_coordinate
         if col_idx >= len(self.df.columns) or row_idx >= len(self.df):
             self.notify("Invalid cell position", title="Error")
             return
 
         # Get the value of the currently selected cell
-        cell_value = self.df.item(row_idx, col_idx)
-        if cell_value is None:
-            self.notify("Cannot search with null value", title="Error")
-            return
+        term = self.df.item(row_idx, col_idx)
+        term = "NULL" if term is None else str(term)
 
         col_dtype = self.df.dtypes[col_idx]
-        search_term = str(cell_value)
-        if col_dtype == pl.Boolean:
-            search_term = search_term.lower()
-
-        self._on_search_screen(search_term)
+        col_name = self.df.columns[col_idx]
+        self._on_search_screen((term, col_dtype, col_name))
 
     def _highlight_rows(self, clear: bool = False) -> None:
         """Update all rows, highlighting selected ones in red and restoring others to default.

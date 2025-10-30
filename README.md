@@ -89,6 +89,7 @@ python main.py < data.csv
 | Key | Action |
 |-----|--------|
 | `\|` (pipe) | Search in current column (case-insensitive) |
+| `/` (slash) | Global search across all columns (cell-level highlighting) |
 | `\` | Search current column using cell value |
 | `t` | Toggle highlighting of selected rows |
 | `T` (Shift+T) | Clear all selected rows |
@@ -145,6 +146,13 @@ Press `Enter` on any row to open a modal showing all column values for that row.
 - Case-insensitive substring matching
 - All matching rows are highlighted in red
 - Multiple searches accumulate selections
+
+**Global Search** (`/`):
+- Search for a term across all columns simultaneously
+- Cell-level highlighting in red for each matching cell
+- Useful for finding a value anywhere in the dataset
+- Automatically loads rows if matches extend beyond visible area
+- Type-aware matching: converts values to strings before comparing
 
 **Cell-Value Search** (`\`):
 - Automatically search using the current cell's value
