@@ -15,7 +15,13 @@ from textual.reactive import Reactive
 from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, Input, Label, Markdown, Static
-from textual.widgets._data_table import CellKey, ColumnKey, CursorType, RowKey
+from textual.widgets._data_table import (
+    CellDoesNotExist,
+    CellKey,
+    ColumnKey,
+    CursorType,
+    RowKey,
+)
 
 STYLES = {
     "Int64": {"style": "cyan", "justify": "right"},
@@ -772,6 +778,7 @@ class History:
     loaded_rows: int
     sorted_columns: dict[str, bool]
     selected_rows: list[bool]
+    visible_rows: list[bool]
     fixed_rows: int
     fixed_columns: int
     cursor_coordinate: Coordinate
@@ -884,9 +891,22 @@ class MyDataTable(DataTable):
         """Refresh highlighting when cursor coordinate changes.
 
         This explicitly refreshes cells that need to change their highlight state
-        to fix the delay issue with column label highlighting.
+        to fix the delay issue with column label highlighting. Also emits CellSelected
+        message when cursor type is "cell" to match DataTable's behavior for mouse clicks.
         """
         if old_coordinate != new_coordinate:
+            # Emit CellSelected message for cell cursor type (keyboard navigation)
+            if self.cursor_type == "cell":
+                try:
+                    cell_key = self.coordinate_to_cell_key(new_coordinate)
+                    value = self.get_cell_at(new_coordinate)
+                    self.post_message(
+                        DataTable.CellSelected(self, value, new_coordinate, cell_key)
+                    )
+                except CellDoesNotExist:
+                    # This could happen when after calling clear(), the old coordinate is invalid
+                    pass
+
             # For cell cursor type, refresh old and new row/column headers
             if self.cursor_type == "cell":
                 old_row, old_col = old_coordinate
@@ -1025,7 +1045,9 @@ class DataFrameApp(App):
     """
 
     # Reactive cursor coordinate to highlight row label and column header
-    cursor_coordinate: Reactive[Coordinate] = Reactive(None, always_update=True)
+    cursor_coordinate: Reactive[Coordinate] = Reactive(
+        Coordinate(0, 0), always_update=True
+    )
 
     def __init__(self, df: pl.DataFrame, filename: str = ""):
         super().__init__()
@@ -1035,6 +1057,7 @@ class DataFrameApp(App):
         self.loaded_rows = 0  # Track how many rows are currently loaded
         self.sorted_columns = {}  # Track sort keys as dict of col_name -> descending
         self.selected_rows = [False] * len(df)  # Track selected rows (0-based)
+        self.visible_rows = [True] * len(df)  # Track visible rows (0-based)
         self.fixed_rows = 0  # Number of fixed rows
         self.fixed_columns = 0  # Number of fixed columns
 
@@ -1091,6 +1114,9 @@ class DataFrameApp(App):
         elif event.key == "f":
             # Open filter screen for current column
             self._open_filter_screen()
+        elif event.key == "v":
+            # Filter by current cell value
+            self._filter_by_cell_value()
         elif event.key == "e":
             # Open edit modal for current cell
             self._edit_cell()
@@ -1144,6 +1170,14 @@ class DataFrameApp(App):
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
         self._check_and_load_more()
+
+    def on_data_table_cell_selected(self, event: DataTable.CellSelected) -> None:
+        """Update reactive cursor coordinate when cell is selected.
+
+        Notes: cursor movement via keyboard does not trigger this event
+        """
+        self.cursor_coordinate = event.coordinate
+        self.log(f"======= Updated cursor_coordinate to {self.cursor_coordinate}")
 
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility using CSS property."""
@@ -1200,21 +1234,27 @@ class DataFrameApp(App):
             self.loaded_rows = 0
             self.sorted_columns = {}
             self.selected_rows = [False] * len(self.df)
+            self.visible_rows = [True] * len(self.df)
             self.fixed_rows = 0
             self.fixed_columns = 0
 
+        stop = max(
+            INITIAL_BATCH_SIZE,
+            _rindex(self.selected_rows, True) + 1,
+            _rindex(self.visible_rows, True) + 1 if False in self.visible_rows else 0,
+        )
+
         self._setup_columns()
-        self._load_rows(INITIAL_BATCH_SIZE)
+        self._load_rows(stop)
         self._highlight_rows()
 
         self.table.fixed_rows = self.fixed_rows
         self.table.fixed_columns = self.fixed_columns
 
         # Restore cursor position
-        if self.cursor_coordinate is not None:
-            row_idx, col_idx = self.cursor_coordinate
-            if row_idx < len(self.table.rows) and col_idx < len(self.table.columns):
-                self.table.move_cursor(row=row_idx, column=col_idx)
+        row_idx, col_idx = self.cursor_coordinate
+        if row_idx < len(self.table.rows) and col_idx < len(self.table.columns):
+            self.table.move_cursor(row=row_idx, column=col_idx)
 
     def _setup_columns(self) -> None:
         """Clear table and setup columns."""
@@ -1276,6 +1316,8 @@ class DataFrameApp(App):
         df_slice = self.df.slice(start, stop - start)
 
         for row_idx, row in enumerate(df_slice.rows(), start):
+            if not self.visible_rows[row_idx]:
+                continue  # Skip hidden rows
             vals, dtypes = [], []
             for val, dtype in zip(row, self.df.dtypes):
                 vals.append(val)
@@ -1309,7 +1351,7 @@ class DataFrameApp(App):
             return
 
         # Push the frequency modal screen
-        self.push_screen(FrequencyScreen(col_idx, self.df))
+        self.push_screen(FrequencyScreen(col_idx, self.df.filter(self.visible_rows)))
 
     def _open_pin_screen(self) -> None:
         """Open the pin screen to set fixed rows and columns."""
@@ -1559,14 +1601,24 @@ class DataFrameApp(App):
             # Add new column to sort
             self.sorted_columns[col_to_sort] = descending
         else:
-            # Toggle direction
+            # Toggle direction and move to end of sort order
             del self.sorted_columns[col_to_sort]
             self.sorted_columns[col_to_sort] = descending
 
         # Apply multi-column sort
         sort_cols = list(self.sorted_columns.keys())
         descending_flags = list(self.sorted_columns.values())
-        self.df = self.df.sort(sort_cols, descending=descending_flags, nulls_last=True)
+        df_sorted = self.df.with_row_index("__rid__").sort(
+            sort_cols, descending=descending_flags, nulls_last=True
+        )
+
+        # Updated selected_rows and visible_rows to match new order
+        old_row_indices = df_sorted["__rid__"].to_list()
+        self.selected_rows = [self.selected_rows[i] for i in old_row_indices]
+        self.visible_rows = [self.visible_rows[i] for i in old_row_indices]
+
+        # Update the dataframe
+        self.df = df_sorted.drop("__rid__")
 
         # Recreate the table for display
         self._setup_table()
@@ -1742,9 +1794,11 @@ class DataFrameApp(App):
             )
             return
 
-        # Returns a boolean Series, convert to list
-        # Add to existing selected rows
-        match_count = matches.to_list().count(True)
+        # Exclude invisible rows from matches
+        matches = matches.to_list()
+        matches = [m and v for m, v in zip(matches, self.visible_rows)]
+
+        match_count = matches.count(True)
         if match_count == 0:
             self.notify(
                 f"No matches found for: [on $primary]{term}[/]",
@@ -1766,7 +1820,7 @@ class DataFrameApp(App):
         self._highlight_rows()
 
         self.notify(
-            f"Found [on $success]{match_count}[/] matches for [on $primary]{term}[/]",
+            f"Found [on $primary]{match_count}[/] matches for [on $primary]{term}[/]",
             title="Search",
         )
 
@@ -1834,10 +1888,9 @@ class DataFrameApp(App):
 
     def _search_with_cell_value(self) -> None:
         """Search in the current column using the value of the currently selected cell."""
-        row_idx, col_idx = self.table.cursor_coordinate
-        if col_idx >= len(self.df.columns) or row_idx >= len(self.df):
-            self.notify("Invalid cell position", title="Error")
-            return
+        row_key = self.table.cursor_row_key
+        row_idx = int(row_key.value) - 1  # Convert to 0-based index
+        col_idx = self.table.cursor_column
 
         # Get the value of the currently selected cell
         term = self.df.item(row_idx, col_idx)
@@ -1864,7 +1917,8 @@ class DataFrameApp(App):
         self._load_rows(stop)
 
         # Update all rows based on selected state
-        for row_idx, row in enumerate(self.table.ordered_rows):
+        for row in self.table.ordered_rows:
+            row_idx = int(row.key.value) - 1  # Convert to 0-based index
             is_selected = self.selected_rows[row_idx]
 
             # Update all cells in this row
@@ -1956,9 +2010,12 @@ class DataFrameApp(App):
             title="Filter",
         )
 
+    # Filter
     def _open_filter_screen(self) -> None:
         """Open the filter screen to enter a filter expression."""
-        row_idx, col_idx = self.table.cursor_coordinate
+        row_key = self.table.cursor_row_key
+        row_idx = int(row_key.value) - 1  # Convert to 0-based index
+        col_idx = self.table.cursor_column
 
         cell_value = self.df.item(row_idx, col_idx)
         if self.df.dtypes[col_idx] == pl.String and cell_value is not None:
@@ -1968,10 +2025,10 @@ class DataFrameApp(App):
             FilterScreen(
                 self.df, current_col_idx=col_idx, current_cell_value=cell_value
             ),
-            callback=self._on_filter_screen,
+            callback=self._do_filter,
         )
 
-    def _on_filter_screen(self, result) -> None:
+    def _do_filter(self, result) -> None:
         """Handle result from FilterScreen.
 
         Args:
@@ -1979,11 +2036,11 @@ class DataFrameApp(App):
         """
         if result is None:
             return
-
         expr, expr_str = result
 
         # Apply the filter expression
-        df_filtered = self.df.filter(expr)
+        df_filtered = self.df.with_row_index("__rid__").filter(expr)
+
         matched_count = len(df_filtered)
         if not matched_count:
             self.notify(
@@ -1996,9 +2053,12 @@ class DataFrameApp(App):
         # Add to history
         self._add_history(f"Filtered by expression [on $primary]{expr_str}[/]")
 
-        # Update the dataframe to only include matching rows
-        self.df = df_filtered
-        self.selected_rows = [False] * len(self.df)
+        # Mark unfiltered rows as hidden
+        filtered_row_indices = set(df_filtered["__rid__"].to_list())
+        if filtered_row_indices:
+            for rid in range(len(self.visible_rows)):
+                if rid not in filtered_row_indices:
+                    self.visible_rows[rid] = False
 
         # Recreate the table for display
         self._setup_table()
@@ -2007,6 +2067,23 @@ class DataFrameApp(App):
             f"Filtered to [on $primary]{matched_count}[/] matching rows",
             title="Filter",
         )
+
+    def _filter_by_cell_value(self) -> None:
+        """Filter rows based on the value of the currently selected cell."""
+        row_key = self.table.cursor_row_key
+        row_idx = int(row_key.value) - 1  # Convert to 0-based index
+        col_idx = self.table.cursor_column
+
+        cell_value = self.df.item(row_idx, col_idx)
+
+        if cell_value is None:
+            expr = pl.col(self.df.columns[col_idx]).is_null()
+            expr_str = "NULL"
+        else:
+            expr = pl.col(self.df.columns[col_idx]) == cell_value
+            expr_str = f"$_ == {repr(cell_value)}"
+
+        self._do_filter((expr, expr_str))
 
     # Misc
     def _cycle_cursor_type(self) -> None:
@@ -2031,6 +2108,7 @@ class DataFrameApp(App):
             loaded_rows=self.loaded_rows,
             sorted_columns=self.sorted_columns.copy(),
             selected_rows=self.selected_rows.copy(),
+            visible_rows=self.visible_rows.copy(),
             fixed_rows=self.fixed_rows,
             fixed_columns=self.fixed_columns,
             cursor_coordinate=self.table.cursor_coordinate,
@@ -2051,6 +2129,7 @@ class DataFrameApp(App):
         self.loaded_rows = history.loaded_rows
         self.sorted_columns = history.sorted_columns.copy()
         self.selected_rows = history.selected_rows.copy()
+        self.visible_rows = history.visible_rows.copy()
         self.fixed_rows = history.fixed_rows
         self.fixed_columns = history.fixed_columns
         self.cursor_coordinate = history.cursor_coordinate
