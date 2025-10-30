@@ -75,8 +75,7 @@ BOOLS = {
     "0": False,
 }
 
-CURSOR_TYPES = ["row", "column", "cell"]
-LABEL_STYLE = "on yellow"  # Style for highlighted row/column labels
+CURSOR_TYPES = ["row", "column", "cell", "none"]
 
 
 def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
@@ -2106,12 +2105,13 @@ class DataFrameApp(App):
         # Add to history
         self._add_history(f"Filtered by expression [on $primary]{expr_str}[/]")
 
-        # Mark unfiltered rows as hidden
+        # Mark unfiltered rows as invisible and unselected
         filtered_row_indices = set(df_filtered["__rid__"].to_list())
         if filtered_row_indices:
             for rid in range(len(self.visible_rows)):
                 if rid not in filtered_row_indices:
                     self.visible_rows[rid] = False
+                    self.selected_rows[rid] = False
 
         # Recreate the table for display
         self._setup_table()
@@ -2142,7 +2142,9 @@ class DataFrameApp(App):
     def _cycle_cursor_type(self) -> None:
         """Cycle through cursor types: cell -> row -> column -> cell."""
         current_type = self.table.cursor_type
-        next_type = CURSOR_TYPES[(CURSOR_TYPES.index(current_type) + 1) % 3]
+        next_type = CURSOR_TYPES[
+            (CURSOR_TYPES.index(current_type) + 1) % len(CURSOR_TYPES)
+        ]
         self.table.cursor_type = next_type
 
         self.notify(f"Cursor type: [on $primary]{next_type}[/]", title="Cursor")
