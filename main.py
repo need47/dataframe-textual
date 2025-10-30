@@ -23,23 +23,29 @@ from textual.widgets._data_table import (
     RowKey,
 )
 
+# itype is used by Input widget for input validation
 STYLES = {
-    "Int64": {"style": "cyan", "justify": "right"},
-    "Float64": {"style": "magenta", "justify": "right"},
-    "String": {"style": "green", "justify": "left"},
-    "Boolean": {"style": "blue", "justify": "center"},
-    "Date": {"style": "blue", "justify": "center"},
-    "Datetime": {"style": "blue", "justify": "center"},
+    "Int64": {"style": "cyan", "justify": "right", "itype": "integer"},
+    "Float64": {"style": "magenta", "justify": "right", "itype": "number"},
+    "String": {"style": "green", "justify": "left", "itype": "text"},
+    "Boolean": {"style": "blue", "justify": "center", "itype": "text"},
+    "Date": {"style": "blue", "justify": "center", "itype": "text"},
+    "Datetime": {"style": "blue", "justify": "center", "itype": "text"},
 }
 
-TYPES = {
-    "Int64": "integer",
-    "Float64": "float",
-    "String": "string",
-    "Boolean": "boolean",
-    "Date": "date",
-    "Datetime": "datetime",
-}
+
+@dataclass
+class DtypeConfig:
+    style: str
+    justify: str
+    itype: str
+
+    def __init__(self, dtype: pl.DataType):
+        dc = STYLES.get(str(dtype), {"style": "", "justify": "", "itype": "text"})
+        self.style = dc["style"]
+        self.justify = dc["justify"]
+        self.itype = dc["itype"]
+
 
 # Subscript digits mapping for sort indicators
 SUBSCRIPT_DIGITS = {
@@ -73,17 +79,6 @@ CURSOR_TYPES = ["row", "column", "cell"]
 LABEL_STYLE = "on yellow"  # Style for highlighted row/column labels
 
 
-@dataclass
-class DtypeStyle:
-    style: str
-    justify: str
-
-    def __init__(self, dtype: pl.DataType):
-        ds = STYLES.get(str(dtype), {"style": "", "justify": ""})
-        self.style = ds["style"]
-        self.justify = ds["justify"]
-
-
 def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
     """Format a single row with proper styling and justification.
 
@@ -95,7 +90,7 @@ def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
     formatted_row = []
 
     for val, dtype in zip(vals, dtypes, strict=True):
-        ds = DtypeStyle(dtype)
+        dc = DtypeConfig(dtype)
 
         # Format the value
         if val is None:
@@ -108,8 +103,8 @@ def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
         formatted_row.append(
             Text(
                 text_val,
-                style=ds.style,
-                justify=ds.justify if apply_justify else "",
+                style=dc.style,
+                justify=dc.justify if apply_justify else "",
             )
         )
 
@@ -462,11 +457,11 @@ class FrequencyScreen(ModalScreen):
         """Create the frequency table."""
         column = self.df.columns[self.col_idx]
         dtype = str(self.df.dtypes[self.col_idx])
-        ds = DtypeStyle(dtype)
+        dc = DtypeConfig(dtype)
 
         # Create frequency table
         freq_table = DataTable(zebra_stripes=True)
-        freq_table.add_column(Text(column, justify=ds.justify), key=column)
+        freq_table.add_column(Text(column, justify=dc.justify), key=column)
         freq_table.add_column(Text("Count", justify="right"), key="Count")
         freq_table.add_column(Text("%", justify="right"), key="%")
 
@@ -475,8 +470,8 @@ class FrequencyScreen(ModalScreen):
         total_count = len(self.df)
 
         # Get style config for Int64 and Float64
-        ds_int = DtypeStyle("Int64")
-        ds_float = DtypeStyle("Float64")
+        ds_int = DtypeConfig("Int64")
+        ds_float = DtypeConfig("Float64")
 
         # Add rows to the frequency table
         for row in freq_df.rows():
@@ -486,8 +481,8 @@ class FrequencyScreen(ModalScreen):
             freq_table.add_row(
                 Text(
                     "-" if value is None else str(value),
-                    style=ds.style,
-                    justify=ds.justify,
+                    style=dc.style,
+                    justify=dc.justify,
                 ),
                 Text(
                     str(count),
@@ -576,21 +571,19 @@ class EditCellScreen(YesNoScreen):
         row_idx = int(row_key.value) - 1  # Convert to 0-based
 
         # Label
-        content = f"{self.col_name} ({self.col_dtype})"
+        content = f"[$primary]{self.col_name}[/] ([$accent]{self.col_dtype}[/])"
 
         # Input
         df_value = df.item(row_idx, col_idx)
         self.input_value = str(df_value) if df_value is not None else ""
 
-        # For input validation
-        input_type = TYPES.get(self.col_dtype)
-        if input_type not in ("integer", "number", "float"):
-            input_type = "text"
-
         super().__init__(
             title="Edit Cell",
             label=content,
-            input={"value": self.input_value, "type": input_type},
+            input={
+                "value": self.input_value,
+                "type": DtypeConfig(self.col_dtype).itype,
+            },
             on_yes_callback=self._save_edit,
         )
 
@@ -658,13 +651,11 @@ class SearchScreen(YesNoScreen):
         label = f"Search [$primary]{term}[/] ([$accent]{col_dtype}[/])"
         self.col_name = col_name
         self.col_dtype = col_dtype
-        input_type = TYPES.get(str(col_dtype))
-        if input_type not in ("integer", "number", "text"):
-            input_type = "text"
+
         super().__init__(
             title="Search" if col_name else "Global Search",
             label=f"{label} in [$primary]{col_name}[/]" if col_name else label,
-            input={"value": term, "type": input_type},
+            input={"value": term, "type": DtypeConfig(col_dtype).itype},
             on_yes_callback=self._do_search,
         )
 
@@ -1220,7 +1211,9 @@ class DataFrameApp(App):
     def on_data_table_cell_selected(self, event: DataTable.CellSelected) -> None:
         """Update reactive cursor coordinate when cell is selected.
 
-        Notes: cursor movement via keyboard does not trigger this event
+        Notes: cursor movement via keyboard does not trigger this event.
+
+        See `MyDataTable.watch_cursor_coordinate()` above.
         """
         self.cursor_coordinate = event.coordinate
 
@@ -1320,13 +1313,13 @@ class DataFrameApp(App):
                     )
                     header_text = col + sort_indicator
                     self.table.add_column(
-                        Text(header_text, justify=DtypeStyle(dtype).justify), key=col
+                        Text(header_text, justify=DtypeConfig(dtype).justify), key=col
                     )
 
                     break
             else:  # No break occurred, so column is not sorted
                 self.table.add_column(
-                    Text(col, justify=DtypeStyle(dtype).justify), key=col
+                    Text(col, justify=DtypeConfig(dtype).justify), key=col
                 )
 
         self.table.cursor_type = "cell"
@@ -1766,8 +1759,8 @@ class DataFrameApp(App):
             if cell_value is None:
                 cell_value = "-"
             dtype = self.df.dtypes[col_idx]
-            ds = DtypeStyle(dtype)
-            formatted_value = Text(str(cell_value), style=ds.style, justify=ds.justify)
+            dc = DtypeConfig(dtype)
+            formatted_value = Text(str(cell_value), style=dc.style, justify=dc.justify)
 
             row_key = str(row_idx + 1)
             col_key = str(col_name)
@@ -1980,17 +1973,17 @@ class DataFrameApp(App):
                 dtype = self.df.dtypes[col_idx]
 
                 # Get style config based on dtype
-                ds = DtypeStyle(dtype)
+                dc = DtypeConfig(dtype)
 
                 # Use red for selected rows, default style for others
-                style = "red" if is_selected else ds.style
+                style = "red" if is_selected else dc.style
                 cell_text.style = style
 
                 # cell_value = cell_text.plain
                 # formatted_value = Text(
                 #     str(cell_value) if cell_value is not None else "-",
                 #     style=style,
-                #     justify=ds.justify,
+                #     justify=dc.justify,
                 # )
 
                 # Update the cell in the table
