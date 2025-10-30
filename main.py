@@ -248,10 +248,10 @@ class YesNoScreen(ModalScreen):
     def __init__(
         self,
         title: str = None,
-        label: str = None,
-        input: str = None,
-        yes: str = "Yes",
-        no: str = "No",
+        label: str | dict | Label = None,
+        input: str | dict | Input = None,
+        yes: str | dict | Button = "Yes",
+        no: str | dict | Button = "No",
         on_yes_callback=None,
     ):
         """Initialize the modal screen.
@@ -278,23 +278,44 @@ class YesNoScreen(ModalScreen):
                 container.border_title = self.title
 
             if self.label:
-                yield Label(self.label, id="label")
+                if isinstance(self.label, Label):
+                    pass
+                elif isinstance(self.label, dict):
+                    self.label = Label(**self.label)
+                else:
+                    self.label = Label(self.label)
+                yield self.label
 
             if self.input:
-                if isinstance(self.input, tuple) and len(self.input) == 2:
-                    self.input, self.input_type = self.input
+                if isinstance(self.input, Input):
+                    pass
+                elif isinstance(self.input, dict):
+                    self.input = Input(**self.input)
                 else:
-                    self.input_type = "text"
-                self.input = Input(value=self.input, id="input", type=self.input_type)
+                    self.input = Input(self.input)
                 self.input.select_all()
                 yield self.input
 
             if self.yes or self.no:
                 with Horizontal(id="button-container"):
                     if self.yes:
-                        yield Button(self.yes, id="yes", variant="success")
+                        if isinstance(self.yes, Button):
+                            pass
+                        elif isinstance(self.yes, dict):
+                            self.yes = Button(**self.yes, id="yes", variant="success")
+                        else:
+                            self.yes = Button(self.yes, id="yes", variant="success")
+
+                        yield self.yes
                     if self.no:
-                        yield Button(self.no, id="no", variant="error")
+                        if isinstance(self.no, Button):
+                            pass
+                        elif isinstance(self.no, dict):
+                            self.no = Button(**self.no, id="no", variant="error")
+                        else:
+                            self.no = Button(self.no, id="no", variant="error")
+
+                        yield self.no
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "yes":
@@ -546,11 +567,13 @@ class EditCellScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "EditCellScreen")
 
-    def __init__(self, row_idx: int, col_idx: int, df: pl.DataFrame):
-        self.row_idx = row_idx
+    def __init__(self, row_key: str, col_idx: int, df: pl.DataFrame):
+        self.row_key = row_key
         self.col_idx = col_idx
         self.col_name = df.columns[col_idx]
         self.col_dtype = str(df.dtypes[col_idx])
+
+        row_idx = int(row_key.value) - 1  # Convert to 0-based
 
         # Label
         content = f"{self.col_name} ({self.col_dtype})"
@@ -567,7 +590,7 @@ class EditCellScreen(YesNoScreen):
         super().__init__(
             title="Edit Cell",
             label=content,
-            input=(self.input_value, input_type),
+            input={"value": self.input_value, "type": input_type},
             on_yes_callback=self._save_edit,
         )
 
@@ -590,7 +613,7 @@ class EditCellScreen(YesNoScreen):
             return
 
         # Dismiss with the new value
-        self.dismiss((self.row_idx, self.col_idx, new_value))
+        self.dismiss((self.row_key, self.col_idx, new_value))
 
     def _parse_value(self, value: str):
         """Parse string value based on column dtype."""
@@ -641,7 +664,7 @@ class SearchScreen(YesNoScreen):
         super().__init__(
             title="Search" if col_name else "Global Search",
             label=f"{label} in [$primary]{col_name}[/]" if col_name else label,
-            input=(term, input_type),
+            input={"value": term, "type": input_type},
             on_yes_callback=self._do_search,
         )
 
@@ -892,17 +915,16 @@ class MyDataTable(DataTable):
 
         This explicitly refreshes cells that need to change their highlight state
         to fix the delay issue with column label highlighting. Also emits CellSelected
-        message when cursor type is "cell" to match DataTable's behavior for mouse clicks.
+        message when cursor type is "cell" for keyboard navigation only (mouse clicks
+        already trigger the parent class's CellSelected message).
         """
         if old_coordinate != new_coordinate:
-            # Emit CellSelected message for cell cursor type (keyboard navigation)
-            if self.cursor_type == "cell":
+            # Emit CellSelected message for cell cursor type (keyboard navigation only)
+            # Only emit if this is from keyboard navigation (flag is True when from keyboard)
+            if self.cursor_type == "cell" and getattr(self, "_from_keyboard", False):
+                self._from_keyboard = False  # Reset flag
                 try:
-                    cell_key = self.coordinate_to_cell_key(new_coordinate)
-                    value = self.get_cell_at(new_coordinate)
-                    self.post_message(
-                        DataTable.CellSelected(self, value, new_coordinate, cell_key)
-                    )
+                    self._post_selected_message()
                 except CellDoesNotExist:
                     # This could happen when after calling clear(), the old coordinate is invalid
                     pass
@@ -931,6 +953,30 @@ class MyDataTable(DataTable):
                 self.call_after_refresh(self._scroll_cursor_into_view)
             else:
                 self._scroll_cursor_into_view()
+
+    def on_key(self, event) -> None:
+        """Handle keyboard events to set flag for keyboard-driven cursor changes.
+
+        When arrow keys are pressed, set _from_keyboard flag so watcher emits CellSelected.
+        """
+        if event.key in (
+            "up",
+            "down",
+            "left",
+            "right",
+            "home",
+            "end",
+            "pageup",
+            "pagedown",
+            "ctrl+home",
+            "ctrl+end",
+        ):
+            self._from_keyboard = True
+
+            # Let parent handle the actual key event
+            parent = super()
+            if hasattr(parent, "on_key"):
+                parent.on_key(event)
 
 
 class MyHelpPanel(Widget):
@@ -1177,7 +1223,6 @@ class DataFrameApp(App):
         Notes: cursor movement via keyboard does not trigger this event
         """
         self.cursor_coordinate = event.coordinate
-        self.log(f"======= Updated cursor_coordinate to {self.cursor_coordinate}")
 
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility using CSS property."""
@@ -1681,7 +1726,8 @@ class DataFrameApp(App):
     # Edit
     def _edit_cell(self) -> None:
         """Open modal to edit the selected cell."""
-        row_idx = self.table.cursor_row
+        row_key = self.table.cursor_row_key
+        row_idx = int(row_key.value) - 1  # Convert to 0-based
         col_idx = self.table.cursor_column
 
         if row_idx >= len(self.df) or col_idx >= len(self.df.columns):
@@ -1693,16 +1739,17 @@ class DataFrameApp(App):
 
         # Push the edit modal screen
         self.push_screen(
-            EditCellScreen(row_idx, col_idx, self.df),
-            callback=self._on_edit_cell_screen,
+            EditCellScreen(row_key, col_idx, self.df),
+            callback=self._do_edit_cell,
         )
 
-    def _on_edit_cell_screen(self, result) -> None:
+    def _do_edit_cell(self, result) -> None:
         """Handle result from EditCellScreen."""
         if result is None:
             return
 
-        row_idx, col_idx, new_value = result
+        row_key, col_idx, new_value = result
+        row_idx = int(row_key.value) - 1  # Convert to 0-based
         col_name = self.df.columns[col_idx]
 
         # Update the cell in the dataframe
@@ -1749,10 +1796,10 @@ class DataFrameApp(App):
         # Push the search modal screen
         self.push_screen(
             SearchScreen(term, col_dtype, col_name),
-            callback=self._on_search_screen,
+            callback=self._do_search_column,
         )
 
-    def _on_search_screen(self, result) -> None:
+    def _do_search_column(self, result) -> None:
         """Handle result from SearchScreen."""
         if result is None:
             return
@@ -1775,17 +1822,21 @@ class DataFrameApp(App):
             col_dtype: The data type of the column
             col_name: The name of the column to search in
         """
+        df_rid = self.df.with_row_index("__rid__")
+        if False in self.visible_rows:
+            df_rid = df_rid.filter(self.visible_rows)
+
         # Perform type-aware search based on column dtype
         if term.lower() == "null":
-            matches = self.df[col_name].is_null()
+            masks = df_rid[col_name].is_null()
         elif col_dtype == pl.String:
-            matches = self.df[col_name].str.contains(term)
+            masks = df_rid[col_name].str.contains(term)
         elif col_dtype == pl.Boolean:
-            matches = self.df[col_name] == BOOLS[term.lower()]
+            masks = df_rid[col_name] == BOOLS[term.lower()]
         elif col_dtype in (pl.Int32, pl.Int64):
-            matches = self.df[col_name] == int(term)
+            masks = df_rid[col_name] == int(term)
         elif col_dtype in (pl.Float32, pl.Float64):
-            matches = self.df[col_name] == float(term)
+            masks = df_rid[col_name] == float(term)
         else:
             self.notify(
                 f"Search not yet supported for column type: [on $primary]{col_dtype}[/]",
@@ -1794,11 +1845,10 @@ class DataFrameApp(App):
             )
             return
 
-        # Exclude invisible rows from matches
-        matches = matches.to_list()
-        matches = [m and v for m, v in zip(matches, self.visible_rows)]
+        # Apply filter to get matched row indices
+        matches = set(df_rid.filter(masks)["__rid__"].to_list())
 
-        match_count = matches.count(True)
+        match_count = len(matches)
         if match_count == 0:
             self.notify(
                 f"No matches found for: [on $primary]{term}[/]",
@@ -1812,9 +1862,8 @@ class DataFrameApp(App):
         )
 
         # Update selected rows to include new matches
-        self.selected_rows = [
-            old or new for old, new in zip(self.selected_rows, matches)
-        ]
+        for m in matches:
+            self.selected_rows[m] = True
 
         # Highlight selected rows
         self._highlight_rows()
@@ -1830,25 +1879,29 @@ class DataFrameApp(App):
         Args:
             term: The search term to find
         """
+        df_rid = self.df.with_row_index("__rid__")
+        if False in self.visible_rows:
+            df_rid = df_rid.filter(self.visible_rows)
+
         matches: dict[int, set[int]] = defaultdict(set)
         match_count = 0
         if term.lower() == "null":
             # Search for NULL values across all columns
-            for col_idx, col in enumerate(self.df.columns):
-                masks = self.df[col].is_null().to_list()
-                for row_idx, is_match in enumerate(masks):
-                    if is_match:
-                        matches[row_idx].add(col_idx)
-                        match_count += 1
+            for col_idx, col in enumerate(df_rid.columns[1:]):
+                masks = df_rid[col].is_null()
+                matched_rids = set(df_rid.filter(masks)["__rid__"].to_list())
+                for rid in matched_rids:
+                    matches[rid].add(col_idx)
+                    match_count += 1
         else:
             # Search for the term in all columns
-            for col_idx, col in enumerate(self.df.columns):
-                col_series = self.df[col].cast(pl.String)
-                masks = col_series.str.contains(term).to_list()
-                for row_idx, is_match in enumerate(masks):
-                    if is_match:
-                        matches[row_idx].add(col_idx)
-                        match_count += 1
+            for col_idx, col in enumerate(df_rid.columns[1:]):
+                col_series = df_rid[col].cast(pl.String)
+                masks = col_series.str.contains(term)
+                matched_rids = set(df_rid.filter(masks)["__rid__"].to_list())
+                for rid in matched_rids:
+                    matches[rid].add(col_idx)
+                    match_count += 1
 
         if match_count == 0:
             self.notify(
@@ -1866,15 +1919,15 @@ class DataFrameApp(App):
         )
 
         # Highlight matching cells directly
-        for row_idx, row in enumerate(self.table.ordered_rows):
-            # Only process rows that are loaded
+        for row in self.table.ordered_rows:
+            row_idx = int(row.key.value) - 1  # Convert to 0-based index
             if row_idx not in matches:
                 continue
 
             for col_idx in matches[row_idx]:
-                row_key, col_key = self.table.coordinate_to_cell_key(
-                    Coordinate(row_idx, col_idx)
-                )
+                row_key = row.key
+                col_key = self.df.columns[col_idx]
+
                 cell_text: Text = self.table.get_cell(row_key, col_key)
                 cell_text.style = "red"
 
@@ -1898,7 +1951,7 @@ class DataFrameApp(App):
 
         col_dtype = self.df.dtypes[col_idx]
         col_name = self.df.columns[col_idx]
-        self._on_search_screen((term, col_dtype, col_name))
+        self._do_search_column((term, col_dtype, col_name))
 
     def _highlight_rows(self, clear: bool = False) -> None:
         """Update all rows, highlighting selected ones in red and restoring others to default.
@@ -2038,8 +2091,15 @@ class DataFrameApp(App):
             return
         expr, expr_str = result
 
+        # Add a row index column to track original row indices
+        df_with_rid = self.df.with_row_index("__rid__")
+
+        # Apply existing visibility filter first
+        if False in self.visible_rows:
+            df_with_rid = df_with_rid.filter(self.visible_rows)
+
         # Apply the filter expression
-        df_filtered = self.df.with_row_index("__rid__").filter(expr)
+        df_filtered = df_with_rid.filter(expr)
 
         matched_count = len(df_filtered)
         if not matched_count:
