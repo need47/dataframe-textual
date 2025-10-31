@@ -1,23 +1,30 @@
 # DataFrame Viewer
 
-A powerful, interactive terminal-based CSV viewer built with Python, Polars, and Textual. Inspired by VisiData, this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring CSV data directly in your terminal.
+A powerful, interactive terminal-based CSV viewer built with Python, Polars, and Textual. Inspired by VisiData, this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring CSV data directly in your terminal. Now with **multi-file support for simultaneous data comparison**!
 
 ![Screenshot](screenshot.png)
 
 ## Features
 
+### Core Data Viewing
 - 🚀 **Fast CSV Loading** - Powered by Polars for efficient data handling with lazy pagination
 - 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with automatic type detection
 - ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls for browsing, editing, and manipulating data
 - 📊 **Flexible Input** - Read from files or stdin (pipes/redirects)
 - 🔄 **Smart Pagination** - Lazy load rows on demand for handling large datasets
+
+### Data Manipulation
 - 📝 **Data Editing** - Edit cells, delete rows, and remove columns
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
 - ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts
 - 📈 **Sorting & Statistics** - Multi-column sorting and frequency distribution analysis
-- � **Save & Undo** - Save filtered data back to CSV with full undo/redo support
+- 💾 **Save & Undo** - Save filtered data back to CSV with full undo/redo support
+
+### Advanced Features
 - 📌 **Pin Rows/Columns** - Keep important rows and columns visible while scrolling
 - 🎯 **Cursor Type Cycling** - Switch between cell, row, and column selection modes
+- 📂 **Multi-File Support** - Open multiple CSV files in tabs for side-by-side comparison
+- 🔄 **Tab Management** - Seamlessly switch between open files with keyboard shortcuts
 
 ## Installation
 
@@ -40,7 +47,7 @@ python main.py <csv_file>
 
 ## Usage
 
-### Basic Usage
+### Basic Usage - Single File
 
 ```bash
 # View a CSV file
@@ -54,7 +61,37 @@ cat data.csv | python main.py
 python main.py < data.csv
 ```
 
+### Multi-File Usage - Compare Multiple Files
+
+```bash
+# Open multiple files in tabs
+python main.py file1.csv file2.csv file3.csv
+
+# Or with uv
+uv run python main.py file1.csv file2.csv file3.csv
+
+# Mix files and stdin (file opens first, then read from stdin)
+python main.py data1.csv < data2.csv
+```
+
+When multiple files are opened:
+- Each file appears as a separate tab at the top
+- Switch between tabs using `Ctrl+Tab` (next) or `Ctrl+Shift+Tab` (previous)
+- Open additional files with `Ctrl+O`
+- Close the current tab with `Ctrl+W`
+- Each file maintains its own state (sort order, selections, history, etc.)
+- Edits and filters are independent per file
+
 ## Keyboard Shortcuts
+
+### Multi-File Navigation (New!)
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+O` | Open new CSV file in a new tab |
+| `Ctrl+W` | Close current tab |
+| `Ctrl+Tab` | Move to next tab |
+| `Ctrl+Shift+Tab` | Move to previous tab |
 
 ### Navigation
 
@@ -318,6 +355,8 @@ Press `c` to copy:
 
 ## Examples
 
+### Single File Examples
+
 ```bash
 # View Pokemon dataset
 python main.py pokemon.csv
@@ -333,6 +372,38 @@ grep "Fire" pokemon.csv | python main.py
 
 # Chain with other commands
 cat data.csv | sort -t',' -k2 | python main.py
+```
+
+### Multi-File Examples
+
+```bash
+# Compare two versions of a dataset
+python main.py pokemon_v1.csv pokemon_v2.csv
+
+# Side-by-side analysis of related files
+python main.py sales_2022.csv sales_2023.csv forecast_2024.csv
+
+# Cross-reference datasets
+python main.py customers.csv orders.csv products.csv
+
+# Start with one file, open others using Ctrl+O
+python main.py initial_data.csv
+# Then press Ctrl+O to open more files interactively
+```
+
+### Advanced Workflows
+
+```bash
+# Start with a filtered file, compare with original
+grep "status=active" data.csv > filtered.csv
+python main.py data.csv filtered.csv
+# Now compare the full dataset with the filtered version in separate tabs
+
+# Multi-step analysis
+# 1. Open multiple related CSVs
+# 2. Use Ctrl+O to open additional files as you discover relationships
+# 3. Each tab maintains independent sort/filter/search state
+# 4. Use Ctrl+W to close tabs when done analyzing
 ```
 
 ## Performance
@@ -353,14 +424,38 @@ Tested with:
 - **textual**: Terminal UI framework
 - **rich**: Rich text and formatting in the terminal
 
-## Technical Details
+## Architecture Overview
 
-- Built with Textual's reactive framework for smooth updates
-- Custom DataTable subclass with intelligent highlighting
-- Polars for efficient CSV parsing and lazy row loading
-- Direct `/dev/tty` access for keyboard input when reading from stdin
-- History/undo system with full state snapshots
-- Modal screens for search, edit, save, and pin operations
+### Single-Table Design
+
+The core of the application is built around the `DataFrameTable` widget:
+
+- **Self-contained**: Each table instance maintains its own complete state (13 independent variables)
+- **Fully autonomous**: All operations (editing, sorting, filtering, searching) are handled within the table
+- **Event-driven**: Each table owns and handles its keyboard events
+- **Backward compatible**: Works identically in single-file mode
+
+### Multi-Table Design
+
+The `DataFrameApp` coordinates multiple independent `DataFrameTable` instances:
+
+- **Tab-based interface**: Uses Textual's `TabbedContent` for tab management
+- **Independent state**: Each tab has completely separate state (sort order, selections, history)
+- **Seamless switching**: Switch between files without losing context or state
+- **File management**: Open/close files dynamically without restarting the application
+
+### State Isolation
+
+Each `DataFrameTable` instance owns:
+- DataFrame (`self.df`)
+- Sorted columns (`self.sorted_columns`)
+- Selected rows (`self.selected_rows`)
+- Edit history (`self.histories`)
+- Cursor state (position, type)
+- Search/filter state
+- And 8 more internal state variables
+
+This ensures perfect isolation between tabs with zero cross-contamination.
 
 ## Requirements
 
