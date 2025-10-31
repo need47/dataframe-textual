@@ -4,6 +4,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from io import StringIO
 from textwrap import dedent
+from typing import Any
 
 import polars as pl
 from rich.text import Text
@@ -23,15 +24,31 @@ from textual.widgets._data_table import (
     RowKey,
 )
 
-# itype is used by Input widget for input validation
-STYLES = {
-    "Int64": {"style": "cyan", "justify": "right", "itype": "integer"},
-    "Float64": {"style": "magenta", "justify": "right", "itype": "number"},
-    "String": {"style": "green", "justify": "left", "itype": "text"},
-    "Boolean": {"style": "blue", "justify": "center", "itype": "text"},
-    "Date": {"style": "blue", "justify": "center", "itype": "text"},
-    "Datetime": {"style": "blue", "justify": "center", "itype": "text"},
+# Boolean string mappings
+BOOLS = {
+    "true": True,
+    "t": True,
+    "yes": True,
+    "y": True,
+    "1": True,
+    "false": False,
+    "f": False,
+    "no": False,
+    "n": False,
+    "0": False,
 }
+
+# itype is used by Input widget for input validation
+# fmt: off
+STYLES = {
+    "Int64": {"style": "cyan", "justify": "right", "itype": "integer", "convert": int},
+    "Float64": {"style": "magenta", "justify": "right", "itype": "number", "convert": float},
+    "String": {"style": "green", "justify": "left", "itype": "text", "convert": str},
+    "Boolean": {"style": "blue", "justify": "center", "itype": "text", "convert": lambda x: BOOLS[x.lower()]},
+    "Date": {"style": "blue", "justify": "center", "itype": "text", "convert": str},
+    "Datetime": {"style": "blue", "justify": "center", "itype": "text", "convert": str},
+}
+# fmt: on
 
 
 @dataclass
@@ -39,12 +56,16 @@ class DtypeConfig:
     style: str
     justify: str
     itype: str
+    convert: Any
 
     def __init__(self, dtype: pl.DataType):
-        dc = STYLES.get(str(dtype), {"style": "", "justify": "", "itype": "text"})
+        dc = STYLES.get(
+            str(dtype), {"style": "", "justify": "", "itype": "text", "convert": str}
+        )
         self.style = dc["style"]
         self.justify = dc["justify"]
         self.itype = dc["itype"]
+        self.convert = dc["convert"]
 
 
 # Subscript digits mapping for sort indicators
@@ -61,19 +82,6 @@ SUBSCRIPT_DIGITS = {
     9: "₉",
 }
 
-# Boolean string mappings
-BOOLS = {
-    "true": True,
-    "t": True,
-    "yes": True,
-    "y": True,
-    "1": True,
-    "false": False,
-    "f": False,
-    "no": False,
-    "n": False,
-    "0": False,
-}
 
 CURSOR_TYPES = ["row", "column", "cell", "none"]
 
@@ -111,7 +119,7 @@ def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
 
 
 def _rindex(lst: list, value) -> int:
-    """Return the last index of value in lst. Return -1 if not found."""
+    """Return the last index of value in a list. Return -1 if not found."""
     for i, item in enumerate(reversed(lst)):
         if item == value:
             return len(lst) - 1 - i
@@ -217,7 +225,9 @@ class YesNoScreen(ModalScreen):
         }
 
         YesNoScreen > Static {
-            width: 60;
+            width: auto;
+            min-width: 30;
+            max-width: 60;
             height: auto;
             border: solid $primary;
             background: $surface;
@@ -415,7 +425,7 @@ class EditCellScreen(YesNoScreen):
 
         # Parse and validate based on column dtype
         try:
-            new_value = self._parse_value(new_value_str)
+            new_value = DtypeConfig(self.col_dtype).convert(new_value_str)
         except Exception as e:
             self.dismiss(None)  # Dismiss without changes
             self.notify(f"Invalid value: {str(e)}", title="Edit", severity="error")
@@ -423,33 +433,6 @@ class EditCellScreen(YesNoScreen):
 
         # Dismiss with the new value
         self.dismiss((self.row_key, self.col_idx, new_value))
-
-    def _parse_value(self, value: str):
-        """Parse string value based on column dtype."""
-        dtype = self.col_dtype
-
-        if value == "":
-            return None
-        elif dtype == "Int64":
-            return int(value)
-        elif dtype == "Float64":
-            return float(value)
-        elif dtype == "String":
-            return value
-        elif dtype == "Boolean":
-            try:
-                return BOOLS[value.lower()]
-            except KeyError:
-                raise ValueError(f"Invalid boolean value: [on $primary]{value}[/]")
-        elif dtype == "Date":
-            # Try to parse ISO date format (YYYY-MM-DD)
-            return pl.col(self.col_name).str.to_date().to_list()[0].__class__(value)
-        elif dtype == "Datetime":
-            # Try to parse ISO datetime format
-            return pl.col(self.col_name).str.to_datetime().to_list()[0].__class__(value)
-        else:
-            # For unknown types, return as string
-            return value
 
 
 class SearchScreen(YesNoScreen):
@@ -537,7 +520,7 @@ class FilterScreen(YesNoScreen):
             self.dismiss(None)
 
 
-class PinScreen(YesNoScreen):
+class FreezeScreen(YesNoScreen):
     """Modal screen to pin rows and columns.
 
     Accepts one value for fixed rows, or two space-separated values for fixed rows and columns.
@@ -608,41 +591,99 @@ class TableScreen(ModalScreen):
     keyboard shortcuts and styling.
     """
 
-    BINDINGS = [
-        ("q,escape", "app.pop_screen", "Close"),
-    ]
-
     DEFAULT_CSS = """
         TableScreen {
             align: center middle;
         }
 
         TableScreen > DataTable {
-            width: 60;
+            width: auto;
+            min-width: 30;
             height: auto;
             border: solid $primary;
         }
     """
 
-    def __init__(self, df: pl.DataFrame):
+    def __init__(self, df: pl.DataFrame, id: str | None = None):
         super().__init__()
         self.df = df
-
-    def on_key(self, event) -> None:
-        """Handle key events."""
-        # Prevent Enter from propagating to parent screen.
-        if event.key in (
-            "enter",
-            "shift+left",
-            "shift+right",
-            "shift+up",
-            "shift+down",
-        ):
-            event.stop()
+        self.id = id
 
     def compose(self) -> ComposeResult:
         """Create the table. Must be overridden by subclasses."""
-        raise NotImplementedError("Subclasses must implement compose()")
+        self.table = DataTable(zebra_stripes=True, id=self.id)
+        yield self.table
+
+    def on_key(self, event):
+        if event.key in ("q", "escape"):
+            self.app.pop_screen()
+            event.stop()
+        # Prevent key events from propagating to parent screen,
+        # except for the following default key bindings for DataTable
+        elif event.key not in (
+            "up",
+            "down",
+            "right",
+            "left",
+            "pageup",
+            "pagedown",
+            "ctrl+home",
+            "ctrl+end",
+            "home",
+            "end",
+        ):
+            event.stop()
+
+    def _filter_or_highlight_selected_value(
+        self, col_name_value: tuple[str, str] | None, action: str = "filter"
+    ) -> None:
+        """Apply filter or highlight action by the selected value from the frequency table.
+
+        Args:
+            col_name: The name of the column to filter/highlight.
+            col_value: The value to filter/highlight by.
+            action: Either "filter" to filter visible rows, or "highlight" to select matching rows.
+        """
+        if col_name_value is None:
+            return
+        col_name, col_value = col_name_value
+
+        # Handle NULL values
+        if col_value == "-":
+            # Create expression for NULL values
+            expr = pl.col(col_name).is_null()
+            value_display = "[on $primary]NULL[/]"
+        else:
+            # Create expression for the selected value
+            expr = pl.col(col_name) == col_value
+            value_display = f"[on $primary]{col_value}[/]"
+
+        app = self.app
+        matched_indices = set(
+            app.df.with_row_index("__rid__").filter(expr)["__rid__"].to_list()
+        )
+
+        # Apply the action
+        if action == "filter":
+            # Update visible_rows to reflect the filter
+            for i in range(len(app.visible_rows)):
+                app.visible_rows[i] = i in matched_indices
+            title = "Filter"
+            message = f"Filtered by [on $primary]{col_name}[/] = {value_display}"
+        else:  # action == "highlight"
+            # Update selected_rows to reflect the highlights
+            for i in range(len(app.selected_rows)):
+                app.selected_rows[i] = i in matched_indices
+            title = "Highlight"
+            message = f"Highlighted [on $primary]{col_name}[/] = {value_display}"
+
+        # Recreate the table display with updated data in the main app
+        app._setup_table()
+
+        # Dismiss the frequency screen
+        self.app.pop_screen()
+
+        self.notify(message, title=title)
 
 
 class RowDetailScreen(TableScreen):
@@ -651,26 +692,45 @@ class RowDetailScreen(TableScreen):
     CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "RowDetailScreen")
 
     def __init__(self, row_idx: int, df: pl.DataFrame):
-        super().__init__(df)
+        super().__init__(df, id="row-detail-table")
         self.row_idx = row_idx
 
-    def compose(self) -> ComposeResult:
+    def on_mount(self) -> None:
         """Create the detail table."""
-        detail_table = DataTable(zebra_stripes=True)
-
-        # Add two columns: Column Name and Value
-        detail_table.add_column("Column")
-        detail_table.add_column("Value")
+        self.table.add_column("Column")
+        self.table.add_column("Value")
 
         # Get all columns and values from the dataframe row
         for col, val, dtype in zip(
             self.df.columns, self.df.row(self.row_idx), self.df.dtypes
         ):
-            detail_table.add_row(
+            self.table.add_row(
                 *_format_row([col, val], [None, dtype], apply_justify=False)
             )
 
-        yield detail_table
+    def on_key(self, event):
+        if event.key == "v":
+            # Filter the main table by the selected value
+            self._filter_or_highlight_selected_value(
+                self._get_col_name_value(), action="filter"
+            )
+            event.stop()
+        elif event.key == "quotation_mark":  # '"'
+            # Highlight the main table by the selected value
+            self._filter_or_highlight_selected_value(
+                self._get_col_name_value(), action="highlight"
+            )
+            event.stop()
+
+    def _get_col_name_value(self) -> tuple[str, Any] | None:
+        row_idx = self.table.cursor_row
+        if row_idx >= len(self.df.columns):
+            return None  # Invalid row
+
+        col_name = self.df.columns[row_idx]
+        col_value = self.df.item(self.row_idx, row_idx)
+
+        return col_name, col_value
 
 
 class FrequencyScreen(TableScreen):
@@ -679,39 +739,40 @@ class FrequencyScreen(TableScreen):
     CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "FrequencyScreen")
 
     def __init__(self, col_idx: int, df: pl.DataFrame):
-        super().__init__(df)
+        super().__init__(df, id="frequency-table")
         self.col_idx = col_idx
         self.sorted_columns = {
             1: True,  # Count
             2: True,  # %
         }
 
-    def compose(self) -> ComposeResult:
+    def on_mount(self) -> None:
         """Create the frequency table."""
         column = self.df.columns[self.col_idx]
         dtype = str(self.df.dtypes[self.col_idx])
         dc = DtypeConfig(dtype)
 
-        # Create frequency table
-        freq_table = DataTable(zebra_stripes=True)
-        freq_table.add_column(Text(column, justify=dc.justify), key=column)
-        freq_table.add_column(Text("Count", justify="right"), key="Count")
-        freq_table.add_column(Text("%", justify="right"), key="%")
-
         # Calculate frequencies using Polars
         freq_df = self.df[column].value_counts(sort=True).sort("count", descending=True)
         total_count = len(self.df)
+
+        # Create frequency table
+        self.table.add_column(Text(column, justify=dc.justify), key=column)
+        self.table.add_column(
+            Text(f"Count ({total_count:,})", justify="right"), key="Count"
+        )
+        self.table.add_column(Text("%", justify="right"), key="%")
 
         # Get style config for Int64 and Float64
         ds_int = DtypeConfig("Int64")
         ds_float = DtypeConfig("Float64")
 
         # Add rows to the frequency table
-        for row in freq_df.rows():
+        for row_idx, row in enumerate(freq_df.rows()):
             value, count = row
             percentage = (count / total_count) * 100
 
-            freq_table.add_row(
+            self.table.add_row(
                 Text(
                     "-" if value is None else str(value),
                     style=dc.style,
@@ -727,11 +788,18 @@ class FrequencyScreen(TableScreen):
                     style=ds_float.style,
                     justify=ds_float.justify,
                 ),
+                key=str(row_idx + 1),
             )
 
-        yield freq_table
+        # Add a total row
+        self.table.add_row(
+            Text("Total", style="bold", justify=dc.justify),
+            Text(f"{total_count:,}", style="bold", justify="right"),
+            Text("100.00", style="bold", justify="right"),
+            key="total",
+        )
 
-    def _on_key(self, event):
+    def on_key(self, event):
         if event.key == "left_square_bracket":  # '['
             # Sort by current column in ascending order
             self._sort_by_column(descending=False)
@@ -739,6 +807,18 @@ class FrequencyScreen(TableScreen):
         elif event.key == "right_square_bracket":  # ']'
             # Sort by current column in descending order
             self._sort_by_column(descending=True)
+            event.stop()
+        elif event.key == "v":
+            # Filter the main table by the selected value
+            self._filter_or_highlight_selected_value(
+                self._get_col_name_value(), action="filter"
+            )
+            event.stop()
+        elif event.key == "quotation_mark":  # '"'
+            # Highlight the main table by the selected value
+            self._filter_or_highlight_selected_value(
+                self._get_col_name_value(), action="highlight"
+            )
             event.stop()
 
     def _sort_by_column(self, descending: bool) -> None:
@@ -791,6 +871,19 @@ class FrequencyScreen(TableScreen):
         order = "desc" if descending else "asc"
         self.notify(f"Sorted by [on $primary]{col_name}[/] ({order})", title="Sort")
 
+    def _get_col_name_value(self) -> tuple[str, str] | None:
+        row_idx = self.table.cursor_row
+        if row_idx >= len(self.df.columns):
+            return None  # Skip total row
+
+        col_name = self.df.columns[self.col_idx]
+        col_dtype = self.df.dtypes[self.col_idx]
+
+        cell_value = self.table.get_cell_at(Coordinate(row_idx, 0))
+        col_value = cell_value.plain
+
+        return col_name, DtypeConfig(col_dtype).convert(col_value)
+
 
 # Pagination settings
 INITIAL_BATCH_SIZE = 100  # Load this many rows initially
@@ -813,7 +906,7 @@ class History:
     cursor_coordinate: Coordinate
 
 
-class MyDataTable(DataTable):
+class DataFrameTable(DataTable):
     """Custom DataTable to highlight row/column labels based on cursor position."""
 
     # Help text for the DataTable which will be shown in the HelpPanel
@@ -822,16 +915,17 @@ class MyDataTable(DataTable):
 
         ## ⬆️ Navigation
         - **q** - 🚪 Quit
-        - **Arrow Keys** - 🎯 Move cursor
+        - **↑↓←→** - 🎯 Move cursor
         - **g** - ⬆️ First row
         - **G** - ⬇️ Last row
         - **PgUp/Dn** - 📜 Scroll
 
         ## 👁️ View & Cursor
-        - **Enter** - 📋 Row details
-        - **C** - 🔄 Cycle cursor type (cell/row/col)
+        - **Enter** - 📋 Row detail table
+        - **F** - 📈 Frequency table of olumn
         - **#** - 🏷️ Toggle labels
         - **k** - 🌙 Toggle dark mode
+        - **C** - 🔄 Cycle cursor type (cell/row/col)
 
         ## ✏️ Editing
         - **e** - ✍️ Edit cell
@@ -845,16 +939,30 @@ class MyDataTable(DataTable):
         - **t** - 💡 Toggle selection
         - **"** - 📍 Filter to selected
         - **T** - 🧹 Clear selection
-        - **f** - 🔧 Filter by Polars expression
+        - **v** - 🔧 Filter by cell value
+        - **V** - 🔧 Filter by Polars expression
 
-        ## 📊 Sort & Reorder
+        ## 📊 Sort
         - **[** - 🔼 Sort ascending
         - **]** - 🔽 Sort descending
-        - **F** - 📈 Frequency table of column
+
+        ## 📋 Row Detail
+        - **v** - 🔻 Filter to selected column value
+        - **"** - 🟡 Highlight selected column value
+        - **q/Esc** - 🚪 Close details
+
+        ## 📈 Frequency Table
+        - **[** - 🔼 Sort by column ascending
+        - **]** - 🔽 Sort by column descending
+        - **v** - 🔻 Filter to selected value
+        - **"** - 🟡 Highlight selected value
+        - **q/Esc** - 🚪 Close table
+
+        ## ↔️ Reorder
         - **Shift+↑↓←→** - 🔀 Move row/column
 
         ## 💾 Data Management
-        - **p** - 📌 Pin rows/cols
+        - **f** - 📌 Freeze rows/cols
         - **c** - 📋 Copy cell
         - **Ctrl+S** - 💾 Save
         - **u** - ↩️ Undo
@@ -875,11 +983,6 @@ class MyDataTable(DataTable):
     def cursor_column_key(self) -> ColumnKey:
         """Get the current cursor column as a ColumnKey."""
         return self.cursor_key.column_key
-
-    @property
-    def cursor_row_idx(self) -> int:
-        """Get the current cursor row index (0-based) corresponding to the DataFrame."""
-        return int(self.cursor_row_key.value) - 1
 
     def _should_highlight(
         self,
@@ -990,7 +1093,7 @@ class MyDataTable(DataTable):
                 parent.on_key(event)
 
 
-class MyHelpPanel(Widget):
+class DataFrmeHelpPanel(Widget):
     """
     Shows context sensitive help for the currently focused widget.
 
@@ -998,7 +1101,7 @@ class MyHelpPanel(Widget):
     """
 
     DEFAULT_CSS = """
-        MyHelpPanel {
+        DataFrmeHelpPanel {
             split: right;
             width: 33%;
             min-width: 30;
@@ -1128,7 +1231,7 @@ class DataFrameApp(App):
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
-        self.table = MyDataTable(zebra_stripes=True)
+        self.table = DataFrameTable(zebra_stripes=True)
         yield self.table
         self.help_panel = None
 
@@ -1168,12 +1271,12 @@ class DataFrameApp(App):
         elif event.key == "F":  # shift+f
             # Open frequency modal for current column
             self._show_frequency()
-        elif event.key == "f":
-            # Open filter screen for current column
-            self._open_filter_screen()
         elif event.key == "v":
             # Filter by current cell value
             self._filter_by_cell_value()
+        elif event.key == "V":  # shift+v
+            # Open filter screen for current column
+            self._open_filter_screen()
         elif event.key == "e":
             # Open edit modal for current cell
             self._edit_cell()
@@ -1220,9 +1323,9 @@ class DataFrameApp(App):
         elif event.key == "C":  # shift+c
             # Cycle through cursor types
             self._cycle_cursor_type()
-        elif event.key == "p":
+        elif event.key == "f":
             # Open pin screen to set fixed rows and columns
-            self._open_pin_screen()
+            self._open_freeze_screen()
 
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
@@ -1233,7 +1336,7 @@ class DataFrameApp(App):
 
         Notes: cursor movement via keyboard does not trigger this event.
 
-        See `MyDataTable.watch_cursor_coordinate()` above.
+        See `DataFrameTable.watch_cursor_coordinate()` above.
         """
         self.cursor_coordinate = event.coordinate
 
@@ -1248,7 +1351,7 @@ class DataFrameApp(App):
             self.help_panel.display = not self.help_panel.display
         else:
             # Add HelpPanel
-            self.help_panel = MyHelpPanel()
+            self.help_panel = DataFrmeHelpPanel()
             self.mount(self.help_panel, after=self.table)
 
             # Schedule the update for the next iteration of the event loop
@@ -1416,11 +1519,11 @@ class DataFrameApp(App):
         # Push the frequency modal screen
         self.push_screen(FrequencyScreen(col_idx, self.df.filter(self.visible_rows)))
 
-    def _open_pin_screen(self) -> None:
-        """Open the pin screen to set fixed rows and columns."""
-        self.push_screen(PinScreen(), callback=self._on_pin_screen)
+    def _open_freeze_screen(self) -> None:
+        """Open the freeze screen to set fixed rows and columns."""
+        self.push_screen(FreezeScreen(), callback=self._do_freeze)
 
-    def _on_pin_screen(self, result: tuple[int, int] | None) -> None:
+    def _do_freeze(self, result: tuple[int, int] | None) -> None:
         """Handle result from PinScreen.
 
         Args:
@@ -1767,7 +1870,10 @@ class DataFrameApp(App):
             self.df.write_csv(filename, separator=separator)
             self.dataframe = self.df  # Update original dataframe
             self.filename = filename  # Update current filename
-            self.notify(f"Saved to [on $primary]{filename}[/]", title="Save")
+            self.notify(
+                f"Saved [$accent]{len(self.df)}[/] rows to [on $primary]{filename}[/]",
+                title="Save",
+            )
         except Exception as e:
             self.notify(f"Failed to save: {str(e)}", title="Save", severity="error")
             raise e

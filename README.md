@@ -94,7 +94,7 @@ python main.py < data.csv
 | `t` | Toggle highlighting of selected rows |
 | `T` (Shift+T) | Clear all selected rows |
 | `"` (quote) | Filter to show only selected rows |
-| `f` | Filter by expression (powerful syntax for complex filters) |
+| `V` (Shift+V) | Filter by expression (powerful syntax for complex filters) |
 
 ### Sorting
 
@@ -103,6 +103,28 @@ python main.py < data.csv
 | `[` | Sort current column ascending |
 | `]` | Sort current column descending |
 | `F` (Shift+F) | Show frequency distribution for column |
+
+### Frequency Table Modal
+
+When viewing the frequency distribution (`F`), use these keys:
+
+| Key | Action |
+|-----|--------|
+| `[` | Sort frequency table ascending |
+| `]` | Sort frequency table descending |
+| `v` | Filter main table to selected value |
+| `"` (quote) | Highlight rows with selected value |
+| `q` / `Escape` | Close frequency table |
+
+### Row Detail Modal
+
+When viewing row details (`Enter`), use these keys:
+
+| Key | Action |
+|-----|--------|
+| `v` | Filter main table to selected column value |
+| `"` (quote) | Highlight rows with selected column value |
+| `q` / `Escape` | Close row details |
 
 ### Reordering
 
@@ -117,7 +139,7 @@ python main.py < data.csv
 
 | Key | Action |
 |-----|--------|
-| `p` | Pin rows and columns (set fixed rows/columns) |
+| `f` | Freeze rows and columns |
 | `c` | Copy current cell to clipboard |
 | `Ctrl+S` | Save dataframe to CSV file |
 | `u` | Undo last action |
@@ -138,6 +160,11 @@ Columns are automatically styled based on their data type:
 ### 2. Row Detail View
 
 Press `Enter` on any row to open a modal showing all column values for that row. Useful for examining wide datasets where columns don't fit on screen.
+
+**In the Row Detail Modal**:
+- Press `v` to **filter** the main table to show only rows with the selected column value
+- Press `"` to **highlight** all rows containing the selected column value
+- Press `q` or `Escape` to close the modal
 
 ### 3. Search & Filtering
 
@@ -200,6 +227,19 @@ Press `F` to see how many times each value appears in the current column. The mo
 - Value
 - Count
 - Percentage of total
+- **Total row** at the bottom
+
+**In the Frequency Table**:
+- Press `[` and `]` to sort by any column (value, count, or percentage)
+- Press `v` to **filter** the main table to show only rows with the selected value
+- Press `"` to **highlight** all rows containing the selected value
+- Press `q` or `Escape` to close the frequency table
+
+This is useful for:
+- Understanding value distributions
+- Quickly filtering to specific values
+- Identifying rare or common values
+- Finding the most/least frequent entries
 
 ### 7. Data Editing
 
@@ -230,7 +270,7 @@ Press `F` to see how many times each value appears in the current column. The mo
 
 ### 9. Pin Rows and Columns
 
-Press `p` to open the pin dialog:
+Press `f` to open the pin dialog:
 - Enter number of fixed rows: keeps top rows visible while scrolling
 - Enter two numbers: `<rows> <columns>` (space-separated)
 - Example: `2 3` pins top 2 rows and left 3 columns
