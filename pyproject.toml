@@ -14,3 +14,8 @@ dependencies = [
 dev = [
     "textual-dev>=1.8.0",
 ]
+
+excel = [
+    "fastexcel>=0.16.0",
+   "xlsxwriter>=3.2.9",
+]

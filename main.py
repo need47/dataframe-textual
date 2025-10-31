@@ -2,7 +2,6 @@ import os
 import sys
 from collections import deque
 from dataclasses import dataclass
-from io import StringIO
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Optional
@@ -982,17 +981,15 @@ class DataFrameTable(DataTable):
         Coordinate(0, 0), always_update=True
     )
 
-    def __init__(
-        self, df: pl.DataFrame, filename: str = "", zebra_stripes: bool = True
-    ):
+    def __init__(self, df: pl.DataFrame, filename: str = "", **kwargs):
         """Initialize the DataFrameTable with a dataframe and manage all state.
 
         Args:
             df: The Polars DataFrame to display
             filename: Optional filename of the source CSV
-            zebra_stripes: Whether to show alternating row colors
+            kwargs: Additional keyword arguments for DataTable
         """
-        super().__init__(zebra_stripes=zebra_stripes)
+        super().__init__(**kwargs)
 
         # DataFrame state
         self.dataframe = df  # Original dataframe
@@ -1265,9 +1262,6 @@ class DataFrameTable(DataTable):
                     break
             else:  # No break occurred, so column is not sorted
                 self.add_column(Text(col, justify=DtypeConfig(dtype).justify), key=col)
-
-        self.cursor_type = "cell"
-        self.focus()
 
     def _check_and_load_more(self) -> None:
         """Check if we need to load more rows and load them."""
@@ -2313,42 +2307,38 @@ class DataFrameApp(App):
         }
     """
 
-    def __init__(self, csv_files: list[str] = None):
+    def __init__(self, filenames: list[str]):
         super().__init__()
-        self.csv_files = csv_files or []
+        self.filenames = filenames
         self.open_tables: dict[str, DataFrameTable] = {}  # {filename: table}
         self.help_panel = None
 
-        # Reopen stdin to /dev/tty for proper terminal interaction
-        if not sys.stdin.isatty():
-            tty = open("/dev/tty")
-            os.dup2(tty.fileno(), sys.stdin.fileno())
-
     def compose(self) -> ComposeResult:
         """Create tabbed interface for multiple files or direct table for single file."""
-        if len(self.csv_files) == 1:
-            # Single file: display table directly without tabs
-            csv_file = self.csv_files[0]
+        sources = _load_dataframe(self.filenames)
+
+        # Single table (no tab interface)
+        if len(sources) == 1:
+            df, filename, tabname = sources[0]
             try:
-                df = pl.read_csv(csv_file)
-                table = DataFrameTable(df, csv_file, zebra_stripes=True)
-                self.open_tables[csv_file] = table
+                table = DataFrameTable(df, filename, zebra_stripes=True)
+                self.open_tables[filename] = table
                 yield table
             except Exception as e:
-                self.notify(f"Error loading {csv_file}: {e}", severity="error")
+                self.notify(f"Error loading {filename}: {e}", severity="error")
         else:
             # Multiple files: use tabbed interface
             with TabbedContent(id="main_tabs", initial="tab_1"):
-                for tab_id, csv_file in enumerate(self.csv_files):
+                for idx, (df, filename, tabname) in enumerate(sources):
+                    self.log(
+                        f"Loading tab: tab_id, (filename, tabname, df) = {idx}, {filename}, {tabname}, {df.shape}"
+                    )
                     try:
-                        df = pl.read_csv(csv_file)
-                        filepath = Path(csv_file)
-
-                        table = DataFrameTable(df, csv_file, zebra_stripes=True)
-                        self.open_tables[filepath.stem] = table
-                        yield TabPane(filepath.name, table, id=f"tab_{tab_id}")
+                        table = DataFrameTable(df, filename, zebra_stripes=True)
+                        self.open_tables[filename] = table
+                        yield TabPane(tabname, table, id=f"tab_{idx + 1}")
                     except Exception as e:
-                        self.notify(f"Error loading {csv_file}: {e}", severity="error")
+                        self.notify(f"Error loading {tabname}: {e}", severity="error")
 
     def on_mount(self) -> None:
         """Set up the app when it starts."""
@@ -2369,7 +2359,7 @@ class DataFrameApp(App):
     def on_tabbed_content_changed(self, event: TabbedContent.Changed) -> None:
         """Handle tab changes (only for multiple files)."""
         # Only process if we have multiple files
-        if len(self.csv_files) <= 1:
+        if len(self.filenames) <= 1:
             return
 
         try:
@@ -2382,7 +2372,7 @@ class DataFrameApp(App):
     def _get_active_table(self) -> Optional[DataFrameTable]:
         """Get the currently active table."""
         try:
-            if len(self.csv_files) == 1:
+            if len(self.filenames) == 1:
                 # Single file: return the direct table
                 return self.query_one(DataFrameTable)
             else:
@@ -2427,14 +2417,14 @@ class DataFrameApp(App):
 
     def action_close_file(self) -> None:
         """Close current tab (only for multiple files)."""
-        if len(self.csv_files) <= 1:
+        if len(self.filenames) <= 1:
             self.app.exit()
             return
         self._close_current_tab()
 
     def action_next_tab(self) -> None:
         """Switch to next tab (only for multiple files)."""
-        if len(self.csv_files) <= 1:
+        if len(self.filenames) <= 1:
             return
         try:
             tabbed = self.query_one(TabbedContent)
@@ -2448,7 +2438,7 @@ class DataFrameApp(App):
 
     def action_prev_tab(self) -> None:
         """Switch to previous tab (only for multiple files)."""
-        if len(self.csv_files) <= 1:
+        if len(self.filenames) <= 1:
             return
         try:
             tabbed = self.query_one(TabbedContent)
@@ -2463,14 +2453,14 @@ class DataFrameApp(App):
     def _add_table_tab(self, df: pl.DataFrame, filename: str) -> None:
         """Add new table tab. If single file, replace table; if multiple, add tab."""
         try:
-            if len(self.csv_files) == 1:
+            if len(self.filenames) == 1:
                 # Single file: replace the existing table
                 old_table = self.query_one(DataFrameTable)
                 new_table = DataFrameTable(df, filename, zebra_stripes=True)
                 old_table.remove()
                 self.mount(new_table)
                 self.open_tables[filename] = new_table
-                self.csv_files = [filename]
+                self.filenames = [filename]
             else:
                 # Multiple files: add as a new tab
                 tabbed = self.query_one(TabbedContent)
@@ -2519,43 +2509,89 @@ class OpenFileScreen(ModalScreen):
             self.dismiss("")
 
 
+def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame, str, str]]:
+    """Load a DataFrame from a file spec.
+
+    Args:
+        file_spec: Either "path.csv" or "path.xlsx::sheet_name"
+
+    Returns:
+        Tuple of (DataFrame, display_name)
+    """
+    data = []
+
+    # Single file
+    if len(filenames) == 1:
+        filename = filenames[0]
+        filepath = Path(filename)
+
+        # Handle stdin
+        if filename == "-" or not sys.stdin.isatty():
+            from io import StringIO
+
+            # Read CSV from stdin into memory first (stdin is not seekable)
+            stdin_data = sys.stdin.read()
+            df = pl.read_csv(StringIO(stdin_data))
+
+            # Reopen stdin to /dev/tty for proper terminal interaction
+            if not sys.stdin.isatty():
+                tty = open("/dev/tty")
+                os.dup2(tty.fileno(), sys.stdin.fileno())
+
+            data.append((df, "stdin.csv", "stdin"))
+        # Handle Excel files with multiple sheets
+        elif filename.endswith((".xlsx", ".xls")):
+            sheets = pl.read_excel(filename, sheet_id=0)
+            for sheet_name, df in sheets.items():
+                data.append((df, filename, sheet_name))
+        # Handle regular CSV files
+        else:
+            df = pl.read_csv(filename)
+            data.append((df, filename, filepath.stem))
+    # Multiple files
+    else:
+        for filename in filenames:
+            filepath = Path(filename)
+
+            df = pl.read_csv(filename)
+            data.append((df, filename, filepath.stem))
+
+    return data
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Interactive CSV viewer for the terminal (Textual version)",
+        description="Interactive CSV/Excel viewer for the terminal (Textual version)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Examples:\n"
         "  python main.py data.csv\n"
-        "  python main.py file1.csv file2.csv file3.csv\n"
+        "  python main.py file1.csv file2.xlsx file3.csv\n"
+        "  python main.py data.xlsx  (opens all sheets in tabs)\n"
         "  cat data.csv | python main.py\n",
     )
     parser.add_argument(
-        "files", nargs="*", help="CSV files to view (or read from stdin)"
+        "files", nargs="*", help="CSV or Excel files to view (or read from stdin)"
     )
 
     args = parser.parse_args()
-    csv_files = []
+    filenames = []
 
     # Check if reading from stdin (pipe or redirect)
     if not sys.stdin.isatty():
-        # Read CSV from stdin into memory first (stdin is not seekable)
-        stdin_data = sys.stdin.read()
-        df = pl.read_csv(StringIO(stdin_data))
-        # Create temporary file in memory, but for now just pass one file
-        csv_files = ["stdin.csv"]
-        # TODO: Handle stdin data in DataFrameApp
+        filenames = ["-"]
     elif args.files:
         # Validate all files exist
         for filename in args.files:
             if not os.path.exists(filename):
                 print(f"File not found: {filename}")
                 sys.exit(1)
-        csv_files = args.files
+        filenames = args.files
     else:
         parser.print_help()
         sys.exit(1)
 
     # Run the app with multiple files
-    app = DataFrameApp(csv_files)
+    app = DataFrameApp(filenames)
     app.run()

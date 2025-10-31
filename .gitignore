@@ -10,3 +10,5 @@ wheels/
 .venv
 *bak
 dctap.csv
+sample.xlsx
+test.py
