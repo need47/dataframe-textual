@@ -352,8 +352,9 @@ class SaveFileScreen(YesNoScreen):
             if filename_input:
                 return filename_input
             else:
-                self.notify("Filename cannot be empty", title="Error")
+                self.notify("Filename cannot be empty", title="Save", severity="error")
                 return None
+
         return None
 
 
@@ -518,7 +519,9 @@ class FrequencyScreen(ModalScreen):
         if sort_dir is not None:
             # If already sorted in the same direction, do nothing
             if sort_dir == descending:
-                self.notify("Already sorted in that order", title="Sort")
+                self.notify(
+                    "Already sorted in that order", title="Sort", severity="warning"
+                )
                 return
 
         self.sorted_columns.clear()
@@ -745,7 +748,7 @@ class PinScreen(YesNoScreen):
         input_str = self.input.value.strip()
 
         if not input_str:
-            self.notify("Input cannot be empty", title="Error")
+            self.notify("Input cannot be empty", title="Pin", severity="error")
             return None
 
         parts = input_str.split()
@@ -758,7 +761,9 @@ class PinScreen(YesNoScreen):
                     raise ValueError("must be non-negative")
                 return (fixed_rows, 0)
             except ValueError as e:
-                self.notify(f"Invalid fixed rows value: {str(e)}", title="Error")
+                self.notify(
+                    f"Invalid fixed rows value: {str(e)}", title="Pin", severity="error"
+                )
                 return None
         elif len(parts) == 2:
             # Both fixed rows and columns provided
@@ -769,10 +774,16 @@ class PinScreen(YesNoScreen):
                     raise ValueError("values must be non-negative")
                 return (fixed_rows, fixed_cols)
             except ValueError as e:
-                self.notify(f"Invalid input values: {str(e)}", title="Error")
+                self.notify(
+                    f"Invalid input values: {str(e)}", title="Pin", severity="error"
+                )
                 return None
         else:
-            self.notify("Provide one or two space-separated integers", title="Error")
+            self.notify(
+                "Provide one or two space-separated integers",
+                title="Pin",
+                severity="error",
+            )
             return None
 
 
@@ -859,6 +870,11 @@ class MyDataTable(DataTable):
     def cursor_column_key(self) -> ColumnKey:
         """Get the current cursor column as a ColumnKey."""
         return self.cursor_key.column_key
+
+    @property
+    def cursor_row_idx(self) -> int:
+        """Get the current cursor row index (0-based) corresponding to the DataFrame."""
+        return int(self.cursor_row_key.value) - 1
 
     def _should_highlight(
         self,
@@ -1260,7 +1276,9 @@ class DataFrameApp(App):
             )
             self.notify(f"Copied: {cell_str[:50]}", title="Clipboard")
         except FileNotFoundError:
-            self.notify("clipboard tool not available", title="FileNotFound")
+            self.notify(
+                "clipboard tool not available", title="Clipboard", severity="error"
+            )
 
     # Load
     def _setup_table(self, reset: bool = False) -> None:
@@ -1275,11 +1293,15 @@ class DataFrameApp(App):
             self.fixed_rows = 0
             self.fixed_columns = 0
 
-        stop = max(
-            INITIAL_BATCH_SIZE,
-            _rindex(self.selected_rows, True) + 1,
-            _rindex(self.visible_rows, True) + 1 if False in self.visible_rows else 0,
-        )
+        # Lazy load up to INITIAL_BATCH_SIZE visible rows
+        stop, visible_count = len(self.df), 0
+        for row_idx, visible in enumerate(self.visible_rows):
+            if not visible:
+                continue
+            visible_count += 1
+            if visible_count >= INITIAL_BATCH_SIZE:
+                stop = row_idx + 1
+                break
 
         self._setup_columns()
         self._load_rows(stop)
@@ -1368,8 +1390,7 @@ class DataFrameApp(App):
         # Update loaded rows count
         self.loaded_rows = stop
 
-        if stop != INITIAL_BATCH_SIZE:
-            self.notify(f"Loaded {self.loaded_rows}/{len(self.df)} rows", title="Load")
+        self.notify(f"Loaded {self.loaded_rows}/{len(self.df)} rows", title="Load")
 
     # View
     def _view_row_detail(self) -> None:
@@ -1462,35 +1483,48 @@ class DataFrameApp(App):
 
         Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.
         """
-        prev_count = len(self.df)
+        old_count = len(self.df)
         filter_expr = [True] * len(self.df)
 
         # Delete all selected rows
         if selected_count := self.selected_rows.count(True):
             history_desc = f"Deleted {selected_count} selected row(s)"
 
-            for row_idx, is_selected in enumerate(self.selected_rows):
+            for i, is_selected in enumerate(self.selected_rows):
                 if is_selected:
-                    filter_expr[row_idx] = False
+                    filter_expr[i] = False
         # Delete the row at the cursor
         else:
             row_key = self.table.cursor_row_key
-            row_idx = int(row_key.value) - 1  # Convert to 0-based index
+            i = int(row_key.value) - 1  # Convert to 0-based index
 
-            filter_expr[row_idx] = False
+            filter_expr[i] = False
             history_desc = f"Deleted row [on $primary]{row_key.value}[/]"
 
         # Add to history
         self._add_history(history_desc)
 
-        # Update dataframe to filter out deleted rows
-        self.df = self.df.filter(filter_expr)
-        self.selected_rows = [False] * len(self.df)  # Clear selection
+        # Apply the filter to remove rows
+        df = self.df.with_row_index("__rid__").filter(filter_expr)
+        self.df = df.drop("__rid__")
+
+        # Update selected and visible rows tracking
+        old_row_indices = set(df["__rid__"].to_list())
+        self.selected_rows = [
+            selected
+            for i, selected in enumerate(self.selected_rows)
+            if i in old_row_indices
+        ]
+        self.visible_rows = [
+            visible
+            for i, visible in enumerate(self.visible_rows)
+            if i in old_row_indices
+        ]
 
         # Recreate the table display
         self._setup_table()
 
-        deleted_count = prev_count - len(self.df)
+        deleted_count = old_count - len(self.df)
         self.notify(f"Deleted {deleted_count} row(s)", title="Delete")
 
     def _move_column(self, direction: str) -> None:
@@ -1564,28 +1598,31 @@ class DataFrameApp(App):
         # Validate move is possible
         if direction == "up":
             if row_idx <= 0:
-                self.notify("Cannot move row up", title="Move")
+                self.notify("Cannot move row up", title="Move", severity="warning")
                 return
             swap_idx = row_idx - 1
         elif direction == "down":
             if row_idx >= len(self.table.rows) - 1:
-                self.notify("Cannot move row down", title="Move")
+                self.notify("Cannot move row down", title="Move", severity="warning")
                 return
             swap_idx = row_idx + 1
         else:
-            self.notify(f"Invalid direction: {direction}", title="Move")
+            self.notify(
+                f"Invalid direction: {direction}", title="Move", severity="error"
+            )
             return
+
+        row_key = self.table.coordinate_to_cell_key((row_idx, 0)).row_key
+        swap_key = self.table.coordinate_to_cell_key((swap_idx, 0)).row_key
 
         # Add to history
         self._add_history(
-            f"Moved row [on $primary]{row_idx + 1}[/] {direction} (swapped with row [on $primary]{swap_idx + 1}[/])"
+            f"Moved row [on $primary]{row_key.value}[/] {direction} (swapped with row [on $primary]{swap_key.value}[/])"
         )
 
-        # Swap rows in the dataframe
-        row_key = str(row_idx + 1)  # Convert to 1-based key
-        swap_key = str(swap_idx + 1)  # Convert to 1-based key
-
+        # Swap rows in the table's internal row locations
         self.table.check_idle()
+
         (
             self.table._row_locations[row_key],
             self.table._row_locations[swap_key],
@@ -1600,8 +1637,23 @@ class DataFrameApp(App):
         # Restore cursor position on the moved row
         self.table.move_cursor(row=swap_idx, column=col_idx)
 
+        # Swap rows in the dataframe
+        rid = int(row_key.value) - 1  # 0-based
+        swap_rid = int(swap_key.value) - 1  # 0-based
+        first, second = sorted([rid, swap_rid])
+
+        self.df = pl.concat(
+            [
+                self.df.slice(0, first),
+                self.df.slice(second, 1),
+                self.df.slice(first + 1, second - first - 1),
+                self.df.slice(first, 1),
+                self.df.slice(second + 1),
+            ]
+        )
+
         self.notify(
-            f"Moved row [on $primary]{row_idx + 1}[/] {direction}", title="Move"
+            f"Moved row [on $primary]{row_key.value}[/] {direction}", title="Move"
         )
 
     # Sort
@@ -1712,7 +1764,7 @@ class DataFrameApp(App):
             self.filename = filename  # Update current filename
             self.notify(f"Saved to [on $primary]{filename}[/]", title="Save")
         except Exception as e:
-            self.notify(f"Failed to save: {str(e)}", title="Error")
+            self.notify(f"Failed to save: {str(e)}", title="Save", severity="error")
             raise e
 
     # Edit
@@ -1767,7 +1819,9 @@ class DataFrameApp(App):
 
             self.notify(f"Cell updated to [on $primary]{cell_value}[/]", title="Edit")
         except Exception as e:
-            self.notify(f"Failed to update cell: {str(e)}", title="Edit")
+            self.notify(
+                f"Failed to update cell: {str(e)}", title="Edit", severity="error"
+            )
             raise e
 
     # Search & Highlight
@@ -1845,6 +1899,7 @@ class DataFrameApp(App):
             self.notify(
                 f"No matches found for: [on $primary]{term}[/]",
                 title="Search",
+                severity="warning",
             )
             return
 
@@ -1899,6 +1954,7 @@ class DataFrameApp(App):
             self.notify(
                 f"No matches found for: [on $primary]{term}[/] in any column",
                 title="Global Search",
+                severity="warning",
             )
             return
 
@@ -2147,7 +2203,9 @@ class DataFrameApp(App):
         ]
         self.table.cursor_type = next_type
 
-        self.notify(f"Cursor type: [on $primary]{next_type}[/]", title="Cursor")
+        self.notify(
+            f"Changed cursor type to [on $primary]{next_type}[/]", title="Cursor"
+        )
 
     # History & Undo
     def _add_history(self, description: Text | str) -> None:
