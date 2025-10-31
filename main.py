@@ -373,192 +373,6 @@ class OverwriteFileScreen(YesNoScreen):
         self.dismiss(True)
 
 
-class RowDetailScreen(ModalScreen):
-    """Modal screen to display a single row's details."""
-
-    BINDINGS = [
-        ("q,escape", "app.pop_screen", "Close"),
-    ]
-
-    CSS = """
-        RowDetailScreen {
-            align: center middle;
-        }
-
-        RowDetailScreen > DataTable {
-            width: 80;
-            border: solid $primary;
-        }
-    """
-
-    def __init__(
-        self,
-        row_idx: int,
-        df: pl.DataFrame,
-    ):
-        super().__init__()
-        self.row_idx = row_idx
-        self.df = df
-
-    def on_key(self, event) -> None:
-        """Handle key events."""
-        # Prevent Enter from propagating to parent screen
-        if event.key == "enter":
-            event.stop()
-
-    def compose(self) -> ComposeResult:
-        """Create the detail table."""
-        detail_table = DataTable(zebra_stripes=True)
-
-        # Add two columns: Column Name and Value
-        detail_table.add_column("Column")
-        detail_table.add_column("Value")
-
-        # Get all columns and values from the dataframe row
-        for col, val, dtype in zip(
-            self.df.columns, self.df.row(self.row_idx), self.df.dtypes
-        ):
-            detail_table.add_row(
-                *_format_row([col, val], [None, dtype], apply_justify=False)
-            )
-
-        yield detail_table
-
-
-class FrequencyScreen(ModalScreen):
-    """Modal screen to display frequency of values in a column."""
-
-    BINDINGS = [
-        ("q,escape", "app.pop_screen", "Close"),
-    ]
-
-    CSS = """
-        FrequencyScreen {
-            align: center middle;
-        }
-
-        FrequencyScreen > DataTable {
-            width: 60;
-            height: auto;
-            border: solid $primary;
-        }
-    """
-
-    def __init__(self, col_idx: int, df: pl.DataFrame):
-        super().__init__()
-        self.col_idx = col_idx
-        self.df = df
-        self.sorted_columns = {
-            1: True,  # Count
-            2: True,  # %
-        }
-
-    def compose(self) -> ComposeResult:
-        """Create the frequency table."""
-        column = self.df.columns[self.col_idx]
-        dtype = str(self.df.dtypes[self.col_idx])
-        dc = DtypeConfig(dtype)
-
-        # Create frequency table
-        freq_table = DataTable(zebra_stripes=True)
-        freq_table.add_column(Text(column, justify=dc.justify), key=column)
-        freq_table.add_column(Text("Count", justify="right"), key="Count")
-        freq_table.add_column(Text("%", justify="right"), key="%")
-
-        # Calculate frequencies using Polars
-        freq_df = self.df[column].value_counts(sort=True).sort("count", descending=True)
-        total_count = len(self.df)
-
-        # Get style config for Int64 and Float64
-        ds_int = DtypeConfig("Int64")
-        ds_float = DtypeConfig("Float64")
-
-        # Add rows to the frequency table
-        for row in freq_df.rows():
-            value, count = row
-            percentage = (count / total_count) * 100
-
-            freq_table.add_row(
-                Text(
-                    "-" if value is None else str(value),
-                    style=dc.style,
-                    justify=dc.justify,
-                ),
-                Text(
-                    str(count),
-                    style=ds_int.style,
-                    justify=ds_int.justify,
-                ),
-                Text(
-                    f"{percentage:.2f}",
-                    style=ds_float.style,
-                    justify=ds_float.justify,
-                ),
-            )
-
-        yield freq_table
-
-    def _on_key(self, event):
-        if event.key == "left_square_bracket":  # '['
-            # Sort by current column in ascending order
-            self._sort_by_column(descending=False)
-            event.stop()
-        elif event.key == "right_square_bracket":  # ']'
-            # Sort by current column in descending order
-            self._sort_by_column(descending=True)
-            event.stop()
-
-    def _sort_by_column(self, descending: bool) -> None:
-        """Sort the dataframe by the selected column and refresh the main table."""
-        freq_table = self.query_one(DataTable)
-
-        col_idx = freq_table.cursor_column
-        col_dtype = "String"
-
-        sort_dir = self.sorted_columns.get(col_idx)
-        if sort_dir is not None:
-            # If already sorted in the same direction, do nothing
-            if sort_dir == descending:
-                self.notify(
-                    "Already sorted in that order", title="Sort", severity="warning"
-                )
-                return
-
-        self.sorted_columns.clear()
-        self.sorted_columns[col_idx] = descending
-
-        if col_idx == 0:
-            col_name = self.df.columns[self.col_idx]
-            col_dtype = str(self.df.dtypes[self.col_idx])
-        elif col_idx == 1:
-            col_name = "Count"
-            col_dtype = "Int64"
-        elif col_idx == 2:
-            col_name = "%"
-            col_dtype = "Float64"
-
-        def key_fun(freq_col):
-            col_value = freq_col.plain
-
-            if col_dtype == "Int64":
-                return int(col_value)
-            elif col_dtype == "Float64":
-                return float(col_value)
-            elif col_dtype == "Boolean":
-                return BOOLS[col_value]
-            else:
-                return col_value
-
-        # Sort the table
-        freq_table.sort(
-            col_name, key=lambda freq_col: key_fun(freq_col), reverse=descending
-        )
-
-        # Notify the user
-        order = "desc" if descending else "asc"
-        self.notify(f"Sorted by [on $primary]{col_name}[/] ({order})", title="Sort")
-
-
 class EditCellScreen(YesNoScreen):
     """Modal screen to edit a single cell value."""
 
@@ -785,6 +599,197 @@ class PinScreen(YesNoScreen):
                 severity="error",
             )
             return None
+
+
+class TableScreen(ModalScreen):
+    """Base class for modal screens displaying data in a DataTable.
+
+    Provides common functionality for screens that show tabular data with
+    keyboard shortcuts and styling.
+    """
+
+    BINDINGS = [
+        ("q,escape", "app.pop_screen", "Close"),
+    ]
+
+    DEFAULT_CSS = """
+        TableScreen {
+            align: center middle;
+        }
+
+        TableScreen > DataTable {
+            width: 60;
+            height: auto;
+            border: solid $primary;
+        }
+    """
+
+    def __init__(self, df: pl.DataFrame):
+        super().__init__()
+        self.df = df
+
+    def on_key(self, event) -> None:
+        """Handle key events."""
+        # Prevent Enter from propagating to parent screen.
+        if event.key in (
+            "enter",
+            "shift+left",
+            "shift+right",
+            "shift+up",
+            "shift+down",
+        ):
+            event.stop()
+
+    def compose(self) -> ComposeResult:
+        """Create the table. Must be overridden by subclasses."""
+        raise NotImplementedError("Subclasses must implement compose()")
+
+
+class RowDetailScreen(TableScreen):
+    """Modal screen to display a single row's details."""
+
+    CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "RowDetailScreen")
+
+    def __init__(self, row_idx: int, df: pl.DataFrame):
+        super().__init__(df)
+        self.row_idx = row_idx
+
+    def compose(self) -> ComposeResult:
+        """Create the detail table."""
+        detail_table = DataTable(zebra_stripes=True)
+
+        # Add two columns: Column Name and Value
+        detail_table.add_column("Column")
+        detail_table.add_column("Value")
+
+        # Get all columns and values from the dataframe row
+        for col, val, dtype in zip(
+            self.df.columns, self.df.row(self.row_idx), self.df.dtypes
+        ):
+            detail_table.add_row(
+                *_format_row([col, val], [None, dtype], apply_justify=False)
+            )
+
+        yield detail_table
+
+
+class FrequencyScreen(TableScreen):
+    """Modal screen to display frequency of values in a column."""
+
+    CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "FrequencyScreen")
+
+    def __init__(self, col_idx: int, df: pl.DataFrame):
+        super().__init__(df)
+        self.col_idx = col_idx
+        self.sorted_columns = {
+            1: True,  # Count
+            2: True,  # %
+        }
+
+    def compose(self) -> ComposeResult:
+        """Create the frequency table."""
+        column = self.df.columns[self.col_idx]
+        dtype = str(self.df.dtypes[self.col_idx])
+        dc = DtypeConfig(dtype)
+
+        # Create frequency table
+        freq_table = DataTable(zebra_stripes=True)
+        freq_table.add_column(Text(column, justify=dc.justify), key=column)
+        freq_table.add_column(Text("Count", justify="right"), key="Count")
+        freq_table.add_column(Text("%", justify="right"), key="%")
+
+        # Calculate frequencies using Polars
+        freq_df = self.df[column].value_counts(sort=True).sort("count", descending=True)
+        total_count = len(self.df)
+
+        # Get style config for Int64 and Float64
+        ds_int = DtypeConfig("Int64")
+        ds_float = DtypeConfig("Float64")
+
+        # Add rows to the frequency table
+        for row in freq_df.rows():
+            value, count = row
+            percentage = (count / total_count) * 100
+
+            freq_table.add_row(
+                Text(
+                    "-" if value is None else str(value),
+                    style=dc.style,
+                    justify=dc.justify,
+                ),
+                Text(
+                    str(count),
+                    style=ds_int.style,
+                    justify=ds_int.justify,
+                ),
+                Text(
+                    f"{percentage:.2f}",
+                    style=ds_float.style,
+                    justify=ds_float.justify,
+                ),
+            )
+
+        yield freq_table
+
+    def _on_key(self, event):
+        if event.key == "left_square_bracket":  # '['
+            # Sort by current column in ascending order
+            self._sort_by_column(descending=False)
+            event.stop()
+        elif event.key == "right_square_bracket":  # ']'
+            # Sort by current column in descending order
+            self._sort_by_column(descending=True)
+            event.stop()
+
+    def _sort_by_column(self, descending: bool) -> None:
+        """Sort the dataframe by the selected column and refresh the main table."""
+        freq_table = self.query_one(DataTable)
+
+        col_idx = freq_table.cursor_column
+        col_dtype = "String"
+
+        sort_dir = self.sorted_columns.get(col_idx)
+        if sort_dir is not None:
+            # If already sorted in the same direction, do nothing
+            if sort_dir == descending:
+                self.notify(
+                    "Already sorted in that order", title="Sort", severity="warning"
+                )
+                return
+
+        self.sorted_columns.clear()
+        self.sorted_columns[col_idx] = descending
+
+        if col_idx == 0:
+            col_name = self.df.columns[self.col_idx]
+            col_dtype = str(self.df.dtypes[self.col_idx])
+        elif col_idx == 1:
+            col_name = "Count"
+            col_dtype = "Int64"
+        elif col_idx == 2:
+            col_name = "%"
+            col_dtype = "Float64"
+
+        def key_fun(freq_col):
+            col_value = freq_col.plain
+
+            if col_dtype == "Int64":
+                return int(col_value)
+            elif col_dtype == "Float64":
+                return float(col_value)
+            elif col_dtype == "Boolean":
+                return BOOLS[col_value]
+            else:
+                return col_value
+
+        # Sort the table
+        freq_table.sort(
+            col_name, key=lambda freq_col: key_fun(freq_col), reverse=descending
+        )
+
+        # Notify the user
+        order = "desc" if descending else "asc"
+        self.notify(f"Sorted by [on $primary]{col_name}[/] ({order})", title="Sort")
 
 
 # Pagination settings
