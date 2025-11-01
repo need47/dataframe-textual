@@ -9,10 +9,9 @@ from typing import Any, Optional
 import polars as pl
 from rich.text import Text
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Horizontal, VerticalScroll
 from textual.coordinate import Coordinate
 from textual.css.query import NoMatches
-from textual.reactive import Reactive
 from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import (
@@ -695,6 +694,32 @@ class TableScreen(ModalScreen):
         self.notify(message, title=title)
 
 
+class OpenFileScreen(YesNoScreen):
+    """Modal screen to open a CSV file."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "OpenFileScreen")
+
+    def __init__(self):
+        super().__init__(
+            title="Open File",
+            input="Enter /path/to/file",
+            yes="Open",
+            no="Cancel",
+            on_yes_callback=self.handle_open,
+        )
+
+    def handle_open(self):
+        if self.input:
+            filename_input = self.input.value.strip()
+            if filename_input:
+                return filename_input
+            else:
+                self.notify("Filename cannot be empty", title="Open", severity="error")
+                return None
+
+        return None
+
+
 class RowDetailScreen(TableScreen):
     """Modal screen to display a single row's details."""
 
@@ -976,12 +1001,13 @@ class DataFrameTable(DataTable):
         - **U** - 🔄 Reset all
     """).strip()
 
-    # Make cursor_coordinate reactive for highlighting
-    cursor_coordinate: Reactive[Coordinate] = Reactive(
-        Coordinate(0, 0), always_update=True
-    )
-
-    def __init__(self, df: pl.DataFrame, filename: str = "", **kwargs):
+    def __init__(
+        self,
+        df: pl.DataFrame,
+        filename: str = "",
+        tabname: str = "",
+        **kwargs,
+    ):
         """Initialize the DataFrameTable with a dataframe and manage all state.
 
         Args:
@@ -995,6 +1021,7 @@ class DataFrameTable(DataTable):
         self.dataframe = df  # Original dataframe
         self.df = df  # Internal/working dataframe
         self.filename = filename  # Current filename
+        self.tabname = tabname or Path(filename).stem  # Current tab name
 
         # Pagination & Loading
         self.loaded_rows = 0  # Track how many rows are currently loaded
@@ -1205,6 +1232,10 @@ class DataFrameTable(DataTable):
             # Open pin screen to set fixed rows and columns
             self._open_freeze_screen()
 
+    def on_mouse_scroll_down(self, event) -> None:
+        """Load more rows when scrolling down with mouse."""
+        self._check_and_load_more()
+
     # Setup & Loading
     def _setup_table(self, reset: bool = False) -> None:
         """Setup the table for display."""
@@ -1305,7 +1336,10 @@ class DataFrameTable(DataTable):
         # Update loaded rows count
         self.loaded_rows = stop
 
-        self.app.notify(f"Loaded {self.loaded_rows}/{len(self.df)} rows", title="Load")
+        self.app.notify(
+            f"Loaded [$accent]{self.loaded_rows}/{len(self.df)}[/] rows from [on $primary]{self.tabname}[/]",
+            title="Load",
+        )
 
     def _highlight_rows(self, clear: bool = False) -> None:
         """Update all rows, highlighting selected ones in red and restoring others to default.
@@ -2176,19 +2210,40 @@ class DataFrameTable(DataTable):
 
     def _do_save(self, filename: str) -> None:
         """Actually save the dataframe to a file."""
-        ext = os.path.splitext(filename)[1].lower()
-        if ext in (".tsv", ".tab"):
-            separator = "\t"
-        else:
-            separator = ","
+        filepath = Path(filename)
+        ext = filepath.suffix.lower()
+
         try:
-            self.df.write_csv(filename, separator=separator)
+            if ext in (".xlsx", ".xls"):
+                # Save current dataframe to Excel
+                # self.df.write_excel(filename)
+                self._do_save_excel(filename)
+            else:
+                if ext in (".tsv", ".tab"):
+                    separator = "\t"
+                else:
+                    separator = ","
+
+                self.df.write_csv(filename, separator=separator)
+
             self.dataframe = self.df  # Update original dataframe
             self.filename = filename  # Update current filename
             self.app.notify(
                 f"Saved [$accent]{len(self.df)}[/] rows to [on $primary]{filename}[/]",
                 title="Save",
             )
+        except Exception as e:
+            self.app.notify(f"Failed to save: {str(e)}", title="Save", severity="error")
+            raise e
+
+    def _do_save_excel(self, filename: str) -> None:
+        """Save all dataframes to an Excel file."""
+        import xlsxwriter
+
+        try:
+            with xlsxwriter.Workbook(filename) as wb:
+                for tab_name, table in self.app.open_tables.items():
+                    table.df.write_excel(wb, worksheet=tab_name[:31])
         except Exception as e:
             self.app.notify(f"Failed to save: {str(e)}", title="Save", severity="error")
             raise e
@@ -2281,7 +2336,7 @@ class DataFrameHelpPanel(Widget):
                 pass
 
     def compose(self) -> ComposeResult:
-        yield Markdown(id="widget-help")
+        yield VerticalScroll(Markdown(id="widget-help"))
 
 
 class DataFrameApp(App):
@@ -2298,19 +2353,22 @@ class DataFrameApp(App):
     ]
 
     CSS = """
-        /* Make it scrollable */
-        Markdown {
-            height: 1fr;          /* Fill available vertical space */
-            width: 1fr;           /* Fill available horizontal space */
-            overflow-y: auto;     /* Enable vertical scrolling */
-            overflow-x: auto;     /* (optional) Enable horizontal scrolling */
+        TabbedContent {
+            height: 100%;  /* Or a specific value, e.g., 20; */
+        }
+        TabbedContent > ContentTabs {
+            dock: bottom;
+        }
+        TabbedContent > ContentSwitcher {
+            overflow: auto;
+            height: 1fr;  /* Takes the remaining space below tabs */
         }
     """
 
     def __init__(self, filenames: list[str]):
         super().__init__()
         self.filenames = filenames
-        self.open_tables: dict[str, DataFrameTable] = {}  # {filename: table}
+        self.open_tables: dict[str, DataFrameTable] = {}  # {tabname: table}
         self.help_panel = None
 
     def compose(self) -> ComposeResult:
@@ -2322,21 +2380,23 @@ class DataFrameApp(App):
             df, filename, tabname = sources[0]
             try:
                 table = DataFrameTable(df, filename, zebra_stripes=True)
-                self.open_tables[filename] = table
+                self.open_tables[tabname] = table
                 yield table
             except Exception as e:
                 self.notify(f"Error loading {filename}: {e}", severity="error")
         else:
             # Multiple files: use tabbed interface
-            with TabbedContent(id="main_tabs", initial="tab_1"):
+            with TabbedContent(id="main_tabs"):
                 for idx, (df, filename, tabname) in enumerate(sources):
-                    self.log(
-                        f"Loading tab: tab_id, (filename, tabname, df) = {idx}, {filename}, {tabname}, {df.shape}"
-                    )
+                    tab_id = f"tab_{idx + 1}"
+                    self.log(f"======= Loading {tabname=} {tab_id=} {filename=}")
+
                     try:
-                        table = DataFrameTable(df, filename, zebra_stripes=True)
-                        self.open_tables[filename] = table
-                        yield TabPane(tabname, table, id=f"tab_{idx + 1}")
+                        table = DataFrameTable(
+                            df, filename, tabname=tabname, id=tab_id, zebra_stripes=True
+                        )
+                        self.open_tables[tabname] = table
+                        yield TabPane(tabname, table, id=tab_id)
                     except Exception as e:
                         self.notify(f"Error loading {tabname}: {e}", severity="error")
 
@@ -2344,43 +2404,27 @@ class DataFrameApp(App):
         """Set up the app when it starts."""
         pass
 
-    def on_mouse_scroll_down(self, event) -> None:
-        """Load more rows when scrolling down with mouse."""
-        table = self._get_active_table()
-        if table:
-            table._check_and_load_more()
-
-    def on_data_table_cell_selected(self, event: DataTable.CellSelected) -> None:
-        """Update reactive cursor coordinate in table when cell is selected."""
-        table = self._get_active_table()
-        if table:
-            table.cursor_coordinate = event.coordinate
-
-    def on_tabbed_content_changed(self, event: TabbedContent.Changed) -> None:
+    def on_tabbed_content_tab_activated(
+        self, event: TabbedContent.TabActivated
+    ) -> None:
         """Handle tab changes (only for multiple files)."""
         # Only process if we have multiple files
-        if len(self.filenames) <= 1:
+        if len(self.open_tables) <= 1:
             return
 
         try:
-            active_pane = event.pane
-            table = active_pane.query_one(DataFrameTable)
-            self.open_tables[active_pane.id] = table
+            # Focus the table in the newly activated tab
+            if table := self._get_active_table():
+                table.focus()
         except NoMatches:
             pass
 
     def _get_active_table(self) -> Optional[DataFrameTable]:
         """Get the currently active table."""
         try:
-            if len(self.filenames) == 1:
-                # Single file: return the direct table
-                return self.query_one(DataFrameTable)
-            else:
-                # Multiple files: return the active tab's table
-                tabbed = self.query_one(TabbedContent)
-                active_pane = tabbed.active_pane
-                if active_pane:
-                    return active_pane.query_one(DataFrameTable)
+            tabbed: TabbedContent = self.query_one(TabbedContent)
+            if active_pane := tabbed.active_pane:
+                return active_pane.query_one(DataFrameTable)
         except (NoMatches, AttributeError):
             pass
         return None
@@ -2427,7 +2471,7 @@ class DataFrameApp(App):
         if len(self.filenames) <= 1:
             return
         try:
-            tabbed = self.query_one(TabbedContent)
+            tabbed: TabbedContent = self.query_one(TabbedContent)
             tabs = tabbed.tabs
             if tabs:
                 current_idx = tabs.index(tabbed.active_tab)
@@ -2489,34 +2533,14 @@ class DataFrameApp(App):
             pass
 
 
-class OpenFileScreen(ModalScreen):
-    """Screen for opening a file."""
-
-    def compose(self) -> ComposeResult:
-        """Create the file open dialog."""
-        yield Label("Enter filename:")
-        yield Input(id="filename")
-        with Horizontal():
-            yield Button("Open", id="open", variant="primary")
-            yield Button("Cancel", id="cancel")
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button presses."""
-        if event.button.id == "open":
-            filename = self.query_one(Input).value
-            self.dismiss(filename)
-        else:
-            self.dismiss("")
-
-
 def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame, str, str]]:
     """Load a DataFrame from a file spec.
 
     Args:
-        file_spec: Either "path.csv" or "path.xlsx::sheet_name"
+        filenames: List of filenames to load. If single filename is "-", read from stdin.
 
     Returns:
-        Tuple of (DataFrame, display_name)
+        List of tuples of (DataFrame, filename, tabname)
     """
     data = []
 
@@ -2567,7 +2591,7 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Examples:\n"
         "  python main.py data.csv\n"
-        "  python main.py file1.csv file2.xlsx file3.csv\n"
+        "  python main.py file1.csv file2.csv file3.csv\n"
         "  python main.py data.xlsx  (opens all sheets in tabs)\n"
         "  cat data.csv | python main.py\n",
     )
