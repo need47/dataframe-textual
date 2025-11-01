@@ -4,7 +4,7 @@ from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Optional
+from typing import Any
 
 import polars as pl
 from rich.text import Text
@@ -376,18 +376,18 @@ class SaveFileScreen(YesNoScreen):
         return None
 
 
-class OverwriteFileScreen(YesNoScreen):
+class ConfirmScreen(YesNoScreen):
     """Modal screen to confirm file overwrite."""
 
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "OverwriteFileScreen")
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ConfirmScreen")
 
-    def __init__(self):
+    def __init__(self, title: str):
         super().__init__(
-            title="File already exists. Overwrite?",
-            on_yes_callback=self.handle_overwrite,
+            title=title,
+            on_yes_callback=self.handle_confirm,
         )
 
-    def handle_overwrite(self) -> None:
+    def handle_confirm(self) -> None:
         self.dismiss(True)
 
 
@@ -702,7 +702,7 @@ class OpenFileScreen(YesNoScreen):
     def __init__(self):
         super().__init__(
             title="Open File",
-            input="Enter /path/to/file",
+            input="Enter relative or absolute file path",
             yes="Open",
             no="Cancel",
             on_yes_callback=self.handle_open,
@@ -2192,13 +2192,23 @@ class DataFrameTable(DataTable):
         if os.path.exists(filename):
             self._pending_filename = filename
             self.app.push_screen(
-                OverwriteFileScreen(), callback=self._on_overwrite_screen
+                ConfirmScreen("File already exists. Overwrite?"),
+                callback=self._on_overwrite_screen,
+            )
+        elif len(self.app.tabs) > 1 and Path(filename).suffix.lower() in (
+            ".xlsx",
+            ".xls",
+        ):
+            self._pending_filename = filename
+            self.app.push_screen(
+                ConfirmScreen("Save all tabs to Excel?"),
+                callback=self._do_save_excel,
             )
         else:
             self._do_save(filename)
 
     def _on_overwrite_screen(self, should_overwrite: bool) -> None:
-        """Handle result from OverwriteFileScreen."""
+        """Handle result from ConfirmScreen."""
         if should_overwrite:
             self._do_save(self._pending_filename)
         else:
@@ -2215,9 +2225,8 @@ class DataFrameTable(DataTable):
 
         try:
             if ext in (".xlsx", ".xls"):
-                # Save current dataframe to Excel
-                # self.df.write_excel(filename)
-                self._do_save_excel(filename)
+                self._pending_filename = filename
+                self._do_save_excel()
             else:
                 if ext in (".tsv", ".tab"):
                     separator = "\t"
@@ -2236,17 +2245,30 @@ class DataFrameTable(DataTable):
             self.app.notify(f"Failed to save: {str(e)}", title="Save", severity="error")
             raise e
 
-    def _do_save_excel(self, filename: str) -> None:
-        """Save all dataframes to an Excel file."""
+    def _do_save_excel(self, all_tabs: bool = False) -> None:
+        """Save to an Excel file."""
         import xlsxwriter
 
-        try:
-            with xlsxwriter.Workbook(filename) as wb:
-                for tab_name, table in self.app.open_tables.items():
-                    table.df.write_excel(wb, worksheet=tab_name[:31])
-        except Exception as e:
-            self.app.notify(f"Failed to save: {str(e)}", title="Save", severity="error")
-            raise e
+        if not all_tabs or len(self.app.tabs) == 1:
+            # Single tab - save directly
+            self.df.write_excel(self._pending_filename)
+        else:
+            # Multiple tabs - use xlsxwriter to create multiple sheets
+            with xlsxwriter.Workbook(self._pending_filename) as wb:
+                for table in self.app.tabs.values():
+                    table.df.write_excel(wb, worksheet=table.tabname[:31])
+
+        # From ConfirmScreen callback, so notify accordingly
+        if all_tabs is True:
+            self.app.notify(
+                f"Saved all tabs to [on $primary]{self._pending_filename}[/]",
+                title="Save",
+            )
+        elif all_tabs is None:
+            self.app.notify(
+                f"Saved current tab with [$accent]{len(self.df)}[/] rows to [on $primary]{self._pending_filename}[/]",
+                title="Save",
+            )
 
 
 class DataFrameHelpPanel(Widget):
@@ -2348,8 +2370,8 @@ class DataFrameApp(App):
         ("k", "toggle_dark", "Toggle Dark Mode"),
         ("ctrl+o", "open_file", "Open File"),
         ("ctrl+w", "close_file", "Close Tab"),
-        ("ctrl+tab", "next_tab", "Next Tab"),
-        ("ctrl+shift+tab", "prev_tab", "Prev Tab"),
+        ("greater_than_sign", "next_tab", "Next Tab"),
+        ("less_than_sign", "prev_tab", "Prev Tab"),
     ]
 
     CSS = """
@@ -2368,37 +2390,35 @@ class DataFrameApp(App):
     def __init__(self, filenames: list[str]):
         super().__init__()
         self.filenames = filenames
-        self.open_tables: dict[str, DataFrameTable] = {}  # {tabname: table}
+        self.tabs: dict[TabPane, DataFrameTable] = {}  # {tab: table}
         self.help_panel = None
+
+        self.last_closed: tuple[TabPane, DataFrameTable] | None = None
 
     def compose(self) -> ComposeResult:
         """Create tabbed interface for multiple files or direct table for single file."""
         sources = _load_dataframe(self.filenames)
 
-        # Single table (no tab interface)
-        if len(sources) == 1:
-            df, filename, tabname = sources[0]
-            try:
-                table = DataFrameTable(df, filename, zebra_stripes=True)
-                self.open_tables[tabname] = table
-                yield table
-            except Exception as e:
-                self.notify(f"Error loading {filename}: {e}", severity="error")
-        else:
-            # Multiple files: use tabbed interface
-            with TabbedContent(id="main_tabs"):
-                for idx, (df, filename, tabname) in enumerate(sources):
-                    tab_id = f"tab_{idx + 1}"
-                    self.log(f"======= Loading {tabname=} {tab_id=} {filename=}")
+        # Tabbed interface
+        self.tabbed = TabbedContent(id="main_tabs")
+        with self.tabbed:
+            seen_names = set()
+            for idx, (df, filename, tabname) in enumerate(sources, start=1):
+                # Ensure unique tab names
+                if tabname in seen_names:
+                    tabname = f"{tabname}_{idx}"
+                seen_names.add(tabname)
 
-                    try:
-                        table = DataFrameTable(
-                            df, filename, tabname=tabname, id=tab_id, zebra_stripes=True
-                        )
-                        self.open_tables[tabname] = table
-                        yield TabPane(tabname, table, id=tab_id)
-                    except Exception as e:
-                        self.notify(f"Error loading {tabname}: {e}", severity="error")
+                tab_id = f"tab_{idx}"
+                try:
+                    table = DataFrameTable(
+                        df, filename, name=tabname, id=tab_id, zebra_stripes=True
+                    )
+                    tab = TabPane(tabname, table, name=tabname, id=tab_id)
+                    self.tabs[tab] = table
+                    yield tab
+                except Exception as e:
+                    self.notify(f"Error loading {tabname}: {e}", severity="error")
 
     def on_mount(self) -> None:
         """Set up the app when it starts."""
@@ -2407,9 +2427,9 @@ class DataFrameApp(App):
     def on_tabbed_content_tab_activated(
         self, event: TabbedContent.TabActivated
     ) -> None:
-        """Handle tab changes (only for multiple files)."""
+        """Handle tab changes (only for multiple tabs)."""
         # Only process if we have multiple files
-        if len(self.open_tables) <= 1:
+        if len(self.tabs) <= 1:
             return
 
         try:
@@ -2419,7 +2439,7 @@ class DataFrameApp(App):
         except NoMatches:
             pass
 
-    def _get_active_table(self) -> Optional[DataFrameTable]:
+    def _get_active_table(self) -> DataFrameTable | None:
         """Get the currently active table."""
         try:
             tabbed: TabbedContent = self.query_one(TabbedContent)
@@ -2454,29 +2474,30 @@ class DataFrameApp(App):
         if filename and os.path.exists(filename):
             try:
                 df = pl.read_csv(filename)
-                self._add_table_tab(df, filename)
-                self.notify(f"Opened: {Path(filename).name}", title="File")
+                self._add_tab(df, filename)
+                self.notify(
+                    f"Opened: [on $primary]{Path(filename).name}[/]", title="Open"
+                )
             except Exception as e:
                 self.notify(f"Error: {e}", severity="error")
 
     def action_close_file(self) -> None:
         """Close current tab (only for multiple files)."""
-        if len(self.filenames) <= 1:
+        if len(self.tabs) <= 1:
             self.app.exit()
             return
-        self._close_current_tab()
+        self._close_tab()
 
-    def action_next_tab(self) -> None:
+    def action_next_tab(self) -> str:
         """Switch to next tab (only for multiple files)."""
-        if len(self.filenames) <= 1:
+        if len(self.tabs) <= 1:
             return
         try:
-            tabbed: TabbedContent = self.query_one(TabbedContent)
-            tabs = tabbed.tabs
-            if tabs:
-                current_idx = tabs.index(tabbed.active_tab)
-                next_idx = (current_idx + 1) % len(tabs)
-                tabbed.active_tab = tabs[next_idx]
+            tabs: list[TabPane] = list(self.tabs.keys())
+            current_idx = tabs.index(self.tabbed.active_pane)
+            next_idx = (current_idx + 1) % len(tabs)
+            next_tab = tabs[next_idx]
+            self.tabbed.active = next_tab.id
         except (NoMatches, ValueError):
             pass
 
@@ -2485,50 +2506,40 @@ class DataFrameApp(App):
         if len(self.filenames) <= 1:
             return
         try:
-            tabbed = self.query_one(TabbedContent)
-            tabs = tabbed.tabs
-            if tabs:
-                current_idx = tabs.index(tabbed.active_tab)
-                prev_idx = (current_idx - 1) % len(tabs)
-                tabbed.active_tab = tabs[prev_idx]
+            tabs: list[TabPane] = list(self.tabs.keys())
+            current_idx = tabs.index(self.tabbed.active_pane)
+            prev_idx = (current_idx - 1) % len(tabs)
+            prev_tab = tabs[prev_idx]
+            self.tabbed.active = prev_tab.id
         except (NoMatches, ValueError):
             pass
 
-    def _add_table_tab(self, df: pl.DataFrame, filename: str) -> None:
+    def _add_tab(self, df: pl.DataFrame, filename: str) -> None:
         """Add new table tab. If single file, replace table; if multiple, add tab."""
-        try:
-            if len(self.filenames) == 1:
-                # Single file: replace the existing table
-                old_table = self.query_one(DataFrameTable)
-                new_table = DataFrameTable(df, filename, zebra_stripes=True)
-                old_table.remove()
-                self.mount(new_table)
-                self.open_tables[filename] = new_table
-                self.filenames = [filename]
-            else:
-                # Multiple files: add as a new tab
-                tabbed = self.query_one(TabbedContent)
-                table = DataFrameTable(df, filename, zebra_stripes=True)
-                tab_pane = TabPane(Path(filename).name, table, id=filename)
-                tabbed.add_pane(tab_pane)
-                self.open_tables[filename] = table
-                tabbed.active_tab = tab_pane
-        except NoMatches:
-            pass
+        table = DataFrameTable(df, filename, zebra_stripes=True)
+        tabname = Path(filename).stem
+        if any(tab.name == tabname for tab in self.tabs):
+            tabname = f"{tabname}_{len(self.tabs) + 1}"
 
-    def _close_current_tab(self) -> None:
+        tab = TabPane(tabname, table, name=tabname, id=f"tab_{len(self.tabs) + 1}")
+        self.tabbed.add_pane(tab)
+        self.tabs[tab.id] = table
+
+        # Activate the new tab
+        self.tabbed.active = tab.id
+        table.focus()
+
+    def _close_tab(self) -> None:
         """Close current tab."""
         try:
-            tabbed = self.query_one(TabbedContent)
-            active_pane = tabbed.active_pane
-            if active_pane and len(tabbed.tabs) > 1:
-                file_id = active_pane.id
-                active_pane.remove()
-                if file_id in self.open_tables:
-                    del self.open_tables[file_id]
-                self.notify("Tab closed", title="Info")
-            elif len(tabbed.tabs) == 1:
-                self.notify("Cannot close last tab", title="Info")
+            if len(self.tabs) == 1:
+                self.app.exit()
+            else:
+                if active_pane := self.tabbed.active_pane:
+                    self.tabbed.remove_pane(active_pane.id)
+                    self.notify(
+                        f"Closed tab [on $primary]{active_pane.name}[/]", title="Close"
+                    )
         except NoMatches:
             pass
 
