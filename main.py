@@ -944,62 +944,54 @@ class DataFrameTable(DataTable):
 
     # Help text for the DataTable which will be shown in the HelpPanel
     HELP = dedent("""
-        # 📊 DataFrame Viewer - Quick Help
+        # 📊 DataFrame Viewer - Table Controls
 
         ## ⬆️ Navigation
-        - **q** - 🚪 Quit
-        - **↑↓←→** - 🎯 Move cursor
-        - **g** - ⬆️ First row
-        - **G** - ⬇️ Last row
-        - **PgUp/Dn** - 📜 Scroll
+        - **↑↓←→** - 🎯 Move cursor (cell/row/column)
+        - **g** - ⬆️ Jump to first row
+        - **G** - ⬇️ Jump to last row
+        - **PgUp/PgDn** - 📜 Page up/down
 
-        ## 👁️ View & Cursor
-        - **Enter** - 📋 Row detail table
-        - **F** - 📈 Frequency table of olumn
-        - **#** - 🏷️ Toggle labels
-        - **k** - 🌙 Toggle dark mode
-        - **C** - 🔄 Cycle cursor type (cell/row/col)
+        ## 👁️ View & Display
+        - **Enter** - 📋 Show row details in modal
+        - **F** - 📊 Show frequency distribution
+        - **C** - 🔄 Cycle cursor (cell → row → column → cell)
+        - **#** - 🏷️ Toggle row labels
 
-        ## ✏️ Editing
-        - **e** - ✍️ Edit cell
-        - **d** - 🗑️ Delete row
-        - **-** - ❌ Delete column
+        ## ↕️ Sorting
+        - **[** - 🔼 Sort column ascending
+        - **]** - 🔽 Sort column descending
+        - *(Multi-column sort supported)*
 
-        ## 🔍 Search & Filter
-        - **|** - 🔎 Search column
-        - **\\\\** - 🎯 Search cell value
+        ## 🔍 Search
+        - **|** - 🔎 Search in current column
         - **/** - 🌐 Global search (all columns)
-        - **t** - 💡 Toggle selection
-        - **"** - 📍 Filter to selected
-        - **T** - 🧹 Clear selection
-        - **v** - 🔧 Filter by cell value
+        - **\\\\** - 🔍 Search using current cell value
+
+        ## 🔧 Filter & Select
+        - **t** - 💡 Toggle row selection
+        - **"** - 📍 Filter to selected rows only
+        - **T** - 🧹 Clear all selections
+        - **v** - ⚙️ Filter by current cell value
         - **V** - 🔧 Filter by Polars expression
 
-        ## 📊 Sort
-        - **[** - 🔼 Sort ascending
-        - **]** - 🔽 Sort descending
+        ## ✏️ Edit & Modify
+        - **e** - ✍️ Edit current cell
+        - **d** - �️ Delete current row
+        - **-** - ❌ Delete current column
 
-        ## 📋 Row Detail
-        - **v** - 🔻 Filter to selected column value
-        - **"** - 🟡 Highlight selected column value
-        - **q/Esc** - 🚪 Close details
-
-        ## 📈 Frequency Table
-        - **[** - 🔼 Sort by column ascending
-        - **]** - 🔽 Sort by column descending
-        - **v** - 🔻 Filter to selected value
-        - **"** - 🟡 Highlight selected value
-        - **q/Esc** - 🚪 Close table
-
-        ## ↔️ Reorder
-        - **Shift+↑↓←→** - 🔀 Move row/column
+        ## 🎯 Reorder
+        - **Shift+↑↓** - ⬆️⬇️ Move row up/down
+        - **Shift+←→** - ⬅️➡️ Move column left/right
 
         ## 💾 Data Management
-        - **f** - 📌 Freeze rows/cols
-        - **c** - 📋 Copy cell
-        - **Ctrl+S** - 💾 Save
-        - **u** - ↩️ Undo
-        - **U** - 🔄 Reset all
+        - **f** - 📌 Freeze rows/columns
+        - **c** - 📋 Copy cell to clipboard
+        - **Ctrl+S** - 💾 Save to file
+        - **u** - ↩️ Undo last action
+        - **U** - 🔄 Reset to original data
+
+        *Use `?` to see app-level controls*
     """).strip()
 
     def __init__(
@@ -2350,7 +2342,7 @@ class DataFrameHelpPanel(Widget):
             return
         self.set_class(focused_widget is not None, "-show-help")
         if focused_widget is not None:
-            help = focused_widget.HELP or ""
+            help = self.app.HELP + "\n" + focused_widget.HELP or ""
             if not help:
                 self.remove_class("-show-help")
             try:
@@ -2364,6 +2356,33 @@ class DataFrameHelpPanel(Widget):
 
 class DataFrameApp(App):
     """A Textual app to interact with multiple Polars DataFrames via tabbed interface."""
+
+    HELP = dedent("""
+        # 📊 DataFrame Viewer - App Controls
+
+        ## 🎯 File & Tab Management
+        - **Ctrl+O** - 📁 Open CSV file
+        - **Ctrl+W** - ❌ Close current tab
+        - **>** - ▶️ Next tab
+        - **<** - ◀️ Previous tab
+        - **b** - 👁️ Toggle tab bar visibility
+        - **q** - 🚪 Quit application
+
+        ## 🎨 View & Settings
+        - **?** or **h** - ❓ Toggle this help panel
+        - **k** - 🌙 Toggle dark/light mode
+
+        ## ⭐ Features
+        - **Multi-file support** - 📂 Open multiple CSV/Excel files as tabs
+        - **Excel sheets** - 📊 Excel files auto-expand sheets into tabs
+        - **Lazy loading** - ⚡ Large files load on demand
+        - **Sticky tabs** - 📌 Tab bar stays visible when scrolling
+        - **Rich formatting** - 🎨 Color-coded data types
+        - **Search & filter** - 🔍 Find and filter data quickly
+        - **Sort & reorder** - ⬆️ Multi-column sort, drag rows/columns
+        - **Undo/Redo** - 🔄 Full history of operations
+        - **Freeze rows/cols** - 🔒 Pin header rows and columns
+    """).strip()
 
     BINDINGS = [
         ("q", "quit", "Quit"),
@@ -2392,10 +2411,8 @@ class DataFrameApp(App):
     def __init__(self, filenames: list[str]):
         super().__init__()
         self.filenames = filenames
-        self.tabs: dict[TabPane, DataFrameTable] = {}  # {tab: table}
+        self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel = None
-
-        self.last_closed: tuple[TabPane, DataFrameTable] | None = None
 
     def compose(self) -> ComposeResult:
         """Create tabbed interface for multiple files or direct table for single file."""
@@ -2459,14 +2476,6 @@ class DataFrameApp(App):
         else:
             self.help_panel = DataFrameHelpPanel()
             self.mount(self.help_panel)
-
-            def update_markdown():
-                table = self._get_active_table()
-                if table:
-                    markdown = self.query_one(Markdown)
-                    markdown.update(table.HELP)
-
-            self.call_later(update_markdown)
 
     def action_open_file(self) -> None:
         """Open file dialog to load CSV."""
