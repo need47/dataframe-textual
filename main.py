@@ -31,6 +31,7 @@ from textual.widgets._data_table import (
     CursorType,
     RowKey,
 )
+from textual.widgets.tabbed_content import ContentTabs
 
 # Boolean string mappings
 BOOLS = {
@@ -2368,6 +2369,7 @@ class DataFrameApp(App):
         ("q", "quit", "Quit"),
         ("h,?", "toggle_help_panel", "Help"),
         ("k", "toggle_dark", "Toggle Dark Mode"),
+        ("b", "toggle_tab_bar", "Toggle Tab Bar"),
         ("ctrl+o", "open_file", "Open File"),
         ("ctrl+w", "close_file", "Close Tab"),
         ("greater_than_sign", "next_tab", "Next Tab"),
@@ -2422,7 +2424,8 @@ class DataFrameApp(App):
 
     def on_mount(self) -> None:
         """Set up the app when it starts."""
-        pass
+        if len(self.tabs) == 1:
+            self.query_one(ContentTabs).display = False
 
     def on_tabbed_content_tab_activated(
         self, event: TabbedContent.TabActivated
@@ -2525,6 +2528,9 @@ class DataFrameApp(App):
         self.tabbed.add_pane(tab)
         self.tabs[tab.id] = table
 
+        if len(self.tabs) > 1:
+            self.query_one(ContentTabs).display = True
+
         # Activate the new tab
         self.tabbed.active = tab.id
         table.focus()
@@ -2542,6 +2548,13 @@ class DataFrameApp(App):
                     )
         except NoMatches:
             pass
+
+    def action_toggle_tab_bar(self) -> None:
+        """Toggle tab bar visibility."""
+        tabs = self.query_one(ContentTabs)
+        tabs.display = not tabs.display
+        status = "shown" if tabs.display else "hidden"
+        self.notify(f"Tab bar [on $primary]{status}[/]", title="Toggle")
 
 
 def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame, str, str]]:
