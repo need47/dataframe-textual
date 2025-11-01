@@ -2,6 +2,7 @@ import os
 import sys
 from collections import deque
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
@@ -358,9 +359,9 @@ class SaveFileScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SaveFileScreen")
 
-    def __init__(self, filename: str):
+    def __init__(self, filename: str, title="Save Tab"):
         super().__init__(
-            title="Save DataFrame",
+            title=title,
             input=filename,
             on_yes_callback=self.handle_save,
         )
@@ -987,7 +988,7 @@ class DataFrameTable(DataTable):
         ## 💾 Data Management
         - **f** - 📌 Freeze rows/columns
         - **c** - 📋 Copy cell to clipboard
-        - **Ctrl+S** - 💾 Save to file
+        - **Ctrl+S** - 💾 Save current tabto file
         - **u** - ↩️ Undo last action
         - **U** - 🔄 Reset to original data
 
@@ -2176,27 +2177,27 @@ class DataFrameTable(DataTable):
             SaveFileScreen(self.filename), callback=self._on_save_file_screen
         )
 
-    def _on_save_file_screen(self, filename: str | None) -> None:
+    def _on_save_file_screen(
+        self, filename: str | None, all_tabs: bool = False
+    ) -> None:
         """Handle result from SaveFileScreen."""
         if filename is None:
             return
+        filepath = Path(filename)
+        ext = filepath.suffix.lower()
+
+        # Whether to save all tabs (for Excel files)
+        self._all_tabs = all_tabs
 
         # Check if file exists
-        if os.path.exists(filename):
+        if filepath.exists():
             self._pending_filename = filename
             self.app.push_screen(
                 ConfirmScreen("File already exists. Overwrite?"),
                 callback=self._on_overwrite_screen,
             )
-        elif len(self.app.tabs) > 1 and Path(filename).suffix.lower() in (
-            ".xlsx",
-            ".xls",
-        ):
-            self._pending_filename = filename
-            self.app.push_screen(
-                ConfirmScreen("Save all tabs to Excel?"),
-                callback=self._do_save_excel,
-            )
+        elif ext in (".xlsx", ".xls"):
+            self._do_save_excel(filename)
         else:
             self._do_save(filename)
 
@@ -2218,48 +2219,49 @@ class DataFrameTable(DataTable):
 
         try:
             if ext in (".xlsx", ".xls"):
-                self._pending_filename = filename
-                self._do_save_excel()
+                self._do_save_excel(filename)
+            elif ext in (".tsv", ".tab"):
+                self.df.write_csv(filename, separator="\t")
+            elif ext == ".json":
+                self.df.write_json(filename)
+            elif ext == ".parquet":
+                self.df.write_parquet(filename)
             else:
-                if ext in (".tsv", ".tab"):
-                    separator = "\t"
-                else:
-                    separator = ","
-
-                self.df.write_csv(filename, separator=separator)
+                self.df.write_csv(filename)
 
             self.dataframe = self.df  # Update original dataframe
             self.filename = filename  # Update current filename
-            self.app.notify(
-                f"Saved [$accent]{len(self.df)}[/] rows to [on $primary]{filename}[/]",
-                title="Save",
-            )
+            if not self._all_tabs:
+                self.app.notify(
+                    f"Saved [$accent]{len(self.df)}[/] rows to [on $primary]{filename}[/]",
+                    title="Save",
+                )
         except Exception as e:
             self.app.notify(f"Failed to save: {str(e)}", title="Save", severity="error")
             raise e
 
-    def _do_save_excel(self, all_tabs: bool = False) -> None:
+    def _do_save_excel(self, filename: str) -> None:
         """Save to an Excel file."""
         import xlsxwriter
 
-        if not all_tabs or len(self.app.tabs) == 1:
+        if not self._all_tabs or len(self.app.tabs) == 1:
             # Single tab - save directly
-            self.df.write_excel(self._pending_filename)
+            self.df.write_excel(filename)
         else:
             # Multiple tabs - use xlsxwriter to create multiple sheets
-            with xlsxwriter.Workbook(self._pending_filename) as wb:
+            with xlsxwriter.Workbook(filename) as wb:
                 for table in self.app.tabs.values():
                     table.df.write_excel(wb, worksheet=table.tabname[:31])
 
         # From ConfirmScreen callback, so notify accordingly
-        if all_tabs is True:
+        if self._all_tabs is True:
             self.app.notify(
-                f"Saved all tabs to [on $primary]{self._pending_filename}[/]",
+                f"Saved all tabs to [on $primary]{filename}[/]",
                 title="Save",
             )
-        elif all_tabs is None:
+        else:
             self.app.notify(
-                f"Saved current tab with [$accent]{len(self.df)}[/] rows to [on $primary]{self._pending_filename}[/]",
+                f"Saved current tab with [$accent]{len(self.df)}[/] rows to [on $primary]{filename}[/]",
                 title="Save",
             )
 
@@ -2361,7 +2363,8 @@ class DataFrameApp(App):
         # 📊 DataFrame Viewer - App Controls
 
         ## 🎯 File & Tab Management
-        - **Ctrl+O** - 📁 Open CSV file
+        - **Ctrl+O** - 📁 Add a new tab
+        - **Ctrl+Shift+S** - 💾 Save all tabs
         - **Ctrl+W** - ❌ Close current tab
         - **>** - ▶️ Next tab
         - **<** - ◀️ Previous tab
@@ -2389,10 +2392,11 @@ class DataFrameApp(App):
         ("h,?", "toggle_help_panel", "Help"),
         ("k", "toggle_dark", "Toggle Dark Mode"),
         ("b", "toggle_tab_bar", "Toggle Tab Bar"),
-        ("ctrl+o", "open_file", "Open File"),
-        ("ctrl+w", "close_file", "Close Tab"),
-        ("greater_than_sign", "next_tab", "Next Tab"),
-        ("less_than_sign", "prev_tab", "Prev Tab"),
+        ("ctrl+o", "add_tab", "Add Tab"),
+        ("ctrl+shift+s", "save_all_tabs", "Save All Tabs"),
+        ("ctrl+w", "close_tab", "Close Tab"),
+        ("greater_than_sign", "next_tab(1)", "Next Tab"),
+        ("less_than_sign", "next_tab(-1)", "Prev Tab"),
     ]
 
     CSS = """
@@ -2477,8 +2481,8 @@ class DataFrameApp(App):
             self.help_panel = DataFrameHelpPanel()
             self.mount(self.help_panel)
 
-    def action_open_file(self) -> None:
-        """Open file dialog to load CSV."""
+    def action_add_tab(self) -> None:
+        """Open file dialog to load file to new tab."""
         self.push_screen(OpenFileScreen(), self._handle_file_open)
 
     def _handle_file_open(self, filename: str) -> None:
@@ -2493,36 +2497,31 @@ class DataFrameApp(App):
             except Exception as e:
                 self.notify(f"Error: {e}", severity="error")
 
-    def action_close_file(self) -> None:
+    def action_save_all_tabs(self) -> None:
+        """Save all tabs to a Excel file."""
+        callback = partial(self._get_active_table()._on_save_file_screen, all_tabs=True)
+        self.push_screen(
+            SaveFileScreen("all-tabs.xlsx", title="Save All Tabs"),
+            callback=callback,
+        )
+
+    def action_close_tab(self) -> None:
         """Close current tab (only for multiple files)."""
         if len(self.tabs) <= 1:
             self.app.exit()
             return
         self._close_tab()
 
-    def action_next_tab(self) -> str:
+    def action_next_tab(self, offset: int = 1) -> str:
         """Switch to next tab (only for multiple files)."""
         if len(self.tabs) <= 1:
             return
         try:
             tabs: list[TabPane] = list(self.tabs.keys())
             current_idx = tabs.index(self.tabbed.active_pane)
-            next_idx = (current_idx + 1) % len(tabs)
+            next_idx = (current_idx + offset) % len(tabs)
             next_tab = tabs[next_idx]
             self.tabbed.active = next_tab.id
-        except (NoMatches, ValueError):
-            pass
-
-    def action_prev_tab(self) -> None:
-        """Switch to previous tab (only for multiple files)."""
-        if len(self.filenames) <= 1:
-            return
-        try:
-            tabs: list[TabPane] = list(self.tabs.keys())
-            current_idx = tabs.index(self.tabbed.active_pane)
-            prev_idx = (current_idx - 1) % len(tabs)
-            prev_tab = tabs[prev_idx]
-            self.tabbed.active = prev_tab.id
         except (NoMatches, ValueError):
             pass
 
@@ -2535,7 +2534,7 @@ class DataFrameApp(App):
 
         tab = TabPane(tabname, table, name=tabname, id=f"tab_{len(self.tabs) + 1}")
         self.tabbed.add_pane(tab)
-        self.tabs[tab.id] = table
+        self.tabs[tab] = table
 
         if len(self.tabs) > 1:
             self.query_one(ContentTabs).display = True
@@ -2581,6 +2580,7 @@ def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame, str, str]]
     if len(filenames) == 1:
         filename = filenames[0]
         filepath = Path(filename)
+        ext = filepath.suffix.lower()
 
         # Handle stdin
         if filename == "-" or not sys.stdin.isatty():
@@ -2597,10 +2597,22 @@ def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame, str, str]]
 
             data.append((df, "stdin.csv", "stdin"))
         # Handle Excel files with multiple sheets
-        elif filename.endswith((".xlsx", ".xls")):
+        elif ext in (".xlsx", ".xls"):
             sheets = pl.read_excel(filename, sheet_id=0)
             for sheet_name, df in sheets.items():
                 data.append((df, filename, sheet_name))
+        # Handle TSV files
+        elif ext in (".tsv", ".tab"):
+            df = pl.read_csv(filename, separator="\t")
+            data.append((df, filename, filepath.stem))
+        # Handle JSON files
+        elif ext == ".json":
+            df = pl.read_json(filename)
+            data.append((df, filename, filepath.stem))
+        # Handle Parquet files
+        elif ext == ".parquet":
+            df = pl.read_parquet(filename)
+            data.append((df, filename, filepath.stem))
         # Handle regular CSV files
         else:
             df = pl.read_csv(filename)
@@ -2609,9 +2621,24 @@ def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame, str, str]]
     else:
         for filename in filenames:
             filepath = Path(filename)
+            ext = filepath.suffix.lower()
 
-            df = pl.read_csv(filename)
-            data.append((df, filename, filepath.stem))
+            if ext in (".xlsx", ".xls"):
+                # Read only the first sheet for multiple files
+                df = pl.read_excel(filename)
+                data.append((df, filename, filepath.stem))
+            elif ext in (".tsv", ".tab"):
+                df = pl.read_csv(filename, separator="\t")
+                data.append((df, filename, filepath.stem))
+            elif ext == ".json":
+                df = pl.read_json(filename)
+                data.append((df, filename, filepath.stem))
+            elif ext == ".parquet":
+                df = pl.read_parquet(filename)
+                data.append((df, filename, filepath.stem))
+            else:
+                df = pl.read_csv(filename)
+                data.append((df, filename, filepath.stem))
 
     return data
 

@@ -61,11 +61,14 @@ cat data.csv | python main.py
 python main.py < data.csv
 ```
 
-### Multi-File Usage - Compare Multiple Files
+### Multi-File Usage - Multiple Tabs
 
 ```bash
 # Open multiple files in tabs
 python main.py file1.csv file2.csv file3.csv
+
+# Open multiple sheets in tabs in an Excel file
+python main.py file.xlsx
 
 # Or with uv
 uv run python main.py file1.csv file2.csv file3.csv
@@ -76,7 +79,7 @@ python main.py data1.csv < data2.csv
 
 When multiple files are opened:
 - Each file appears as a separate tab at the top
-- Switch between tabs using `Ctrl+Tab` (next) or `Ctrl+Shift+Tab` (previous)
+- Switch between tabs using `>` (next) or `<` (previous)
 - Open additional files with `Ctrl+O`
 - Close the current tab with `Ctrl+W`
 - Each file maintains its own state (sort order, selections, history, etc.)
@@ -84,16 +87,32 @@ When multiple files are opened:
 
 ## Keyboard Shortcuts
 
-### Multi-File Navigation (New!)
+### App-Level Controls
+
+#### File & Tab Management
 
 | Key | Action |
 |-----|--------|
 | `Ctrl+O` | Open new CSV file in a new tab |
 | `Ctrl+W` | Close current tab |
-| `Ctrl+Tab` | Move to next tab |
-| `Ctrl+Shift+Tab` | Move to previous tab |
+| `Ctrl+Shift+S` | Save all open tabs to Excel file |
+| `>` | Move to next tab |
+| `<` | Move to previous tab |
+| `b` | Toggle tab bar visibility |
+| `q` | Quit the application |
 
-### Navigation
+#### View & Settings
+
+| Key | Action |
+|-----|--------|
+| `?` or `h` | Toggle help panel (context-sensitive) |
+| `k` | Toggle dark mode |
+
+---
+
+### Table-Level Controls
+
+#### Navigation
 
 | Key | Action |
 |-----|--------|
@@ -104,16 +123,16 @@ When multiple files are opened:
 | `PageDown` / `PageUp` | Scroll down/up |
 | Arrow keys | Navigate the table |
 
-### Viewing & Display
+#### Viewing & Display
 
 | Key | Action |
 |-----|--------|
 | `Enter` | View full details of current row in modal |
+| `F` | Show frequency distribution for column |
+| `C` | Cycle cursor type: cell → row → column → cell |
 | `#` | Toggle row labels visibility |
-| `C` (Shift+C) | Cycle cursor type: cell → row → column → cell |
-| `k` | Toggle dark mode |
 
-### Data Editing
+#### Data Editing
 
 | Key | Action |
 |-----|--------|
@@ -121,67 +140,58 @@ When multiple files are opened:
 | `d` | Delete current row |
 | `-` | Delete current column |
 
-### Searching & Filtering
+#### Searching & Filtering
 
 | Key | Action |
 |-----|--------|
 | `\|` (pipe) | Search in current column (case-insensitive) |
-| `/` (slash) | Global search across all columns (cell-level highlighting) |
+| `/` (slash) | Global search across all columns |
 | `\` | Search current column using cell value |
 | `t` | Toggle highlighting of selected rows |
-| `T` (Shift+T) | Clear all selected rows |
+| `T` | Clear all selected rows |
 | `"` (quote) | Filter to show only selected rows |
-| `V` (Shift+V) | Filter by expression (powerful syntax for complex filters) |
+| `V` | Filter by expression (Polars expression syntax) |
 
-### Sorting
+#### Sorting
 
 | Key | Action |
 |-----|--------|
 | `[` | Sort current column ascending |
 | `]` | Sort current column descending |
-| `F` (Shift+F) | Show frequency distribution for column |
 
-### Frequency Table Modal
-
-When viewing the frequency distribution (`F`), use these keys:
+#### Reordering
 
 | Key | Action |
 |-----|--------|
-| `[` | Sort frequency table ascending |
-| `]` | Sort frequency table descending |
-| `v` | Filter main table to selected value |
-| `"` (quote) | Highlight rows with selected value |
-| `q` / `Escape` | Close frequency table |
-
-### Row Detail Modal
-
-When viewing row details (`Enter`), use these keys:
-
-| Key | Action |
-|-----|--------|
-| `v` | Filter main table to selected column value |
-| `"` (quote) | Highlight rows with selected column value |
-| `q` / `Escape` | Close row details |
-
-### Reordering
-
-| Key | Action |
-|-----|--------|
-| `Shift+←` | Move current column left |
-| `Shift+→` | Move current column right |
 | `Shift+↑` | Move current row up |
 | `Shift+↓` | Move current row down |
+| `Shift+←` | Move current column left |
+| `Shift+→` | Move current column right |
 
-### Advanced
+#### Data Management
 
 | Key | Action |
 |-----|--------|
 | `f` | Freeze rows and columns |
 | `c` | Copy current cell to clipboard |
-| `Ctrl+S` | Save dataframe to CSV file |
+| `Ctrl+S` | Save current tab to CSV/TSV file |
 | `u` | Undo last action |
-| `U` | Reset or reload entire table |
-| `q` | Quit viewer |
+| `U` | Reset to original data |
+
+#### Modal Interactions
+
+**In Frequency Distribution Modal** (opened with `F`):
+- `[` / `]` - Sort frequency table
+- `v` - Filter main table to selected value
+- `"` - Highlight rows with selected value
+- `q` / `Escape` - Close modal
+
+**In Row Detail Modal** (opened with `Enter`):
+- `v` - Filter main table to selected column value
+- `"` - Highlight rows with selected column value
+- `q` / `Escape` - Close modal
+
+**Tip**: Press `?` or `h` to open the context-sensitive help panel which displays all available shortcuts based on your current focus.
 
 ## Features in Detail
 
@@ -462,25 +472,6 @@ This ensures perfect isolation between tabs with zero cross-contamination.
 - Python 3.8+
 - POSIX-compatible terminal (macOS, Linux, WSL)
 - Terminal supporting ANSI escape sequences and mouse events
-
-## Troubleshooting
-
-**Issue**: Some keys not working
-- Terminal might not support all key combinations
-- Try different keyboard shortcuts (e.g., `[` instead of Shift+[)
-
-**Issue**: Can't read from pipe
-- Make sure you have proper permissions to read from `/dev/tty`
-- Some terminal emulators may not support this
-
-**Issue**: Slow with large files
-- First load time depends on CSV size
-- Subsequent navigation is optimized with pagination
-- Sorting/searching on large columns may take a moment
-
-**Issue**: Colors not showing correctly
-- Ensure your terminal supports 256 colors or truecolor
-- Check `TERM` environment variable: `echo $TERM`
 
 ## Acknowledgments
 
