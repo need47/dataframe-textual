@@ -2412,9 +2412,9 @@ class DataFrameApp(App):
         }
     """
 
-    def __init__(self, sources: list[tuple[pl.DataFrame, str, str]]):
+    def __init__(self, *filenames):
         super().__init__()
-        self.sources = sources
+        self.sources = _load_dataframe(filenames)
         self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel = None
 
@@ -2677,9 +2677,6 @@ if __name__ == "__main__":
         parser.print_help()
         sys.exit(1)
 
-    # Load all dataframes
-    sources = _load_dataframe(filenames)
-
     # Run the app with multiple files
-    app = DataFrameApp(sources)
+    app = DataFrameApp(*filenames)
     app.run()
