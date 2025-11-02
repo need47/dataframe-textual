@@ -9,9 +9,6 @@ wheels/
 # Virtual environments
 .venv
 *bak
-dctap.csv
-sample.xlsx
+*.csv
+*.xlsx
 test.py
-all.xlsx
-.gitignore
-all-tabs.xlsx
