@@ -2412,21 +2412,19 @@ class DataFrameApp(App):
         }
     """
 
-    def __init__(self, filenames: list[str]):
+    def __init__(self, sources: list[tuple[pl.DataFrame, str, str]]):
         super().__init__()
-        self.filenames = filenames
+        self.sources = sources
         self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel = None
 
     def compose(self) -> ComposeResult:
         """Create tabbed interface for multiple files or direct table for single file."""
-        sources = _load_dataframe(self.filenames)
-
         # Tabbed interface
         self.tabbed = TabbedContent(id="main_tabs")
         with self.tabbed:
             seen_names = set()
-            for idx, (df, filename, tabname) in enumerate(sources, start=1):
+            for idx, (df, filename, tabname) in enumerate(self.sources, start=1):
                 # Ensure unique tab names
                 if tabname in seen_names:
                     tabname = f"{tabname}_{idx}"
@@ -2447,6 +2445,7 @@ class DataFrameApp(App):
         """Set up the app when it starts."""
         if len(self.tabs) == 1:
             self.query_one(ContentTabs).display = False
+            self._get_active_table().focus()
 
     def on_tabbed_content_tab_activated(
         self, event: TabbedContent.TabActivated
@@ -2574,7 +2573,7 @@ def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame, str, str]]
     Returns:
         List of tuples of (DataFrame, filename, tabname)
     """
-    data = []
+    sources = []
 
     # Single file
     if len(filenames) == 1:
@@ -2591,32 +2590,34 @@ def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame, str, str]]
             df = pl.read_csv(StringIO(stdin_data))
 
             # Reopen stdin to /dev/tty for proper terminal interaction
-            if not sys.stdin.isatty():
+            try:
                 tty = open("/dev/tty")
                 os.dup2(tty.fileno(), sys.stdin.fileno())
+            except (OSError, FileNotFoundError):
+                pass
 
-            data.append((df, "stdin.csv", "stdin"))
+            sources.append((df, "stdin.csv", "stdin"))
         # Handle Excel files with multiple sheets
         elif ext in (".xlsx", ".xls"):
             sheets = pl.read_excel(filename, sheet_id=0)
             for sheet_name, df in sheets.items():
-                data.append((df, filename, sheet_name))
+                sources.append((df, filename, sheet_name))
         # Handle TSV files
         elif ext in (".tsv", ".tab"):
             df = pl.read_csv(filename, separator="\t")
-            data.append((df, filename, filepath.stem))
+            sources.append((df, filename, filepath.stem))
         # Handle JSON files
         elif ext == ".json":
             df = pl.read_json(filename)
-            data.append((df, filename, filepath.stem))
+            sources.append((df, filename, filepath.stem))
         # Handle Parquet files
         elif ext == ".parquet":
             df = pl.read_parquet(filename)
-            data.append((df, filename, filepath.stem))
+            sources.append((df, filename, filepath.stem))
         # Handle regular CSV files
         else:
             df = pl.read_csv(filename)
-            data.append((df, filename, filepath.stem))
+            sources.append((df, filename, filepath.stem))
     # Multiple files
     else:
         for filename in filenames:
@@ -2626,21 +2627,21 @@ def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame, str, str]]
             if ext in (".xlsx", ".xls"):
                 # Read only the first sheet for multiple files
                 df = pl.read_excel(filename)
-                data.append((df, filename, filepath.stem))
+                sources.append((df, filename, filepath.stem))
             elif ext in (".tsv", ".tab"):
                 df = pl.read_csv(filename, separator="\t")
-                data.append((df, filename, filepath.stem))
+                sources.append((df, filename, filepath.stem))
             elif ext == ".json":
                 df = pl.read_json(filename)
-                data.append((df, filename, filepath.stem))
+                sources.append((df, filename, filepath.stem))
             elif ext == ".parquet":
                 df = pl.read_parquet(filename)
-                data.append((df, filename, filepath.stem))
+                sources.append((df, filename, filepath.stem))
             else:
                 df = pl.read_csv(filename)
-                data.append((df, filename, filepath.stem))
+                sources.append((df, filename, filepath.stem))
 
-    return data
+    return sources
 
 
 if __name__ == "__main__":
@@ -2676,6 +2677,9 @@ if __name__ == "__main__":
         parser.print_help()
         sys.exit(1)
 
+    # Load all dataframes
+    sources = _load_dataframe(filenames)
+
     # Run the app with multiple files
-    app = DataFrameApp(filenames)
+    app = DataFrameApp(sources)
     app.run()
