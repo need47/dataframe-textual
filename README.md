@@ -147,9 +147,11 @@ When multiple files are opened:
 | `\|` (pipe) | Search in current column (case-insensitive) |
 | `/` (slash) | Global search across all columns |
 | `\` | Search current column using cell value |
-| `t` | Toggle highlighting of selected rows |
+| `s` | Select/deselect current row |
+| `t` | Toggle highlighting of all selected rows (invert) |
 | `T` | Clear all selected rows |
 | `"` (quote) | Filter to show only selected rows |
+| `v` | Filter by selected rows (if any) or current cell value |
 | `V` | Filter by expression (Polars expression syntax) |
 
 #### Sorting

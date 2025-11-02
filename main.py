@@ -970,10 +970,11 @@ class DataFrameTable(DataTable):
         - **\\\\** - 🔍 Search using current cell value
 
         ## 🔧 Filter & Select
-        - **t** - 💡 Toggle row selection
+        - **s** - ✓️ Select/deselect current row
+        - **t** - 💡 Toggle row selection (invert all)
         - **"** - 📍 Filter to selected rows only
         - **T** - 🧹 Clear all selections
-        - **v** - ⚙️ Filter by current cell value
+        - **v** - 🎯 Filter by selected rows or current cell value
         - **V** - 🔧 Filter by Polars expression
 
         ## ✏️ Edit & Modify
@@ -1051,6 +1052,11 @@ class DataFrameTable(DataTable):
     def cursor_column_key(self) -> ColumnKey:
         """Get the current cursor column as a ColumnKey."""
         return self.cursor_key.column_key
+
+    @property
+    def cursor_row_index(self) -> int:
+        """Get the current cursor row index (0-based)."""
+        return int(self.cursor_row_key.value) - 1
 
     def on_mount(self) -> None:
         """Initialize table display when widget is mounted."""
@@ -1172,7 +1178,7 @@ class DataFrameTable(DataTable):
             self._show_frequency()
         elif event.key == "v":
             # Filter by current cell value
-            self._filter_by_cell_value()
+            self._filter_rows()
         elif event.key == "V":  # shift+v
             # Open filter screen for current column
             self._open_filter_screen()
@@ -1188,6 +1194,9 @@ class DataFrameTable(DataTable):
         elif event.key == "slash":  # '/' key
             # Open search modal for all columns
             self._search_column(all_columns=True)
+        elif event.key == "s":
+            # Toggle selection for current row
+            self._toggle_selected_rows(current_row=True)
         elif event.key == "t":
             # Toggle selected rows highlighting
             self._toggle_selected_rows()
@@ -2002,20 +2011,18 @@ class DataFrameTable(DataTable):
         col_name = self.df.columns[col_idx]
         self._do_search_column((term, col_dtype, col_name))
 
-    def _toggle_selected_rows(self) -> None:
+    def _toggle_selected_rows(self, current_row=False) -> None:
         """Toggle selected rows highlighting on/off."""
-        # Check if any rows are currently selected
-        if True not in self.selected_rows:
-            self.app.notify(
-                "No rows selected to toggle", title="Toggle", severity="warning"
-            )
-            return
-
         # Save current state to history
         self._add_history("Toggled row selection")
 
-        # Invert all selected rows
-        self.selected_rows = [not match for match in self.selected_rows]
+        # Select current row if no rows are currently selected
+        if current_row:
+            cursor_row_idx = int(self.cursor_row_key.value) - 1
+            self.selected_rows[cursor_row_idx] = not self.selected_rows[cursor_row_idx]
+        else:
+            # Invert all selected rows
+            self.selected_rows = [not match for match in self.selected_rows]
 
         # Check if we're highlighting or un-highlighting
         if new_selected_count := self.selected_rows.count(True):
@@ -2136,20 +2143,29 @@ class DataFrameTable(DataTable):
             title="Filter",
         )
 
-    def _filter_by_cell_value(self) -> None:
-        """Filter rows based on the value of the currently selected cell."""
-        row_key = self.cursor_row_key
-        row_idx = int(row_key.value) - 1  # Convert to 0-based index
-        col_idx = self.cursor_column
+    def _filter_rows(self) -> None:
+        """Filter rows.
 
-        cell_value = self.df.item(row_idx, col_idx)
+        If there are selected rows, filter to those rows.
+        Otherwise, filter based on the value of the currently selected cell.
+        """
 
-        if cell_value is None:
-            expr = pl.col(self.df.columns[col_idx]).is_null()
-            expr_str = "NULL"
+        if True in self.selected_rows:
+            expr = self.selected_rows
+            expr_str = "selected rows"
         else:
-            expr = pl.col(self.df.columns[col_idx]) == cell_value
-            expr_str = f"$_ == {repr(cell_value)}"
+            row_key = self.cursor_row_key
+            row_idx = int(row_key.value) - 1  # Convert to 0-based index
+            col_idx = self.cursor_column
+
+            cell_value = self.df.item(row_idx, col_idx)
+
+            if cell_value is None:
+                expr = pl.col(self.df.columns[col_idx]).is_null()
+                expr_str = "NULL"
+            else:
+                expr = pl.col(self.df.columns[col_idx]) == cell_value
+                expr_str = f"$_ == {repr(cell_value)}"
 
         self._do_filter((expr, expr_str))
 
