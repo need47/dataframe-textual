@@ -1,0 +1,409 @@
+"""Modal screens with Yes/No buttons and their specialized variants."""
+
+import polars as pl
+from textual.app import ComposeResult
+from textual.containers import Horizontal
+from textual.screen import ModalScreen
+from textual.widgets import Button, Input, Label, Static
+
+from .common import DtypeConfig, parse_filter_expression
+
+
+class YesNoScreen(ModalScreen):
+    """Reusable modal screen with Yes/No buttons and customizable label and input.
+
+    This widget handles:
+    - Yes/No button responses
+    - Enter key for Yes, Escape for No
+    - Optional callback function for Yes action
+    """
+
+    DEFAULT_CSS = """
+        YesNoScreen {
+            align: center middle;
+        }
+
+        YesNoScreen > Static {
+            width: auto;
+            min-width: 30;
+            max-width: 60;
+            height: auto;
+            border: solid $primary;
+            background: $surface;
+            padding: 2;
+        }
+
+        YesNoScreen Input {
+            margin: 1 0;
+        }
+
+        YesNoScreen #button-container {
+            width: 100%;
+            height: 3;
+            align: center middle;
+        }
+
+        YesNoScreen Button {
+            margin: 0 1;
+        }
+    """
+
+    def __init__(
+        self,
+        title: str = None,
+        label: str | dict | Label = None,
+        input: str | dict | Input = None,
+        yes: str | dict | Button = "Yes",
+        no: str | dict | Button = "No",
+        on_yes_callback=None,
+    ):
+        """Initialize the modal screen.
+
+        Args:
+            title: The title to display in the border
+            label: Optional label to display below title as a Label
+            input: Optional input value to pre-fill an Input widget. If None, no Input is shown. If it is a 2-value tuple, the first value is the pre-filled input, and the second value is the type of input (e.g., "integer", "number", "text")
+            yes: Text for the Yes button. If None, hides the Yes button
+            no: Text for the No button. If None, hides the No button
+            on_yes_callback: Optional callable that takes no args and returns the value to dismiss with
+        """
+        super().__init__()
+        self.title = title
+        self.label = label
+        self.input = input
+        self.yes = yes
+        self.no = no
+        self.on_yes_callback = on_yes_callback
+
+    def compose(self) -> ComposeResult:
+        with Static(id="modal-container") as container:
+            if self.title:
+                container.border_title = self.title
+
+            if self.label:
+                if isinstance(self.label, Label):
+                    pass
+                elif isinstance(self.label, dict):
+                    self.label = Label(**self.label)
+                else:
+                    self.label = Label(self.label)
+                yield self.label
+
+            if self.input:
+                if isinstance(self.input, Input):
+                    pass
+                elif isinstance(self.input, dict):
+                    self.input = Input(**self.input)
+                else:
+                    self.input = Input(self.input)
+                self.input.select_all()
+                yield self.input
+
+            if self.yes or self.no:
+                with Horizontal(id="button-container"):
+                    if self.yes:
+                        if isinstance(self.yes, Button):
+                            pass
+                        elif isinstance(self.yes, dict):
+                            self.yes = Button(**self.yes, id="yes", variant="success")
+                        else:
+                            self.yes = Button(self.yes, id="yes", variant="success")
+
+                        yield self.yes
+                    if self.no:
+                        if isinstance(self.no, Button):
+                            pass
+                        elif isinstance(self.no, dict):
+                            self.no = Button(**self.no, id="no", variant="error")
+                        else:
+                            self.no = Button(self.no, id="no", variant="error")
+
+                        yield self.no
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "yes":
+            self._handle_yes()
+        elif event.button.id == "no":
+            self.dismiss(None)
+
+    def on_key(self, event) -> None:
+        if event.key == "enter":
+            self._handle_yes()
+            event.stop()
+        elif event.key == "escape":
+            self.dismiss(None)
+            event.stop()
+
+    def _handle_yes(self) -> None:
+        """Handle Yes button/Enter key press."""
+        if self.on_yes_callback:
+            result = self.on_yes_callback()
+            self.dismiss(result)
+        else:
+            self.dismiss(True)
+
+
+class SaveFileScreen(YesNoScreen):
+    """Modal screen to save the dataframe to a CSV file."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SaveFileScreen")
+
+    def __init__(self, filename: str, title="Save Tab"):
+        super().__init__(
+            title=title,
+            input=filename,
+            on_yes_callback=self.handle_save,
+        )
+
+    def handle_save(self):
+        if self.input:
+            filename_input = self.input.value.strip()
+            if filename_input:
+                return filename_input
+            else:
+                self.notify("Filename cannot be empty", title="Save", severity="error")
+                return None
+
+        return None
+
+
+class ConfirmScreen(YesNoScreen):
+    """Modal screen to confirm file overwrite."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ConfirmScreen")
+
+    def __init__(self, title: str):
+        super().__init__(
+            title=title,
+            on_yes_callback=self.handle_confirm,
+        )
+
+    def handle_confirm(self) -> None:
+        self.dismiss(True)
+
+
+class EditCellScreen(YesNoScreen):
+    """Modal screen to edit a single cell value."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "EditCellScreen")
+
+    def __init__(self, row_key: str, col_idx: int, df: pl.DataFrame):
+        self.row_key = row_key
+        self.col_idx = col_idx
+        self.col_name = df.columns[col_idx]
+        self.col_dtype = str(df.dtypes[col_idx])
+
+        row_idx = int(row_key.value) - 1  # Convert to 0-based
+
+        # Label
+        content = f"[$primary]{self.col_name}[/] ([$accent]{self.col_dtype}[/])"
+
+        # Input
+        df_value = df.item(row_idx, col_idx)
+        self.input_value = str(df_value) if df_value is not None else ""
+
+        super().__init__(
+            title="Edit Cell",
+            label=content,
+            input={
+                "value": self.input_value,
+                "type": DtypeConfig(self.col_dtype).itype,
+            },
+            on_yes_callback=self._save_edit,
+        )
+
+    def _save_edit(self) -> None:
+        """Validate and save the edited value."""
+        new_value_str = self.input.value.strip()
+
+        # Check if value changed
+        if new_value_str == self.input_value:
+            self.dismiss(None)
+            self.notify("No changes made", title="Edit", severity="warning")
+            return
+
+        # Parse and validate based on column dtype
+        try:
+            new_value = DtypeConfig(self.col_dtype).convert(new_value_str)
+        except Exception as e:
+            self.dismiss(None)  # Dismiss without changes
+            self.notify(f"Invalid value: {str(e)}", title="Edit", severity="error")
+            return
+
+        # Dismiss with the new value
+        self.dismiss((self.row_key, self.col_idx, new_value))
+
+
+class SearchScreen(YesNoScreen):
+    """Modal screen to search for values in a column."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen")
+
+    def __init__(
+        self,
+        term,
+        col_dtype: pl.DataType,
+        col_name: str | None = None,
+    ):
+        col_dtype = col_dtype if col_name else pl.String
+        label = f"Search [$primary]{term}[/] ([$accent]{col_dtype}[/])"
+        self.col_name = col_name
+        self.col_dtype = col_dtype
+
+        super().__init__(
+            title="Search" if col_name else "Global Search",
+            label=f"{label} in [$primary]{col_name}[/]" if col_name else label,
+            input={"value": term, "type": DtypeConfig(col_dtype).itype},
+            on_yes_callback=self._do_search,
+        )
+
+    def _do_search(self) -> None:
+        """Perform the search."""
+        term = self.input.value.strip()
+
+        if not term:
+            self.notify("Search term cannot be empty", title="Search", severity="error")
+            return
+
+        # Dismiss with the search term
+        self.dismiss((term, self.col_dtype, self.col_name))
+
+
+class FilterScreen(YesNoScreen):
+    """Modal screen to filter rows by column expression."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "FilterScreen")
+
+    def __init__(
+        self,
+        df: pl.DataFrame,
+        current_col_idx: int | None = None,
+        current_cell_value: str | None = None,
+    ):
+        self.df = df
+        self.current_col_idx = current_col_idx
+        super().__init__(
+            title="Filter by Expression",
+            label="e.g., $1 > 50, $name == 'text', $_ > 100, $a < $b",
+            input=f"$_ == {current_cell_value}",
+            on_yes_callback=self._validate_filter,
+        )
+
+    def _validate_filter(self) -> pl.Expr | None:
+        """Validate and return the filter expression."""
+        expression = self.input.value.strip()
+
+        try:
+            # Try to parse the expression to ensure it's valid
+            expr_str = parse_filter_expression(
+                expression, self.df, self.current_col_idx
+            )
+
+            try:
+                # Test the expression by evaluating it
+                expr = eval(expr_str, {"pl": pl})
+
+                # Dismiss with the expression
+                self.dismiss((expr, expr_str))
+            except Exception as e:
+                self.notify(
+                    f"Error evaluating expression: {str(e)}",
+                    title="Filter",
+                    severity="error",
+                )
+                self.dismiss(None)
+        except ValueError as ve:
+            self.notify(
+                f"Invalid expression: {str(ve)}", title="Filter", severity="error"
+            )
+            self.dismiss(None)
+
+
+class FreezeScreen(YesNoScreen):
+    """Modal screen to pin rows and columns.
+
+    Accepts one value for fixed rows, or two space-separated values for fixed rows and columns.
+    """
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "PinScreen")
+
+    def __init__(self):
+        super().__init__(
+            title="Pin Rows and Columns",
+            label="Enter number of fixed rows and columns (space-separated)",
+            input="1",
+            on_yes_callback=self._parse_pin_input,
+        )
+
+    def _parse_pin_input(self) -> tuple[int, int] | None:
+        """Parse and validate the pin input.
+
+        Returns:
+            Tuple of (fixed_rows, fixed_columns) or None if invalid.
+        """
+        input_str = self.input.value.strip()
+
+        if not input_str:
+            self.notify("Input cannot be empty", title="Pin", severity="error")
+            return None
+
+        parts = input_str.split()
+
+        if len(parts) == 1:
+            # Only fixed rows provided
+            try:
+                fixed_rows = int(parts[0])
+                if fixed_rows < 0:
+                    raise ValueError("must be non-negative")
+                return (fixed_rows, 0)
+            except ValueError as e:
+                self.notify(
+                    f"Invalid fixed rows value: {str(e)}", title="Pin", severity="error"
+                )
+                return None
+        elif len(parts) == 2:
+            # Both fixed rows and columns provided
+            try:
+                fixed_rows = int(parts[0])
+                fixed_cols = int(parts[1])
+                if fixed_rows < 0 or fixed_cols < 0:
+                    raise ValueError("values must be non-negative")
+                return (fixed_rows, fixed_cols)
+            except ValueError as e:
+                self.notify(
+                    f"Invalid input values: {str(e)}", title="Pin", severity="error"
+                )
+                return None
+        else:
+            self.notify(
+                "Provide one or two space-separated integers",
+                title="Pin",
+                severity="error",
+            )
+            return None
+
+
+class OpenFileScreen(YesNoScreen):
+    """Modal screen to open a CSV file."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "OpenFileScreen")
+
+    def __init__(self):
+        super().__init__(
+            title="Open File",
+            input="Enter relative or absolute file path",
+            yes="Open",
+            no="Cancel",
+            on_yes_callback=self.handle_open,
+        )
+
+    def handle_open(self):
+        if self.input:
+            filename_input = self.input.value.strip()
+            if filename_input:
+                return filename_input
+            else:
+                self.notify("Filename cannot be empty", title="Open", severity="error")
+                return None
+
+        return None

@@ -1,7 +1,11 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "dataframe-viewer"
 version = "0.1.0"
-description = "Add your description here"
+description = "Interactive CSV/Excel viewer for the terminal (Textual TUI)"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -19,3 +23,9 @@ excel = [
     "fastexcel>=0.16.0",
     "xlsxwriter>=3.2.9",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dataframe_viewer"]
+
+[project.scripts]
+pk = "dataframe_viewer.data_frame_viewer:run"
