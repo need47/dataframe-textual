@@ -6,6 +6,7 @@ import polars as pl
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.coordinate import Coordinate
+from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
@@ -136,6 +137,8 @@ class RowDetailScreen(TableScreen):
                 *_format_row([col, val], [None, dtype], apply_justify=False)
             )
 
+        self.table.cursor_type = "row"
+
     def on_key(self, event):
         if event.key == "v":
             # Filter the main table by the selected value
@@ -188,6 +191,7 @@ class FrequencyScreen(TableScreen):
         self.table.add_column(Text(column, justify=dc.justify), key=column)
         self.table.add_column(Text("Count", justify="right"), key="Count")
         self.table.add_column(Text("%", justify="right"), key="%")
+        self.table.add_column(Text("Histogram", justify="left"), key="Histogram")
 
         # Get style config for Int64 and Float64
         ds_int = DtypeConfig("Int64")
@@ -204,15 +208,15 @@ class FrequencyScreen(TableScreen):
                     style=dc.style,
                     justify=dc.justify,
                 ),
-                Text(
-                    str(count),
-                    style=ds_int.style,
-                    justify=ds_int.justify,
-                ),
+                Text(str(count), style=ds_int.style, justify=ds_int.justify),
                 Text(
                     f"{percentage:.2f}",
                     style=ds_float.style,
                     justify=ds_float.justify,
+                ),
+                Bar(
+                    highlight_range=(0.0, percentage / 100 * 10),
+                    width=10,
                 ),
                 key=str(row_idx + 1),
             )
