@@ -14,6 +14,7 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.coordinate import Coordinate
 from textual.css.query import NoMatches
 from textual.screen import ModalScreen
+from textual.theme import BUILTIN_THEMES
 from textual.widget import Widget
 from textual.widgets import (
     Button,
@@ -92,8 +93,8 @@ SUBSCRIPT_DIGITS = {
     9: "₉",
 }
 
-
-CURSOR_TYPES = ["row", "column", "cell", "none"]
+# Cursor types ("none" removed)
+CURSOR_TYPES = ["row", "column", "cell"]
 
 
 def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
@@ -134,6 +135,15 @@ def _rindex(lst: list, value) -> int:
         if item == value:
             return len(lst) - 1 - i
     return -1
+
+
+def _next(lst: list[Any], current, offset=1) -> Any:
+    """Return the next item in the list after the current item, cycling if needed."""
+    if current not in lst:
+        raise ValueError("Current item not in list")
+    current_index = lst.index(current)
+    next_index = (current_index + offset) % len(lst)
+    return lst[next_index]
 
 
 def parse_filter_expression(
@@ -2171,10 +2181,7 @@ class DataFrameTable(DataTable):
 
     def _cycle_cursor_type(self) -> None:
         """Cycle through cursor types: cell -> row -> column -> cell."""
-        current_type = self.cursor_type
-        next_type = CURSOR_TYPES[
-            (CURSOR_TYPES.index(current_type) + 1) % len(CURSOR_TYPES)
-        ]
+        next_type = _next(CURSOR_TYPES, self.cursor_type)
         self.cursor_type = next_type
 
         self.app.notify(
@@ -2389,7 +2396,7 @@ class DataFrameApp(App):
 
         ## 🎨 View & Settings
         - **?** or **h** - ❓ Toggle this help panel
-        - **k** - 🌙 Toggle dark/light mode
+        - **k** - 🌙 Cycle through themes
 
         ## ⭐ Features
         - **Multi-file support** - 📂 Open multiple CSV/Excel files as tabs
@@ -2406,7 +2413,6 @@ class DataFrameApp(App):
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("h,?", "toggle_help_panel", "Help"),
-        ("k", "toggle_dark", "Toggle Dark Mode"),
         ("b", "toggle_tab_bar", "Toggle Tab Bar"),
         ("ctrl+o", "add_tab", "Add Tab"),
         ("ctrl+shift+s", "save_all_tabs", "Save All Tabs"),
@@ -2462,6 +2468,11 @@ class DataFrameApp(App):
         if len(self.tabs) == 1:
             self.query_one(ContentTabs).display = False
             self._get_active_table().focus()
+
+    def on_key(self, event):
+        if event.key == "k":
+            self.theme = _next(list(BUILTIN_THEMES.keys()), self.theme)
+            self.notify(f"Switched to theme: [$primary]{self.theme}[/]", title="Theme")
 
     def on_tabbed_content_tab_activated(
         self, event: TabbedContent.TabActivated
@@ -2533,9 +2544,7 @@ class DataFrameApp(App):
             return
         try:
             tabs: list[TabPane] = list(self.tabs.keys())
-            current_idx = tabs.index(self.tabbed.active_pane)
-            next_idx = (current_idx + offset) % len(tabs)
-            next_tab = tabs[next_idx]
+            next_tab = _next(tabs, self.tabbed.active_pane, offset)
             self.tabbed.active = next_tab.id
         except (NoMatches, ValueError):
             pass

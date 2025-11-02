@@ -106,7 +106,7 @@ When multiple files are opened:
 | Key | Action |
 |-----|--------|
 | `?` or `h` | Toggle help panel (context-sensitive) |
-| `k` | Toggle dark mode |
+| `k` | Cycle through themes |
 
 ---
 
