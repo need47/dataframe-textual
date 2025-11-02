@@ -11,7 +11,7 @@ from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
 from textual.theme import BUILTIN_THEMES
 from textual.widgets import TabbedContent, TabPane
-from textual.widgets.tabbed_content import ContentTabs
+from textual.widgets.tabbed_content import ContentTab, ContentTabs
 
 from .common import _next
 from .data_frame_help_panel import DataFrameHelpPanel
@@ -29,9 +29,9 @@ class DataFrameViewer(App):
         - **Ctrl+O** - 📁 Add a new tab
         - **Ctrl+Shift+S** - 💾 Save all tabs
         - **Ctrl+W** - ❌ Close current tab
-        - **>** - ▶️ Next tab
+        - **>** or **b** - ▶️ Next tab
         - **<** - ◀️ Previous tab
-        - **b** - 👁️ Toggle tab bar visibility
+        - **B** - 👁️ Toggle tab bar visibility
         - **q** - 🚪 Quit application
 
         ## 🎨 View & Settings
@@ -53,11 +53,11 @@ class DataFrameViewer(App):
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("h,?", "toggle_help_panel", "Help"),
-        ("b", "toggle_tab_bar", "Toggle Tab Bar"),
+        ("B", "toggle_tab_bar", "Toggle Tab Bar"),
         ("ctrl+o", "add_tab", "Add Tab"),
         ("ctrl+shift+s", "save_all_tabs", "Save All Tabs"),
         ("ctrl+w", "close_tab", "Close Tab"),
-        ("greater_than_sign", "next_tab(1)", "Next Tab"),
+        ("greater_than_sign,b", "next_tab(1)", "Next Tab"),
         ("less_than_sign", "next_tab(-1)", "Prev Tab"),
     ]
 
@@ -66,11 +66,16 @@ class DataFrameViewer(App):
             height: 100%;  /* Or a specific value, e.g., 20; */
         }
         TabbedContent > ContentTabs {
-            dock: top;
+            dock: bottom;
         }
         TabbedContent > ContentSwitcher {
             overflow: auto;
             height: 1fr;  /* Takes the remaining space below tabs */
+        }
+
+        TabbedContent ContentTab.active {
+            background: $primary;
+            color: $text;
         }
     """
 
@@ -121,6 +126,12 @@ class DataFrameViewer(App):
         # Only process if we have multiple files
         if len(self.tabs) <= 1:
             return
+
+        # Apply background color to active tab
+        event.tab.add_class("active")
+        for tab in self.tabbed.query(ContentTab):
+            if tab != event.tab:
+                tab.remove_class("active")
 
         try:
             # Focus the table in the newly activated tab

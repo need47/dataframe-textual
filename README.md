@@ -96,9 +96,9 @@ When multiple files are opened:
 | `Ctrl+O` | Open new CSV file in a new tab |
 | `Ctrl+W` | Close current tab |
 | `Ctrl+Shift+S` | Save all open tabs to Excel file |
-| `>` | Move to next tab |
+| `>` or `b` | Move to next tab |
 | `<` | Move to previous tab |
-| `b` | Toggle tab bar visibility |
+| `B` | Toggle tab bar visibility |
 | `q` | Quit the application |
 
 #### View & Settings
