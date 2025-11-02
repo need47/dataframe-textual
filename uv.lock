@@ -171,7 +171,7 @@ wheels = [
 
 [[package]]
 name = "dataframe-textual"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "polars" },
@@ -188,6 +188,11 @@ excel = [
     { name = "xlsxwriter" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "textual-dev" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastexcel", marker = "extra == 'excel'", specifier = ">=0.16.0" },
@@ -198,6 +203,9 @@ requires-dist = [
     { name = "xlsxwriter", marker = "extra == 'excel'", specifier = ">=3.2.9" },
 ]
 provides-extras = ["excel", "dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "textual-dev", specifier = ">=1.8.0" }]
 
 [[package]]
 name = "fastexcel"
