@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Entry point for DataFrameViewer."""
 
-from dataframe_viewer.data_frame_viewer import run
+from dataframe_viewer.__main__ import main
 
 if __name__ == "__main__":
-    run()
+    main()

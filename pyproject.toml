@@ -7,25 +7,54 @@ name = "dataframe-viewer"
 version = "0.1.0"
 description = "Interactive CSV/Excel viewer for the terminal (Textual TUI)"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Tiejun Cheng", email = "need47@gmail.com"}
+]
+keywords = ["csv", "viewer", "terminal", "tui", "textual", "data-analysis", "polars", "interactive"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: MacOS",
+    "Operating System :: Unix",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Office/Business",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
 dependencies = [
     "polars>=1.34.0",
     "rich>=14.2.0",
     "textual>=1.0.0",
 ]
 
-[dependency-groups]
-dev = [
-    "textual-dev>=1.8.0",
-]
+[project.urls]
+Homepage = "https://github.com/need47/dataframe-viewer"
+Repository = "https://github.com/need47/dataframe-viewer.git"
+Documentation = "https://github.com/need47/dataframe-viewer#readme"
+"Bug Tracker" = "https://github.com/need47/dataframe-viewer/issues"
 
+[project.optional-dependencies]
 excel = [
     "fastexcel>=0.16.0",
     "xlsxwriter>=3.2.9",
+]
+dev = [
+    "textual-dev>=1.8.0",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dataframe_viewer"]
 
 [project.scripts]
-pk = "dataframe_viewer.data_frame_viewer:run"
+dataframe-viewer = "dataframe_viewer.__main__:main"

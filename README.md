@@ -471,7 +471,7 @@ This ensures perfect isolation between tabs with zero cross-contamination.
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.11+
 - POSIX-compatible terminal (macOS, Linux, WSL)
 - Terminal supporting ANSI escape sequences and mouse events
 
