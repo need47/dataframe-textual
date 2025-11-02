@@ -170,8 +170,8 @@ wheels = [
 ]
 
 [[package]]
-name = "dataframe-viewer"
-version = "0.1.0"
+name = "dataframe-textual"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "polars" },

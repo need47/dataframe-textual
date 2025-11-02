@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "dataframe-viewer"
-version = "0.1.0"
+name = "dataframe-textual"
+version = "0.2.0"
 description = "Interactive CSV/Excel viewer for the terminal (Textual TUI)"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -39,10 +39,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/need47/dataframe-viewer"
-Repository = "https://github.com/need47/dataframe-viewer.git"
-Documentation = "https://github.com/need47/dataframe-viewer#readme"
-"Bug Tracker" = "https://github.com/need47/dataframe-viewer/issues"
+Homepage = "https://github.com/need47/dataframe-textual"
+Repository = "https://github.com/need47/dataframe-textual.git"
+Documentation = "https://github.com/need47/dataframe-textual#readme"
+"Bug Tracker" = "https://github.com/need47/dataframe-textual/issues"
 
 [project.optional-dependencies]
 excel = [
@@ -57,4 +57,4 @@ dev = [
 packages = ["src/dataframe_viewer"]
 
 [project.scripts]
-dataframe-viewer = "dataframe_viewer.__main__:main"
+dataframe-textual = "dataframe_viewer.__main__:main"

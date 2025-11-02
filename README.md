@@ -1,8 +1,8 @@
-# DataFrame Viewer
+# DataFrame Viewer/Editor
 
-A powerful, interactive terminal-based CSV viewer built with Python, Polars, and Textual. Inspired by VisiData, this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring CSV data directly in your terminal. Now with **multi-file support for simultaneous data comparison**!
+A powerful, interactive terminal-based CSV/Excel viewer/editor built with Python, Polars, and Textual. Inspired by VisiData, this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in your terminal. Now with **multi-file support for simultaneous data comparison**!
 
-![Screenshot](screenshot.png)
+![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshot.png)
 
 ## Features
 
@@ -28,21 +28,48 @@ A powerful, interactive terminal-based CSV viewer built with Python, Polars, and
 
 ## Installation
 
-### Using uv (recommended)
-
-```bash
-# Clone or download the project
-cd dataframe-viewer
-
-# Run directly with uv
-uv run python main.py <csv_file>
-```
-
 ### Using pip
 
 ```bash
-pip install polars textual
-python main.py <csv_file>
+# Install from PyPI
+pip install dataframe-textual
+
+# With Excel support (fastexcel, xlsxwriter)
+pip install dataframe-textual[excel]
+```
+
+Then run:
+```bash
+dataframe-textual <csv_file>
+```
+
+### Using uv
+
+```bash
+# Quick run using uvx without installation
+uvx https://github.com/need47/dataframe-textual.git <csvfile>
+
+# Clone or download the project
+cd dataframe-textual
+
+# Run directly with uv
+uv run python main.py <csv_file>
+
+#
+```
+
+### Development installation
+
+```bash
+# Clone the repository
+git clone https://github.com/need47/dataframe-textual.git
+cd dataframe-textual
+
+# Install from local source
+pip install -e .
+
+# Or with development dependencies
+pip install -e ".[excel,dev]"
 ```
 
 ## Usage
@@ -50,31 +77,31 @@ python main.py <csv_file>
 ### Basic Usage - Single File
 
 ```bash
-# View a CSV file
+# After pip install dataframe-textual
+dataframe-textual pokemon.csv
+
+# Or if running from source
 python main.py pokemon.csv
 
 # Or with uv
 uv run python main.py pokemon.csv
 
 # Read from stdin
-cat data.csv | python main.py
-python main.py < data.csv
+cat data.csv | dataframe-textual
+dataframe-textual < data.csv
 ```
 
 ### Multi-File Usage - Multiple Tabs
 
 ```bash
 # Open multiple files in tabs
-python main.py file1.csv file2.csv file3.csv
+dataframe-textual file1.csv file2.csv file3.csv
 
 # Open multiple sheets in tabs in an Excel file
-python main.py file.xlsx
-
-# Or with uv
-uv run python main.py file1.csv file2.csv file3.csv
+dataframe-textual file.xlsx
 
 # Mix files and stdin (file opens first, then read from stdin)
-python main.py data1.csv < data2.csv
+dataframe-textual data1.csv < data2.csv
 ```
 
 When multiple files are opened:
@@ -371,35 +398,35 @@ Press `c` to copy:
 
 ```bash
 # View Pokemon dataset
-python main.py pokemon.csv
+dataframe-textual pokemon.csv
 
 # View Titanic dataset with analysis
-python main.py titanic.csv
+dataframe-textual titanic.csv
 
 # Filter and view specific columns
-cut -d',' -f1,2,3 pokemon.csv | python main.py
+cut -d',' -f1,2,3 pokemon.csv | dataframe-textual
 
 # View with grep filter (then use | search in viewer)
-grep "Fire" pokemon.csv | python main.py
+grep "Fire" pokemon.csv | dataframe-textual
 
 # Chain with other commands
-cat data.csv | sort -t',' -k2 | python main.py
+cat data.csv | sort -t',' -k2 | dataframe-textual
 ```
 
 ### Multi-File Examples
 
 ```bash
 # Compare two versions of a dataset
-python main.py pokemon_v1.csv pokemon_v2.csv
+dataframe-textual pokemon_v1.csv pokemon_v2.csv
 
 # Side-by-side analysis of related files
-python main.py sales_2022.csv sales_2023.csv forecast_2024.csv
+dataframe-textual sales_2022.csv sales_2023.csv forecast_2024.csv
 
 # Cross-reference datasets
-python main.py customers.csv orders.csv products.csv
+dataframe-textual customers.csv orders.csv products.csv
 
 # Start with one file, open others using Ctrl+O
-python main.py initial_data.csv
+dataframe-textual initial_data.csv
 # Then press Ctrl+O to open more files interactively
 ```
 
@@ -408,7 +435,7 @@ python main.py initial_data.csv
 ```bash
 # Start with a filtered file, compare with original
 grep "status=active" data.csv > filtered.csv
-python main.py data.csv filtered.csv
+dataframe-textual data.csv filtered.csv
 # Now compare the full dataset with the filtered version in separate tabs
 
 # Multi-step analysis
