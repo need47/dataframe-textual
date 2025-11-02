@@ -549,7 +549,7 @@ class DataFrameTable(DataTable):
             return
 
         # Push the modal screen
-        self.app.push_screen(RowDetailScreen(row_idx, self.df))
+        self.app.push_screen(RowDetailScreen(row_idx, self))
 
     def _show_frequency(self) -> None:
         """Show frequency distribution for the current column."""
@@ -558,9 +558,7 @@ class DataFrameTable(DataTable):
             return
 
         # Push the frequency modal screen
-        self.app.push_screen(
-            FrequencyScreen(col_idx, self.df.filter(self.visible_rows))
-        )
+        self.app.push_screen(FrequencyScreen(col_idx, self))
 
     def _open_freeze_screen(self) -> None:
         """Open the freeze screen to set fixed rows and columns."""

@@ -1,6 +1,9 @@
 """Modal screens for displaying data in tables (row details and frequency)."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .data_frame_table import DataFrameTable
 
 import polars as pl
 from rich.text import Text
@@ -33,14 +36,14 @@ class TableScreen(ModalScreen):
         }
     """
 
-    def __init__(self, df: pl.DataFrame, id: str | None = None):
+    def __init__(self, dftable: DataFrameTable):
         super().__init__()
-        self.df = df
-        self.id = id
+        self.df: pl.DataFrame = dftable.df  # Polars DataFrame
+        self.dftable = dftable  # DataFrameTable
 
     def compose(self) -> ComposeResult:
         """Create the table. Must be overridden by subclasses."""
-        self.table = DataTable(zebra_stripes=True, id=self.id)
+        self.table = DataTable(zebra_stripes=True)
         yield self.table
 
     def on_key(self, event):
@@ -87,27 +90,26 @@ class TableScreen(ModalScreen):
             expr = pl.col(col_name) == col_value
             value_display = f"[on $primary]{col_value}[/]"
 
-        app = self.app
         matched_indices = set(
-            app.df.with_row_index("__rid__").filter(expr)["__rid__"].to_list()
+            self.dftable.df.with_row_index("__rid__").filter(expr)["__rid__"].to_list()
         )
 
         # Apply the action
         if action == "filter":
             # Update visible_rows to reflect the filter
-            for i in range(len(app.visible_rows)):
-                app.visible_rows[i] = i in matched_indices
+            for i in range(len(self.dftable.visible_rows)):
+                self.dftable.visible_rows[i] = i in matched_indices
             title = "Filter"
             message = f"Filtered by [on $primary]{col_name}[/] = {value_display}"
         else:  # action == "highlight"
             # Update selected_rows to reflect the highlights
-            for i in range(len(app.selected_rows)):
-                app.selected_rows[i] = i in matched_indices
+            for i in range(len(self.dftable.selected_rows)):
+                self.dftable.selected_rows[i] = i in matched_indices
             title = "Highlight"
             message = f"Highlighted [on $primary]{col_name}[/] = {value_display}"
 
         # Recreate the table display with updated data in the main app
-        app._setup_table()
+        self.dftable._setup_table()
 
         # Dismiss the frequency screen
         self.app.pop_screen()
@@ -120,8 +122,8 @@ class RowDetailScreen(TableScreen):
 
     CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "RowDetailScreen")
 
-    def __init__(self, row_idx: int, df: pl.DataFrame):
-        super().__init__(df, id="row-detail-table")
+    def __init__(self, row_idx: int, dftable):
+        super().__init__(dftable)
         self.row_idx = row_idx
 
     def on_mount(self) -> None:
@@ -169,8 +171,8 @@ class FrequencyScreen(TableScreen):
 
     CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "FrequencyScreen")
 
-    def __init__(self, col_idx: int, df: pl.DataFrame):
-        super().__init__(df, id="frequency-table")
+    def __init__(self, col_idx: int, dftable):
+        super().__init__(dftable)
         self.col_idx = col_idx
         self.sorted_columns = {
             1: True,  # Count
@@ -283,14 +285,17 @@ class FrequencyScreen(TableScreen):
         def key_fun(freq_col):
             col_value = freq_col.plain
 
-            if col_dtype == "Int64":
-                return int(col_value)
-            elif col_dtype == "Float64":
-                return float(col_value)
-            elif col_dtype == "Boolean":
-                return BOOLS[col_value]
-            else:
-                return col_value
+            try:
+                if col_dtype == "Int64":
+                    return int(col_value)
+                elif col_dtype == "Float64":
+                    return float(col_value)
+                elif col_dtype == "Boolean":
+                    return BOOLS[col_value]
+                else:
+                    return col_value
+            except ValueError:
+                return 0
 
         # Sort the table
         freq_table.sort(
