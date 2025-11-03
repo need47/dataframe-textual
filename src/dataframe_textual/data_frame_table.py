@@ -1540,7 +1540,7 @@ class DataFrameTable(DataTable):
         self._highlight_rows()
 
         self.app.notify(
-            f"Found [$success]{match_count}[/] matches for [$success]{term}[/]",
+            f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]",
             title="Search",
         )
 
@@ -1556,7 +1556,7 @@ class DataFrameTable(DataTable):
 
         matches: dict[int, set[int]] = {}
         match_count = 0
-        if term.lower() == "null":
+        if term == "NULL":
             # Search for NULL values across all columns
             for col_idx, col in enumerate(df_ridx.columns[1:]):
                 masks = df_ridx[col].is_null()
