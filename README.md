@@ -166,6 +166,9 @@ When multiple files are opened:
 | `e` | Edit current cell (respects data type) |
 | `x` | Delete current row |
 | `-` | Delete current column |
+| `d` | Duplicate current column (appends '_copy' suffix) |
+| `h` | Hide current column |
+| `H` | Show all hidden columns |
 
 #### Searching & Filtering
 
@@ -334,7 +337,39 @@ This is useful for:
 - Removes the entire column from view and dataframe
 - Cannot be undone directly (use undo feature)
 
-### 8. Column & Row Reordering
+### 8. Hide & Show Columns
+
+**Hide Column** (`h`):
+- Temporarily hides the current column from display
+- Column data is preserved in the dataframe
+- Hidden columns don't appear in saves until shown again
+
+**Show Hidden Columns** (`H`):
+- Restores all previously hidden columns to the display
+- Returns table to full column view
+- Useful for temporarily removing columns from view without deleting them
+
+This is useful for:
+- Focusing on specific columns without deleting data
+- Temporarily removing cluttered or unnecessary columns
+- Comparing different column sets (hide/show to compare)
+- Preserving all data while simplifying the view
+
+### 9. Duplicate Column
+
+Press `d` to duplicate the current column:
+- Creates a new column immediately after the current column
+- New column has '_copy' suffix (e.g., 'price' → 'price_copy')
+- Duplicate preserves all data from original column
+- New column is inserted into the dataframe using Polars `insert_column()`
+
+This is useful for:
+- Creating backup copies of columns before transformation
+- Working with alternative versions of column data
+- Comparing original vs. processed column values side-by-side
+- Data preparation and validation workflows
+
+### 10. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
 - Swaps adjacent columns
@@ -344,14 +379,14 @@ This is useful for:
 - Swaps adjacent rows
 - Visual reordering without affecting data
 
-### 9. Pin Rows and Columns
+### 11. Pin Rows and Columns
 
 Press `f` to open the pin dialog:
 - Enter number of fixed rows: keeps top rows visible while scrolling
 - Enter two numbers: `<rows> <columns>` (space-separated)
 - Example: `2 3` pins top 2 rows and left 3 columns
 
-### 10. Save to CSV
+### 12. Save to CSV
 
 Press `Ctrl+S` to save:
 - Save filtered, edited, or sorted data back to CSV
@@ -359,14 +394,14 @@ Press `Ctrl+S` to save:
 - Confirm if file already exists
 - Automatic .tsv or .csv detection
 
-### 11. Undo/Redo
+### 13. Undo/Redo
 
 Press `u` to undo:
 - Reverts last action with full state restoration
 - Works for edits, deletions, sorts, searches, etc.
 - Shows description of reverted action
 
-### 12. Cursor Type Cycling
+### 14. Cursor Type Cycling
 
 Press `C` to cycle through selection modes:
 1. **Cell mode**: Highlight individual cell (and its row/column headers)
@@ -375,7 +410,7 @@ Press `C` to cycle through selection modes:
 
 Visual feedback shows which mode is active.
 
-### 13. Clipboard Operations
+### 15. Clipboard Operations
 
 Press `c` to copy:
 - Copies current cell value to system clipboard

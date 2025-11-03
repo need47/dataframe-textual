@@ -118,7 +118,7 @@ class DataFrameViewer(App):
         if event.key == "k":
             self.theme = _next(list(BUILTIN_THEMES.keys()), self.theme)
             self.notify(
-                f"Switched to theme: [on $primary]{self.theme}[/]", title="Theme"
+                f"Switched to theme: [$success]{self.theme}[/]", title="Theme"
             )
 
     def on_tabbed_content_tab_activated(
@@ -171,7 +171,7 @@ class DataFrameViewer(App):
                 df = pl.read_csv(filename)
                 self._add_tab(df, filename)
                 self.notify(
-                    f"Opened: [on $primary]{Path(filename).name}[/]", title="Open"
+                    f"Opened: [$success]{Path(filename).name}[/]", title="Open"
                 )
             except Exception as e:
                 self.notify(f"Error: {e}", severity="error")
@@ -242,7 +242,7 @@ class DataFrameViewer(App):
                     self.tabbed.remove_pane(active_pane.id)
                     self.tabs.pop(active_pane)
                     self.notify(
-                        f"Closed tab [on $primary]{active_pane.name}[/]", title="Close"
+                        f"Closed tab [$success]{active_pane.name}[/]", title="Close"
                     )
         except NoMatches:
             pass
@@ -252,7 +252,7 @@ class DataFrameViewer(App):
         tabs = self.query_one(ContentTabs)
         tabs.display = not tabs.display
         status = "shown" if tabs.display else "hidden"
-        self.notify(f"Tab bar [on $primary]{status}[/]", title="Toggle")
+        self.notify(f"Tab bar [$success]{status}[/]", title="Toggle")
 
 
 def _load_dataframe(

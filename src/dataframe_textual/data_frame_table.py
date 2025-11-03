@@ -49,6 +49,7 @@ class History:
     filename: str
     loaded_rows: int
     sorted_columns: dict[str, bool]
+    hidden_columns: set[str]
     selected_rows: list[bool]
     visible_rows: list[bool]
     fixed_rows: int
@@ -97,6 +98,9 @@ class DataFrameTable(DataTable):
         - **e** - ✍️ Edit current cell
         - **x** - 🗑️ Delete current row
         - **-** - ❌ Delete current column
+        - **d** - 📋 Duplicate current column
+        - **h** - 👁️ Hide current column
+        - **H** - 👀 Show all hidden columns
 
         ## 🎯 Reorder
         - **Shift+↑↓** - ⬆️⬇️ Move row up/down
@@ -105,7 +109,7 @@ class DataFrameTable(DataTable):
         ## 💾 Data Management
         - **f** - 📌 Freeze rows/columns
         - **c** - 📋 Copy cell to clipboard
-        - **Ctrl+S** - 💾 Save current tabto file
+        - **Ctrl+S** - 💾 Save current tab to file
         - **u** - ↩️ Undo last action
         - **U** - 🔄 Reset to original data
 
@@ -139,6 +143,7 @@ class DataFrameTable(DataTable):
 
         # State tracking (all 0-based indexing)
         self.sorted_columns: dict[str, bool] = {}  # col_name -> descending
+        self.hidden_columns: set[str] = set()  # Set of hidden column names
         self.selected_rows: list[bool] = [False] * len(self.df)  # Track selected rows
         self.visible_rows: list[bool] = [True] * len(
             self.df
@@ -280,6 +285,12 @@ class DataFrameTable(DataTable):
         elif event.key == "minus":
             # Remove the current column
             self._delete_column()
+        elif event.key == "h":
+            # Hide current column
+            self._hide_column()
+        elif event.key == "H":
+            # Show hidden columns
+            self._show_column()
         elif event.key == "left_square_bracket":  # '['
             # Sort by current column in ascending order
             self._sort_by_column(descending=False)
@@ -322,6 +333,9 @@ class DataFrameTable(DataTable):
         elif event.key == "x":
             # Delete the current row
             self._delete_row()
+        elif event.key == "d":
+            # Duplicate the current column
+            self._duplicate_column()
         elif event.key == "u":
             # Undo last action
             self._undo()
@@ -363,6 +377,7 @@ class DataFrameTable(DataTable):
             self.df = self.lazyframe.collect()
             self.loaded_rows = 0
             self.sorted_columns = {}
+            self.hidden_columns = set()
             self.selected_rows = [False] * len(self.df)
             self.visible_rows = [True] * len(self.df)
             self.fixed_rows = 0
@@ -393,8 +408,12 @@ class DataFrameTable(DataTable):
         self.clear(columns=True)
         self.show_row_labels = True
 
+        self.log("=" * 21, "\n".join(self.df.columns))
+
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
+            if col in self.hidden_columns:
+                continue  # Skip hidden columns
             for idx, c in enumerate(self.sorted_columns, 1):
                 if c == col:
                     # Add sort indicator to column header
@@ -445,7 +464,9 @@ class DataFrameTable(DataTable):
             if not self.visible_rows[row_idx]:
                 continue  # Skip hidden rows
             vals, dtypes = [], []
-            for val, dtype in zip(row, self.df.dtypes):
+            for val, col, dtype in zip(row, self.df.columns, self.df.dtypes):
+                if col in self.hidden_columns:
+                    continue  # Skip hidden columns
                 vals.append(val)
                 dtypes.append(dtype)
             formatted_row = _format_row(vals, dtypes)
@@ -456,7 +477,7 @@ class DataFrameTable(DataTable):
         self.loaded_rows = stop
 
         self.app.notify(
-            f"Loaded [$accent]{self.loaded_rows}/{len(self.df)}[/] rows from [on $primary]{self.tabname}[/]",
+            f"Loaded [$accent]{self.loaded_rows}/{len(self.df)}[/] rows from [$success]{self.tabname}[/]",
             title="Load",
         )
 
@@ -509,6 +530,7 @@ class DataFrameTable(DataTable):
             filename=self.filename,
             loaded_rows=self.loaded_rows,
             sorted_columns=self.sorted_columns.copy(),
+            hidden_columns=self.hidden_columns.copy(),
             selected_rows=self.selected_rows.copy(),
             visible_rows=self.visible_rows.copy(),
             fixed_rows=self.fixed_rows,
@@ -530,6 +552,7 @@ class DataFrameTable(DataTable):
         self.filename = history.filename
         self.loaded_rows = history.loaded_rows
         self.sorted_columns = history.sorted_columns.copy()
+        self.hidden_columns = history.hidden_columns.copy()
         self.selected_rows = history.selected_rows.copy()
         self.visible_rows = history.visible_rows.copy()
         self.fixed_rows = history.fixed_rows
@@ -602,7 +625,7 @@ class DataFrameTable(DataTable):
         col_to_remove = self.df.columns[col_idx]
 
         # Add to history
-        self._add_history(f"Removed column [on $primary]{col_to_remove}[/]")
+        self._add_history(f"Removed column [$success]{col_to_remove}[/]")
 
         # Remove the column from the table display using the column name as key
         self.remove_column(col_to_remove)
@@ -619,7 +642,95 @@ class DataFrameTable(DataTable):
         self.df = self.df.drop(col_to_remove)
 
         self.app.notify(
-            f"Removed column [on $primary]{col_to_remove}[/] from display",
+            f"Removed column [$success]{col_to_remove}[/] from display",
+            title="Column",
+        )
+
+    def _hide_column(self) -> None:
+        """Hide the currently selected column from the table display."""
+        col_key = self.cursor_column_key
+        col_name = col_key.value
+
+        if col_name not in self.df.columns:
+            return
+        col_idx = self.cursor_column
+
+        # Add to history
+        self._add_history(f"Hid column [$success]{col_name}[/]")
+
+        # Remove the column from the table display (but keep in dataframe)
+        self.remove_column(col_key)
+
+        # Track hidden columns
+        self.hidden_columns.add(col_name)
+
+        # Move cursor left if we hid the last column
+        if col_idx >= len(self.columns):
+            self.move_cursor(column=len(self.columns) - 1)
+
+        self.app.notify(
+            f"Hid column [$success]{col_name}[/]. Press [$accent]H[/] to show hidden columns",
+            title="Column",
+        )
+
+    def _show_column(self) -> None:
+        """Show all hidden columns by recreating the table with all dataframe columns."""
+        # Get currently visible columns
+        visible_cols = set(col.key for col in self.ordered_columns)
+
+        # Find hidden columns (in dataframe but not in table)
+        hidden_cols = [col for col in self.df.columns if col not in visible_cols]
+
+        if not hidden_cols:
+            self.app.notify(
+                "No hidden columns to show", title="Column", severity="warning"
+            )
+            return
+
+        # Add to history
+        self._add_history(f"Showed {len(hidden_cols)} hidden column(s)")
+
+        # Recreate table with all columns
+        self._setup_table()
+
+        self.app.notify(
+            f"Showed [$accent]{len(hidden_cols)}[/] hidden column(s)",
+            title="Column",
+        )
+
+    def _duplicate_column(self) -> None:
+        """Duplicate the currently selected column, inserting it right after the current column."""
+        col_key = self.cursor_column_key
+        col_name = col_key.value
+
+        try:
+            cid = self.df.columns.index(col_name)
+        except ValueError:
+            return
+
+        col_idx = self.cursor_column
+        new_col_name = f"{col_name}_copy"
+
+        # Add to history
+        self._add_history(f"Duplicated column [$success]{col_name}[/]")
+
+        # Create new column and reorder columns to insert after current column
+        cols_before = self.df.columns[: cid + 1]
+        cols_after = self.df.columns[cid + 1 :]
+
+        # Add the new column and reorder columns for insertion after current column
+        self.df = self.df.with_columns(pl.col(col_name).alias(new_col_name)).select(
+            list(cols_before) + [new_col_name] + list(cols_after)
+        )
+
+        # Recreate the table for display
+        self._setup_table()
+
+        # Move cursor to the new duplicated column
+        self.move_cursor(column=col_idx + 1)
+
+        self.app.notify(
+            f"Duplicated column [$success]{col_name}[/] as [$success]{new_col_name}[/]",
             title="Column",
         )
 
@@ -644,7 +755,7 @@ class DataFrameTable(DataTable):
             i = int(row_key.value) - 1  # Convert to 0-based index
 
             filter_expr[i] = False
-            history_desc = f"Deleted row [on $primary]{row_key.value}[/]"
+            history_desc = f"Deleted row [$success]{row_key.value}[/]"
 
         # Add to history
         self._add_history(history_desc)
@@ -703,7 +814,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self._add_history(
-            f"Moved column [on $primary]{col_name}[/] {direction} (swapped with [on $primary]{swap_name}[/])"
+            f"Moved column [$success]{col_name}[/] {direction} (swapped with [$success]{swap_name}[/])"
         )
 
         # Swap columns in the table's internal column locations
@@ -730,7 +841,7 @@ class DataFrameTable(DataTable):
         self.df = self.df.select(cols)
 
         self.app.notify(
-            f"Moved column [on $primary]{col_name}[/] {direction}",
+            f"Moved column [$success]{col_name}[/] {direction}",
             title="Move",
         )
 
@@ -766,7 +877,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self._add_history(
-            f"Moved row [on $primary]{row_key.value}[/] {direction} (swapped with row [on $primary]{swap_key.value}[/])"
+            f"Moved row [$success]{row_key.value}[/] {direction} (swapped with row [$success]{swap_key.value}[/])"
         )
 
         # Swap rows in the table's internal row locations
@@ -802,7 +913,7 @@ class DataFrameTable(DataTable):
         )
 
         self.app.notify(
-            f"Moved row [on $primary]{row_key.value}[/] {direction}", title="Move"
+            f"Moved row [$success]{row_key.value}[/] {direction}", title="Move"
         )
 
     # Sort
@@ -827,14 +938,14 @@ class DataFrameTable(DataTable):
         if old_desc == descending:
             # Same direction - remove this column from sort
             self.app.notify(
-                f"Already sorted by [on $primary]{col_to_sort}[/] ({'desc' if descending else 'asc'})",
+                f"Already sorted by [$success]{col_to_sort}[/] ({'desc' if descending else 'asc'})",
                 title="Sort",
                 severity="warning",
             )
             return
 
         # Add to history
-        self._add_history(f"Sorted on column [on $primary]{col_to_sort}[/]")
+        self._add_history(f"Sorted on column [$success]{col_to_sort}[/]")
         if old_desc is None:
             # Add new column to sort
             self.sorted_columns[col_to_sort] = descending
@@ -876,7 +987,7 @@ class DataFrameTable(DataTable):
         col_name = self.df.columns[col_idx]
 
         # Save current state to history
-        self._add_history(f"Edited cell [on $primary]({row_idx + 1}, {col_name})[/]")
+        self._add_history(f"Edited cell [$success]({row_idx + 1}, {col_name})[/]")
 
         # Push the edit modal screen
         self.app.push_screen(
@@ -914,9 +1025,7 @@ class DataFrameTable(DataTable):
             col_key = str(col_name)
             self.update_cell(row_key, col_key, formatted_value)
 
-            self.app.notify(
-                f"Cell updated to [on $primary]{cell_value}[/]", title="Edit"
-            )
+            self.app.notify(f"Cell updated to [$success]{cell_value}[/]", title="Edit")
         except Exception as e:
             self.app.notify(
                 f"Failed to update cell: {str(e)}", title="Edit", severity="error"
@@ -1005,7 +1114,7 @@ class DataFrameTable(DataTable):
             masks = df_rid[col_name] == float(term)
         else:
             self.app.notify(
-                f"Search not yet supported for column type: [on $primary]{col_dtype}[/]",
+                f"Search not yet supported for column type: [$success]{col_dtype}[/]",
                 title="Search",
                 severity="warning",
             )
@@ -1017,7 +1126,7 @@ class DataFrameTable(DataTable):
         match_count = len(matches)
         if match_count == 0:
             self.app.notify(
-                f"No matches found for: [on $primary]{term}[/]",
+                f"No matches found for: [$success]{term}[/]",
                 title="Search",
                 severity="warning",
             )
@@ -1025,7 +1134,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self._add_history(
-            f"Searched and highlighted [on $primary]{term}[/] in column [on $primary]{col_name}[/]"
+            f"Searched and highlighted [$success]{term}[/] in column [$success]{col_name}[/]"
         )
 
         # Update selected rows to include new matches
@@ -1036,7 +1145,7 @@ class DataFrameTable(DataTable):
         self._highlight_rows()
 
         self.app.notify(
-            f"Found [on $primary]{match_count}[/] matches for [on $primary]{term}[/]",
+            f"Found [$success]{match_count}[/] matches for [$success]{term}[/]",
             title="Search",
         )
 
@@ -1076,7 +1185,7 @@ class DataFrameTable(DataTable):
 
         if match_count == 0:
             self.app.notify(
-                f"No matches found for: [on $primary]{term}[/] in any column",
+                f"No matches found for: [$success]{term}[/] in any column",
                 title="Global Search",
                 severity="warning",
             )
@@ -1087,7 +1196,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self._add_history(
-            f"Searched and highlighted [on $primary]{term}[/] across all columns"
+            f"Searched and highlighted [$success]{term}[/] across all columns"
         )
 
         # Highlight matching cells directly
@@ -1107,7 +1216,7 @@ class DataFrameTable(DataTable):
                 self.update_cell(row_key, col_key, cell_text)
 
         self.app.notify(
-            f"Found [$accent]{match_count}[/] matches for [on $primary]{term}[/] across all columns",
+            f"Found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns",
             title="Global Search",
         )
 
@@ -1232,14 +1341,14 @@ class DataFrameTable(DataTable):
         matched_count = len(df_filtered)
         if not matched_count:
             self.app.notify(
-                f"No rows match the expression: [on $primary]{expr_str}[/]",
+                f"No rows match the expression: [$success]{expr_str}[/]",
                 title="Filter",
                 severity="warning",
             )
             return
 
         # Add to history
-        self._add_history(f"Filtered by expression [on $primary]{expr_str}[/]")
+        self._add_history(f"Filtered by expression [$success]{expr_str}[/]")
 
         # Mark unfiltered rows as invisible and unselected
         filtered_row_indices = set(df_filtered["__rid__"].to_list())
@@ -1289,7 +1398,7 @@ class DataFrameTable(DataTable):
         self.cursor_type = next_type
 
         self.app.notify(
-            f"Changed cursor type to [on $primary]{next_type}[/]", title="Cursor"
+            f"Changed cursor type to [$success]{next_type}[/]", title="Cursor"
         )
 
     def _toggle_row_labels(self) -> None:
@@ -1360,7 +1469,7 @@ class DataFrameTable(DataTable):
             self.filename = filename  # Update current filename
             if not self._all_tabs:
                 self.app.notify(
-                    f"Saved [$accent]{len(self.df)}[/] rows to [on $primary]{filename}[/]",
+                    f"Saved [$accent]{len(self.df)}[/] rows to [$success]{filename}[/]",
                     title="Save",
                 )
         except Exception as e:
@@ -1383,11 +1492,11 @@ class DataFrameTable(DataTable):
         # From ConfirmScreen callback, so notify accordingly
         if self._all_tabs is True:
             self.app.notify(
-                f"Saved all tabs to [on $primary]{filename}[/]",
+                f"Saved all tabs to [$success]{filename}[/]",
                 title="Save",
             )
         else:
             self.app.notify(
-                f"Saved current tab with [$accent]{len(self.df)}[/] rows to [on $primary]{filename}[/]",
+                f"Saved current tab with [$accent]{len(self.df)}[/] rows to [$success]{filename}[/]",
                 title="Save",
             )
