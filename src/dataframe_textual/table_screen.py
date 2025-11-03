@@ -176,7 +176,6 @@ class FrequencyScreen(TableScreen):
         self.col_idx = col_idx
         self.sorted_columns = {
             1: True,  # Count
-            2: True,  # %
         }
         self.df: pl.DataFrame = (
             dftable.df[dftable.df.columns[self.col_idx]]
@@ -219,10 +218,29 @@ class FrequencyScreen(TableScreen):
         # Calculate frequencies using Polars
         total_count = len(self.dftable.df)
 
-        self.table.add_column(Text(column, justify=dc.justify), key=column)
-        self.table.add_column(Text("Count", justify="right"), key="Count")
-        self.table.add_column(Text("%", justify="right"), key="%")
-        self.table.add_column(Text("Histogram", justify="left"), key="Histogram")
+        # Add column headers with sort indicators
+        columns = [
+            (column, "Value", 0),
+            ("Count", "Count", 1),
+            ("%", "%", 2),
+            ("Histogram", "Histogram", 3),
+        ]
+
+        for display_name, key, col_idx_num in columns:
+            # Check if this column is sorted and add indicator
+            if col_idx_num in self.sorted_columns:
+                descending = self.sorted_columns[col_idx_num]
+                sort_indicator = " ▼" if descending else " ▲"
+                header_text = display_name + sort_indicator
+            else:
+                header_text = display_name
+
+            justify = (
+                dc.justify
+                if col_idx_num == 0
+                else ("right" if col_idx_num in (1, 2) else "left")
+            )
+            self.table.add_column(Text(header_text, justify=justify), key=key)
 
         # Get style config for Int64 and Float64
         ds_int = DtypeConfig("Int64")
