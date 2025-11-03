@@ -164,6 +164,7 @@ When multiple files are opened:
 | Key | Action |
 |-----|--------|
 | `e` | Edit current cell (respects data type) |
+| `E` | Rename current column
 | `x` | Delete current row |
 | `D` | Duplicate current row |
 | `-` | Delete current column |

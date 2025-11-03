@@ -216,20 +216,70 @@ class EditCellScreen(YesNoScreen):
         """Validate and save the edited value."""
         new_value_str = self.input.value.strip()
 
+        # Handle empty input
+        if not new_value_str:
+            new_value = None
+            self.notify("Empty value provided.", title="Edit", severity="warning")
         # Check if value changed
-        if new_value_str == self.input_value:
+        elif new_value_str == self.input_value:
+            new_value = None
             self.notify("No changes made", title="Edit", severity="warning")
-            return None
-
-        # Parse and validate based on column dtype
-        try:
-            new_value = DtypeConfig(self.col_dtype).convert(new_value_str)
-        except Exception as e:
-            self.notify(f"Invalid value: {str(e)}", title="Edit", severity="error")
-            return None
+        else:
+            # Parse and validate based on column dtype
+            try:
+                new_value = DtypeConfig(self.col_dtype).convert(new_value_str)
+            except Exception as e:
+                new_value = None
+                self.notify(f"Invalid value: {str(e)}", title="Edit", severity="error")
 
         # New value
         return self.row_key, self.col_idx, new_value
+
+
+class RenameColumnScreen(YesNoScreen):
+    """Modal screen to rename a column."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "RenameColumnScreen")
+
+    def __init__(self, col_idx: int, col_name: str, existing_columns: list[str]):
+        self.col_idx = col_idx
+        self.col_name = col_name
+        self.existing_columns = [c for c in existing_columns if c != col_name]
+
+        # Label
+        content = f"Rename [$primary]{col_name}[/] to:"
+
+        super().__init__(
+            title="Rename Column",
+            label=content,
+            input={"value": col_name},
+            on_yes_callback=self._save_rename,
+        )
+
+    def _save_rename(self) -> None:
+        """Validate and save the new column name."""
+        new_name = self.input.value.strip()
+
+        # Check if name is empty
+        if not new_name:
+            self.notify("Column name cannot be empty", title="Rename", severity="error")
+
+        # Check if name changed
+        elif new_name == self.col_name:
+            self.notify("No changes made", title="Rename", severity="warning")
+            new_name = None
+
+        # Check if name already exists
+        elif new_name in self.existing_columns:
+            self.notify(
+                f"Column [$accent]{new_name}[/] already exists",
+                title="Rename",
+                severity="error",
+            )
+            new_name = None
+
+        # Return new name
+        return self.col_idx, self.col_name, new_name
 
 
 class SearchScreen(YesNoScreen):

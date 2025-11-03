@@ -35,6 +35,7 @@ from .yes_no_screen import (
     EditCellScreen,
     FilterScreen,
     FreezeScreen,
+    RenameColumnScreen,
     SaveFileScreen,
     SearchScreen,
 )
@@ -96,6 +97,7 @@ class DataFrameTable(DataTable):
 
         ## ✏️ Edit & Modify
         - **e** - ✍️ Edit current cell
+        - **E** - 📝 Rename current column
         - **x** - 🗑️ Delete current row
         - **D** - 📋 Duplicate current row
         - **-** - ❌ Delete current column
@@ -131,6 +133,7 @@ class DataFrameTable(DataTable):
         ("v", "filter_rows", "Filter rows"),
         ("V", "open_filter_screen", "Advanced filter"),
         ("e", "edit_cell", "Edit cell"),
+        ("E", "rename_column", "Rename column"),
         ("backslash", "search_with_cell_value", "Search with value"),
         ("vertical_line", "search_column", "Search column"),
         ("slash", "search_all_columns", "Search all"),
@@ -361,6 +364,10 @@ class DataFrameTable(DataTable):
     def action_edit_cell(self) -> None:
         """Edit the current cell."""
         self._edit_cell()
+
+    def action_rename_column(self) -> None:
+        """Rename the current column."""
+        self._rename_column()
 
     def action_search_with_cell_value(self) -> None:
         """Search using the current cell value."""
@@ -1115,6 +1122,13 @@ class DataFrameTable(DataTable):
             return
 
         row_key, col_idx, new_value = result
+        if new_value is None:
+            self.app.push_screen(
+                EditCellScreen(row_key, col_idx, self.df),
+                callback=self._do_edit_cell,
+            )
+            return
+
         row_idx = int(row_key.value) - 1  # Convert to 0-based
         col_name = self.df.columns[col_idx]
 
@@ -1145,6 +1159,61 @@ class DataFrameTable(DataTable):
                 f"Failed to update cell: {str(e)}", title="Edit", severity="error"
             )
             raise e
+
+    def _rename_column(self) -> None:
+        """Open modal to rename the selected column."""
+        col_name = self.cursor_column_key.value
+        if col_name not in self.df.columns:
+            return
+
+        col_idx = self.cursor_column
+
+        # Push the rename column modal screen
+        self.app.push_screen(
+            RenameColumnScreen(col_idx, col_name, self.df.columns),
+            callback=self._do_rename_column,
+        )
+
+    def _do_rename_column(self, result) -> None:
+        """Handle result from RenameColumnScreen."""
+        if result is None:
+            return
+
+        col_idx, col_name, new_name = result
+        if new_name is None:
+            self.app.push_screen(
+                RenameColumnScreen(col_idx, col_name, self.df.columns),
+                callback=self._do_rename_column,
+            )
+            return
+
+        # Add to history
+        self._add_history(
+            f"Renamed column [$accent]{col_name}[/] to [$success]{new_name}[/]"
+        )
+
+        # Rename the column in the dataframe
+        self.df = self.df.rename({col_name: new_name})
+
+        # Update sorted_columns if this column was sorted
+        if col_name in self.sorted_columns:
+            self.sorted_columns[new_name] = self.sorted_columns.pop(col_name)
+
+        # Update hidden_columns if this column was hidden
+        if col_name in self.hidden_columns:
+            self.hidden_columns.remove(col_name)
+            self.hidden_columns.add(new_name)
+
+        # Recreate the table for display
+        self._setup_table()
+
+        # Move cursor to the renamed column
+        self.move_cursor(column=col_idx)
+
+        self.app.notify(
+            f"Renamed column [$success]{col_name}[/] to [$success]{new_name}[/]",
+            title="Column",
+        )
 
     def _copy_cell(self) -> None:
         """Copy the current cell to clipboard."""
