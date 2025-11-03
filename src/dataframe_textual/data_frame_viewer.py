@@ -280,7 +280,7 @@ def _load_dataframe(
 
             # Read CSV from stdin into memory first (stdin is not seekable)
             stdin_data = sys.stdin.read()
-            df = pl.read_csv(StringIO(stdin_data))
+            lf = pl.scan_csv(StringIO(stdin_data))
 
             # Reopen stdin to /dev/tty for proper terminal interaction
             try:
@@ -289,7 +289,7 @@ def _load_dataframe(
             except (OSError, FileNotFoundError):
                 pass
 
-            sources.append((df, "stdin.csv", "stdin"))
+            sources.append((lf, "stdin.csv", "stdin"))
         # Handle Excel files with multiple sheets
         elif ext in (".xlsx", ".xls"):
             sheets = pl.read_excel(filename, sheet_id=0)
@@ -297,20 +297,20 @@ def _load_dataframe(
                 sources.append((df, filename, sheet_name))
         # Handle TSV files
         elif ext in (".tsv", ".tab"):
-            df = pl.read_csv(filename, separator="\t")
-            sources.append((df, filename, filepath.stem))
+            lf = pl.scan_csv(filename, separator="\t")
+            sources.append((lf, filename, filepath.stem))
         # Handle JSON files
         elif ext == ".json":
             df = pl.read_json(filename)
             sources.append((df, filename, filepath.stem))
         # Handle Parquet files
         elif ext == ".parquet":
-            df = pl.read_parquet(filename)
-            sources.append((df, filename, filepath.stem))
+            lf = pl.scan_parquet(filename)
+            sources.append((lf, filename, filepath.stem))
         # Handle regular CSV files
         else:
-            df = pl.read_csv(filename)
-            sources.append((df, filename, filepath.stem))
+            lf = pl.scan_csv(filename)
+            sources.append((lf, filename, filepath.stem))
     # Multiple files
     else:
         for filename in filenames:
@@ -322,16 +322,16 @@ def _load_dataframe(
                 df = pl.read_excel(filename)
                 sources.append((df, filename, filepath.stem))
             elif ext in (".tsv", ".tab"):
-                df = pl.read_csv(filename, separator="\t")
-                sources.append((df, filename, filepath.stem))
+                lf = pl.scan_csv(filename, separator="\t")
+                sources.append((lf, filename, filepath.stem))
             elif ext == ".json":
                 df = pl.read_json(filename)
                 sources.append((df, filename, filepath.stem))
             elif ext == ".parquet":
-                df = pl.read_parquet(filename)
-                sources.append((df, filename, filepath.stem))
+                lf = pl.scan_parquet(filename)
+                sources.append((lf, filename, filepath.stem))
             else:
-                df = pl.read_csv(filename)
-                sources.append((df, filename, filepath.stem))
+                lf = pl.scan_csv(filename)
+                sources.append((lf, filename, filepath.stem))
 
     return sources

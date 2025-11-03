@@ -114,7 +114,7 @@ class DataFrameTable(DataTable):
 
     def __init__(
         self,
-        df: pl.DataFrame,
+        df: pl.DataFrame | pl.LazyFrame,
         filename: str = "",
         tabname: str = "",
         **kwargs,
@@ -129,8 +129,8 @@ class DataFrameTable(DataTable):
         super().__init__(**kwargs)
 
         # DataFrame state
-        self.dataframe = df  # Original dataframe
-        self.df = df  # Internal/working dataframe
+        self.lazyframe = df.lazy()  # Original dataframe
+        self.df = self.lazyframe.collect()  # Internal/working dataframe
         self.filename = filename  # Current filename
         self.tabname = tabname or Path(filename).stem  # Current tab name
 
@@ -139,9 +139,9 @@ class DataFrameTable(DataTable):
 
         # State tracking (all 0-based indexing)
         self.sorted_columns: dict[str, bool] = {}  # col_name -> descending
-        self.selected_rows: list[bool] = [False] * len(df)  # Track selected rows
+        self.selected_rows: list[bool] = [False] * len(self.df)  # Track selected rows
         self.visible_rows: list[bool] = [True] * len(
-            df
+            self.df
         )  # Track visible rows (for filtering)
 
         # Freezing
@@ -360,7 +360,7 @@ class DataFrameTable(DataTable):
         """Setup the table for display."""
         # Reset to original dataframe
         if reset:
-            self.df = self.dataframe
+            self.df = self.lazyframe.collect()
             self.loaded_rows = 0
             self.sorted_columns = {}
             self.selected_rows = [False] * len(self.df)
@@ -1356,7 +1356,7 @@ class DataFrameTable(DataTable):
             else:
                 self.df.write_csv(filename)
 
-            self.dataframe = self.df  # Update original dataframe
+            self.lazyframe = self.df  # Update original dataframe
             self.filename = filename  # Update current filename
             if not self._all_tabs:
                 self.app.notify(
