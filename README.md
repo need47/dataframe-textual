@@ -1,4 +1,4 @@
-# DataFrame Viewer/Editor
+# DataFrame Textual
 
 A powerful, interactive terminal-based CSV/Excel viewer/editor built with Python, Polars, and Textual. Inspired by VisiData, this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in your terminal. Now with **multi-file support for simultaneous data comparison**!
 
