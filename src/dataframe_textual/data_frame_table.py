@@ -577,7 +577,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self._add_history(
-            f"Pinned [on $primary]{fixed_rows}[/] rows and [on $primary]{fixed_columns}[/] columns"
+            f"Pinned [$accent]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns"
         )
 
         # Apply the pin settings to the table
@@ -587,7 +587,7 @@ class DataFrameTable(DataTable):
             self.fixed_columns = fixed_columns
 
         self.app.notify(
-            f"Pinned [on $primary]{fixed_rows}[/] rows and [on $primary]{fixed_columns}[/] columns",
+            f"Pinned [$accent]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns",
             title="Pin",
         )
 
@@ -1107,7 +1107,7 @@ class DataFrameTable(DataTable):
                 self.update_cell(row_key, col_key, cell_text)
 
         self.app.notify(
-            f"Found [on $success]{match_count}[/] matches for [on $primary]{term}[/] across all columns",
+            f"Found [$accent]{match_count}[/] matches for [on $primary]{term}[/] across all columns",
             title="Global Search",
         )
 
@@ -1141,7 +1141,7 @@ class DataFrameTable(DataTable):
         # Check if we're highlighting or un-highlighting
         if new_selected_count := self.selected_rows.count(True):
             self.app.notify(
-                f"Toggled selection - now showing [on $primary]{new_selected_count}[/] rows",
+                f"Toggled selection - now showing [$accent]{new_selected_count}[/] rows",
                 title="Toggle",
             )
 
@@ -1165,7 +1165,7 @@ class DataFrameTable(DataTable):
         self._highlight_rows(clear=True)
 
         self.app.notify(
-            f"Cleared [on $primary]{selected_count}[/] selected rows", title="Clear"
+            f"Cleared [$accent]{selected_count}[/] selected rows", title="Clear"
         )
 
     def _filter_selected_rows(self) -> None:
@@ -1188,7 +1188,7 @@ class DataFrameTable(DataTable):
         self._setup_table()
 
         self.app.notify(
-            f"Removed unselected rows. Now showing [on $primary]{selected_count}[/] rows",
+            f"Removed unselected rows. Now showing [$accent]{selected_count}[/] rows",
             title="Filter",
         )
 
@@ -1253,7 +1253,7 @@ class DataFrameTable(DataTable):
         self._setup_table()
 
         self.app.notify(
-            f"Filtered to [on $primary]{matched_count}[/] matching rows",
+            f"Filtered to [$accent]{matched_count}[/] matching rows",
             title="Filter",
         )
 

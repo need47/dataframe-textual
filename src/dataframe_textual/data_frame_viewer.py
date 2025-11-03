@@ -117,7 +117,9 @@ class DataFrameViewer(App):
     def on_key(self, event):
         if event.key == "k":
             self.theme = _next(list(BUILTIN_THEMES.keys()), self.theme)
-            self.notify(f"Switched to theme: [$primary]{self.theme}[/]", title="Theme")
+            self.notify(
+                f"Switched to theme: [on $primary]{self.theme}[/]", title="Theme"
+            )
 
     def on_tabbed_content_tab_activated(
         self, event: TabbedContent.TabActivated
@@ -202,12 +204,24 @@ class DataFrameViewer(App):
 
     def _add_tab(self, df: pl.DataFrame, filename: str) -> None:
         """Add new table tab. If single file, replace table; if multiple, add tab."""
-        table = DataFrameTable(df, filename, zebra_stripes=True)
         tabname = Path(filename).stem
         if any(tab.name == tabname for tab in self.tabs):
             tabname = f"{tabname}_{len(self.tabs) + 1}"
 
-        tab = TabPane(tabname, table, name=tabname, id=f"tab_{len(self.tabs) + 1}")
+        # Find an available tab index
+        tab_idx = f"tab_{len(self.tabs) + 1}"
+        for idx in range(len(self.tabs)):
+            pending_tab_idx = f"tab_{idx + 1}"
+            if any(tab.id == pending_tab_idx for tab in self.tabs):
+                continue
+
+            tab_idx = pending_tab_idx
+            break
+
+        table = DataFrameTable(
+            df, filename, zebra_stripes=True, id=tab_idx, name=tabname
+        )
+        tab = TabPane(tabname, table, name=tabname, id=tab_idx)
         self.tabbed.add_pane(tab)
         self.tabs[tab] = table
 
