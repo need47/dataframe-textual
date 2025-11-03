@@ -156,8 +156,8 @@ When multiple files are opened:
 |-----|--------|
 | `Enter` | View full details of current row in modal |
 | `F` | Show frequency distribution for column |
-| `@` | Cycle cursor type: cell → row → column → cell |
-| `#` | Toggle row labels visibility |
+| `!` | Cycle cursor type: cell → row → column → cell |
+| `@` | Toggle row labels visibility |
 
 #### Data Editing
 
@@ -205,6 +205,15 @@ When multiple files are opened:
 | `Shift+↓` | Move current row down |
 | `Shift+←` | Move current column left |
 | `Shift+→` | Move current column right |
+
+#### Type Conversion
+
+| Key | Action |
+|-----|--------|
+| `#` | Cast current column to integer (Int64) |
+| `%` | Cast current column to float (Float64) |
+| `$` | Cast current column to boolean |
+| `^` | Cast current column to string |
 
 #### Data Management
 
@@ -421,16 +430,40 @@ Press `u` to undo:
 - Works for edits, deletions, sorts, searches, etc.
 - Shows description of reverted action
 
-### 15. Cursor Type Cycling
+### 15. Column Type Conversion
 
-Press `C` to cycle through selection modes:
+Press the type conversion keys to instantly cast the current column to a different data type:
+
+**Type Conversion Shortcuts**:
+- `#` - Cast to **Integer (Int64)**
+- `%` - Cast to **Float (Float64)**
+- `$` - Cast to **Boolean**
+- `*` - Cast to **String**
+
+**Examples**:
+- Convert string numbers to integers: Move to column, press `#`
+- Convert integers to decimals: Move to column, press `%`
+- Convert text to string: Move to column, press `*`
+- Convert numeric values to true/false: Move to column, press `$`
+
+**Features**:
+- Instant conversion with visual feedback
+- Full undo support - press `u` to revert
+- Automatic error handling with helpful messages
+- Works with Polars' robust type casting
+
+**Note**: Type conversion attempts to preserve data where possible. Conversions that would lose data (e.g., float to int rounding, invalid boolean strings) will notify you with the reason.
+
+### 16. Cursor Type Cycling
+
+Press `!` to cycle through selection modes:
 1. **Cell mode**: Highlight individual cell (and its row/column headers)
 2. **Row mode**: Highlight entire row
 3. **Column mode**: Highlight entire column
 
 Visual feedback shows which mode is active.
 
-### 16. Clipboard Operations
+### 17. Clipboard Operations
 
 Press `Ctrl+C` to copy:
 - Copies current cell value to system clipboard

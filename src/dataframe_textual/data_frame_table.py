@@ -76,8 +76,8 @@ class DataFrameTable(DataTable):
         ## 👁️ View & Display
         - **Enter** - 📋 Show row details in modal
         - **F** - 📊 Show frequency distribution
-        - **@** - 🔄 Cycle cursor (cell → row → column → cell)
-        - **#** - 🏷️ Toggle row labels
+        - **!** - 🔄 Cycle cursor (cell → row → column → cell)
+        - **@** - 🏷️ Toggle row labels
 
         ## ↕️ Sorting
         - **[** - 🔼 Sort column ascending
@@ -115,7 +115,13 @@ class DataFrameTable(DataTable):
         - **Shift+↑↓** - ⬆️⬇️ Move row up/down
         - **Shift+←→** - ⬅️➡️ Move column left/right
 
-        ## 💾 Data Management
+        ## � Type Conversion
+        - **#** - 🔢 Cast column to integer
+        - **%** - 🔢 Cast column to float
+        - **$** - ✅ Cast column to boolean
+        - **** - 📝 Cast column to string
+
+        ## �💾 Data Management
         - **f** - 📌 Freeze rows/columns
         - **Ctrl+C** - 📋 Copy cell to clipboard
         - **Ctrl+S** - 💾 Save current tab to file
@@ -129,11 +135,11 @@ class DataFrameTable(DataTable):
         ("g", "jump_top", "Jump to top"),
         ("G", "jump_bottom", "Jump to bottom"),
         ("enter", "view_row_detail", "View row details"),
-        ("minus", "delete_column", "Delete column"),
+        ("minus", "delete_column", "Delete column"),  # `-`
         ("h", "hide_column", "Hide column"),
         ("H", "show_column", "Show columns"),
-        ("left_square_bracket", "sort_ascending", "Sort ascending"),
-        ("right_square_bracket", "sort_descending", "Sort descending"),
+        ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
+        ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
         ("ctrl+c", "copy_cell", "Copy cell"),
         ("ctrl+s", "save_to_file", "Save to file"),
         ("F", "show_frequency", "Show frequency"),
@@ -145,12 +151,12 @@ class DataFrameTable(DataTable):
         ("a", "add_column", "Add column"),
         ("A", "add_column_expr", "Add column with expression"),
         ("c", "clear_cell", "Clear cell"),
-        ("backslash", "search_with_cell_value", "Search with value"),
-        ("vertical_line", "search_column", "Search column"),
-        ("slash", "search_all_columns", "Search all"),
+        ("backslash", "search_with_cell_value", "Search with value"),  # `\`
+        ("vertical_line", "search_column", "Search column"),  # `|`
+        ("slash", "search_all_columns", "Search all"),  # `/`
         ("s", "toggle_selected_row", "Toggle row selection"),
         ("t", "toggle_selected_rows", "Toggle all selections"),
-        ("quotation_mark", "filter_selected_rows", "Filter selected"),
+        ("quotation_mark", "filter_selected_rows", "Filter selected"),  # `"`
         ("x", "delete_row", "Delete row"),
         ("d", "duplicate_column", "Duplicate column"),
         ("D", "duplicate_row", "Duplicate row"),
@@ -161,8 +167,13 @@ class DataFrameTable(DataTable):
         ("shift+up", "move_row_up", "Move row up"),
         ("shift+down", "move_row_down", "Move row down"),
         ("T", "clear_selected_rows", "Clear selections"),
-        ("at", "cycle_cursor_type", "Cycle cursor mode"),
+        ("at", "toggle_row_labels", "Toggle row labels"),  # `@`
+        ("exclamation", "cycle_cursor_type", "Cycle cursor mode"),  # `!`
         ("f", "open_freeze_screen", "Freeze rows/columns"),
+        ("number_sign", "cast_column_dtype('int')", "Cast column dtype to int"),  # `#`
+        ("percent_sign", "cast_column_dtype('float')", "Cast column dtype to float"),  # `%`
+        ("dollar_sign", "cast_column_dtype('bool')", "Cast column dtype to bool"),  # `$`
+        ("circumflex_accent", "cast_column_dtype('string')", "Cast column dtype to string"),  # `^`
     ]
 
     def __init__(
@@ -225,6 +236,18 @@ class DataFrameTable(DataTable):
     def cursor_rid(self) -> int:
         """Get the current cursor row index (0-based) in dataframe."""
         return int(self.cursor_row_key.value) - 1
+
+    @property
+    def cursor_cid(self) -> int:
+        """Get the current cursor column index (0-based) in dataframe."""
+        col_name = self.cursor_column_key.value
+
+        try:
+            cid = self.df.columns.index(col_name)
+        except ValueError:
+            raise ValueError("Cursor column key not found in ordered columns")
+
+        return cid
 
     def on_mount(self) -> None:
         """Initialize table display when widget is mounted."""
@@ -464,6 +487,16 @@ class DataFrameTable(DataTable):
     def action_open_freeze_screen(self) -> None:
         """Open the freeze/pin screen."""
         self._open_freeze_screen()
+
+    def action_toggle_row_labels(self) -> None:
+        """Toggle row labels visibility."""
+        self.show_row_labels = not self.show_row_labels
+        status = "shown" if self.show_row_labels else "hidden"
+        self.app.notify(f"Row labels {status}", title="Labels")
+
+    def action_cast_column_dtype(self, dtype: str | pl.DataType) -> None:
+        """Cast the current column to a different data type."""
+        self._cast_column_dtype(dtype)
 
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
@@ -1375,6 +1408,75 @@ class DataFrameTable(DataTable):
             self.app.notify(f"Failed to add column: {str(e)}", title="Add Column", severity="error")
             raise e
 
+    def _string_to_polars_dtype(self, dtype_str: str) -> pl.DataType:
+        """Convert string type name to Polars DataType.
+
+        Args:
+            dtype_str: String representation of the type ("string", "int", "float", "bool")
+
+        Returns:
+            Corresponding Polars DataType
+
+        Raises:
+            ValueError: If the type string is not recognized
+        """
+        dtype_map = {
+            "string": pl.String,
+            "int": pl.Int64,
+            "float": pl.Float64,
+            "bool": pl.Boolean,
+        }
+
+        dtype_lower = dtype_str.lower().strip()
+        return dtype_map.get(dtype_lower)
+
+    def _cast_column_dtype(self, dtype: str | pl.DataType = pl.String) -> None:
+        """Cast the current column to a different data type.
+
+        Args:
+            dtype: Target data type (string like "int", "float", "bool", "string" or Polars DataType)
+        """
+        cid = self.cursor_cid
+        if cid >= len(self.df.columns):
+            self.app.notify("Invalid column selected", title="Cast", severity="error")
+            return
+
+        col_name = self.df.columns[cid]
+        current_dtype = self.df.dtypes[cid]
+
+        # Convert string dtype to Polars DataType if needed
+        if isinstance(dtype, str):
+            target_dtype = self._string_to_polars_dtype(dtype)
+            if target_dtype is None:
+                self.app.notify(
+                    f"Use string for unknown data type: {dtype}. Supported types: {', '.join(self._string_to_polars_dtype.keys())}",
+                    title="Cast",
+                    severity="warning",
+                )
+                target_dtype = pl.String
+        else:
+            target_dtype = dtype
+
+        # Add to history
+        self._add_history(
+            f"Cast column [$success]{col_name}[/] from [$accent]{current_dtype}[/] to [$accent]{target_dtype}[/]"
+        )
+
+        try:
+            # Cast the column using Polars
+            self.df = self.df.with_columns(pl.col(col_name).cast(target_dtype))
+
+            # Recreate the table display
+            self._setup_table()
+
+            self.app.notify(
+                f"Cast column [$success]{col_name}[/] to [$accent]{target_dtype}[/]",
+                title="Cast",
+            )
+        except Exception as e:
+            self.app.notify(f"Failed to cast column: {str(e)}", title="Cast", severity="error")
+            raise e
+
     def _search_column(self, all_columns: bool = False) -> None:
         """Open modal to search in the selected column."""
         row_idx, col_idx = self.cursor_coordinate
@@ -1705,12 +1807,6 @@ class DataFrameTable(DataTable):
         self.cursor_type = next_type
 
         self.app.notify(f"Changed cursor type to [$success]{next_type}[/]", title="Cursor")
-
-    def _toggle_row_labels(self) -> None:
-        """Toggle row labels visibility."""
-        self.show_row_labels = not self.show_row_labels
-        status = "shown" if self.show_row_labels else "hidden"
-        self.app.notify(f"Row labels {status}", title="Labels")
 
     def _save_to_file(self) -> None:
         """Open save file dialog."""
