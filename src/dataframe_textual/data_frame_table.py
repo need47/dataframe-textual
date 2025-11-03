@@ -103,8 +103,8 @@ class DataFrameTable(DataTable):
         - **m** - 📝 Rename current column
         - **a** - ➕ Add empty column after current
         - **A** - ➕ Add column with name and optional expression
-        - **c** - ✨ Clear current cell (set to None)
         - **x** - 🗑️ Delete current row
+        - **X** - ✨ Clear current cell (set to None)
         - **D** - 📋 Duplicate current row
         - **-** - ❌ Delete current column
         - **d** - 📋 Duplicate current column
@@ -150,7 +150,6 @@ class DataFrameTable(DataTable):
         ("m", "rename_column", "Rename column"),
         ("a", "add_column", "Add column"),
         ("A", "add_column_expr", "Add column with expression"),
-        ("c", "clear_cell", "Clear cell"),
         ("backslash", "search_with_cell_value", "Search with value"),  # `\`
         ("vertical_line", "search_column", "Search column"),  # `|`
         ("slash", "search_all_columns", "Search all"),  # `/`
@@ -158,6 +157,7 @@ class DataFrameTable(DataTable):
         ("t", "toggle_selected_rows", "Toggle all selections"),
         ("quotation_mark", "filter_selected_rows", "Filter selected"),  # `"`
         ("x", "delete_row", "Delete row"),
+        ("X", "clear_cell", "Clear cell"),
         ("d", "duplicate_column", "Duplicate column"),
         ("D", "duplicate_row", "Duplicate row"),
         ("u", "undo", "Undo"),
@@ -233,21 +233,24 @@ class DataFrameTable(DataTable):
         return self.cursor_key.column_key
 
     @property
-    def cursor_rid(self) -> int:
+    def cursor_ridx(self) -> int:
         """Get the current cursor row index (0-based) in dataframe."""
-        return int(self.cursor_row_key.value) - 1
+        ridx = int(self.cursor_row_key.value) - 1
+        assert ridx < len(self.df), "Cursor row index is out of bounds"
+        return ridx
 
     @property
-    def cursor_cid(self) -> int:
+    def cursor_cidx(self) -> int:
         """Get the current cursor column index (0-based) in dataframe."""
         col_name = self.cursor_column_key.value
 
         try:
-            cid = self.df.columns.index(col_name)
+            cidx = self.df.columns.index(col_name)
         except ValueError:
-            raise ValueError("Cursor column key not found in ordered columns")
+            cidx = -1
 
-        return cid
+        assert -1 < cidx < len(self.df.columns), "Cursor column index is out of bounds"
+        return cidx
 
     def on_mount(self) -> None:
         """Initialize table display when widget is mounted."""
@@ -696,21 +699,17 @@ class DataFrameTable(DataTable):
     # View
     def _view_row_detail(self) -> None:
         """Open a modal screen to view the selected row's details."""
-        row_idx = self.cursor_row
-        if row_idx >= len(self.df):
-            return
+        ridx = self.cursor_ridx
 
         # Push the modal screen
-        self.app.push_screen(RowDetailScreen(row_idx, self))
+        self.app.push_screen(RowDetailScreen(ridx, self))
 
     def _show_frequency(self) -> None:
         """Show frequency distribution for the current column."""
-        col_idx = self.cursor_column
-        if col_idx >= len(self.df.columns):
-            return
+        cidx = self.cursor_cidx
 
         # Push the frequency modal screen
-        self.app.push_screen(FrequencyScreen(col_idx, self))
+        self.app.push_screen(FrequencyScreen(cidx, self))
 
     def _open_freeze_screen(self) -> None:
         """Open the freeze screen to set fixed rows and columns."""
@@ -744,32 +743,31 @@ class DataFrameTable(DataTable):
     # Delete & Move
     def _delete_column(self) -> None:
         """Remove the currently selected column from the table."""
+        cidx = self.cursor_cidx
         col_idx = self.cursor_column
-        if col_idx >= len(self.df.columns):
-            return
 
         # Get the column name to remove
-        col_to_remove = self.df.columns[col_idx]
+        col_name = self.df.columns[cidx]
 
         # Add to history
-        self._add_history(f"Removed column [$success]{col_to_remove}[/]")
+        self._add_history(f"Removed column [$success]{col_name}[/]")
 
         # Remove the column from the table display using the column name as key
-        self.remove_column(col_to_remove)
+        self.remove_column(col_name)
 
         # Move cursor left if we deleted the last column
         if col_idx >= len(self.columns):
             self.move_cursor(column=len(self.columns) - 1)
 
         # Remove from sorted columns if present
-        if col_to_remove in self.sorted_columns:
-            del self.sorted_columns[col_to_remove]
+        if col_name in self.sorted_columns:
+            del self.sorted_columns[col_name]
 
         # Remove from dataframe
-        self.df = self.df.drop(col_to_remove)
+        self.df = self.df.drop(col_name)
 
         self.app.notify(
-            f"Removed column [$success]{col_to_remove}[/] from display",
+            f"Removed column [$success]{col_name}[/] from display",
             title="Column",
         )
 
@@ -825,13 +823,8 @@ class DataFrameTable(DataTable):
 
     def _duplicate_column(self) -> None:
         """Duplicate the currently selected column, inserting it right after the current column."""
-        col_key = self.cursor_column_key
-        col_name = col_key.value
-
-        try:
-            cid = self.df.columns.index(col_name)
-        except ValueError:
-            return
+        cidx = self.cursor_cidx
+        col_name = self.df.columns[cidx]
 
         col_idx = self.cursor_column
         new_col_name = f"{col_name}_copy"
@@ -840,8 +833,8 @@ class DataFrameTable(DataTable):
         self._add_history(f"Duplicated column [$success]{col_name}[/]")
 
         # Create new column and reorder columns to insert after current column
-        cols_before = self.df.columns[: cid + 1]
-        cols_after = self.df.columns[cid + 1 :]
+        cols_before = self.df.columns[: cidx + 1]
+        cols_after = self.df.columns[cidx + 1 :]
 
         # Add the new column and reorder columns for insertion after current column
         self.df = self.df.with_columns(pl.col(col_name).alias(new_col_name)).select(
@@ -876,21 +869,19 @@ class DataFrameTable(DataTable):
                     filter_expr[i] = False
         # Delete the row at the cursor
         else:
-            row_key = self.cursor_row_key
-            i = int(row_key.value) - 1  # Convert to 0-based index
-
-            filter_expr[i] = False
-            history_desc = f"Deleted row [$success]{row_key.value}[/]"
+            ridx = self.cursor_ridx
+            filter_expr[ridx] = False
+            history_desc = f"Deleted row [$success]{ridx + 1}[/]"
 
         # Add to history
         self._add_history(history_desc)
 
         # Apply the filter to remove rows
-        df = self.df.with_row_index("__rid__").filter(filter_expr)
-        self.df = df.drop("__rid__")
+        df = self.df.with_row_index("__ridx__").filter(filter_expr)
+        self.df = df.drop("__ridx__")
 
         # Update selected and visible rows tracking
-        old_row_indices = set(df["__rid__"].to_list())
+        old_row_indices = set(df["__ridx__"].to_list())
         self.selected_rows = [selected for i, selected in enumerate(self.selected_rows) if i in old_row_indices]
         self.visible_rows = [visible for i, visible in enumerate(self.visible_rows) if i in old_row_indices]
 
@@ -902,26 +893,24 @@ class DataFrameTable(DataTable):
 
     def _duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""
-        rid = self.cursor_rid
-        if rid >= len(self.df):
-            return
+        ridx = self.cursor_ridx
 
         # Get the row to duplicate
-        row_to_duplicate = self.df.slice(rid, 1)
+        row_to_duplicate = self.df.slice(ridx, 1)
 
         # Add to history
-        self._add_history(f"Duplicated row [$success]{rid + 1}[/]")
+        self._add_history(f"Duplicated row [$success]{ridx + 1}[/]")
 
         # Concatenate: rows before + duplicated row + rows after
-        df_before = self.df.slice(0, rid + 1)
-        df_after = self.df.slice(rid + 1)
+        df_before = self.df.slice(0, ridx + 1)
+        df_after = self.df.slice(ridx + 1)
 
         # Combine the parts
         self.df = pl.concat([df_before, row_to_duplicate, df_after])
 
         # Update selected and visible rows tracking to account for new row
-        new_selected_rows = self.selected_rows[: rid + 1] + [self.selected_rows[rid]] + self.selected_rows[rid + 1 :]
-        new_visible_rows = self.visible_rows[: rid + 1] + [self.visible_rows[rid]] + self.visible_rows[rid + 1 :]
+        new_selected_rows = self.selected_rows[: ridx + 1] + [self.selected_rows[ridx]] + self.selected_rows[ridx + 1 :]
+        new_visible_rows = self.visible_rows[: ridx + 1] + [self.visible_rows[ridx]] + self.visible_rows[ridx + 1 :]
         self.selected_rows = new_selected_rows
         self.visible_rows = new_visible_rows
 
@@ -929,10 +918,10 @@ class DataFrameTable(DataTable):
         self._setup_table()
 
         # Move cursor to the new duplicated row
-        self.move_cursor(row=rid + 1)
+        self.move_cursor(row=ridx + 1)
 
         self.app.notify(
-            f"Duplicated row [$success]{rid + 1}[/]",
+            f"Duplicated row [$success]{ridx + 1}[/]",
             title="Row",
         )
 
@@ -944,6 +933,8 @@ class DataFrameTable(DataTable):
         """
         row_idx, col_idx = self.cursor_coordinate
         col_key = self.cursor_column_key
+        col_name = col_key.value
+        cidx = self.cursor_cidx
 
         # Validate move is possible
         if direction == "left":
@@ -957,16 +948,16 @@ class DataFrameTable(DataTable):
                 return
             swap_idx = col_idx + 1
 
-        # Get column names to swap
-        col_name = self.df.columns[col_idx]
-        swap_name = self.df.columns[swap_idx]
+        # Get column to swap
+        _, swap_key = self.coordinate_to_cell_key(Coordinate(row_idx, swap_idx))
+        swap_name = swap_key.value
+        swap_cidx = self.df.columns.index(swap_name)
 
         # Add to history
         self._add_history(f"Moved column [$success]{col_name}[/] {direction} (swapped with [$success]{swap_name}[/])")
 
         # Swap columns in the table's internal column locations
         self.check_idle()
-        swap_key = self.df.columns[swap_idx]  # str as column key
 
         (
             self._column_locations[col_key],
@@ -984,13 +975,10 @@ class DataFrameTable(DataTable):
 
         # Update the dataframe column order
         cols = list(self.df.columns)
-        cols[col_idx], cols[swap_idx] = cols[swap_idx], cols[col_idx]
+        cols[cidx], cols[swap_cidx] = cols[swap_cidx], cols[cidx]
         self.df = self.df.select(cols)
 
-        self.app.notify(
-            f"Moved column [$success]{col_name}[/] {direction}",
-            title="Move",
-        )
+        # self.app.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move")
 
     def _move_row(self, direction: str) -> None:
         """Move the current row up or down.
@@ -1041,9 +1029,9 @@ class DataFrameTable(DataTable):
         self.move_cursor(row=swap_idx, column=col_idx)
 
         # Swap rows in the dataframe
-        rid = int(row_key.value) - 1  # 0-based
-        swap_rid = int(swap_key.value) - 1  # 0-based
-        first, second = sorted([rid, swap_rid])
+        ridx = int(row_key.value) - 1  # 0-based
+        swap_ridx = int(swap_key.value) - 1  # 0-based
+        first, second = sorted([ridx, swap_ridx])
 
         self.df = pl.concat(
             [
@@ -1068,45 +1056,43 @@ class DataFrameTable(DataTable):
         Args:
             descending: If True, sort in descending order. If False, ascending order.
         """
+        cidx = self.cursor_cidx
+        col_name = self.df.columns[cidx]
         col_idx = self.cursor_column
-        if col_idx >= len(self.df.columns):
-            return
-
-        col_to_sort = self.df.columns[col_idx]
 
         # Check if this column is already in the sort keys
-        old_desc = self.sorted_columns.get(col_to_sort)
+        old_desc = self.sorted_columns.get(col_name)
         if old_desc == descending:
             # Same direction - remove this column from sort
             self.app.notify(
-                f"Already sorted by [$success]{col_to_sort}[/] ({'desc' if descending else 'asc'})",
+                f"Already sorted by [$success]{col_name}[/] ({'desc' if descending else 'asc'})",
                 title="Sort",
                 severity="warning",
             )
             return
 
         # Add to history
-        self._add_history(f"Sorted on column [$success]{col_to_sort}[/]")
+        self._add_history(f"Sorted on column [$success]{col_name}[/]")
         if old_desc is None:
             # Add new column to sort
-            self.sorted_columns[col_to_sort] = descending
+            self.sorted_columns[col_name] = descending
         else:
             # Toggle direction and move to end of sort order
-            del self.sorted_columns[col_to_sort]
-            self.sorted_columns[col_to_sort] = descending
+            del self.sorted_columns[col_name]
+            self.sorted_columns[col_name] = descending
 
         # Apply multi-column sort
         sort_cols = list(self.sorted_columns.keys())
         descending_flags = list(self.sorted_columns.values())
-        df_sorted = self.df.with_row_index("__rid__").sort(sort_cols, descending=descending_flags, nulls_last=True)
+        df_sorted = self.df.with_row_index("__ridx__").sort(sort_cols, descending=descending_flags, nulls_last=True)
 
         # Updated selected_rows and visible_rows to match new order
-        old_row_indices = df_sorted["__rid__"].to_list()
+        old_row_indices = df_sorted["__ridx__"].to_list()
         self.selected_rows = [self.selected_rows[i] for i in old_row_indices]
         self.visible_rows = [self.visible_rows[i] for i in old_row_indices]
 
         # Update the dataframe
-        self.df = df_sorted.drop("__rid__")
+        self.df = df_sorted.drop("__ridx__")
 
         # Recreate the table for display
         self._setup_table()
@@ -1117,20 +1103,16 @@ class DataFrameTable(DataTable):
     # Edit
     def _edit_cell(self) -> None:
         """Open modal to edit the selected cell."""
-        row_key = self.cursor_row_key
-        row_idx = int(row_key.value) - 1  # Convert to 0-based
-        col_idx = self.cursor_column
-
-        if row_idx >= len(self.df) or col_idx >= len(self.df.columns):
-            return
-        col_name = self.df.columns[col_idx]
+        ridx = self.cursor_ridx
+        cidx = self.cursor_cidx
+        col_name = self.df.columns[cidx]
 
         # Save current state to history
-        self._add_history(f"Edited cell [$success]({row_idx + 1}, {col_name})[/]")
+        self._add_history(f"Edited cell [$success]({ridx + 1}, {col_name})[/]")
 
         # Push the edit modal screen
         self.app.push_screen(
-            EditCellScreen(row_key, col_idx, self.df),
+            EditCellScreen(ridx, cidx, self.df),
             callback=self._do_edit_cell,
         )
 
@@ -1139,35 +1121,34 @@ class DataFrameTable(DataTable):
         if result is None:
             return
 
-        row_key, col_idx, new_value = result
+        ridx, cidx, new_value = result
         if new_value is None:
             self.app.push_screen(
-                EditCellScreen(row_key, col_idx, self.df),
+                EditCellScreen(ridx, cidx, self.df),
                 callback=self._do_edit_cell,
             )
             return
 
-        row_idx = int(row_key.value) - 1  # Convert to 0-based
-        col_name = self.df.columns[col_idx]
+        col_name = self.df.columns[cidx]
 
         # Update the cell in the dataframe
         try:
             self.df = self.df.with_columns(
-                pl.when(pl.arange(0, len(self.df)) == row_idx)
+                pl.when(pl.arange(0, len(self.df)) == ridx)
                 .then(pl.lit(new_value))
                 .otherwise(pl.col(col_name))
                 .alias(col_name)
             )
 
             # Update the display
-            cell_value = self.df.item(row_idx, col_idx)
+            cell_value = self.df.item(ridx, ridx)
             if cell_value is None:
                 cell_value = "-"
-            dtype = self.df.dtypes[col_idx]
+            dtype = self.df.dtypes[ridx]
             dc = DtypeConfig(dtype)
             formatted_value = Text(str(cell_value), style=dc.style, justify=dc.justify)
 
-            row_key = str(row_idx + 1)
+            row_key = str(ridx + 1)
             col_key = str(col_name)
             self.update_cell(row_key, col_key, formatted_value)
 
@@ -1178,15 +1159,11 @@ class DataFrameTable(DataTable):
 
     def _edit_column(self) -> None:
         """Open modal to edit the entire column with an expression."""
-        col_idx = self.cursor_column
-        if col_idx >= len(self.df.columns):
-            return
-
-        col_name = self.df.columns[col_idx]
+        cidx = self.cursor_cidx
 
         # Push the edit column modal screen
         self.app.push_screen(
-            EditColumnScreen(col_idx, col_name, self.df),
+            EditColumnScreen(cidx, self.df),
             callback=self._do_edit_column,
         )
 
@@ -1195,13 +1172,15 @@ class DataFrameTable(DataTable):
         if result is None:
             return
 
-        col_idx, col_name, expr_str, expr = result
+        cidx, expr_str, expr = result
         if expr_str is None:
             self.app.push_screen(
-                EditColumnScreen(col_idx, col_name, self.df),
+                EditColumnScreen(cidx, self.df),
                 callback=self._do_edit_column,
             )
             return
+
+        col_name = self.df.columns[cidx]
 
         # Add to history
         self._add_history(f"Edited column [$accent]{col_name}[/] with expression")
@@ -1221,6 +1200,7 @@ class DataFrameTable(DataTable):
         """Open modal to rename the selected column."""
         col_name = self.cursor_column_key.value
         if col_name not in self.df.columns:
+            self.notify(f"Invalid column selected: [$accent]{col_name}[/]", title="Rename", severity="error")
             return
 
         col_idx = self.cursor_column
@@ -1274,11 +1254,11 @@ class DataFrameTable(DataTable):
         """Copy the current cell to clipboard."""
         import subprocess
 
-        rid = self.cursor_rid
-        col_idx = self.cursor_column
+        ridx = self.cursor_ridx
+        cidx = self.cursor_cidx
 
         try:
-            cell_str = str(self.df.item(rid, col_idx))
+            cell_str = str(self.df.item(ridx, cidx))
             subprocess.run(
                 [
                     "pbcopy" if sys.platform == "darwin" else "xclip",
@@ -1295,28 +1275,24 @@ class DataFrameTable(DataTable):
     def _clear_cell(self) -> None:
         """Clear the current cell by setting its value to None."""
         row_key, col_key = self.cursor_key
-        rid = self.cursor_rid
-        col_idx = self.cursor_column
-
-        if rid >= len(self.df) or col_idx >= len(self.df.columns):
-            return
-
-        col_name = self.df.columns[col_idx]
+        ridx = self.cursor_ridx
+        cidx = self.cursor_cidx
+        col_name = self.df.columns[cidx]
 
         # Add to history
-        self._add_history(f"Cleared cell [$success]({rid + 1}, {col_name})[/]")
+        self._add_history(f"Cleared cell [$success]({ridx + 1}, {col_name})[/]")
 
         # Update the cell to None in the dataframe
         try:
             self.df = self.df.with_columns(
-                pl.when(pl.arange(0, len(self.df)) == rid)
+                pl.when(pl.arange(0, len(self.df)) == ridx)
                 .then(pl.lit(None))
                 .otherwise(pl.col(col_name))
                 .alias(col_name)
             )
 
             # Update the display
-            dtype = self.df.dtypes[col_idx]
+            dtype = self.df.dtypes[cidx]
             dc = DtypeConfig(dtype)
             formatted_value = Text("-", style=dc.style, justify=dc.justify)
 
@@ -1328,8 +1304,8 @@ class DataFrameTable(DataTable):
             raise e
 
     def _add_column(self, col_name: str = None, col_value: pl.Expr = None) -> None:
-        """Add an empty column after the current column."""
-        col_idx = self.cursor_column
+        """Add acolumn after the current column."""
+        cidx = self.cursor_cidx
 
         if not col_name:
             # Generate a unique column name
@@ -1343,7 +1319,7 @@ class DataFrameTable(DataTable):
             new_name = col_name
 
         # Add to history
-        self._add_history(f"Added empty column [$success]{new_name}[/] after column {col_idx + 1}")
+        self._add_history(f"Added column [$success]{new_name}[/] after column {cidx + 1}")
 
         try:
             # Create an empty column (all None values)
@@ -1354,8 +1330,8 @@ class DataFrameTable(DataTable):
 
             # Get columns up to current, the new column, then remaining columns
             cols = self.df.columns
-            cols_before = cols[: col_idx + 1]
-            cols_after = cols[col_idx + 1 :]
+            cols_before = cols[: cidx + 1]
+            cols_after = cols[cidx + 1 :]
 
             # Build the new dataframe with columns reordered
             select_cols = cols_before + [new_name] + cols_after
@@ -1371,9 +1347,9 @@ class DataFrameTable(DataTable):
 
     def _add_column_expr(self) -> None:
         """Open AddColumnScreen to add a new column with optional expression."""
-        col_idx = self.cursor_column
+        cidx = self.cursor_cidx
         self.app.push_screen(
-            AddColumnScreen(col_idx, self.df.columns, self.df),
+            AddColumnScreen(cidx, self.df),
             self._do_add_column_expr,
         )
 
@@ -1382,7 +1358,7 @@ class DataFrameTable(DataTable):
         if result is None:
             return
 
-        col_idx, col_name, expr_str, expr = result
+        cidx, col_name, expr_str, expr = result
 
         # Add to history
         self._add_history(f"Added column [$success]{col_name}[/] with expression: {expr_str}")
@@ -1393,8 +1369,8 @@ class DataFrameTable(DataTable):
 
             # Get columns up to current, the new column, then remaining columns
             cols = self.df.columns
-            cols_before = cols[: col_idx + 1]
-            cols_after = cols[col_idx + 1 :]
+            cols_before = cols[: cidx + 1]
+            cols_after = cols[cidx + 1 :]
 
             # Build the new dataframe with columns reordered
             select_cols = cols_before + [col_name] + cols_after
@@ -1403,9 +1379,9 @@ class DataFrameTable(DataTable):
             # Recreate the table display
             self._setup_table()
 
-            self.app.notify(f"Added column [$success]{col_name}[/]", title="Add Column")
+            self.notify(f"Added column [$success]{col_name}[/]", title="Add Column")
         except Exception as e:
-            self.app.notify(f"Failed to add column: {str(e)}", title="Add Column", severity="error")
+            self.notify(f"Failed to add column: [$error]{str(e)}[/]", title="Add Column", severity="error")
             raise e
 
     def _string_to_polars_dtype(self, dtype_str: str) -> pl.DataType:
@@ -1436,13 +1412,13 @@ class DataFrameTable(DataTable):
         Args:
             dtype: Target data type (string like "int", "float", "bool", "string" or Polars DataType)
         """
-        cid = self.cursor_cid
-        if cid >= len(self.df.columns):
+        cidx = self.cursor_cidx
+        if cidx >= len(self.df.columns):
             self.app.notify("Invalid column selected", title="Cast", severity="error")
             return
 
-        col_name = self.df.columns[cid]
-        current_dtype = self.df.dtypes[cid]
+        col_name = self.df.columns[cidx]
+        current_dtype = self.df.dtypes[cidx]
 
         # Convert string dtype to Polars DataType if needed
         if isinstance(dtype, str):
@@ -1518,21 +1494,21 @@ class DataFrameTable(DataTable):
             col_dtype: The data type of the column
             col_name: The name of the column to search in
         """
-        df_rid = self.df.with_row_index("__rid__")
+        df_ridx = self.df.with_row_index("__ridx__")
         if False in self.visible_rows:
-            df_rid = df_rid.filter(self.visible_rows)
+            df_ridx = df_ridx.filter(self.visible_rows)
 
         # Perform type-aware search based on column dtype
         if term.lower() == "null":
-            masks = df_rid[col_name].is_null()
+            masks = df_ridx[col_name].is_null()
         elif col_dtype == pl.String:
-            masks = df_rid[col_name].str.contains(term)
+            masks = df_ridx[col_name].str.contains(term)
         elif col_dtype == pl.Boolean:
-            masks = df_rid[col_name] == BOOLS[term.lower()]
+            masks = df_ridx[col_name] == BOOLS[term.lower()]
         elif col_dtype in (pl.Int32, pl.Int64):
-            masks = df_rid[col_name] == int(term)
+            masks = df_ridx[col_name] == int(term)
         elif col_dtype in (pl.Float32, pl.Float64):
-            masks = df_rid[col_name] == float(term)
+            masks = df_ridx[col_name] == float(term)
         else:
             self.app.notify(
                 f"Search not yet supported for column type: [$success]{col_dtype}[/]",
@@ -1542,7 +1518,7 @@ class DataFrameTable(DataTable):
             return
 
         # Apply filter to get matched row indices
-        matches = set(df_rid.filter(masks)["__rid__"].to_list())
+        matches = set(df_ridx.filter(masks)["__ridx__"].to_list())
 
         match_count = len(matches)
         if match_count == 0:
@@ -1574,32 +1550,32 @@ class DataFrameTable(DataTable):
         Args:
             term: The search term to find
         """
-        df_rid = self.df.with_row_index("__rid__")
+        df_ridx = self.df.with_row_index("__ridx__")
         if False in self.visible_rows:
-            df_rid = df_rid.filter(self.visible_rows)
+            df_ridx = df_ridx.filter(self.visible_rows)
 
         matches: dict[int, set[int]] = {}
         match_count = 0
         if term.lower() == "null":
             # Search for NULL values across all columns
-            for col_idx, col in enumerate(df_rid.columns[1:]):
-                masks = df_rid[col].is_null()
-                matched_rids = set(df_rid.filter(masks)["__rid__"].to_list())
-                for rid in matched_rids:
-                    if rid not in matches:
-                        matches[rid] = set()
-                    matches[rid].add(col_idx)
+            for col_idx, col in enumerate(df_ridx.columns[1:]):
+                masks = df_ridx[col].is_null()
+                matched_ridxs = set(df_ridx.filter(masks)["__ridx__"].to_list())
+                for ridx in matched_ridxs:
+                    if ridx not in matches:
+                        matches[ridx] = set()
+                    matches[ridx].add(col_idx)
                     match_count += 1
         else:
             # Search for the term in all columns
-            for col_idx, col in enumerate(df_rid.columns[1:]):
-                col_series = df_rid[col].cast(pl.String)
+            for col_idx, col in enumerate(df_ridx.columns[1:]):
+                col_series = df_ridx[col].cast(pl.String)
                 masks = col_series.str.contains(term)
-                matched_rids = set(df_rid.filter(masks)["__rid__"].to_list())
-                for rid in matched_rids:
-                    if rid not in matches:
-                        matches[rid] = set()
-                    matches[rid].add(col_idx)
+                matched_ridxs = set(df_ridx.filter(masks)["__ridx__"].to_list())
+                for ridx in matched_ridxs:
+                    if ridx not in matches:
+                        matches[ridx] = set()
+                    matches[ridx].add(col_idx)
                     match_count += 1
 
         if match_count == 0:
@@ -1639,16 +1615,15 @@ class DataFrameTable(DataTable):
 
     def _search_with_cell_value(self) -> None:
         """Search in the current column using the value of the currently selected cell."""
-        row_key = self.cursor_row_key
-        row_idx = int(row_key.value) - 1  # Convert to 0-based index
-        col_idx = self.cursor_column
+        ridx = self.cursor_ridx
+        cidx = self.cursor_cidx
 
         # Get the value of the currently selected cell
-        term = self.df.item(row_idx, col_idx)
+        term = self.df.item(ridx, cidx)
         term = "NULL" if term is None else str(term)
 
-        col_dtype = self.df.dtypes[col_idx]
-        col_name = self.df.columns[col_idx]
+        col_dtype = self.df.dtypes[cidx]
+        col_name = self.df.columns[cidx]
         self._do_search_column((term, col_dtype, col_name))
 
     def _toggle_selected_rows(self, current_row=False) -> None:
@@ -1713,17 +1688,16 @@ class DataFrameTable(DataTable):
         )
 
     def _open_filter_screen(self) -> None:
-        """Open the filter screen to enter a filter expression."""
-        row_key = self.cursor_row_key
-        row_idx = int(row_key.value) - 1  # Convert to 0-based index
-        col_idx = self.cursor_column
+        """Open the filter screen to enter an expression."""
+        ridx = self.cursor_ridx
+        cidx = self.cursor_cidx
 
-        cell_value = self.df.item(row_idx, col_idx)
-        if self.df.dtypes[col_idx] == pl.String and cell_value is not None:
+        cell_value = self.df.item(ridx, cidx)
+        if self.df.dtypes[cidx] == pl.String and cell_value is not None:
             cell_value = repr(cell_value)
 
         self.app.push_screen(
-            FilterScreen(self.df, current_col_idx=col_idx, current_cell_value=cell_value),
+            FilterScreen(self.df, cidx, cell_value),
             callback=self._do_filter,
         )
 
@@ -1738,14 +1712,14 @@ class DataFrameTable(DataTable):
         expr_str, expr = result
 
         # Add a row index column to track original row indices
-        df_with_rid = self.df.with_row_index("__rid__")
+        df_with_ridx = self.df.with_row_index("__ridx__")
 
         # Apply existing visibility filter first
         if False in self.visible_rows:
-            df_with_rid = df_with_rid.filter(self.visible_rows)
+            df_with_ridx = df_with_ridx.filter(self.visible_rows)
 
         # Apply the filter expression
-        df_filtered = df_with_rid.filter(expr)
+        df_filtered = df_with_ridx.filter(expr)
 
         matched_count = len(df_filtered)
         if not matched_count:
@@ -1760,12 +1734,12 @@ class DataFrameTable(DataTable):
         self._add_history(f"Filtered by expression [$success]{expr_str}[/]")
 
         # Mark unfiltered rows as invisible and unselected
-        filtered_row_indices = set(df_filtered["__rid__"].to_list())
+        filtered_row_indices = set(df_filtered["__ridx__"].to_list())
         if filtered_row_indices:
-            for rid in range(len(self.visible_rows)):
-                if rid not in filtered_row_indices:
-                    self.visible_rows[rid] = False
-                    self.selected_rows[rid] = False
+            for ridx in range(len(self.visible_rows)):
+                if ridx not in filtered_row_indices:
+                    self.visible_rows[ridx] = False
+                    self.selected_rows[ridx] = False
 
         # Recreate the table for display
         self._setup_table()
@@ -1786,17 +1760,16 @@ class DataFrameTable(DataTable):
             expr = self.selected_rows
             expr_str = "selected rows"
         else:
-            row_key = self.cursor_row_key
-            row_idx = int(row_key.value) - 1  # Convert to 0-based index
-            col_idx = self.cursor_column
+            ridx = self.cursor_ridx
+            cidx = self.cursor_cidx
 
-            cell_value = self.df.item(row_idx, col_idx)
+            cell_value = self.df.item(ridx, cidx)
 
             if cell_value is None:
-                expr = pl.col(self.df.columns[col_idx]).is_null()
+                expr = pl.col(self.df.columns[cidx]).is_null()
                 expr_str = "NULL"
             else:
-                expr = pl.col(self.df.columns[col_idx]) == cell_value
+                expr = pl.col(self.df.columns[cidx]) == cell_value
                 expr_str = f"$_ == {repr(cell_value)}"
 
         self._do_filter((expr, expr_str))

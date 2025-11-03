@@ -120,9 +120,9 @@ class RowDetailScreen(TableScreen):
 
     CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "RowDetailScreen")
 
-    def __init__(self, row_idx: int, dftable):
+    def __init__(self, ridx: int, dftable):
         super().__init__(dftable)
-        self.row_idx = row_idx
+        self.ridx = ridx
 
     def on_mount(self) -> None:
         """Create the detail table."""
@@ -130,7 +130,7 @@ class RowDetailScreen(TableScreen):
         self.table.add_column("Value")
 
         # Get all columns and values from the dataframe row
-        for col, val, dtype in zip(self.df.columns, self.df.row(self.row_idx), self.df.dtypes):
+        for col, val, dtype in zip(self.df.columns, self.df.row(self.ridx), self.df.dtypes):
             self.table.add_row(*_format_row([col, val], [None, dtype], apply_justify=False))
 
         self.table.cursor_type = "row"
@@ -151,7 +151,7 @@ class RowDetailScreen(TableScreen):
             return None  # Invalid row
 
         col_name = self.df.columns[row_idx]
-        col_value = self.df.item(self.row_idx, row_idx)
+        col_value = self.df.item(self.ridx, row_idx)
 
         return col_name, col_value
 

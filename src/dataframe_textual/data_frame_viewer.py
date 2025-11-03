@@ -136,16 +136,6 @@ class DataFrameViewer(App):
         except NoMatches:
             pass
 
-    def _get_active_table(self) -> DataFrameTable | None:
-        """Get the currently active table."""
-        try:
-            tabbed: TabbedContent = self.query_one(TabbedContent)
-            if active_pane := tabbed.active_pane:
-                return active_pane.query_one(DataFrameTable)
-        except (NoMatches, AttributeError):
-            pass
-        return None
-
     def action_toggle_help_panel(self) -> None:
         """Toggle the HelpPanel on/off."""
         if self.help_panel:
@@ -157,16 +147,6 @@ class DataFrameViewer(App):
     def action_add_tab(self) -> None:
         """Open file dialog to load file to new tab."""
         self.push_screen(OpenFileScreen(), self._handle_file_open)
-
-    def _handle_file_open(self, filename: str) -> None:
-        """Handle file selection from dialog."""
-        if filename and os.path.exists(filename):
-            try:
-                df = pl.read_csv(filename)
-                self._add_tab(df, filename)
-                self.notify(f"Opened: [$success]{Path(filename).name}[/]", title="Open")
-            except Exception as e:
-                self.notify(f"Error: {e}", severity="error")
 
     def action_save_all_tabs(self) -> None:
         """Save all tabs to a Excel file."""
@@ -193,6 +173,33 @@ class DataFrameViewer(App):
             self.tabbed.active = next_tab.id
         except (NoMatches, ValueError):
             pass
+
+    def action_toggle_tab_bar(self) -> None:
+        """Toggle tab bar visibility."""
+        tabs = self.query_one(ContentTabs)
+        tabs.display = not tabs.display
+        status = "shown" if tabs.display else "hidden"
+        self.notify(f"Tab bar [$success]{status}[/]", title="Toggle")
+
+    def _get_active_table(self) -> DataFrameTable | None:
+        """Get the currently active table."""
+        try:
+            tabbed: TabbedContent = self.query_one(TabbedContent)
+            if active_pane := tabbed.active_pane:
+                return active_pane.query_one(DataFrameTable)
+        except (NoMatches, AttributeError):
+            pass
+        return None
+
+    def _handle_file_open(self, filename: str) -> None:
+        """Handle file selection from dialog."""
+        if filename and os.path.exists(filename):
+            try:
+                df = pl.read_csv(filename)
+                self._add_tab(df, filename)
+                self.notify(f"Opened: [$success]{Path(filename).name}[/]", title="Open")
+            except Exception as e:
+                self.notify(f"Error: {e}", severity="error")
 
     def _add_tab(self, df: pl.DataFrame, filename: str) -> None:
         """Add new table tab. If single file, replace table; if multiple, add tab."""
@@ -234,13 +241,6 @@ class DataFrameViewer(App):
                     self.notify(f"Closed tab [$success]{active_pane.name}[/]", title="Close")
         except NoMatches:
             pass
-
-    def action_toggle_tab_bar(self) -> None:
-        """Toggle tab bar visibility."""
-        tabs = self.query_one(ContentTabs)
-        tabs.display = not tabs.display
-        status = "shown" if tabs.display else "hidden"
-        self.notify(f"Tab bar [$success]{status}[/]", title="Toggle")
 
 
 def _load_dataframe(

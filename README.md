@@ -168,8 +168,8 @@ When multiple files are opened:
 | `m` | Rename current column |
 | `a` | Add empty column after current |
 | `A` | Add column with name and optional expression (separated by `;`) |
-| `c` | Clear current cell (set to None) |
 | `x` | Delete current row |
+| `X` | Clear current cell (set to None) |
 | `D` | Duplicate current row |
 | `-` | Delete current column |
 | `d` | Duplicate current column (appends '_copy' suffix) |
