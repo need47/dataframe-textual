@@ -117,6 +117,40 @@ class DataFrameTable(DataTable):
         *Use `?` to see app-level controls*
     """).strip()
 
+    BINDINGS = [
+        ("g", "jump_top", "Jump to top"),
+        ("G", "jump_bottom", "Jump to bottom"),
+        ("enter", "view_row_detail", "View row details"),
+        ("minus", "delete_column", "Delete column"),
+        ("h", "hide_column", "Hide column"),
+        ("H", "show_column", "Show columns"),
+        ("left_square_bracket", "sort_ascending", "Sort ascending"),
+        ("right_square_bracket", "sort_descending", "Sort descending"),
+        ("ctrl+s", "save_to_file", "Save to file"),
+        ("F", "show_frequency", "Show frequency"),
+        ("v", "filter_rows", "Filter rows"),
+        ("V", "open_filter_screen", "Advanced filter"),
+        ("e", "edit_cell", "Edit cell"),
+        ("backslash", "search_with_cell_value", "Search with value"),
+        ("vertical_line", "search_column", "Search column"),
+        ("slash", "search_all_columns", "Search all"),
+        ("s", "toggle_selected_row", "Toggle row selection"),
+        ("t", "toggle_selected_rows", "Toggle all selections"),
+        ("quotation_mark", "filter_selected_rows", "Filter selected"),
+        ("x", "delete_row", "Delete row"),
+        ("d", "duplicate_column", "Duplicate column"),
+        ("D", "duplicate_row", "Duplicate row"),
+        ("u", "undo", "Undo"),
+        ("U", "reset", "Reset to original"),
+        ("shift+left", "move_column_left", "Move column left"),
+        ("shift+right", "move_column_right", "Move column right"),
+        ("shift+up", "move_row_up", "Move row up"),
+        ("shift+down", "move_row_down", "Move row down"),
+        ("T", "clear_selected_rows", "Clear selections"),
+        ("C", "cycle_cursor_type", "Cycle cursor mode"),
+        ("f", "open_freeze_screen", "Freeze rows/columns"),
+    ]
+
     def __init__(
         self,
         df: pl.DataFrame | pl.LazyFrame,
@@ -270,104 +304,136 @@ class DataFrameTable(DataTable):
 
     def on_key(self, event) -> None:
         """Handle keyboard events for table operations and navigation."""
-        if event.key == "g":
-            # Jump to top
-            self.move_cursor(row=0)
-        elif event.key == "G":
-            # Load all remaining rows before jumping to end
-            self._load_rows()
-            self.move_cursor(row=self.row_count - 1)
-        elif event.key in ("pagedown", "down"):
+        if event.key in ("pagedown", "down"):
             # Let the table handle the navigation first
             self._check_and_load_more()
-        elif event.key == "enter":
-            # Open row detail modal
-            self._view_row_detail()
-        elif event.key == "minus":
-            # Remove the current column
-            self._delete_column()
-        elif event.key == "h":
-            # Hide current column
-            self._hide_column()
-        elif event.key == "H":
-            # Show hidden columns
-            self._show_column()
-        elif event.key == "left_square_bracket":  # '['
-            # Sort by current column in ascending order
-            self._sort_by_column(descending=False)
-        elif event.key == "right_square_bracket":  # ']'
-            # Sort by current column in descending order
-            self._sort_by_column(descending=True)
-        elif event.key == "ctrl+s":
-            # Save dataframe to CSV
-            self._save_to_file()
-        elif event.key == "F":  # shift+f
-            # Open frequency modal for current column
-            self._show_frequency()
-        elif event.key == "v":
-            # Filter by current cell value
-            self._filter_rows()
-        elif event.key == "V":  # shift+v
-            # Open filter screen for current column
-            self._open_filter_screen()
-        elif event.key == "e":
-            # Open edit modal for current cell
-            self._edit_cell()
-        elif event.key == "backslash":  # '\' key
-            # Search with current cell value and highlight matched rows
-            self._search_with_cell_value()
-        elif event.key == "vertical_line":  # '|' key
-            # Open search modal for current column
-            self._search_column()
-        elif event.key == "slash":  # '/' key
-            # Open search modal for all columns
-            self._search_column(all_columns=True)
-        elif event.key == "s":
-            # Toggle selection for current row
-            self._toggle_selected_rows(current_row=True)
-        elif event.key == "t":
-            # Toggle selected rows highlighting
-            self._toggle_selected_rows()
-        elif event.key == "quotation_mark":  # '"' key
-            # Display selected rows only
-            self._filter_selected_rows()
-        elif event.key == "x":
-            # Delete the current row
-            self._delete_row()
-        elif event.key == "d":
-            # Duplicate the current column
-            self._duplicate_column()
-        elif event.key == "D":
-            # Duplicate the current row
-            self._duplicate_row()
-        elif event.key == "u":
-            # Undo last action
-            self._undo()
-        elif event.key == "U":
-            # Undo all changes and restore original dataframe
-            self._setup_table(reset=True)
-            self.app.notify("Restored original display", title="Reset")
-        elif event.key == "shift+left":  # shift + left arrow
-            # Move current column to the left
-            self._move_column("left")
-        elif event.key == "shift+right":  # shift + right arrow
-            # Move current column to the right
-            self._move_column("right")
-        elif event.key == "shift+up":  # shift + up arrow
-            # Move current row up
-            self._move_row("up")
-        elif event.key == "shift+down":  # shift + down arrow
-            # Move current row down
-            self._move_row("down")
-        elif event.key == "T":  # shift+t
-            # Clear all selected rows
-            self._clear_selected_rows()
-        elif event.key == "C":  # shift+c
-            # Cycle through cursor types
-            self._cycle_cursor_type()
-        elif event.key == "f":
-            # Open pin screen to set fixed rows and columns
-            self._open_freeze_screen()
+
+    # Action handlers for BINDINGS
+    def action_jump_top(self) -> None:
+        """Jump to the top of the table."""
+        self.move_cursor(row=0)
+
+    def action_jump_bottom(self) -> None:
+        """Jump to the bottom of the table."""
+        self._load_rows()
+        self.move_cursor(row=self.row_count - 1)
+
+    def action_view_row_detail(self) -> None:
+        """View details of the current row."""
+        self._view_row_detail()
+
+    def action_delete_column(self) -> None:
+        """Delete the current column."""
+        self._delete_column()
+
+    def action_hide_column(self) -> None:
+        """Hide the current column."""
+        self._hide_column()
+
+    def action_show_column(self) -> None:
+        """Show all hidden columns."""
+        self._show_column()
+
+    def action_sort_ascending(self) -> None:
+        """Sort by current column in ascending order."""
+        self._sort_by_column(descending=False)
+
+    def action_sort_descending(self) -> None:
+        """Sort by current column in descending order."""
+        self._sort_by_column(descending=True)
+
+    def action_save_to_file(self) -> None:
+        """Save the current dataframe to a file."""
+        self._save_to_file()
+
+    def action_show_frequency(self) -> None:
+        """Show frequency distribution for the current column."""
+        self._show_frequency()
+
+    def action_filter_rows(self) -> None:
+        """Filter rows by current cell value."""
+        self._filter_rows()
+
+    def action_open_filter_screen(self) -> None:
+        """Open the advanced filter screen."""
+        self._open_filter_screen()
+
+    def action_edit_cell(self) -> None:
+        """Edit the current cell."""
+        self._edit_cell()
+
+    def action_search_with_cell_value(self) -> None:
+        """Search using the current cell value."""
+        self._search_with_cell_value()
+
+    def action_search_column(self) -> None:
+        """Search in the current column."""
+        self._search_column()
+
+    def action_search_all_columns(self) -> None:
+        """Search across all columns."""
+        self._search_column(all_columns=True)
+
+    def action_toggle_selected_row(self) -> None:
+        """Toggle selection for the current row."""
+        self._toggle_selected_rows(current_row=True)
+
+    def action_toggle_selected_rows(self) -> None:
+        """Toggle all row selections."""
+        self._toggle_selected_rows()
+
+    def action_filter_selected_rows(self) -> None:
+        """Filter to show only selected rows."""
+        self._filter_selected_rows()
+
+    def action_delete_row(self) -> None:
+        """Delete the current row."""
+        self._delete_row()
+
+    def action_duplicate_column(self) -> None:
+        """Duplicate the current column."""
+        self._duplicate_column()
+
+    def action_duplicate_row(self) -> None:
+        """Duplicate the current row."""
+        self._duplicate_row()
+
+    def action_undo(self) -> None:
+        """Undo the last action."""
+        self._undo()
+
+    def action_reset(self) -> None:
+        """Reset to the original data."""
+        self._setup_table(reset=True)
+        self.app.notify("Restored original display", title="Reset")
+
+    def action_move_column_left(self) -> None:
+        """Move the current column to the left."""
+        self._move_column("left")
+
+    def action_move_column_right(self) -> None:
+        """Move the current column to the right."""
+        self._move_column("right")
+
+    def action_move_row_up(self) -> None:
+        """Move the current row up."""
+        self._move_row("up")
+
+    def action_move_row_down(self) -> None:
+        """Move the current row down."""
+        self._move_row("down")
+
+    def action_clear_selected_rows(self) -> None:
+        """Clear all row selections."""
+        self._clear_selected_rows()
+
+    def action_cycle_cursor_type(self) -> None:
+        """Cycle through cursor types."""
+        self._cycle_cursor_type()
+
+    def action_open_freeze_screen(self) -> None:
+        """Open the freeze/pin screen."""
+        self._open_freeze_screen()
 
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
