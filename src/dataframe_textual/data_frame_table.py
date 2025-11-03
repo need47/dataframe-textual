@@ -33,6 +33,7 @@ from .table_screen import FrequencyScreen, RowDetailScreen
 from .yes_no_screen import (
     ConfirmScreen,
     EditCellScreen,
+    EditColumnScreen,
     FilterScreen,
     FreezeScreen,
     RenameColumnScreen,
@@ -97,6 +98,7 @@ class DataFrameTable(DataTable):
 
         ## ✏️ Edit & Modify
         - **e** - ✍️ Edit current cell
+        - **E** - 📊 Edit entire column with expression
         - **m** - 📝 Rename current column
         - **c** - ✨ Clear current cell (set to None)
         - **x** - 🗑️ Delete current row
@@ -135,6 +137,7 @@ class DataFrameTable(DataTable):
         ("v", "filter_rows", "Filter rows"),
         ("V", "open_filter_screen", "Advanced filter"),
         ("e", "edit_cell", "Edit cell"),
+        ("E", "edit_column", "Edit column"),
         ("m", "rename_column", "Rename column"),
         ("c", "clear_cell", "Clear cell"),
         ("backslash", "search_with_cell_value", "Search with value"),
@@ -363,6 +366,10 @@ class DataFrameTable(DataTable):
     def action_edit_cell(self) -> None:
         """Edit the current cell."""
         self._edit_cell()
+
+    def action_edit_column(self) -> None:
+        """Edit the entire current column with an expression."""
+        self._edit_column()
 
     def action_rename_column(self) -> None:
         """Rename the current column."""
@@ -1121,6 +1128,55 @@ class DataFrameTable(DataTable):
             self.app.notify(f"Cell updated to [$success]{cell_value}[/]", title="Edit")
         except Exception as e:
             self.app.notify(f"Failed to update cell: {str(e)}", title="Edit", severity="error")
+            raise e
+
+    def _edit_column(self) -> None:
+        """Open modal to edit the entire column with an expression."""
+        col_idx = self.cursor_column
+        if col_idx >= len(self.df.columns):
+            return
+
+        col_name = self.df.columns[col_idx]
+
+        # Push the edit column modal screen
+        self.app.push_screen(
+            EditColumnScreen(col_idx, col_name, self.df),
+            callback=self._do_edit_column,
+        )
+
+    def _do_edit_column(self, result) -> None:
+        """Handle result from EditColumnScreen."""
+        if result is None:
+            return
+
+        col_idx, col_name, expr_str = result
+        if expr_str is None:
+            self.app.push_screen(
+                EditColumnScreen(col_idx, col_name, self.df),
+                callback=self._do_edit_column,
+            )
+            return
+
+        # Add to history
+        self._add_history(f"Edited column [$accent]{col_name}[/] with expression")
+
+        # Apply the expression to the column
+        try:
+            # Evaluate the expression with Polars context
+            expr = eval(expr_str, {"pl": pl})
+
+            # Apply the expression to the column
+            self.df = self.df.with_columns(expr.alias(col_name))
+
+            # Recreate the table for display
+            self._setup_table()
+
+            self.app.notify(
+                f"Column [$success]{col_name}[/] updated with expression",
+                title="Edit",
+            )
+        except Exception as e:
+            self.app.notify(f"Failed to apply expression: {str(e)}", title="Edit", severity="error")
             raise e
 
     def _rename_column(self) -> None:

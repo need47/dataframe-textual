@@ -120,23 +120,18 @@ def _next(lst: list[Any], current, offset=1) -> Any:
     return lst[next_index]
 
 
-def parse_filter_expression(expression: str, df: pl.DataFrame, current_col_idx: int) -> str:
+def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: int) -> str:
     """Parse and convert a filter expression to Polars syntax.
 
-    Supports:
+    Replaces column references with Polars col() expressions:
     - $_ - Current selected column
     - $1, $2, etc. - Column by 1-based index
-    - $col_name - Column by name
-    - Comparison operators: ==, !=, <, >, <=, >=
-    - Logical operators: &&, ||
-    - String literals: 'text', "text"
-    - Numeric literals: integers and floats
+    - $col_name - Column by name (valid identifier starting with _ or letter)
 
     Examples:
     - "$_ > 50" -> "pl.col('current_col') > 50"
     - "$1 > 50" -> "pl.col('col0') > 50"
     - "$name == 'Alex'" -> "pl.col('name') == 'Alex'"
-    - "$1 > 3 && $name == 'Alex'" -> "(pl.col('col0') > 3) & (pl.col('name') == 'Alex')"
     - "$age < $salary" -> "pl.col('age') < pl.col('salary')"
 
     Args:
@@ -145,56 +140,41 @@ def parse_filter_expression(expression: str, df: pl.DataFrame, current_col_idx: 
         current_col_idx: The index of the currently selected column (0-based). Used for $_ reference.
 
     Returns:
-        A Python expression string that can be eval'd with Polars symbols.
+        A Python expression string with $references replaced by pl.col() calls.
 
     Raises:
-        ValueError: If the expression contains invalid column references.
-        SyntaxError: If the expression has invalid syntax.
+        ValueError: If a column reference is invalid.
     """
-    # Tokenize the expression
-    # Pattern matches: $_, $index, $identifier, strings, operators, numbers, etc.
-    token_pattern = r'\$_|\$\d+|\$\w+|\'[^\']*\'|"[^"]*"|&&|\|\||<=|>=|!=|==|[+\-*/%<>=()]|\d+\.?\d*|\w+|.'
+    # Early return if no $ present
+    # This may be valid Polars expression already
+    if "$" not in expression:
+        return expression
 
-    tokens = re.findall(token_pattern, expression)
+    # Pattern to match $ followed by either:
+    # - _ (single underscore)
+    # - digits (integer)
+    # - identifier (starts with letter or _, followed by letter/digit/_)
+    pattern = r"\$(_|\d+|[a-zA-Z_]\w*)"
 
-    if not tokens:
-        raise ValueError("Expression is empty")
+    def replace_column_ref(match):
+        col_ref = match.group(1)
 
-    # Convert tokens to Polars expression syntax
-    converted_tokens = []
-    for token in tokens:
-        if token.startswith("$"):
-            # Column reference
-            col_ref = token[1:]
-
-            # Special case: $_ refers to the current selected column
-            if col_ref == "_":
-                col_name = df.columns[current_col_idx]
-            # Check if it's a numeric index
-            elif col_ref.isdigit():
-                col_idx = int(col_ref) - 1  # Convert to 0-based index
-                if col_idx < 0 or col_idx >= len(df.columns):
-                    raise ValueError(f"Column index out of range: ${col_ref}")
-                col_name = df.columns[col_idx]
-            else:
-                # It's a column name
-                if col_ref not in df.columns:
-                    raise ValueError(f"Column not found: ${col_ref}")
-                col_name = col_ref
-
-            converted_tokens.append(f"pl.col('{col_name}')")
-
-        elif token in ("&&", "||"):
-            # Convert logical operators and wrap surrounding expressions in parentheses
-            if token == "&&":
-                converted_tokens.append(") & (")
-            else:
-                converted_tokens.append(") | (")
-
+        if col_ref == "_":
+            # Current selected column
+            col_name = df.columns[current_col_idx]
+        elif col_ref.isdigit():
+            # Column by 1-based index
+            col_idx = int(col_ref) - 1
+            if col_idx < 0 or col_idx >= len(df.columns):
+                raise ValueError(f"Column index out of range: ${col_ref}")
+            col_name = df.columns[col_idx]
         else:
-            # Keep as-is (operators, numbers, strings, parentheses)
-            converted_tokens.append(token)
+            # Column by name
+            if col_ref not in df.columns:
+                raise ValueError(f"Column not found: ${col_ref}")
+            col_name = col_ref
 
-    # Join tokens with space to ensure proper separation
-    result = "(" + " ".join(converted_tokens) + ")"
+        return f"pl.col('{col_name}')"
+
+    result = re.sub(pattern, replace_column_ref, expression)
     return result

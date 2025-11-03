@@ -6,7 +6,7 @@ from textual.containers import Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Static
 
-from .common import DtypeConfig, parse_filter_expression
+from .common import DtypeConfig, parse_polars_expression
 
 
 class YesNoScreen(ModalScreen):
@@ -31,6 +31,11 @@ class YesNoScreen(ModalScreen):
             border: solid $primary;
             background: $surface;
             padding: 2;
+        }
+
+        YesNoScreen Label {
+            width: 100%;
+            text-wrap: wrap;
         }
 
         YesNoScreen Input {
@@ -345,7 +350,7 @@ class FilterScreen(YesNoScreen):
 
         try:
             # Try to parse the expression to ensure it's valid
-            expr_str = parse_filter_expression(expression, self.df, self.current_col_idx)
+            expr_str = parse_polars_expression(expression, self.df, self.current_col_idx)
 
             try:
                 # Test the expression by evaluating it
@@ -447,5 +452,51 @@ class OpenFileScreen(YesNoScreen):
             else:
                 self.notify("Filename cannot be empty", title="Open", severity="error")
                 return None
+
+
+class EditColumnScreen(YesNoScreen):
+    """Modal screen to edit an entire column with an expression."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "EditColumnScreen")
+
+    def __init__(self, col_idx: int, col_name: str, df: pl.DataFrame):
+        self.col_idx = col_idx
+        self.col_name = col_name
+        self.df = df
+        super().__init__(
+            title="Edit Column Expression",
+            label="Enter expression (e.g., $_ * 2, $1 + $2, $_.str.to_uppercase())",
+            input="$_",
+            on_yes_callback=self._validate_expression,
+        )
+
+    def _validate_expression(self) -> tuple[int, str, str] | None:
+        """Validate and return the column expression."""
+        expression = self.input.value.strip()
+
+        if not expression:
+            self.notify("Expression cannot be empty", title="Edit", severity="error")
+            return None
+
+        try:
+            # Parse the expression to replace $_ with pl.col(col_name)
+            expr_str = parse_polars_expression(expression, self.df, self.col_idx)
+
+            try:
+                # Test the expression by evaluating it
+                eval(expr_str, {"pl": pl})
+
+                # Expression is valid - return column index, original column name, and expression
+                return self.col_idx, self.col_name, expr_str
+            except Exception as e:
+                self.notify(
+                    f"Error evaluating expression: {str(e)}",
+                    title="Edit",
+                    severity="error",
+                )
+        except ValueError as ve:
+            self.notify(f"Invalid expression: {str(ve)}", title="Edit", severity="error")
+
+        return None
 
         return None
