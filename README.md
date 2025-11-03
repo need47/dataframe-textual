@@ -156,7 +156,7 @@ When multiple files are opened:
 |-----|--------|
 | `Enter` | View full details of current row in modal |
 | `F` | Show frequency distribution for column |
-| `C` | Cycle cursor type: cell → row → column → cell |
+| `@` | Cycle cursor type: cell → row → column → cell |
 | `#` | Toggle row labels visibility |
 
 #### Data Editing
@@ -207,7 +207,7 @@ When multiple files are opened:
 | Key | Action |
 |-----|--------|
 | `f` | Freeze rows and columns |
-| `c` | Copy current cell to clipboard |
+| `Ctrl+C` | Copy current cell to clipboard |
 | `Ctrl+S` | Save current tab to CSV/TSV file |
 | `u` | Undo last action |
 | `U` | Reset to original data |
@@ -428,7 +428,7 @@ Visual feedback shows which mode is active.
 
 ### 16. Clipboard Operations
 
-Press `c` to copy:
+Press `Ctrl+C` to copy:
 - Copies current cell value to system clipboard
 - Works on macOS (`pbcopy`) and Linux (`xclip`)
 - Shows confirmation notification

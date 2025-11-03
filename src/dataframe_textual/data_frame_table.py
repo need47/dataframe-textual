@@ -74,7 +74,7 @@ class DataFrameTable(DataTable):
         ## 👁️ View & Display
         - **Enter** - 📋 Show row details in modal
         - **F** - 📊 Show frequency distribution
-        - **C** - 🔄 Cycle cursor (cell → row → column → cell)
+        - **@** - 🔄 Cycle cursor (cell → row → column → cell)
         - **#** - 🏷️ Toggle row labels
 
         ## ↕️ Sorting
@@ -111,7 +111,7 @@ class DataFrameTable(DataTable):
 
         ## 💾 Data Management
         - **f** - 📌 Freeze rows/columns
-        - **c** - 📋 Copy cell to clipboard
+        - **Ctrl+C** - 📋 Copy cell to clipboard
         - **Ctrl+S** - 💾 Save current tab to file
         - **u** - ↩️ Undo last action
         - **U** - 🔄 Reset to original data
@@ -128,6 +128,7 @@ class DataFrameTable(DataTable):
         ("H", "show_column", "Show columns"),
         ("left_square_bracket", "sort_ascending", "Sort ascending"),
         ("right_square_bracket", "sort_descending", "Sort descending"),
+        ("ctrl+c", "copy_cell", "Copy cell"),
         ("ctrl+s", "save_to_file", "Save to file"),
         ("F", "show_frequency", "Show frequency"),
         ("v", "filter_rows", "Filter rows"),
@@ -150,7 +151,7 @@ class DataFrameTable(DataTable):
         ("shift+up", "move_row_up", "Move row up"),
         ("shift+down", "move_row_down", "Move row down"),
         ("T", "clear_selected_rows", "Clear selections"),
-        ("C", "cycle_cursor_type", "Cycle cursor mode"),
+        ("at", "cycle_cursor_type", "Cycle cursor mode"),
         ("f", "open_freeze_screen", "Freeze rows/columns"),
     ]
 
@@ -1169,15 +1170,15 @@ class DataFrameTable(DataTable):
             title="Column",
         )
 
-    def _copy_cell(self) -> None:
+    def action_copy_cell(self) -> None:
         """Copy the current cell to clipboard."""
         import subprocess
 
-        row_idx = self.cursor_row
+        rid = self.cursor_rid
         col_idx = self.cursor_column
 
         try:
-            cell_str = str(self.df.item(row_idx, col_idx))
+            cell_str = str(self.df.item(rid, col_idx))
             subprocess.run(
                 [
                     "pbcopy" if sys.platform == "darwin" else "xclip",
