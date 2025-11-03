@@ -97,7 +97,7 @@ class DataFrameTable(DataTable):
 
         ## ✏️ Edit & Modify
         - **e** - ✍️ Edit current cell
-        - **E** - 📝 Rename current column
+        - **m** - 📝 Rename current column
         - **c** - ✨ Clear current cell (set to None)
         - **x** - 🗑️ Delete current row
         - **D** - 📋 Duplicate current row
@@ -135,7 +135,7 @@ class DataFrameTable(DataTable):
         ("v", "filter_rows", "Filter rows"),
         ("V", "open_filter_screen", "Advanced filter"),
         ("e", "edit_cell", "Edit cell"),
-        ("E", "rename_column", "Rename column"),
+        ("m", "rename_column", "Rename column"),
         ("c", "clear_cell", "Clear cell"),
         ("backslash", "search_with_cell_value", "Search with value"),
         ("vertical_line", "search_column", "Search column"),
