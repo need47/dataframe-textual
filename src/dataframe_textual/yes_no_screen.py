@@ -357,7 +357,7 @@ class FilterScreen(YesNoScreen):
                 expr = eval(expr_str, {"pl": pl})
 
                 # Expression is valid
-                return expr, expr_str
+                return expr_str, expr
             except Exception as e:
                 self.notify(
                     f"Error evaluating expression: {str(e)}",
@@ -484,10 +484,10 @@ class EditColumnScreen(YesNoScreen):
 
             try:
                 # Test the expression by evaluating it
-                eval(expr_str, {"pl": pl})
+                expr = eval(expr_str, {"pl": pl})
 
                 # Expression is valid - return column index, original column name, and expression
-                return self.col_idx, self.col_name, expr_str
+                return self.col_idx, self.col_name, expr_str, expr
             except Exception as e:
                 self.notify(
                     f"Error evaluating expression: {str(e)}",
@@ -498,5 +498,80 @@ class EditColumnScreen(YesNoScreen):
             self.notify(f"Invalid expression: {str(ve)}", title="Edit", severity="error")
 
         return None
+
+
+class AddColumnScreen(YesNoScreen):
+    """Modal screen to add a new column with an expression."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "AddColumnScreen")
+
+    def __init__(
+        self,
+        col_idx: int,
+        existing_columns: list[str],
+        df: pl.DataFrame,
+    ):
+        self.col_idx = col_idx
+        self.existing_columns = existing_columns
+        self.df = df
+        super().__init__(
+            title="Add New Column",
+            label="Enter column name and expression separated by ';' (e.g., 'new_col ; $_ * 2)",
+            input="new_column",
+            on_yes_callback=self._validate_column,
+        )
+
+    def _validate_column(self) -> tuple[int, str, str] | None:
+        """Validate and return the new column configuration."""
+        input_text = self.input.value.strip()
+
+        if not input_text:
+            self.notify("Input cannot be empty", title="Add Column", severity="error")
+            return None
+
+        # Split input into column name and expression
+        # Format: "col_name ; expression" or just "col_name" (defaults to an empty column)
+        parts = input_text.split(";")
+        col_name = parts[0].strip()
+        expr_str = parts[1].strip() if len(parts) > 1 else None
+
+        # Validate column name
+        if not col_name:
+            self.notify("Column name cannot be empty", title="Add Column", severity="error")
+            return None
+
+        if col_name in self.existing_columns:
+            self.notify(
+                f"Column [$accent]{col_name}[/] already exists",
+                title="Add Column",
+                severity="error",
+            )
+            return None
+
+        if expr_str is None:
+            # No expression provided - add empty column
+            return self.col_idx, col_name, "NULL", pl.lit(None)
+        elif "$" not in expr_str:
+            # No expression provided - add empty column
+            return self.col_idx, col_name, "NULL", pl.lit(expr_str)
+
+        try:
+            # Parse the expression to replace $_ with pl.col(current_col_name)
+            expr_str = parse_polars_expression(expr_str, self.df, self.col_idx)
+
+            try:
+                # Test the expression by evaluating it
+                expr = eval(expr_str, {"pl": pl})
+
+                # Expression is valid - return column index, new column name, and expression
+                return self.col_idx, col_name, expr_str, expr
+            except Exception as e:
+                self.notify(
+                    f"Error evaluating expression: {str(e)}",
+                    title="Add Column",
+                    severity="error",
+                )
+        except ValueError as ve:
+            self.notify(f"Invalid expression: {str(ve)}", title="Add Column", severity="error")
 
         return None

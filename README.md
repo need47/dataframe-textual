@@ -166,6 +166,8 @@ When multiple files are opened:
 | `e` | Edit current cell (respects data type) |
 | `E` | Edit entire column with expression |
 | `m` | Rename current column |
+| `a` | Add empty column after current |
+| `A` | Add column with name and optional expression (separated by `;`) |
 | `c` | Clear current cell (set to None) |
 | `x` | Delete current row |
 | `D` | Duplicate current row |

@@ -31,6 +31,7 @@ from .common import (
 )
 from .table_screen import FrequencyScreen, RowDetailScreen
 from .yes_no_screen import (
+    AddColumnScreen,
     ConfirmScreen,
     EditCellScreen,
     EditColumnScreen,
@@ -100,6 +101,8 @@ class DataFrameTable(DataTable):
         - **e** - ✍️ Edit current cell
         - **E** - 📊 Edit entire column with expression
         - **m** - 📝 Rename current column
+        - **a** - ➕ Add empty column after current
+        - **A** - ➕ Add column with name and optional expression
         - **c** - ✨ Clear current cell (set to None)
         - **x** - 🗑️ Delete current row
         - **D** - 📋 Duplicate current row
@@ -139,6 +142,8 @@ class DataFrameTable(DataTable):
         ("e", "edit_cell", "Edit cell"),
         ("E", "edit_column", "Edit column"),
         ("m", "rename_column", "Rename column"),
+        ("a", "add_column", "Add column"),
+        ("A", "add_column_expr", "Add column with expression"),
         ("c", "clear_cell", "Clear cell"),
         ("backslash", "search_with_cell_value", "Search with value"),
         ("vertical_line", "search_column", "Search column"),
@@ -370,6 +375,14 @@ class DataFrameTable(DataTable):
     def action_edit_column(self) -> None:
         """Edit the entire current column with an expression."""
         self._edit_column()
+
+    def action_add_column(self) -> None:
+        """Add an empty column after the current column."""
+        self._add_column()
+
+    def action_add_column_expr(self) -> None:
+        """Add a new column with optional expression after the current column."""
+        self._add_column_expr()
 
     def action_rename_column(self) -> None:
         """Rename the current column."""
@@ -1149,7 +1162,7 @@ class DataFrameTable(DataTable):
         if result is None:
             return
 
-        col_idx, col_name, expr_str = result
+        col_idx, col_name, expr_str, expr = result
         if expr_str is None:
             self.app.push_screen(
                 EditColumnScreen(col_idx, col_name, self.df),
@@ -1161,23 +1174,15 @@ class DataFrameTable(DataTable):
         self._add_history(f"Edited column [$accent]{col_name}[/] with expression")
 
         # Apply the expression to the column
-        try:
-            # Evaluate the expression with Polars context
-            expr = eval(expr_str, {"pl": pl})
+        self.df = self.df.with_columns(expr.alias(col_name))
 
-            # Apply the expression to the column
-            self.df = self.df.with_columns(expr.alias(col_name))
+        # Recreate the table for display
+        self._setup_table()
 
-            # Recreate the table for display
-            self._setup_table()
-
-            self.app.notify(
-                f"Column [$success]{col_name}[/] updated with expression",
-                title="Edit",
-            )
-        except Exception as e:
-            self.app.notify(f"Failed to apply expression: {str(e)}", title="Edit", severity="error")
-            raise e
+        self.app.notify(
+            f"Column [$success]{col_name}[/] updated with expression",
+            title="Edit",
+        )
 
     def _rename_column(self) -> None:
         """Open modal to rename the selected column."""
@@ -1287,6 +1292,87 @@ class DataFrameTable(DataTable):
             self.app.notify("Cell cleared to [$success]None[/]", title="Clear")
         except Exception as e:
             self.app.notify(f"Failed to clear cell: {str(e)}", title="Clear", severity="error")
+            raise e
+
+    def _add_column(self, col_name: str = None, col_value: pl.Expr = None) -> None:
+        """Add an empty column after the current column."""
+        col_idx = self.cursor_column
+
+        if not col_name:
+            # Generate a unique column name
+            base_name = "new_col"
+            new_name = base_name
+            counter = 1
+            while new_name in self.df.columns:
+                new_name = f"{base_name}_{counter}"
+                counter += 1
+        else:
+            new_name = col_name
+
+        # Add to history
+        self._add_history(f"Added empty column [$success]{new_name}[/] after column {col_idx + 1}")
+
+        try:
+            # Create an empty column (all None values)
+            if isinstance(col_value, pl.Expr):
+                new_col = col_value.alias(new_name)
+            else:
+                new_col = pl.lit(col_value).alias(new_name)
+
+            # Get columns up to current, the new column, then remaining columns
+            cols = self.df.columns
+            cols_before = cols[: col_idx + 1]
+            cols_after = cols[col_idx + 1 :]
+
+            # Build the new dataframe with columns reordered
+            select_cols = cols_before + [new_name] + cols_after
+            self.df = self.df.with_columns(new_col).select(select_cols)
+
+            # Recreate the table display
+            self._setup_table()
+
+            self.app.notify(f"Added column [$success]{new_name}[/]", title="Add Column")
+        except Exception as e:
+            self.app.notify(f"Failed to add column: {str(e)}", title="Add Column", severity="error")
+            raise e
+
+    def _add_column_expr(self) -> None:
+        """Open AddColumnScreen to add a new column with optional expression."""
+        col_idx = self.cursor_column
+        self.app.push_screen(
+            AddColumnScreen(col_idx, self.df.columns, self.df),
+            self._do_add_column_expr,
+        )
+
+    def _do_add_column_expr(self, result: tuple[int, str, str, pl.Expr] | None) -> None:
+        """Handle the result from AddColumnScreen."""
+        if result is None:
+            return
+
+        col_idx, col_name, expr_str, expr = result
+
+        # Add to history
+        self._add_history(f"Added column [$success]{col_name}[/] with expression: {expr_str}")
+
+        try:
+            # Create the column
+            new_col = expr.alias(col_name)
+
+            # Get columns up to current, the new column, then remaining columns
+            cols = self.df.columns
+            cols_before = cols[: col_idx + 1]
+            cols_after = cols[col_idx + 1 :]
+
+            # Build the new dataframe with columns reordered
+            select_cols = cols_before + [col_name] + cols_after
+            self.df = self.df.with_columns(new_col).select(select_cols)
+
+            # Recreate the table display
+            self._setup_table()
+
+            self.app.notify(f"Added column [$success]{col_name}[/]", title="Add Column")
+        except Exception as e:
+            self.app.notify(f"Failed to add column: {str(e)}", title="Add Column", severity="error")
             raise e
 
     def _search_column(self, all_columns: bool = False) -> None:
@@ -1547,7 +1633,7 @@ class DataFrameTable(DataTable):
         """
         if result is None:
             return
-        expr, expr_str = result
+        expr_str, expr = result
 
         # Add a row index column to track original row indices
         df_with_rid = self.df.with_row_index("__rid__")
