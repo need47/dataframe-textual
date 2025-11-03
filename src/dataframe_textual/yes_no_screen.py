@@ -65,7 +65,7 @@ class YesNoScreen(ModalScreen):
             input: Optional input value to pre-fill an Input widget. If None, no Input is shown. If it is a 2-value tuple, the first value is the pre-filled input, and the second value is the type of input (e.g., "integer", "number", "text")
             yes: Text for the Yes button. If None, hides the Yes button
             no: Text for the No button. If None, hides the No button
-            on_yes_callback: Optional callable that takes no args and returns the value to dismiss with
+            on_yes_callback: Optional callable that takes no args and returns the value to dismiss with when Yes is pressed
         """
         super().__init__()
         self.title = title
@@ -179,7 +179,7 @@ class ConfirmScreen(YesNoScreen):
         )
 
     def handle_confirm(self) -> None:
-        self.dismiss(True)
+        return True
 
 
 class EditCellScreen(YesNoScreen):
@@ -218,20 +218,18 @@ class EditCellScreen(YesNoScreen):
 
         # Check if value changed
         if new_value_str == self.input_value:
-            self.dismiss(None)
             self.notify("No changes made", title="Edit", severity="warning")
-            return
+            return None
 
         # Parse and validate based on column dtype
         try:
             new_value = DtypeConfig(self.col_dtype).convert(new_value_str)
         except Exception as e:
-            self.dismiss(None)  # Dismiss without changes
             self.notify(f"Invalid value: {str(e)}", title="Edit", severity="error")
-            return
+            return None
 
-        # Dismiss with the new value
-        self.dismiss((self.row_key, self.col_idx, new_value))
+        # New value
+        return self.row_key, self.col_idx, new_value
 
 
 class SearchScreen(YesNoScreen):
@@ -265,8 +263,8 @@ class SearchScreen(YesNoScreen):
             self.notify("Search term cannot be empty", title="Search", severity="error")
             return
 
-        # Dismiss with the search term
-        self.dismiss((term, self.col_dtype, self.col_name))
+        # Search term
+        return term, self.col_dtype, self.col_name
 
 
 class FilterScreen(YesNoScreen):
@@ -303,20 +301,20 @@ class FilterScreen(YesNoScreen):
                 # Test the expression by evaluating it
                 expr = eval(expr_str, {"pl": pl})
 
-                # Dismiss with the expression
-                self.dismiss((expr, expr_str))
+                # Expression is valid
+                return expr, expr_str
             except Exception as e:
                 self.notify(
                     f"Error evaluating expression: {str(e)}",
                     title="Filter",
                     severity="error",
                 )
-                self.dismiss(None)
         except ValueError as ve:
             self.notify(
                 f"Invalid expression: {str(ve)}", title="Filter", severity="error"
             )
-            self.dismiss(None)
+
+        return None
 
 
 class FreezeScreen(YesNoScreen):

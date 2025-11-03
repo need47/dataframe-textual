@@ -13,7 +13,7 @@ from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
-from .common import BOOLS, DtypeConfig, _format_row
+from .common import DtypeConfig, _format_row
 
 
 class TableScreen(ModalScreen):
@@ -171,25 +171,54 @@ class FrequencyScreen(TableScreen):
 
     CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "FrequencyScreen")
 
-    def __init__(self, col_idx: int, dftable):
+    def __init__(self, col_idx: int, dftable: DataFrameTable):
         super().__init__(dftable)
         self.col_idx = col_idx
         self.sorted_columns = {
             1: True,  # Count
             2: True,  # %
         }
+        self.df: pl.DataFrame = (
+            dftable.df[dftable.df.columns[self.col_idx]]
+            .value_counts(sort=True)
+            .sort("count", descending=True)
+        )
 
     def on_mount(self) -> None:
         """Create the frequency table."""
-        column = self.df.columns[self.col_idx]
-        dtype = str(self.df.dtypes[self.col_idx])
+        self.build_table()
+
+    def on_key(self, event):
+        if event.key == "left_square_bracket":  # '['
+            # Sort by current column in ascending order
+            self._sort_by_column(descending=False)
+            event.stop()
+        elif event.key == "right_square_bracket":  # ']'
+            # Sort by current column in descending order
+            self._sort_by_column(descending=True)
+            event.stop()
+        elif event.key == "v":
+            # Filter the main table by the selected value
+            self._filter_or_highlight_selected_value(
+                self._get_col_name_value(), action="filter"
+            )
+            event.stop()
+        elif event.key == "quotation_mark":  # '"'
+            # Highlight the main table by the selected value
+            self._filter_or_highlight_selected_value(
+                self._get_col_name_value(), action="highlight"
+            )
+            event.stop()
+
+    def build_table(self) -> None:
+        # Create frequency table
+        column = self.dftable.df.columns[self.col_idx]
+        dtype = str(self.dftable.df.dtypes[self.col_idx])
         dc = DtypeConfig(dtype)
 
         # Calculate frequencies using Polars
-        freq_df = self.df[column].value_counts(sort=True).sort("count", descending=True)
-        total_count = len(self.df)
+        total_count = len(self.dftable.df)
 
-        # Create frequency table
         self.table.add_column(Text(column, justify=dc.justify), key=column)
         self.table.add_column(Text("Count", justify="right"), key="Count")
         self.table.add_column(Text("%", justify="right"), key="%")
@@ -200,7 +229,7 @@ class FrequencyScreen(TableScreen):
         ds_float = DtypeConfig("Float64")
 
         # Add rows to the frequency table
-        for row_idx, row in enumerate(freq_df.rows()):
+        for row_idx, row in enumerate(self.df.rows()):
             value, count = row
             percentage = (count / total_count) * 100
 
@@ -228,39 +257,22 @@ class FrequencyScreen(TableScreen):
             Text("Total", style="bold", justify=dc.justify),
             Text(f"{total_count:,}", style="bold", justify="right"),
             Text("100.00", style="bold", justify="right"),
+            Bar(
+                highlight_range=(0.0, 10),
+                width=10,
+            ),
             key="total",
         )
 
-    def on_key(self, event):
-        if event.key == "left_square_bracket":  # '['
-            # Sort by current column in ascending order
-            self._sort_by_column(descending=False)
-            event.stop()
-        elif event.key == "right_square_bracket":  # ']'
-            # Sort by current column in descending order
-            self._sort_by_column(descending=True)
-            event.stop()
-        elif event.key == "v":
-            # Filter the main table by the selected value
-            self._filter_or_highlight_selected_value(
-                self._get_col_name_value(), action="filter"
-            )
-            event.stop()
-        elif event.key == "quotation_mark":  # '"'
-            # Highlight the main table by the selected value
-            self._filter_or_highlight_selected_value(
-                self._get_col_name_value(), action="highlight"
-            )
-            event.stop()
-
     def _sort_by_column(self, descending: bool) -> None:
         """Sort the dataframe by the selected column and refresh the main table."""
-        freq_table = self.query_one(DataTable)
 
-        col_idx = freq_table.cursor_column
-        col_dtype = "String"
+        self.log(self.df)
 
-        sort_dir = self.sorted_columns.get(col_idx)
+        row_idx, col_idx = self.table.cursor_coordinate
+        col_sort = col_idx if col_idx == 0 else 1
+
+        sort_dir = self.sorted_columns.get(col_sort)
         if sort_dir is not None:
             # If already sorted in the same direction, do nothing
             if sort_dir == descending:
@@ -270,37 +282,16 @@ class FrequencyScreen(TableScreen):
                 return
 
         self.sorted_columns.clear()
-        self.sorted_columns[col_idx] = descending
+        self.sorted_columns[col_sort] = descending
 
-        if col_idx == 0:
-            col_name = self.df.columns[self.col_idx]
-            col_dtype = str(self.df.dtypes[self.col_idx])
-        elif col_idx == 1:
-            col_name = "Count"
-            col_dtype = "Int64"
-        elif col_idx == 2:
-            col_name = "%"
-            col_dtype = "Float64"
+        col_name = self.df.columns[col_sort]
+        self.df = self.df.sort(col_name, descending=descending)
 
-        def key_fun(freq_col):
-            col_value = freq_col.plain
+        # Rebuild the frequency table
+        self.table.clear(columns=True)
+        self.build_table()
 
-            try:
-                if col_dtype == "Int64":
-                    return int(col_value)
-                elif col_dtype == "Float64":
-                    return float(col_value)
-                elif col_dtype == "Boolean":
-                    return BOOLS[col_value]
-                else:
-                    return col_value
-            except ValueError:
-                return 0
-
-        # Sort the table
-        freq_table.sort(
-            col_name, key=lambda freq_col: key_fun(freq_col), reverse=descending
-        )
+        self.table.move_cursor(row=row_idx, column=col_idx)
 
         # Notify the user
         order = "desc" if descending else "asc"

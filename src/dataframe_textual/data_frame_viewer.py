@@ -226,6 +226,7 @@ class DataFrameViewer(App):
             else:
                 if active_pane := self.tabbed.active_pane:
                     self.tabbed.remove_pane(active_pane.id)
+                    self.tabs.pop(active_pane)
                     self.notify(
                         f"Closed tab [on $primary]{active_pane.name}[/]", title="Close"
                     )
