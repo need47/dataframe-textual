@@ -183,9 +183,7 @@ class DataFrameTable(DataTable):
         self.sorted_columns: dict[str, bool] = {}  # col_name -> descending
         self.hidden_columns: set[str] = set()  # Set of hidden column names
         self.selected_rows: list[bool] = [False] * len(self.df)  # Track selected rows
-        self.visible_rows: list[bool] = [True] * len(
-            self.df
-        )  # Track visible rows (for filtering)
+        self.visible_rows: list[bool] = [True] * len(self.df)  # Track visible rows (for filtering)
 
         # Freezing
         self.fixed_rows = 0  # Number of fixed rows
@@ -259,9 +257,7 @@ class DataFrameTable(DataTable):
         else:
             return False
 
-    def watch_cursor_coordinate(
-        self, old_coordinate: Coordinate, new_coordinate: Coordinate
-    ) -> None:
+    def watch_cursor_coordinate(self, old_coordinate: Coordinate, new_coordinate: Coordinate) -> None:
         """Refresh highlighting when cursor coordinate changes.
 
         This explicitly refreshes cells that need to change their highlight state
@@ -496,14 +492,10 @@ class DataFrameTable(DataTable):
                     # Add sort indicator to column header
                     descending = self.sorted_columns[col]
                     sort_indicator = (
-                        f" ▼{SUBSCRIPT_DIGITS.get(idx, '')}"
-                        if descending
-                        else f" ▲{SUBSCRIPT_DIGITS.get(idx, '')}"
+                        f" ▼{SUBSCRIPT_DIGITS.get(idx, '')}" if descending else f" ▲{SUBSCRIPT_DIGITS.get(idx, '')}"
                     )
                     header_text = col + sort_indicator
-                    self.add_column(
-                        Text(header_text, justify=DtypeConfig(dtype).justify), key=col
-                    )
+                    self.add_column(Text(header_text, justify=DtypeConfig(dtype).justify), key=col)
 
                     break
             else:  # No break occurred, so column is not sorted
@@ -676,9 +668,7 @@ class DataFrameTable(DataTable):
         fixed_rows, fixed_columns = result
 
         # Add to history
-        self._add_history(
-            f"Pinned [$accent]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns"
-        )
+        self._add_history(f"Pinned [$accent]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns")
 
         # Apply the pin settings to the table
         if fixed_rows > 0:
@@ -759,9 +749,7 @@ class DataFrameTable(DataTable):
         hidden_cols = [col for col in self.df.columns if col not in visible_cols]
 
         if not hidden_cols:
-            self.app.notify(
-                "No hidden columns to show", title="Column", severity="warning"
-            )
+            self.app.notify("No hidden columns to show", title="Column", severity="warning")
             return
 
         # Add to history
@@ -843,16 +831,8 @@ class DataFrameTable(DataTable):
 
         # Update selected and visible rows tracking
         old_row_indices = set(df["__rid__"].to_list())
-        self.selected_rows = [
-            selected
-            for i, selected in enumerate(self.selected_rows)
-            if i in old_row_indices
-        ]
-        self.visible_rows = [
-            visible
-            for i, visible in enumerate(self.visible_rows)
-            if i in old_row_indices
-        ]
+        self.selected_rows = [selected for i, selected in enumerate(self.selected_rows) if i in old_row_indices]
+        self.visible_rows = [visible for i, visible in enumerate(self.visible_rows) if i in old_row_indices]
 
         # Recreate the table display
         self._setup_table()
@@ -880,16 +860,8 @@ class DataFrameTable(DataTable):
         self.df = pl.concat([df_before, row_to_duplicate, df_after])
 
         # Update selected and visible rows tracking to account for new row
-        new_selected_rows = (
-            self.selected_rows[: rid + 1]
-            + [self.selected_rows[rid]]
-            + self.selected_rows[rid + 1 :]
-        )
-        new_visible_rows = (
-            self.visible_rows[: rid + 1]
-            + [self.visible_rows[rid]]
-            + self.visible_rows[rid + 1 :]
-        )
+        new_selected_rows = self.selected_rows[: rid + 1] + [self.selected_rows[rid]] + self.selected_rows[rid + 1 :]
+        new_visible_rows = self.visible_rows[: rid + 1] + [self.visible_rows[rid]] + self.visible_rows[rid + 1 :]
         self.selected_rows = new_selected_rows
         self.visible_rows = new_visible_rows
 
@@ -916,16 +888,12 @@ class DataFrameTable(DataTable):
         # Validate move is possible
         if direction == "left":
             if col_idx <= 0:
-                self.app.notify(
-                    "Cannot move column left", title="Move", severity="warning"
-                )
+                self.app.notify("Cannot move column left", title="Move", severity="warning")
                 return
             swap_idx = col_idx - 1
         elif direction == "right":
             if col_idx >= len(self.columns) - 1:
-                self.app.notify(
-                    "Cannot move column right", title="Move", severity="warning"
-                )
+                self.app.notify("Cannot move column right", title="Move", severity="warning")
                 return
             swap_idx = col_idx + 1
 
@@ -934,9 +902,7 @@ class DataFrameTable(DataTable):
         swap_name = self.df.columns[swap_idx]
 
         # Add to history
-        self._add_history(
-            f"Moved column [$success]{col_name}[/] {direction} (swapped with [$success]{swap_name}[/])"
-        )
+        self._add_history(f"Moved column [$success]{col_name}[/] {direction} (swapped with [$success]{swap_name}[/])")
 
         # Swap columns in the table's internal column locations
         self.check_idle()
@@ -982,15 +948,11 @@ class DataFrameTable(DataTable):
             swap_idx = row_idx - 1
         elif direction == "down":
             if row_idx >= len(self.rows) - 1:
-                self.app.notify(
-                    "Cannot move row down", title="Move", severity="warning"
-                )
+                self.app.notify("Cannot move row down", title="Move", severity="warning")
                 return
             swap_idx = row_idx + 1
         else:
-            self.app.notify(
-                f"Invalid direction: {direction}", title="Move", severity="error"
-            )
+            self.app.notify(f"Invalid direction: {direction}", title="Move", severity="error")
             return
 
         row_key = self.coordinate_to_cell_key((row_idx, 0)).row_key
@@ -1033,9 +995,7 @@ class DataFrameTable(DataTable):
             ]
         )
 
-        self.app.notify(
-            f"Moved row [$success]{row_key.value}[/] {direction}", title="Move"
-        )
+        self.app.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move")
 
     # Sort
     def _sort_by_column(self, descending: bool = False) -> None:
@@ -1078,9 +1038,7 @@ class DataFrameTable(DataTable):
         # Apply multi-column sort
         sort_cols = list(self.sorted_columns.keys())
         descending_flags = list(self.sorted_columns.values())
-        df_sorted = self.df.with_row_index("__rid__").sort(
-            sort_cols, descending=descending_flags, nulls_last=True
-        )
+        df_sorted = self.df.with_row_index("__rid__").sort(sort_cols, descending=descending_flags, nulls_last=True)
 
         # Updated selected_rows and visible_rows to match new order
         old_row_indices = df_sorted["__rid__"].to_list()
@@ -1155,9 +1113,7 @@ class DataFrameTable(DataTable):
 
             self.app.notify(f"Cell updated to [$success]{cell_value}[/]", title="Edit")
         except Exception as e:
-            self.app.notify(
-                f"Failed to update cell: {str(e)}", title="Edit", severity="error"
-            )
+            self.app.notify(f"Failed to update cell: {str(e)}", title="Edit", severity="error")
             raise e
 
     def _rename_column(self) -> None:
@@ -1188,9 +1144,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self._add_history(
-            f"Renamed column [$accent]{col_name}[/] to [$success]{new_name}[/]"
-        )
+        self._add_history(f"Renamed column [$accent]{col_name}[/] to [$success]{new_name}[/]")
 
         # Rename the column in the dataframe
         self.df = self.df.rename({col_name: new_name})
@@ -1270,9 +1224,7 @@ class DataFrameTable(DataTable):
             # Perform search in all columns
             self._search_all_columns(term)
 
-    def _search_single_column(
-        self, term: str, col_dtype: pl.DataType, col_name: str
-    ) -> None:
+    def _search_single_column(self, term: str, col_dtype: pl.DataType, col_name: str) -> None:
         """Search for a term in a single column and update selected rows.
 
         Args:
@@ -1316,9 +1268,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self._add_history(
-            f"Searched and highlighted [$success]{term}[/] in column [$success]{col_name}[/]"
-        )
+        self._add_history(f"Searched and highlighted [$success]{term}[/] in column [$success]{col_name}[/]")
 
         # Update selected rows to include new matches
         for m in matches:
@@ -1378,9 +1328,7 @@ class DataFrameTable(DataTable):
         self._load_rows(max(matches.keys()) + 1)
 
         # Add to history
-        self._add_history(
-            f"Searched and highlighted [$success]{term}[/] across all columns"
-        )
+        self._add_history(f"Searched and highlighted [$success]{term}[/] across all columns")
 
         # Highlight matching cells directly
         for row in self.ordered_rows:
@@ -1445,9 +1393,7 @@ class DataFrameTable(DataTable):
         # Check if any rows are currently selected
         selected_count = self.selected_rows.count(True)
         if selected_count == 0:
-            self.app.notify(
-                "No rows selected to clear", title="Clear", severity="warning"
-            )
+            self.app.notify("No rows selected to clear", title="Clear", severity="warning")
             return
 
         # Save current state to history
@@ -1456,17 +1402,13 @@ class DataFrameTable(DataTable):
         # Clear all selections and refresh highlighting
         self._highlight_rows(clear=True)
 
-        self.app.notify(
-            f"Cleared [$accent]{selected_count}[/] selected rows", title="Clear"
-        )
+        self.app.notify(f"Cleared [$accent]{selected_count}[/] selected rows", title="Clear")
 
     def _filter_selected_rows(self) -> None:
         """Display only the selected rows."""
         selected_count = self.selected_rows.count(True)
         if selected_count == 0:
-            self.app.notify(
-                "No rows selected to filter", title="Filter", severity="warning"
-            )
+            self.app.notify("No rows selected to filter", title="Filter", severity="warning")
             return
 
         # Save current state to history
@@ -1495,9 +1437,7 @@ class DataFrameTable(DataTable):
             cell_value = repr(cell_value)
 
         self.app.push_screen(
-            FilterScreen(
-                self.df, current_col_idx=col_idx, current_cell_value=cell_value
-            ),
+            FilterScreen(self.df, current_col_idx=col_idx, current_cell_value=cell_value),
             callback=self._do_filter,
         )
 
@@ -1580,9 +1520,7 @@ class DataFrameTable(DataTable):
         next_type = _next(CURSOR_TYPES, self.cursor_type)
         self.cursor_type = next_type
 
-        self.app.notify(
-            f"Changed cursor type to [$success]{next_type}[/]", title="Cursor"
-        )
+        self.app.notify(f"Changed cursor type to [$success]{next_type}[/]", title="Cursor")
 
     def _toggle_row_labels(self) -> None:
         """Toggle row labels visibility."""
@@ -1592,13 +1530,9 @@ class DataFrameTable(DataTable):
 
     def _save_to_file(self) -> None:
         """Open save file dialog."""
-        self.app.push_screen(
-            SaveFileScreen(self.filename), callback=self._on_save_file_screen
-        )
+        self.app.push_screen(SaveFileScreen(self.filename), callback=self._on_save_file_screen)
 
-    def _on_save_file_screen(
-        self, filename: str | None, all_tabs: bool = False
-    ) -> None:
+    def _on_save_file_screen(self, filename: str | None, all_tabs: bool = False) -> None:
         """Handle result from SaveFileScreen."""
         if filename is None:
             return

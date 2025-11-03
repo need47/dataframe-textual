@@ -90,9 +90,7 @@ class TableScreen(ModalScreen):
             expr = pl.col(col_name) == col_value
             value_display = f"[on $primary]{col_value}[/]"
 
-        matched_indices = set(
-            self.dftable.df.with_row_index("__rid__").filter(expr)["__rid__"].to_list()
-        )
+        matched_indices = set(self.dftable.df.with_row_index("__rid__").filter(expr)["__rid__"].to_list())
 
         # Apply the action
         if action == "filter":
@@ -132,27 +130,19 @@ class RowDetailScreen(TableScreen):
         self.table.add_column("Value")
 
         # Get all columns and values from the dataframe row
-        for col, val, dtype in zip(
-            self.df.columns, self.df.row(self.row_idx), self.df.dtypes
-        ):
-            self.table.add_row(
-                *_format_row([col, val], [None, dtype], apply_justify=False)
-            )
+        for col, val, dtype in zip(self.df.columns, self.df.row(self.row_idx), self.df.dtypes):
+            self.table.add_row(*_format_row([col, val], [None, dtype], apply_justify=False))
 
         self.table.cursor_type = "row"
 
     def on_key(self, event):
         if event.key == "v":
             # Filter the main table by the selected value
-            self._filter_or_highlight_selected_value(
-                self._get_col_name_value(), action="filter"
-            )
+            self._filter_or_highlight_selected_value(self._get_col_name_value(), action="filter")
             event.stop()
         elif event.key == "quotation_mark":  # '"'
             # Highlight the main table by the selected value
-            self._filter_or_highlight_selected_value(
-                self._get_col_name_value(), action="highlight"
-            )
+            self._filter_or_highlight_selected_value(self._get_col_name_value(), action="highlight")
             event.stop()
 
     def _get_col_name_value(self) -> tuple[str, Any] | None:
@@ -178,9 +168,7 @@ class FrequencyScreen(TableScreen):
             1: True,  # Count
         }
         self.df: pl.DataFrame = (
-            dftable.df[dftable.df.columns[self.col_idx]]
-            .value_counts(sort=True)
-            .sort("count", descending=True)
+            dftable.df[dftable.df.columns[self.col_idx]].value_counts(sort=True).sort("count", descending=True)
         )
 
     def on_mount(self) -> None:
@@ -198,15 +186,11 @@ class FrequencyScreen(TableScreen):
             event.stop()
         elif event.key == "v":
             # Filter the main table by the selected value
-            self._filter_or_highlight_selected_value(
-                self._get_col_name_value(), action="filter"
-            )
+            self._filter_or_highlight_selected_value(self._get_col_name_value(), action="filter")
             event.stop()
         elif event.key == "quotation_mark":  # '"'
             # Highlight the main table by the selected value
-            self._filter_or_highlight_selected_value(
-                self._get_col_name_value(), action="highlight"
-            )
+            self._filter_or_highlight_selected_value(self._get_col_name_value(), action="highlight")
             event.stop()
 
     def build_table(self) -> None:
@@ -235,11 +219,7 @@ class FrequencyScreen(TableScreen):
             else:
                 header_text = display_name
 
-            justify = (
-                dc.justify
-                if col_idx_num == 0
-                else ("right" if col_idx_num in (1, 2) else "left")
-            )
+            justify = dc.justify if col_idx_num == 0 else ("right" if col_idx_num in (1, 2) else "left")
             self.table.add_column(Text(header_text, justify=justify), key=key)
 
         # Get style config for Int64 and Float64
@@ -294,9 +274,7 @@ class FrequencyScreen(TableScreen):
         if sort_dir is not None:
             # If already sorted in the same direction, do nothing
             if sort_dir == descending:
-                self.notify(
-                    "Already sorted in that order", title="Sort", severity="warning"
-                )
+                self.notify("Already sorted in that order", title="Sort", severity="warning")
                 return
 
         self.sorted_columns.clear()

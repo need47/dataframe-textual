@@ -42,9 +42,7 @@ class DtypeConfig:
     convert: Any
 
     def __init__(self, dtype: pl.DataType):
-        dc = STYLES.get(
-            str(dtype), {"style": "", "justify": "", "itype": "text", "convert": str}
-        )
+        dc = STYLES.get(str(dtype), {"style": "", "justify": "", "itype": "text", "convert": str})
         self.style = dc["style"]
         self.justify = dc["justify"]
         self.itype = dc["itype"]
@@ -122,9 +120,7 @@ def _next(lst: list[Any], current, offset=1) -> Any:
     return lst[next_index]
 
 
-def parse_filter_expression(
-    expression: str, df: pl.DataFrame, current_col_idx: int
-) -> str:
+def parse_filter_expression(expression: str, df: pl.DataFrame, current_col_idx: int) -> str:
     """Parse and convert a filter expression to Polars syntax.
 
     Supports:

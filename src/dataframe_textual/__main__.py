@@ -18,9 +18,7 @@ def main():
         "  dataframe-viewer data.xlsx  (opens all sheets in tabs)\n"
         "  cat data.csv | dataframe-viewer\n",
     )
-    parser.add_argument(
-        "files", nargs="*", help="CSV or Excel files to view (or read from stdin)"
-    )
+    parser.add_argument("files", nargs="*", help="CSV or Excel files to view (or read from stdin)")
 
     args = parser.parse_args()
     filenames = []

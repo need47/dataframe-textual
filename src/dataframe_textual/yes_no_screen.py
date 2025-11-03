@@ -343,9 +343,7 @@ class FilterScreen(YesNoScreen):
 
         try:
             # Try to parse the expression to ensure it's valid
-            expr_str = parse_filter_expression(
-                expression, self.df, self.current_col_idx
-            )
+            expr_str = parse_filter_expression(expression, self.df, self.current_col_idx)
 
             try:
                 # Test the expression by evaluating it
@@ -360,9 +358,7 @@ class FilterScreen(YesNoScreen):
                     severity="error",
                 )
         except ValueError as ve:
-            self.notify(
-                f"Invalid expression: {str(ve)}", title="Filter", severity="error"
-            )
+            self.notify(f"Invalid expression: {str(ve)}", title="Filter", severity="error")
 
         return None
 
@@ -405,9 +401,7 @@ class FreezeScreen(YesNoScreen):
                     raise ValueError("must be non-negative")
                 return (fixed_rows, 0)
             except ValueError as e:
-                self.notify(
-                    f"Invalid fixed rows value: {str(e)}", title="Pin", severity="error"
-                )
+                self.notify(f"Invalid fixed rows value: {str(e)}", title="Pin", severity="error")
                 return None
         elif len(parts) == 2:
             # Both fixed rows and columns provided
@@ -418,9 +412,7 @@ class FreezeScreen(YesNoScreen):
                     raise ValueError("values must be non-negative")
                 return (fixed_rows, fixed_cols)
             except ValueError as e:
-                self.notify(
-                    f"Invalid input values: {str(e)}", title="Pin", severity="error"
-                )
+                self.notify(f"Invalid input values: {str(e)}", title="Pin", severity="error")
                 return None
         else:
             self.notify(

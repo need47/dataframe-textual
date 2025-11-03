@@ -99,9 +99,7 @@ class DataFrameViewer(App):
 
                 tab_id = f"tab_{idx}"
                 try:
-                    table = DataFrameTable(
-                        df, filename, name=tabname, id=tab_id, zebra_stripes=True
-                    )
+                    table = DataFrameTable(df, filename, name=tabname, id=tab_id, zebra_stripes=True)
                     tab = TabPane(tabname, table, name=tabname, id=tab_id)
                     self.tabs[tab] = table
                     yield tab
@@ -117,13 +115,9 @@ class DataFrameViewer(App):
     def on_key(self, event):
         if event.key == "k":
             self.theme = _next(list(BUILTIN_THEMES.keys()), self.theme)
-            self.notify(
-                f"Switched to theme: [$success]{self.theme}[/]", title="Theme"
-            )
+            self.notify(f"Switched to theme: [$success]{self.theme}[/]", title="Theme")
 
-    def on_tabbed_content_tab_activated(
-        self, event: TabbedContent.TabActivated
-    ) -> None:
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         """Handle tab changes (only for multiple tabs)."""
         # Only process if we have multiple files
         if len(self.tabs) <= 1:
@@ -170,9 +164,7 @@ class DataFrameViewer(App):
             try:
                 df = pl.read_csv(filename)
                 self._add_tab(df, filename)
-                self.notify(
-                    f"Opened: [$success]{Path(filename).name}[/]", title="Open"
-                )
+                self.notify(f"Opened: [$success]{Path(filename).name}[/]", title="Open")
             except Exception as e:
                 self.notify(f"Error: {e}", severity="error")
 
@@ -218,9 +210,7 @@ class DataFrameViewer(App):
             tab_idx = pending_tab_idx
             break
 
-        table = DataFrameTable(
-            df, filename, zebra_stripes=True, id=tab_idx, name=tabname
-        )
+        table = DataFrameTable(df, filename, zebra_stripes=True, id=tab_idx, name=tabname)
         tab = TabPane(tabname, table, name=tabname, id=tab_idx)
         self.tabbed.add_pane(tab)
         self.tabs[tab] = table
@@ -241,9 +231,7 @@ class DataFrameViewer(App):
                 if active_pane := self.tabbed.active_pane:
                     self.tabbed.remove_pane(active_pane.id)
                     self.tabs.pop(active_pane)
-                    self.notify(
-                        f"Closed tab [$success]{active_pane.name}[/]", title="Close"
-                    )
+                    self.notify(f"Closed tab [$success]{active_pane.name}[/]", title="Close")
         except NoMatches:
             pass
 
