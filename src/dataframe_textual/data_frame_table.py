@@ -97,6 +97,7 @@ class DataFrameTable(DataTable):
         ## ✏️ Edit & Modify
         - **e** - ✍️ Edit current cell
         - **x** - 🗑️ Delete current row
+        - **D** - 📋 Duplicate current row
         - **-** - ❌ Delete current column
         - **d** - 📋 Duplicate current column
         - **h** - 👁️ Hide current column
@@ -175,8 +176,8 @@ class DataFrameTable(DataTable):
         return self.cursor_key.column_key
 
     @property
-    def cursor_row_index(self) -> int:
-        """Get the current cursor row index (0-based)."""
+    def cursor_rid(self) -> int:
+        """Get the current cursor row index (0-based) in dataframe."""
         return int(self.cursor_row_key.value) - 1
 
     def on_mount(self) -> None:
@@ -336,6 +337,9 @@ class DataFrameTable(DataTable):
         elif event.key == "d":
             # Duplicate the current column
             self._duplicate_column()
+        elif event.key == "D":
+            # Duplicate the current row
+            self._duplicate_row()
         elif event.key == "u":
             # Undo last action
             self._undo()
@@ -782,6 +786,50 @@ class DataFrameTable(DataTable):
 
         deleted_count = old_count - len(self.df)
         self.app.notify(f"Deleted {deleted_count} row(s)", title="Delete")
+
+    def _duplicate_row(self) -> None:
+        """Duplicate the currently selected row, inserting it right after the current row."""
+        rid = self.cursor_rid
+        if rid >= len(self.df):
+            return
+
+        # Get the row to duplicate
+        row_to_duplicate = self.df.slice(rid, 1)
+
+        # Add to history
+        self._add_history(f"Duplicated row [$success]{rid + 1}[/]")
+
+        # Concatenate: rows before + duplicated row + rows after
+        df_before = self.df.slice(0, rid + 1)
+        df_after = self.df.slice(rid + 1)
+
+        # Combine the parts
+        self.df = pl.concat([df_before, row_to_duplicate, df_after])
+
+        # Update selected and visible rows tracking to account for new row
+        new_selected_rows = (
+            self.selected_rows[: rid + 1]
+            + [self.selected_rows[rid]]
+            + self.selected_rows[rid + 1 :]
+        )
+        new_visible_rows = (
+            self.visible_rows[: rid + 1]
+            + [self.visible_rows[rid]]
+            + self.visible_rows[rid + 1 :]
+        )
+        self.selected_rows = new_selected_rows
+        self.visible_rows = new_visible_rows
+
+        # Recreate the table display
+        self._setup_table()
+
+        # Move cursor to the new duplicated row
+        self.move_cursor(row=rid + 1)
+
+        self.app.notify(
+            f"Duplicated row [$success]{rid + 1}[/]",
+            title="Row",
+        )
 
     def _move_column(self, direction: str) -> None:
         """Move the current column left or right.

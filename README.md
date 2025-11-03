@@ -165,6 +165,7 @@ When multiple files are opened:
 |-----|--------|
 | `e` | Edit current cell (respects data type) |
 | `x` | Delete current row |
+| `D` | Duplicate current row |
 | `-` | Delete current column |
 | `d` | Duplicate current column (appends '_copy' suffix) |
 | `h` | Hide current column |
@@ -361,7 +362,7 @@ Press `d` to duplicate the current column:
 - Creates a new column immediately after the current column
 - New column has '_copy' suffix (e.g., 'price' → 'price_copy')
 - Duplicate preserves all data from original column
-- New column is inserted into the dataframe using Polars `insert_column()`
+- New column is inserted into the dataframe using Polars operations
 
 This is useful for:
 - Creating backup copies of columns before transformation
@@ -369,7 +370,21 @@ This is useful for:
 - Comparing original vs. processed column values side-by-side
 - Data preparation and validation workflows
 
-### 10. Column & Row Reordering
+### 10. Duplicate Row
+
+Press `D` to duplicate the current row:
+- Creates a new row immediately after the current row
+- Duplicate preserves all data from original row
+- New row is inserted into the dataframe
+- Cursor moves to the duplicated row
+
+This is useful for:
+- Creating variations of existing data records
+- Batch adding similar rows with modifications
+- Testing with duplicate data
+- Data validation and comparison workflows
+
+### 11. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
 - Swaps adjacent columns
@@ -379,14 +394,14 @@ This is useful for:
 - Swaps adjacent rows
 - Visual reordering without affecting data
 
-### 11. Pin Rows and Columns
+### 12. Pin Rows and Columns
 
 Press `f` to open the pin dialog:
 - Enter number of fixed rows: keeps top rows visible while scrolling
 - Enter two numbers: `<rows> <columns>` (space-separated)
 - Example: `2 3` pins top 2 rows and left 3 columns
 
-### 12. Save to CSV
+### 13. Save to CSV
 
 Press `Ctrl+S` to save:
 - Save filtered, edited, or sorted data back to CSV
@@ -394,14 +409,14 @@ Press `Ctrl+S` to save:
 - Confirm if file already exists
 - Automatic .tsv or .csv detection
 
-### 13. Undo/Redo
+### 14. Undo/Redo
 
 Press `u` to undo:
 - Reverts last action with full state restoration
 - Works for edits, deletions, sorts, searches, etc.
 - Shows description of reverted action
 
-### 14. Cursor Type Cycling
+### 15. Cursor Type Cycling
 
 Press `C` to cycle through selection modes:
 1. **Cell mode**: Highlight individual cell (and its row/column headers)
@@ -410,7 +425,7 @@ Press `C` to cycle through selection modes:
 
 Visual feedback shows which mode is active.
 
-### 15. Clipboard Operations
+### 16. Clipboard Operations
 
 Press `c` to copy:
 - Copies current cell value to system clipboard
