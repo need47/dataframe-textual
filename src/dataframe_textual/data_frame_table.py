@@ -95,7 +95,7 @@ class DataFrameTable(DataTable):
 
         ## ✏️ Edit & Modify
         - **e** - ✍️ Edit current cell
-        - **d** - 🗑️ Delete current row
+        - **x** - 🗑️ Delete current row
         - **-** - ❌ Delete current column
 
         ## 🎯 Reorder
@@ -319,7 +319,7 @@ class DataFrameTable(DataTable):
         elif event.key == "quotation_mark":  # '"' key
             # Display selected rows only
             self._filter_selected_rows()
-        elif event.key == "d":
+        elif event.key == "x":
             # Delete the current row
             self._delete_row()
         elif event.key == "u":

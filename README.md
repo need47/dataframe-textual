@@ -132,7 +132,7 @@ When multiple files are opened:
 
 | Key | Action |
 |-----|--------|
-| `?` or `h` | Toggle help panel (context-sensitive) |
+| `?` | Toggle help panel (context-sensitive) |
 | `k` | Cycle through themes |
 
 ---
@@ -164,7 +164,7 @@ When multiple files are opened:
 | Key | Action |
 |-----|--------|
 | `e` | Edit current cell (respects data type) |
-| `d` | Delete current row |
+| `x` | Delete current row |
 | `-` | Delete current column |
 
 #### Searching & Filtering

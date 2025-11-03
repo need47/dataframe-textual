@@ -52,7 +52,7 @@ class DataFrameViewer(App):
 
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("h,?", "toggle_help_panel", "Help"),
+        ("?", "toggle_help_panel", "Help"),
         ("B", "toggle_tab_bar", "Toggle Tab Bar"),
         ("ctrl+o", "add_tab", "Add Tab"),
         ("ctrl+shift+s", "save_all_tabs", "Save All Tabs"),
@@ -255,7 +255,9 @@ class DataFrameViewer(App):
         self.notify(f"Tab bar [on $primary]{status}[/]", title="Toggle")
 
 
-def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame, str, str]]:
+def _load_dataframe(
+    filenames: list[str],
+) -> list[tuple[pl.DataFrame | pl.LazyFrame, str, str]]:
     """Load a DataFrame from a file spec.
 
     Args:
