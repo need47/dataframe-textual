@@ -98,6 +98,7 @@ class DataFrameTable(DataTable):
         ## ✏️ Edit & Modify
         - **e** - ✍️ Edit current cell
         - **E** - 📝 Rename current column
+        - **c** - ✨ Clear current cell (set to None)
         - **x** - 🗑️ Delete current row
         - **D** - 📋 Duplicate current row
         - **-** - ❌ Delete current column
@@ -135,6 +136,7 @@ class DataFrameTable(DataTable):
         ("V", "open_filter_screen", "Advanced filter"),
         ("e", "edit_cell", "Edit cell"),
         ("E", "rename_column", "Rename column"),
+        ("c", "clear_cell", "Clear cell"),
         ("backslash", "search_with_cell_value", "Search with value"),
         ("vertical_line", "search_column", "Search column"),
         ("slash", "search_all_columns", "Search all"),
@@ -365,6 +367,10 @@ class DataFrameTable(DataTable):
     def action_rename_column(self) -> None:
         """Rename the current column."""
         self._rename_column()
+
+    def action_clear_cell(self) -> None:
+        """Clear the current cell (set to None)."""
+        self._clear_cell()
 
     def action_search_with_cell_value(self) -> None:
         """Search using the current cell value."""
@@ -1191,6 +1197,41 @@ class DataFrameTable(DataTable):
             self.app.notify(f"Copied: {cell_str[:50]}", title="Clipboard")
         except (FileNotFoundError, IndexError):
             self.app.notify("Error copying cell", title="Clipboard", severity="error")
+
+    def _clear_cell(self) -> None:
+        """Clear the current cell by setting its value to None."""
+        row_key, col_key = self.cursor_key
+        rid = self.cursor_rid
+        col_idx = self.cursor_column
+
+        if rid >= len(self.df) or col_idx >= len(self.df.columns):
+            return
+
+        col_name = self.df.columns[col_idx]
+
+        # Add to history
+        self._add_history(f"Cleared cell [$success]({rid + 1}, {col_name})[/]")
+
+        # Update the cell to None in the dataframe
+        try:
+            self.df = self.df.with_columns(
+                pl.when(pl.arange(0, len(self.df)) == rid)
+                .then(pl.lit(None))
+                .otherwise(pl.col(col_name))
+                .alias(col_name)
+            )
+
+            # Update the display
+            dtype = self.df.dtypes[col_idx]
+            dc = DtypeConfig(dtype)
+            formatted_value = Text("-", style=dc.style, justify=dc.justify)
+
+            self.update_cell(row_key, col_key, formatted_value)
+
+            self.app.notify("Cell cleared to [$success]None[/]", title="Clear")
+        except Exception as e:
+            self.app.notify(f"Failed to clear cell: {str(e)}", title="Clear", severity="error")
+            raise e
 
     def _search_column(self, all_columns: bool = False) -> None:
         """Open modal to search in the selected column."""

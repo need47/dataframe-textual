@@ -219,7 +219,9 @@ class EditCellScreen(YesNoScreen):
         # Handle empty input
         if not new_value_str:
             new_value = None
-            self.notify("Empty value provided.", title="Edit", severity="warning")
+            self.notify(
+                "Empty value provided. If you want to clear the cell, press 'c'.", title="Edit", severity="warning"
+            )
         # Check if value changed
         elif new_value_str == self.input_value:
             new_value = None
