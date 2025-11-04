@@ -156,6 +156,8 @@ When multiple files are opened:
 |-----|--------|
 | `Enter` | View full details of current row in modal |
 | `F` | Show frequency distribution for column |
+| `s` | Show statistics for current column |
+| `S` | Show statistics for entire dataframe |
 | `!` | Cycle cursor type: cell → row → column → cell |
 | `@` | Toggle row labels visibility |
 
@@ -341,7 +343,35 @@ This is useful for:
 - Identifying rare or common values
 - Finding the most/least frequent entries
 
-### 7. Data Editing
+### 7. Column & Dataframe Statistics
+
+Press `s` to see summary statistics for the current column, or press `S` for statistics across the entire dataframe.
+
+**Column Statistics** (`s`):
+- Shows calculated statistics using Polars' `describe()` method
+- Displays: count, null count, mean, median, std, min, max, etc.
+- Values are color-coded according to their data type
+- Statistics label column has no styling for clarity
+
+**Dataframe Statistics** (`S`):
+- Shows statistics for all numeric and applicable columns simultaneously
+- Compare statistical measures across multiple columns side-by-side
+- First column (statistics labels) has no styling
+- Data columns are color-coded by their type (Int64, Float64, String, etc.)
+
+**In the Statistics Modal**:
+- Press `q` or `Escape` to close the statistics table
+- Use arrow keys to navigate
+- Useful for quick data validation and summary reviews
+
+This is useful for:
+- Understanding data distributions and characteristics
+- Identifying outliers and anomalies
+- Data quality assessment
+- Quick statistical summaries without external tools
+- Comparing statistics across columns
+
+### 8. Data Editing
 
 **Edit Cell** (`e`):
 - Opens modal for editing current cell
@@ -358,7 +388,7 @@ This is useful for:
 - Removes the entire column from view and dataframe
 - Cannot be undone directly (use undo feature)
 
-### 8. Hide & Show Columns
+### 9. Hide & Show Columns
 
 **Hide Column** (`h`):
 - Temporarily hides the current column from display
@@ -376,7 +406,7 @@ This is useful for:
 - Comparing different column sets (hide/show to compare)
 - Preserving all data while simplifying the view
 
-### 9. Duplicate Column
+### 10. Duplicate Column
 
 Press `d` to duplicate the current column:
 - Creates a new column immediately after the current column
@@ -390,7 +420,7 @@ This is useful for:
 - Comparing original vs. processed column values side-by-side
 - Data preparation and validation workflows
 
-### 10. Duplicate Row
+### 11. Duplicate Row
 
 Press `D` to duplicate the current row:
 - Creates a new row immediately after the current row
@@ -404,7 +434,7 @@ This is useful for:
 - Testing with duplicate data
 - Data validation and comparison workflows
 
-### 11. Column & Row Reordering
+### 12. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
 - Swaps adjacent columns
@@ -414,14 +444,14 @@ This is useful for:
 - Swaps adjacent rows
 - Visual reordering without affecting data
 
-### 12. Pin Rows and Columns
+### 13. Pin Rows and Columns
 
 Press `p` to open the pin dialog:
 - Enter number of fixed rows: keeps top rows visible while scrolling
 - Enter two numbers: `<rows> <columns>` (space-separated)
 - Example: `2 3` pins top 2 rows and left 3 columns
 
-### 13. Save to CSV
+### 14. Save to CSV
 
 Press `Ctrl+S` to save:
 - Save filtered, edited, or sorted data back to CSV
@@ -429,14 +459,14 @@ Press `Ctrl+S` to save:
 - Confirm if file already exists
 - Automatic .tsv or .csv detection
 
-### 14. Undo/Redo
+### 15. Undo/Redo
 
 Press `u` to undo:
 - Reverts last action with full state restoration
 - Works for edits, deletions, sorts, searches, etc.
 - Shows description of reverted action
 
-### 15. Column Type Conversion
+### 16. Column Type Conversion
 
 Press the type conversion keys to instantly cast the current column to a different data type:
 
@@ -460,7 +490,7 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 **Note**: Type conversion attempts to preserve data where possible. Conversions that would lose data (e.g., float to int rounding, invalid boolean strings) will notify you with the reason.
 
-### 16. Cursor Type Cycling
+### 17. Cursor Type Cycling
 
 Press `!` to cycle through selection modes:
 1. **Cell mode**: Highlight individual cell (and its row/column headers)
@@ -469,7 +499,7 @@ Press `!` to cycle through selection modes:
 
 Visual feedback shows which mode is active.
 
-### 17. Clipboard Operations
+### 18. Clipboard Operations
 
 Press `Ctrl+C` to copy:
 - Copies current cell value to system clipboard

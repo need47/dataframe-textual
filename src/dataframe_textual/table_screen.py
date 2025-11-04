@@ -156,6 +156,101 @@ class RowDetailScreen(TableScreen):
         return col_name, col_value
 
 
+class StatisticsScreen(TableScreen):
+    """Modal screen to display statistics for a column or entire dataframe."""
+
+    CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "StatisticsScreen")
+
+    def __init__(self, dftable: DataFrameTable, col_idx: int | None = None):
+        super().__init__(dftable)
+        self.col_idx = col_idx  # None for dataframe statistics, otherwise column index
+
+    def on_mount(self) -> None:
+        """Create the statistics table."""
+        self.build_table()
+
+    def build_table(self) -> None:
+        """Build the statistics table."""
+        if self.col_idx is None:
+            # Dataframe statistics
+            self._build_dataframe_stats()
+        else:
+            # Column statistics
+            self._build_column_stats()
+
+    def _build_column_stats(self) -> None:
+        """Build statistics for a single column."""
+        col_name = self.dftable.df.columns[self.col_idx]
+
+        # Get column statistics
+        stats_df = self.dftable.df.select(pl.col(col_name)).describe()
+        if len(stats_df) == 0:
+            return
+
+        col_dtype = stats_df.dtypes[1]  # 'value' column
+        dc = DtypeConfig(col_dtype)
+
+        # Add statistics label column
+        self.table.add_column(Text("Statistic", justify="left"), key="statistic")
+
+        # Add value column with appropriate styling
+        self.table.add_column(Text(col_name, justify=dc.justify), key=col_name)
+
+        # Add rows
+        for row in stats_df.rows():
+            stat_label, stat_value = row
+            self.table.add_row(
+                Text(stat_label, justify="left"),
+                Text(
+                    "-"
+                    if stat_value is None
+                    else (f"{stat_value:.4g}" if str(col_dtype).startswith("Float") else str(stat_value)),
+                    style=dc.style,
+                    justify=dc.justify,
+                ),
+            )
+
+    def _build_dataframe_stats(self) -> None:
+        """Build statistics for the entire dataframe."""
+        # Get dataframe statistics
+        stats_df = self.dftable.df.describe()
+
+        # Add columns for each dataframe column with appropriate styling
+        for idx, (col_name, col_dtype) in enumerate(zip(stats_df.columns, stats_df.dtypes), 0):
+            if idx == 0:
+                # Add statistics label column (first column, no styling)
+                self.table.add_column("Statistic", key="statistic")
+                continue
+
+            dc = DtypeConfig(col_dtype)
+            self.table.add_column(Text(col_name, justify=dc.justify), key=col_name)
+
+        # Add rows
+        for row in stats_df.rows():
+            formatted_row = []
+
+            # Format remaining values with appropriate styling
+            for idx, stat_value in enumerate(row):
+                # First element is the statistic label
+                if idx == 0:
+                    formatted_row.append(stat_value)
+                    continue
+
+                col_dtype = stats_df.dtypes[idx]
+                dc = DtypeConfig(col_dtype)
+                formatted_row.append(
+                    Text(
+                        "-"
+                        if stat_value is None
+                        else (f"{stat_value:.4g}" if str(col_dtype).startswith("Float") else str(stat_value)),
+                        style=dc.style,
+                        justify=dc.justify,
+                    )
+                )
+
+            self.table.add_row(*formatted_row)
+
+
 class FrequencyScreen(TableScreen):
     """Modal screen to display frequency of values in a column."""
 
