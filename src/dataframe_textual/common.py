@@ -28,12 +28,14 @@ BOOLS = {
 # itype is used by Input widget for input validation
 # fmt: off
 STYLES = {
+    "Int32": {"style": "cyan", "justify": "right", "itype": "integer", "convert": int},
     "Int64": {"style": "cyan", "justify": "right", "itype": "integer", "convert": int},
+    "Float32": {"style": "magenta", "justify": "right", "itype": "number", "convert": float},
     "Float64": {"style": "magenta", "justify": "right", "itype": "number", "convert": float},
     "String": {"style": "green", "justify": "left", "itype": "text", "convert": str},
     "Boolean": {"style": "blue", "justify": "center", "itype": "text", "convert": lambda x: BOOLS[x.lower()]},
-    "Date": {"style": "blue", "justify": "center", "itype": "text", "convert": str},
-    "Datetime": {"style": "blue", "justify": "center", "itype": "text", "convert": str},
+    "Date": {"style": "yellow", "justify": "center", "itype": "text", "convert": str},
+    "Datetime": {"style": "yellow", "justify": "center", "itype": "text", "convert": str},
 }
 # fmt: on
 
@@ -46,7 +48,15 @@ class DtypeConfig:
     convert: Any
 
     def __init__(self, dtype: pl.DataType):
-        dc = STYLES.get(str(dtype), {"style": "", "justify": "", "itype": "text", "convert": str})
+        dt = str(dtype)
+        if not (dc := STYLES.get(dt)):
+            if dt.startswith("Datetime"):
+                dc = STYLES["Datetime"]
+            elif dt.startswith("Date"):
+                dc = STYLES["Date"]
+            else:
+                dc = {"style": "", "justify": "", "itype": "text", "convert": str}
+
         self.style = dc["style"]
         self.justify = dc["justify"]
         self.itype = dc["itype"]
@@ -87,6 +97,7 @@ def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
 
     for val, dtype in zip(vals, dtypes, strict=True):
         dc = DtypeConfig(dtype)
+        print(dc)
 
         # Format the value
         if val is None:
