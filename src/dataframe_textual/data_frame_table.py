@@ -173,7 +173,7 @@ class DataFrameTable(DataTable):
         ("shift+down", "move_row_down", "Move row down"),
         ("T", "clear_selected_rows", "Clear selections"),
         ("at", "toggle_row_labels", "Toggle row labels"),  # `@`
-        ("exclamation", "cycle_cursor_type", "Cycle cursor mode"),  # `!`
+        ("exclamation_mark", "cycle_cursor_type", "Cycle cursor mode"),  # `!`
         ("f", "open_freeze_screen", "Freeze rows/columns"),
         ("number_sign", "cast_column_dtype('int')", "Cast column dtype to int"),  # `#`
         ("percent_sign", "cast_column_dtype('float')", "Cast column dtype to float"),  # `%`
