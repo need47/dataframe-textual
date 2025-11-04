@@ -159,7 +159,7 @@ class DataFrameTable(DataTable):
         ("slash", "search_global_cursor_value", "Global search with value"),  # `/`
         ("question_mark", "search_global", "Global search"),  # `?`
         ("s", "toggle_selected_row", "Toggle row selection"),
-        ("t", "toggle_selected_rows", "Toggle all selections"),
+        ("t", "toggle_selections", "Toggle all row selections"),
         ("quotation_mark", "filter_selected_rows", "Filter selected"),  # `"`
         ("x", "delete_row", "Delete row"),
         ("X", "clear_cell", "Clear cell"),
@@ -442,11 +442,11 @@ class DataFrameTable(DataTable):
 
     def action_toggle_selected_row(self) -> None:
         """Toggle selection for the current row."""
-        self._toggle_selected_rows(current_row=True)
+        self._toggle_selections(current_row=True)
 
-    def action_toggle_selected_rows(self) -> None:
+    def action_toggle_selections(self) -> None:
         """Toggle all row selections."""
-        self._toggle_selected_rows()
+        self._toggle_selections()
 
     def action_filter_selected_rows(self) -> None:
         """Filter to show only selected rows."""
@@ -540,12 +540,14 @@ class DataFrameTable(DataTable):
                 stop = row_idx + 1
                 break
 
+        # Save current cursor position before clearing
+        row_idx, col_idx = self.cursor_coordinate
+
         self._setup_columns()
         self._load_rows(stop)
         self._do_highlight()
 
         # Restore cursor position
-        row_idx, col_idx = self.cursor_coordinate
         if row_idx < len(self.rows) and col_idx < len(self.columns):
             self.move_cursor(row=row_idx, column=col_idx)
 
@@ -1649,15 +1651,15 @@ class DataFrameTable(DataTable):
 
         self._do_search((term, pl.String, None))
 
-    def _toggle_selected_rows(self, current_row=False) -> None:
+    def _toggle_selections(self, current_row=False) -> None:
         """Toggle selected rows highlighting on/off."""
         # Save current state to history
         self._add_history("Toggled row selection")
 
         # Select current row if no rows are currently selected
         if current_row:
-            cursor_row_idx = int(self.cursor_row_key.value) - 1
-            self.selected_rows[cursor_row_idx] = not self.selected_rows[cursor_row_idx]
+            ridx = self.cursor_ridx
+            self.selected_rows[ridx] = not self.selected_rows[ridx]
         else:
             # Invert all selected rows
             self.selected_rows = [not match for match in self.selected_rows]
