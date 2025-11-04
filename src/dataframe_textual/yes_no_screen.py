@@ -291,13 +291,7 @@ class SearchScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen")
 
-    def __init__(
-        self,
-        term,
-        col_dtype: pl.DataType,
-        col_name: str | None = None,
-    ):
-        col_dtype = col_dtype if col_name else pl.String
+    def __init__(self, term, col_dtype: pl.DataType, col_name: str | None = None):
         label = f"Search [$primary]{term}[/] ([$accent]{col_dtype}[/])"
         self.col_name = col_name
         self.col_dtype = col_dtype

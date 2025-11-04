@@ -132,7 +132,7 @@ When multiple files are opened:
 
 | Key | Action |
 |-----|--------|
-| `?` | Toggle help panel (context-sensitive) |
+| `Ctrl+H` | Toggle help panel |
 | `k` | Cycle through themes |
 
 ---

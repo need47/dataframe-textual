@@ -1,7 +1,7 @@
 """DataFrameTable widget for displaying and interacting with Polars DataFrames."""
 
 import sys
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
@@ -58,6 +58,7 @@ class History:
     fixed_rows: int
     fixed_columns: int
     cursor_coordinate: Coordinate
+    matches: dict[int, set[int]]
 
 
 class DataFrameTable(DataTable):
@@ -206,6 +207,7 @@ class DataFrameTable(DataTable):
         self.hidden_columns: set[str] = set()  # Set of hidden column names
         self.selected_rows: list[bool] = [False] * len(self.df)  # Track selected rows
         self.visible_rows: list[bool] = [True] * len(self.df)  # Track visible rows (for filtering)
+        self.matches: dict[int, set[int]] = defaultdict(set)  # Track search matches: row_idx -> set of col_idx
 
         # Freezing
         self.fixed_rows = 0  # Number of fixed rows
@@ -518,6 +520,7 @@ class DataFrameTable(DataTable):
             self.visible_rows = [True] * len(self.df)
             self.fixed_rows = 0
             self.fixed_columns = 0
+            self.matches = defaultdict(set)
 
         # Lazy load up to INITIAL_BATCH_SIZE visible rows
         stop, visible_count = len(self.df), 0
@@ -531,7 +534,7 @@ class DataFrameTable(DataTable):
 
         self._setup_columns()
         self._load_rows(stop)
-        self._highlight_rows()
+        self._do_highlight()
 
         # Restore cursor position
         row_idx, col_idx = self.cursor_coordinate
@@ -613,13 +616,13 @@ class DataFrameTable(DataTable):
             title="Load",
         )
 
-    def _highlight_rows(self, clear: bool = False) -> None:
+    def _do_highlight(self, clear: bool = False) -> None:
         """Update all rows, highlighting selected ones in red and restoring others to default.
 
         Args:
             clear: If True, clear all highlights.
         """
-        if True not in self.selected_rows:
+        if True not in self.selected_rows and not self.matches:
             return
 
         if clear:
@@ -628,11 +631,15 @@ class DataFrameTable(DataTable):
         # Ensure all highlighted rows are loaded
         stop = _rindex(self.selected_rows, True) + 1
         self._load_rows(stop)
+        self._highlight_table()
 
+    def _highlight_table(self) -> None:
+        """Highlight selected rows/cells in red."""
         # Update all rows based on selected state
         for row in self.ordered_rows:
             row_idx = int(row.key.value) - 1  # Convert to 0-based index
             is_selected = self.selected_rows[row_idx]
+            match_cols = self.matches.get(row_idx, set())
 
             # Update all cells in this row
             for col_idx, col in enumerate(self.ordered_columns):
@@ -643,7 +650,7 @@ class DataFrameTable(DataTable):
                 dc = DtypeConfig(dtype)
 
                 # Use red for selected rows, default style for others
-                style = "red" if is_selected else dc.style
+                style = "red" if is_selected or col_idx in match_cols else dc.style
                 cell_text.style = style
 
                 # Update the cell in the table
@@ -668,6 +675,7 @@ class DataFrameTable(DataTable):
             fixed_rows=self.fixed_rows,
             fixed_columns=self.fixed_columns,
             cursor_coordinate=self.cursor_coordinate,
+            matches={k: v.copy() for k, v in self.matches.items()},
         )
         self.histories.append(history)
 
@@ -690,6 +698,7 @@ class DataFrameTable(DataTable):
         self.fixed_rows = history.fixed_rows
         self.fixed_columns = history.fixed_columns
         self.cursor_coordinate = history.cursor_coordinate
+        self.matches = {k: v.copy() for k, v in history.matches.items()}
 
         # Recreate the table for display
         self._setup_table()
@@ -1455,17 +1464,15 @@ class DataFrameTable(DataTable):
 
     def _search_column(self, all_columns: bool = False) -> None:
         """Open modal to search in the selected column."""
-        row_idx, col_idx = self.cursor_coordinate
-        if col_idx >= len(self.df.columns):
-            self.app.notify("Invalid column selected", title="Search", severity="error")
-            return
-
-        col_name = None if all_columns else self.df.columns[col_idx]
-        col_dtype = self.df.dtypes[col_idx]
+        ridx = self.cursor_ridx
+        cidx = self.cursor_cidx
 
         # Get current cell value as default search term
-        term = self.df.item(row_idx, col_idx)
+        term = self.df.item(ridx, cidx)
         term = "NULL" if term is None else str(term)
+
+        col_name = None if all_columns else self.df.columns[cidx]
+        col_dtype = pl.String if all_columns else self.df.dtypes[cidx]
 
         # Push the search modal screen
         self.app.push_screen(
@@ -1533,11 +1540,12 @@ class DataFrameTable(DataTable):
         self._add_history(f"Searched and highlighted [$success]{term}[/] in column [$success]{col_name}[/]")
 
         # Update selected rows to include new matches
-        for m in matches:
-            self.selected_rows[m] = True
 
-        # Highlight selected rows
-        self._highlight_rows()
+        for m in matches:
+            self.matches[m].add(self.df.columns.index(col_name))
+
+        # Highlight matches
+        self._do_highlight()
 
         self.app.notify(
             f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]",
@@ -1592,21 +1600,11 @@ class DataFrameTable(DataTable):
         # Add to history
         self._add_history(f"Searched and highlighted [$success]{term}[/] across all columns")
 
+        # Update matches
+        self.matches = matches
+
         # Highlight matching cells directly
-        for row in self.ordered_rows:
-            row_idx = int(row.key.value) - 1  # Convert to 0-based index
-            if row_idx not in matches:
-                continue
-
-            for col_idx in matches[row_idx]:
-                row_key = row.key
-                col_key = self.df.columns[col_idx]
-
-                cell_text: Text = self.get_cell(row_key, col_key)
-                cell_text.style = "red"
-
-                # Update the cell in the table
-                self.update_cell(row_key, col_key, cell_text)
+        self._highlight_table()
 
         self.app.notify(
             f"Found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns",
@@ -1647,7 +1645,7 @@ class DataFrameTable(DataTable):
             )
 
         # Refresh the highlighting (also restores default styles for unselected rows)
-        self._highlight_rows()
+        self._do_highlight()
 
     def _clear_selected_rows(self) -> None:
         """Clear all selected rows without removing them from the dataframe."""
@@ -1661,7 +1659,7 @@ class DataFrameTable(DataTable):
         self._add_history("Cleared all selected rows")
 
         # Clear all selections and refresh highlighting
-        self._highlight_rows(clear=True)
+        self._do_highlight(clear=True)
 
         self.app.notify(f"Cleared [$accent]{selected_count}[/] selected rows", title="Clear")
 

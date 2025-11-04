@@ -35,7 +35,7 @@ class DataFrameViewer(App):
         - **q** - 🚪 Quit application
 
         ## 🎨 View & Settings
-        - **?** or **h** - ❓ Toggle this help panel
+        - **Ctrl+H** - ❓ Toggle this help panel
         - **k** - 🌙 Cycle through themes
 
         ## ⭐ Features
@@ -52,7 +52,7 @@ class DataFrameViewer(App):
 
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("?", "toggle_help_panel", "Help"),
+        ("ctrl+h", "toggle_help_panel", "Help"),
         ("B", "toggle_tab_bar", "Toggle Tab Bar"),
         ("ctrl+o", "add_tab", "Add Tab"),
         ("ctrl+shift+s", "save_all_tabs", "Save All Tabs"),
