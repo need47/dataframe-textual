@@ -1,13 +1,13 @@
 # DataFrame Textual
 
-A powerful, interactive terminal-based CSV/Excel viewer/editor built with Python, Polars, and Textual. Inspired by VisiData, this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in your terminal. Now with **multi-file support for simultaneous data comparison**!
+A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/JSON/NDJSON built with Python, Polars, and Textual. Inspired by VisiData, this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in your terminal. Now with **multi-file support for simultaneous data comparison**!
 
 ![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshot.png)
 
 ## Features
 
 ### Core Data Viewing
-- 🚀 **Fast CSV Loading** - Powered by Polars for efficient data handling with lazy pagination
+- 🚀 **Fast Loading** - Powered by Polars for efficient data handling with lazy pagination
 - 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with automatic type detection
 - ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls for browsing, editing, and manipulating data
 - 📊 **Flexible Input** - Read from files or stdin (pipes/redirects)
@@ -18,12 +18,12 @@ A powerful, interactive terminal-based CSV/Excel viewer/editor built with Python
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
 - ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts
 - 📈 **Sorting & Statistics** - Multi-column sorting and frequency distribution analysis
-- 💾 **Save & Undo** - Save filtered data back to CSV with full undo/redo support
+- 💾 **Save & Undo** - Save filtered data back to file with full undo/redo support
 
 ### Advanced Features
 - 📌 **Pin Rows/Columns** - Keep important rows and columns visible while scrolling
 - 🎯 **Cursor Type Cycling** - Switch between cell, row, and column selection modes
-- 📂 **Multi-File Support** - Open multiple CSV files in tabs for side-by-side comparison
+- 📂 **Multi-File Support** - Open multiple files in tabs for side-by-side comparison
 - 🔄 **Tab Management** - Seamlessly switch between open files with keyboard shortcuts
 
 ## Installation

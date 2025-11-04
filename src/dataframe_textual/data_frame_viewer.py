@@ -243,9 +243,60 @@ class DataFrameViewer(App):
             pass
 
 
-def _load_dataframe(
-    filenames: list[str],
-) -> list[tuple[pl.DataFrame | pl.LazyFrame, str, str]]:
+def _load_file(filename: str, multi_sheets: bool = False) -> list[tuple[pl.DataFrame | pl.LazyFrame, str, str]]:
+    """Load a single file and return list of sources.
+
+    For Excel files, when single_file=True, returns one entry per sheet.
+    For other files or multiple files, returns one entry per file.
+
+    Args:
+        filename: Path to file
+        filepath: Path object for file
+        ext: File extension (lowercase)
+        multi_sheets: If True, only load first sheet for Excel files
+
+    Returns:
+        List of tuples of (DataFrame/LazyFrame, filename, tabname)
+    """
+    sources = []
+
+    filepath = Path(filename)
+    ext = filepath.suffix.lower()
+
+    if ext == ".csv":
+        lf = pl.scan_csv(filename)
+        sources.append((lf, filename, filepath.stem))
+    elif ext in (".xlsx", ".xls"):
+        if multi_sheets:
+            # Read only the first sheet for multiple files
+            df = pl.read_excel(filename)
+            sources.append((df, filename, filepath.stem))
+        else:
+            # For single file, expand all sheets
+            sheets = pl.read_excel(filename, sheet_id=0)
+            for sheet_name, df in sheets.items():
+                sources.append((df, filename, sheet_name))
+    elif ext in (".tsv", ".tab"):
+        lf = pl.scan_csv(filename, separator="\t")
+        sources.append((lf, filename, filepath.stem))
+    elif ext == ".parquet":
+        lf = pl.scan_parquet(filename)
+        sources.append((lf, filename, filepath.stem))
+    elif ext == ".json":
+        df = pl.read_json(filename)
+        sources.append((df, filename, filepath.stem))
+    elif ext == ".ndjson":
+        lf = pl.scan_ndjson(filename)
+        sources.append((lf, filename, filepath.stem))
+    else:
+        # Treat other formats as CSV
+        lf = pl.scan_csv(filename)
+        sources.append((lf, filename, filepath.stem))
+
+    return sources
+
+
+def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame | pl.LazyFrame, str, str]]:
     """Load a DataFrame from a file spec.
 
     Args:
@@ -259,8 +310,6 @@ def _load_dataframe(
     # Single file
     if len(filenames) == 1:
         filename = filenames[0]
-        filepath = Path(filename)
-        ext = filepath.suffix.lower()
 
         # Handle stdin
         if filename == "-" or not sys.stdin.isatty():
@@ -278,48 +327,11 @@ def _load_dataframe(
                 pass
 
             sources.append((lf, "stdin.csv", "stdin"))
-        # Handle Excel files with multiple sheets
-        elif ext in (".xlsx", ".xls"):
-            sheets = pl.read_excel(filename, sheet_id=0)
-            for sheet_name, df in sheets.items():
-                sources.append((df, filename, sheet_name))
-        # Handle TSV files
-        elif ext in (".tsv", ".tab"):
-            lf = pl.scan_csv(filename, separator="\t")
-            sources.append((lf, filename, filepath.stem))
-        # Handle JSON files
-        elif ext == ".json":
-            df = pl.read_json(filename)
-            sources.append((df, filename, filepath.stem))
-        # Handle Parquet files
-        elif ext == ".parquet":
-            lf = pl.scan_parquet(filename)
-            sources.append((lf, filename, filepath.stem))
-        # Handle regular CSV files
         else:
-            lf = pl.scan_csv(filename)
-            sources.append((lf, filename, filepath.stem))
+            sources.extend(_load_file(filename, multi_sheets=False))
     # Multiple files
     else:
         for filename in filenames:
-            filepath = Path(filename)
-            ext = filepath.suffix.lower()
-
-            if ext in (".xlsx", ".xls"):
-                # Read only the first sheet for multiple files
-                df = pl.read_excel(filename)
-                sources.append((df, filename, filepath.stem))
-            elif ext in (".tsv", ".tab"):
-                lf = pl.scan_csv(filename, separator="\t")
-                sources.append((lf, filename, filepath.stem))
-            elif ext == ".json":
-                df = pl.read_json(filename)
-                sources.append((df, filename, filepath.stem))
-            elif ext == ".parquet":
-                lf = pl.scan_parquet(filename)
-                sources.append((lf, filename, filepath.stem))
-            else:
-                lf = pl.scan_csv(filename)
-                sources.append((lf, filename, filepath.stem))
+            sources.extend(_load_file(filename, multi_sheets=True))
 
     return sources
