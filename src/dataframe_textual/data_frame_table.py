@@ -471,7 +471,7 @@ class DataFrameTable(DataTable):
     def action_reset(self) -> None:
         """Reset to the original data."""
         self._setup_table(reset=True)
-        self.app.notify("Restored original display", title="Reset")
+        self.notify("Restored original display", title="Reset")
 
     def action_move_column_left(self) -> None:
         """Move the current column to the left."""
@@ -505,11 +505,33 @@ class DataFrameTable(DataTable):
         """Toggle row labels visibility."""
         self.show_row_labels = not self.show_row_labels
         status = "shown" if self.show_row_labels else "hidden"
-        self.app.notify(f"Row labels {status}", title="Labels")
+        self.notify(f"Row labels {status}", title="Labels")
 
     def action_cast_column_dtype(self, dtype: str | pl.DataType) -> None:
         """Cast the current column to a different data type."""
         self._cast_column_dtype(dtype)
+
+    def action_copy_cell(self) -> None:
+        """Copy the current cell to clipboard."""
+        import subprocess
+
+        ridx = self.cursor_ridx
+        cidx = self.cursor_cidx
+
+        try:
+            cell_str = str(self.df.item(ridx, cidx))
+            subprocess.run(
+                [
+                    "pbcopy" if sys.platform == "darwin" else "xclip",
+                    "-selection",
+                    "clipboard",
+                ],
+                input=cell_str,
+                text=True,
+            )
+            self.notify(f"Copied: [$success]{cell_str[:50]}[/]", title="Clipboard")
+        except (FileNotFoundError, IndexError):
+            self.notify("Error copying cell", title="Clipboard", severity="error")
 
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
@@ -621,7 +643,7 @@ class DataFrameTable(DataTable):
         # Update loaded rows count
         self.loaded_rows = stop
 
-        self.app.notify(
+        self.notify(
             f"Loaded [$accent]{self.loaded_rows}/{len(self.df)}[/] rows from [$success]{self.tabname}[/]",
             title="Load",
         )
@@ -694,7 +716,7 @@ class DataFrameTable(DataTable):
     def _undo(self) -> None:
         """Undo the last action."""
         if not self.histories:
-            self.app.notify("No actions to undo", title="Undo", severity="warning")
+            self.notify("No actions to undo", title="Undo", severity="warning")
             return
 
         history = self.histories.pop()
@@ -715,7 +737,7 @@ class DataFrameTable(DataTable):
         # Recreate the table for display
         self._setup_table()
 
-        self.app.notify(f"Reverted: {history.description}", title="Undo")
+        self.notify(f"Reverted: {history.description}", title="Undo")
 
     # View
     def _view_row_detail(self) -> None:
@@ -756,7 +778,7 @@ class DataFrameTable(DataTable):
         if fixed_columns > 0:
             self.fixed_columns = fixed_columns
 
-        self.app.notify(
+        self.notify(
             f"Pinned [$accent]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns",
             title="Pin",
         )
@@ -787,7 +809,7 @@ class DataFrameTable(DataTable):
         # Remove from dataframe
         self.df = self.df.drop(col_name)
 
-        self.app.notify(
+        self.notify(
             f"Removed column [$success]{col_name}[/] from display",
             title="Column",
         )
@@ -814,7 +836,7 @@ class DataFrameTable(DataTable):
         if col_idx >= len(self.columns):
             self.move_cursor(column=len(self.columns) - 1)
 
-        self.app.notify(
+        self.notify(
             f"Hid column [$success]{col_name}[/]. Press [$accent]H[/] to show hidden columns",
             title="Column",
         )
@@ -828,7 +850,7 @@ class DataFrameTable(DataTable):
         hidden_cols = [col for col in self.df.columns if col not in visible_cols]
 
         if not hidden_cols:
-            self.app.notify("No hidden columns to show", title="Column", severity="warning")
+            self.notify("No hidden columns to show", title="Column", severity="warning")
             return
 
         # Add to history
@@ -837,7 +859,7 @@ class DataFrameTable(DataTable):
         # Recreate table with all columns
         self._setup_table()
 
-        self.app.notify(
+        self.notify(
             f"Showed [$accent]{len(hidden_cols)}[/] hidden column(s)",
             title="Column",
         )
@@ -868,7 +890,7 @@ class DataFrameTable(DataTable):
         # Move cursor to the new duplicated column
         self.move_cursor(column=col_idx + 1)
 
-        self.app.notify(
+        self.notify(
             f"Duplicated column [$success]{col_name}[/] as [$success]{new_col_name}[/]",
             title="Column",
         )
@@ -910,7 +932,7 @@ class DataFrameTable(DataTable):
         self._setup_table()
 
         deleted_count = old_count - len(self.df)
-        self.app.notify(f"Deleted {deleted_count} row(s)", title="Delete")
+        self.notify(f"Deleted {deleted_count} row(s)", title="Delete")
 
     def _duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""
@@ -941,7 +963,7 @@ class DataFrameTable(DataTable):
         # Move cursor to the new duplicated row
         self.move_cursor(row=ridx + 1)
 
-        self.app.notify(
+        self.notify(
             f"Duplicated row [$success]{ridx + 1}[/]",
             title="Row",
         )
@@ -960,12 +982,12 @@ class DataFrameTable(DataTable):
         # Validate move is possible
         if direction == "left":
             if col_idx <= 0:
-                self.app.notify("Cannot move column left", title="Move", severity="warning")
+                self.notify("Cannot move column left", title="Move", severity="warning")
                 return
             swap_idx = col_idx - 1
         elif direction == "right":
             if col_idx >= len(self.columns) - 1:
-                self.app.notify("Cannot move column right", title="Move", severity="warning")
+                self.notify("Cannot move column right", title="Move", severity="warning")
                 return
             swap_idx = col_idx + 1
 
@@ -999,7 +1021,7 @@ class DataFrameTable(DataTable):
         cols[cidx], cols[swap_cidx] = cols[swap_cidx], cols[cidx]
         self.df = self.df.select(cols)
 
-        # self.app.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move")
+        # self.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move")
 
     def _move_row(self, direction: str) -> None:
         """Move the current row up or down.
@@ -1012,16 +1034,16 @@ class DataFrameTable(DataTable):
         # Validate move is possible
         if direction == "up":
             if row_idx <= 0:
-                self.app.notify("Cannot move row up", title="Move", severity="warning")
+                self.notify("Cannot move row up", title="Move", severity="warning")
                 return
             swap_idx = row_idx - 1
         elif direction == "down":
             if row_idx >= len(self.rows) - 1:
-                self.app.notify("Cannot move row down", title="Move", severity="warning")
+                self.notify("Cannot move row down", title="Move", severity="warning")
                 return
             swap_idx = row_idx + 1
         else:
-            self.app.notify(f"Invalid direction: {direction}", title="Move", severity="error")
+            self.notify(f"Invalid direction: {direction}", title="Move", severity="error")
             return
 
         row_key = self.coordinate_to_cell_key((row_idx, 0)).row_key
@@ -1064,7 +1086,7 @@ class DataFrameTable(DataTable):
             ]
         )
 
-        self.app.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move")
+        self.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move")
 
     # Sort
     def _sort_by_column(self, descending: bool = False) -> None:
@@ -1085,7 +1107,7 @@ class DataFrameTable(DataTable):
         old_desc = self.sorted_columns.get(col_name)
         if old_desc == descending:
             # Same direction - remove this column from sort
-            self.app.notify(
+            self.notify(
                 f"Already sorted by [$success]{col_name}[/] ({'desc' if descending else 'asc'})",
                 title="Sort",
                 severity="warning",
@@ -1173,9 +1195,9 @@ class DataFrameTable(DataTable):
             col_key = str(col_name)
             self.update_cell(row_key, col_key, formatted_value)
 
-            self.app.notify(f"Cell updated to [$success]{cell_value}[/]", title="Edit")
+            self.notify(f"Cell updated to [$success]{cell_value}[/]", title="Edit")
         except Exception as e:
-            self.app.notify(f"Failed to update cell: {str(e)}", title="Edit", severity="error")
+            self.notify(f"Failed to update cell: {str(e)}", title="Edit", severity="error")
             raise e
 
     def _edit_column(self) -> None:
@@ -1212,7 +1234,7 @@ class DataFrameTable(DataTable):
         # Recreate the table for display
         self._setup_table()
 
-        self.app.notify(
+        self.notify(
             f"Column [$success]{col_name}[/] updated with expression",
             title="Edit",
         )
@@ -1266,32 +1288,10 @@ class DataFrameTable(DataTable):
         # Move cursor to the renamed column
         self.move_cursor(column=col_idx)
 
-        self.app.notify(
+        self.notify(
             f"Renamed column [$success]{col_name}[/] to [$success]{new_name}[/]",
             title="Column",
         )
-
-    def action_copy_cell(self) -> None:
-        """Copy the current cell to clipboard."""
-        import subprocess
-
-        ridx = self.cursor_ridx
-        cidx = self.cursor_cidx
-
-        try:
-            cell_str = str(self.df.item(ridx, cidx))
-            subprocess.run(
-                [
-                    "pbcopy" if sys.platform == "darwin" else "xclip",
-                    "-selection",
-                    "clipboard",
-                ],
-                input=cell_str,
-                text=True,
-            )
-            self.app.notify(f"Copied: {cell_str[:50]}", title="Clipboard")
-        except (FileNotFoundError, IndexError):
-            self.app.notify("Error copying cell", title="Clipboard", severity="error")
 
     def _clear_cell(self) -> None:
         """Clear the current cell by setting its value to None."""
@@ -1319,9 +1319,9 @@ class DataFrameTable(DataTable):
 
             self.update_cell(row_key, col_key, formatted_value)
 
-            self.app.notify("Cell cleared to [$success]None[/]", title="Clear")
+            self.notify("Cell cleared to [$success]None[/]", title="Clear")
         except Exception as e:
-            self.app.notify(f"Failed to clear cell: {str(e)}", title="Clear", severity="error")
+            self.notify(f"Failed to clear cell: {str(e)}", title="Clear", severity="error")
             raise e
 
     def _add_column(self, col_name: str = None, col_value: pl.Expr = None) -> None:
@@ -1361,9 +1361,9 @@ class DataFrameTable(DataTable):
             # Recreate the table display
             self._setup_table()
 
-            self.app.notify(f"Added column [$success]{new_name}[/]", title="Add Column")
+            self.notify(f"Added column [$success]{new_name}[/]", title="Add Column")
         except Exception as e:
-            self.app.notify(f"Failed to add column: {str(e)}", title="Add Column", severity="error")
+            self.notify(f"Failed to add column: {str(e)}", title="Add Column", severity="error")
             raise e
 
     def _add_column_expr(self) -> None:
@@ -1435,7 +1435,7 @@ class DataFrameTable(DataTable):
         """
         cidx = self.cursor_cidx
         if cidx >= len(self.df.columns):
-            self.app.notify("Invalid column selected", title="Cast", severity="error")
+            self.notify("Invalid column selected", title="Cast", severity="error")
             return
 
         col_name = self.df.columns[cidx]
@@ -1445,7 +1445,7 @@ class DataFrameTable(DataTable):
         if isinstance(dtype, str):
             target_dtype = self._string_to_polars_dtype(dtype)
             if target_dtype is None:
-                self.app.notify(
+                self.notify(
                     f"Use string for unknown data type: {dtype}. Supported types: {', '.join(self._string_to_polars_dtype.keys())}",
                     title="Cast",
                     severity="warning",
@@ -1466,12 +1466,12 @@ class DataFrameTable(DataTable):
             # Recreate the table display
             self._setup_table()
 
-            self.app.notify(
+            self.notify(
                 f"Cast column [$success]{col_name}[/] to [$accent]{target_dtype}[/]",
                 title="Cast",
             )
         except Exception as e:
-            self.app.notify(f"Failed to cast column: {str(e)}", title="Cast", severity="error")
+            self.notify(f"Failed to cast column: {str(e)}", title="Cast", severity="error")
             raise e
 
     def _search(self, all_columns: bool = False) -> None:
@@ -1528,7 +1528,7 @@ class DataFrameTable(DataTable):
         elif col_dtype in (pl.Float32, pl.Float64):
             masks = df_ridx[col_name] == float(term)
         else:
-            self.app.notify(
+            self.notify(
                 f"Search not yet supported for column type: [$success]{col_dtype}[/]",
                 title="Search",
                 severity="warning",
@@ -1540,7 +1540,7 @@ class DataFrameTable(DataTable):
 
         match_count = len(matches)
         if match_count == 0:
-            self.app.notify(
+            self.notify(
                 f"No matches found for: [$success]{term}[/]",
                 title="Search",
                 severity="warning",
@@ -1562,7 +1562,7 @@ class DataFrameTable(DataTable):
         # Highlight matches
         self._do_highlight()
 
-        self.app.notify(
+        self.notify(
             f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]",
             title="Search",
         )
@@ -1602,7 +1602,7 @@ class DataFrameTable(DataTable):
                     match_count += 1
 
         if match_count == 0:
-            self.app.notify(
+            self.notify(
                 f"No matches found for: [$success]{term}[/] in any column",
                 title="Global Search",
                 severity="warning",
@@ -1622,7 +1622,7 @@ class DataFrameTable(DataTable):
         # Highlight matching cells directly
         self._highlight_table()
 
-        self.app.notify(
+        self.notify(
             f"Found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns",
             title="Global Search",
         )
@@ -1666,7 +1666,7 @@ class DataFrameTable(DataTable):
 
         # Check if we're highlighting or un-highlighting
         if new_selected_count := self.selected_rows.count(True):
-            self.app.notify(
+            self.notify(
                 f"Toggled selection - now showing [$accent]{new_selected_count}[/] rows",
                 title="Toggle",
             )
@@ -1679,7 +1679,7 @@ class DataFrameTable(DataTable):
         # Check if any rows are currently selected
         selected_count = self.selected_rows.count(True)
         if selected_count == 0:
-            self.app.notify("No rows selected to clear", title="Clear", severity="warning")
+            self.notify("No rows selected to clear", title="Clear", severity="warning")
             return
 
         # Save current state to history
@@ -1688,13 +1688,13 @@ class DataFrameTable(DataTable):
         # Clear all selections and refresh highlighting
         self._do_highlight(clear=True)
 
-        self.app.notify(f"Cleared [$accent]{selected_count}[/] selected rows", title="Clear")
+        self.notify(f"Cleared [$accent]{selected_count}[/] selected rows", title="Clear")
 
     def _filter_selected_rows(self) -> None:
         """Display only the selected rows."""
         selected_count = self.selected_rows.count(True)
         if selected_count == 0:
-            self.app.notify("No rows selected to filter", title="Filter", severity="warning")
+            self.notify("No rows selected to filter", title="Filter", severity="warning")
             return
 
         # Save current state to history
@@ -1707,7 +1707,7 @@ class DataFrameTable(DataTable):
         # Recreate the table for display
         self._setup_table()
 
-        self.app.notify(
+        self.notify(
             f"Removed unselected rows. Now showing [$accent]{selected_count}[/] rows",
             title="Filter",
         )
@@ -1748,7 +1748,7 @@ class DataFrameTable(DataTable):
 
         matched_count = len(df_filtered)
         if not matched_count:
-            self.app.notify(
+            self.notify(
                 f"No rows match the expression: [$success]{expr_str}[/]",
                 title="Filter",
                 severity="warning",
@@ -1769,7 +1769,7 @@ class DataFrameTable(DataTable):
         # Recreate the table for display
         self._setup_table()
 
-        self.app.notify(
+        self.notify(
             f"Filtered to [$accent]{matched_count}[/] matching rows",
             title="Filter",
         )
@@ -1804,7 +1804,7 @@ class DataFrameTable(DataTable):
         next_type = _next(CURSOR_TYPES, self.cursor_type)
         self.cursor_type = next_type
 
-        self.app.notify(f"Changed cursor type to [$success]{next_type}[/]", title="Cursor")
+        self.notify(f"Changed cursor type to [$success]{next_type}[/]", title="Cursor")
 
     def _save_to_file(self) -> None:
         """Open save file dialog."""
@@ -1863,12 +1863,12 @@ class DataFrameTable(DataTable):
             self.lazyframe = self.df  # Update original dataframe
             self.filename = filename  # Update current filename
             if not self._all_tabs:
-                self.app.notify(
+                self.notify(
                     f"Saved [$accent]{len(self.df)}[/] rows to [$success]{filename}[/]",
                     title="Save",
                 )
         except Exception as e:
-            self.app.notify(f"Failed to save: {str(e)}", title="Save", severity="error")
+            self.notify(f"Failed to save: {str(e)}", title="Save", severity="error")
             raise e
 
     def _do_save_excel(self, filename: str) -> None:
@@ -1886,12 +1886,12 @@ class DataFrameTable(DataTable):
 
         # From ConfirmScreen callback, so notify accordingly
         if self._all_tabs is True:
-            self.app.notify(
+            self.notify(
                 f"Saved all tabs to [$success]{filename}[/]",
                 title="Save",
             )
         else:
-            self.app.notify(
+            self.notify(
                 f"Saved current tab with [$accent]{len(self.df)}[/] rows to [$success]{filename}[/]",
                 title="Save",
             )
