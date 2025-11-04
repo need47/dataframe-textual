@@ -636,8 +636,10 @@ class DataFrameTable(DataTable):
         if clear:
             self.selected_rows = [False] * len(self.df)
 
-        # Ensure all highlighted rows are loaded
+        # Ensure all selected rows or matches are loaded
         stop = _rindex(self.selected_rows, True) + 1
+        stop = max(stop, max(self.matches.keys()) + 1)
+
         self._load_rows(stop)
         self._highlight_table()
 
