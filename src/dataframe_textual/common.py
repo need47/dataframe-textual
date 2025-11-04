@@ -7,6 +7,10 @@ from typing import Any
 import polars as pl
 from rich.text import Text
 
+# Special string to represent null value
+NULL = "NULL"
+NULL_DISPLAY = "-"
+
 # Boolean string mappings
 BOOLS = {
     "true": True,
@@ -86,7 +90,7 @@ def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
 
         # Format the value
         if val is None:
-            text_val = "-"
+            text_val = NULL_DISPLAY
         elif str(dtype).startswith("Float"):
             text_val = f"{val:.4g}"
         else:

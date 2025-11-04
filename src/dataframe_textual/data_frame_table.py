@@ -23,6 +23,8 @@ from .common import (
     BOOLS,
     CURSOR_TYPES,
     INITIAL_BATCH_SIZE,
+    NULL,
+    NULL_DISPLAY,
     SUBSCRIPT_DIGITS,
     DtypeConfig,
     _format_row,
@@ -1152,7 +1154,7 @@ class DataFrameTable(DataTable):
             # Update the display
             cell_value = self.df.item(ridx, ridx)
             if cell_value is None:
-                cell_value = "-"
+                cell_value = NULL_DISPLAY
             dtype = self.df.dtypes[ridx]
             dc = DtypeConfig(dtype)
             formatted_value = Text(str(cell_value), style=dc.style, justify=dc.justify)
@@ -1303,7 +1305,7 @@ class DataFrameTable(DataTable):
             # Update the display
             dtype = self.df.dtypes[cidx]
             dc = DtypeConfig(dtype)
-            formatted_value = Text("-", style=dc.style, justify=dc.justify)
+            formatted_value = Text(NULL_DISPLAY, style=dc.style, justify=dc.justify)
 
             self.update_cell(row_key, col_key, formatted_value)
 
@@ -1469,7 +1471,7 @@ class DataFrameTable(DataTable):
 
         # Get current cell value as default search term
         term = self.df.item(ridx, cidx)
-        term = "NULL" if term is None else str(term)
+        term = NULL if term is None else str(term)
 
         col_name = None if all_columns else self.df.columns[cidx]
         col_dtype = pl.String if all_columns else self.df.dtypes[cidx]
@@ -1506,7 +1508,7 @@ class DataFrameTable(DataTable):
             df_ridx = df_ridx.filter(self.visible_rows)
 
         # Perform type-aware search based on column dtype
-        if term.lower() == "null":
+        if term == NULL:
             masks = df_ridx[col_name].is_null()
         elif col_dtype == pl.String:
             masks = df_ridx[col_name].str.contains(term)
@@ -1540,9 +1542,8 @@ class DataFrameTable(DataTable):
         self._add_history(f"Searched and highlighted [$success]{term}[/] in column [$success]{col_name}[/]")
 
         # Update selected rows to include new matches
-
         for m in matches:
-            self.matches[m].add(self.df.columns.index(col_name))
+            self.selected_rows[m] = True
 
         # Highlight matches
         self._do_highlight()
@@ -1564,7 +1565,7 @@ class DataFrameTable(DataTable):
 
         matches: dict[int, set[int]] = {}
         match_count = 0
-        if term == "NULL":
+        if term == NULL:
             # Search for NULL values across all columns
             for col_idx, col in enumerate(df_ridx.columns[1:]):
                 masks = df_ridx[col].is_null()
@@ -1618,7 +1619,7 @@ class DataFrameTable(DataTable):
 
         # Get the value of the currently selected cell
         term = self.df.item(ridx, cidx)
-        term = "NULL" if term is None else str(term)
+        term = NULL if term is None else str(term)
 
         col_dtype = self.df.dtypes[cidx]
         col_name = self.df.columns[cidx]
@@ -1765,7 +1766,7 @@ class DataFrameTable(DataTable):
 
             if cell_value is None:
                 expr = pl.col(self.df.columns[cidx]).is_null()
-                expr_str = "NULL"
+                expr_str = NULL
             else:
                 expr = pl.col(self.df.columns[cidx]) == cell_value
                 expr_str = f"$_ == {repr(cell_value)}"
