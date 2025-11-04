@@ -181,7 +181,8 @@ When multiple files are opened:
 | Key | Action |
 |-----|--------|
 | `\|` (pipe) | Search in current column (case-insensitive) |
-| `/` (slash) | Global search across all columns |
+| `/` (slash) | Global search using current cell value |
+| `?` | Global search across all columns |
 | `\` | Search current column using cell value |
 | `s` | Select/deselect current row |
 | `t` | Toggle highlighting of all selected rows (invert) |
@@ -268,16 +269,21 @@ Press `Enter` on any row to open a modal showing all column values for that row.
 - All matching rows are highlighted in red
 - Multiple searches accumulate selections
 
-**Global Search** (`/`):
+**Global Search** (`?`):
 - Search for a term across all columns simultaneously
 - Cell-level highlighting in red for each matching cell
 - Useful for finding a value anywhere in the dataset
 - Automatically loads rows if matches extend beyond visible area
 - Type-aware matching: converts values to strings before comparing
 
+**Global Search with Cell Value** (`/`):
+- Automatically search across all columns using the current cell's value
+- Quick way to find all occurrences of a value anywhere in the dataset
+- Same highlighting and matching as `?` but pre-populated with cell value
+
 **Cell-Value Search** (`\`):
-- Automatically search using the current cell's value
-- Quick way to find all occurrences of a value
+- Automatically search in the current column using the current cell's value
+- Quick way to find all occurrences of a value in that specific column
 
 **Row Filtering** (`"`):
 - Display only the selected (highlighted) rows

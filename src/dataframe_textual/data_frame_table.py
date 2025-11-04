@@ -89,8 +89,9 @@ class DataFrameTable(DataTable):
 
         ## 🔍 Search
         - **|** - 🔎 Search in current column
-        - **/** - 🌐 Global search (all columns)
-        - **\\\\** - 🔍 Search using current cell value
+        - **/** - 🌐 Global search using cursor value
+        - **?** - 🌐 Global search (all columns)
+        - **\\\\** - 🔍 Search current column using cell value
 
         ## 🔧 Filter & Select
         - **s** - ✓️ Select/deselect current row
@@ -153,9 +154,10 @@ class DataFrameTable(DataTable):
         ("m", "rename_column", "Rename column"),
         ("a", "add_column", "Add column"),
         ("A", "add_column_expr", "Add column with expression"),
-        ("backslash", "search_with_cell_value", "Search with value"),  # `\`
-        ("vertical_line", "search_column", "Search column"),  # `|`
-        ("slash", "search_all_columns", "Search all"),  # `/`
+        ("backslash", "search_cursor_value", "Search column with value"),  # `\`
+        ("vertical_line", "search", "Search column"),  # `|`
+        ("slash", "search_global_cursor_value", "Global search with value"),  # `/`
+        ("question_mark", "search_global", "Global search"),  # `?`
         ("s", "toggle_selected_row", "Toggle row selection"),
         ("t", "toggle_selected_rows", "Toggle all selections"),
         ("quotation_mark", "filter_selected_rows", "Filter selected"),  # `"`
@@ -422,17 +424,21 @@ class DataFrameTable(DataTable):
         """Clear the current cell (set to None)."""
         self._clear_cell()
 
-    def action_search_with_cell_value(self) -> None:
-        """Search using the current cell value."""
-        self._search_with_cell_value()
+    def action_search_cursor_value(self) -> None:
+        """Search current column using cursor value."""
+        self._search_cursor_value()
 
-    def action_search_column(self) -> None:
+    def action_search(self) -> None:
         """Search in the current column."""
-        self._search_column()
+        self._search()
 
-    def action_search_all_columns(self) -> None:
+    def action_search_global_cursor_value(self) -> None:
+        """Search across all columns using cursor value."""
+        self._search_global_cursor_value()
+
+    def action_search_global(self) -> None:
         """Search across all columns."""
-        self._search_column(all_columns=True)
+        self._search(all_columns=True)
 
     def action_toggle_selected_row(self) -> None:
         """Toggle selection for the current row."""
@@ -1464,25 +1470,24 @@ class DataFrameTable(DataTable):
             self.app.notify(f"Failed to cast column: {str(e)}", title="Cast", severity="error")
             raise e
 
-    def _search_column(self, all_columns: bool = False) -> None:
+    def _search(self, all_columns: bool = False) -> None:
         """Open modal to search in the selected column."""
         ridx = self.cursor_ridx
         cidx = self.cursor_cidx
-
-        # Get current cell value as default search term
-        term = self.df.item(ridx, cidx)
-        term = NULL if term is None else str(term)
-
         col_name = None if all_columns else self.df.columns[cidx]
         col_dtype = pl.String if all_columns else self.df.dtypes[cidx]
+
+        # Use current cell value as default search term
+        term = self.df.item(ridx, cidx)
+        term = NULL if term is None else str(term)
 
         # Push the search modal screen
         self.app.push_screen(
             SearchScreen(term, col_dtype, col_name),
-            callback=self._do_search_column,
+            callback=self._do_search,
         )
 
-    def _do_search_column(self, result) -> None:
+    def _do_search(self, result) -> None:
         """Handle result from SearchScreen."""
         if result is None:
             return
@@ -1490,12 +1495,12 @@ class DataFrameTable(DataTable):
         term, col_dtype, col_name = result
         if col_name:
             # Perform search in the specified column
-            self._search_single_column(term, col_dtype, col_name)
+            self._search_column(term, col_dtype, col_name)
         else:
             # Perform search in all columns
-            self._search_all_columns(term)
+            self._search_global(term)
 
-    def _search_single_column(self, term: str, col_dtype: pl.DataType, col_name: str) -> None:
+    def _search_column(self, term: str, col_dtype: pl.DataType, col_name: str) -> None:
         """Search for a term in a single column and update selected rows.
 
         Args:
@@ -1545,6 +1550,11 @@ class DataFrameTable(DataTable):
         for m in matches:
             self.selected_rows[m] = True
 
+        # Add to matches
+        cidx = self.df.columns.index(col_name)
+        for ridx in matches:
+            self.matches[ridx].add(cidx)
+
         # Highlight matches
         self._do_highlight()
 
@@ -1553,7 +1563,7 @@ class DataFrameTable(DataTable):
             title="Search",
         )
 
-    def _search_all_columns(self, term: str) -> None:
+    def _search_global(self, term: str) -> None:
         """Search for a term across all columns and highlight matching cells.
 
         Args:
@@ -1601,8 +1611,9 @@ class DataFrameTable(DataTable):
         # Add to history
         self._add_history(f"Searched and highlighted [$success]{term}[/] across all columns")
 
-        # Update matches
-        self.matches = matches
+        # Add to matches
+        for ridx, col_idxs in matches.items():
+            self.matches[ridx].update(col_idxs)
 
         # Highlight matching cells directly
         self._highlight_table()
@@ -1612,7 +1623,7 @@ class DataFrameTable(DataTable):
             title="Global Search",
         )
 
-    def _search_with_cell_value(self) -> None:
+    def _search_cursor_value(self) -> None:
         """Search in the current column using the value of the currently selected cell."""
         ridx = self.cursor_ridx
         cidx = self.cursor_cidx
@@ -1623,7 +1634,18 @@ class DataFrameTable(DataTable):
 
         col_dtype = self.df.dtypes[cidx]
         col_name = self.df.columns[cidx]
-        self._do_search_column((term, col_dtype, col_name))
+        self._do_search((term, col_dtype, col_name))
+
+    def _search_global_cursor_value(self) -> None:
+        """Search across all columns using the cursor value."""
+        ridx = self.cursor_ridx
+        cidx = self.cursor_cidx
+
+        # Get the value of the currently selected cell
+        term = self.df.item(ridx, cidx)
+        term = NULL if term is None else str(term)
+
+        self._do_search((term, pl.String, None))
 
     def _toggle_selected_rows(self, current_row=False) -> None:
         """Toggle selected rows highlighting on/off."""
