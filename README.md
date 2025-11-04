@@ -184,7 +184,7 @@ When multiple files are opened:
 | `/` (slash) | Global search using current cell value |
 | `?` | Global search across all columns |
 | `\` | Search current column using cell value |
-| `s` | Select/deselect current row |
+| `'` | Select/deselect current row |
 | `t` | Toggle highlighting of all selected rows (invert) |
 | `T` | Clear all selected rows |
 | `"` (quote) | Filter to show only selected rows |
@@ -220,7 +220,7 @@ When multiple files are opened:
 
 | Key | Action |
 |-----|--------|
-| `f` | Freeze rows and columns |
+| `p` | Pin rows and columns |
 | `Ctrl+C` | Copy current cell to clipboard |
 | `Ctrl+S` | Save current tab to CSV/TSV file |
 | `u` | Undo last action |
@@ -416,7 +416,7 @@ This is useful for:
 
 ### 12. Pin Rows and Columns
 
-Press `f` to open the pin dialog:
+Press `p` to open the pin dialog:
 - Enter number of fixed rows: keeps top rows visible while scrolling
 - Enter two numbers: `<rows> <columns>` (space-separated)
 - Example: `2 3` pins top 2 rows and left 3 columns

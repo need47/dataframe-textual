@@ -361,7 +361,7 @@ class FilterScreen(YesNoScreen):
         return None
 
 
-class FreezeScreen(YesNoScreen):
+class PinScreen(YesNoScreen):
     """Modal screen to pin rows and columns.
 
     Accepts one value for fixed rows, or two space-separated values for fixed rows and columns.
