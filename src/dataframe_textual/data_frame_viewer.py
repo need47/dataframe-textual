@@ -119,12 +119,11 @@ class DataFrameViewer(App):
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         """Handle tab changes"""
-        try:
-            # Focus the table in the newly activated tab
-            if table := self._get_active_table():
-                table.focus()
-        except NoMatches:
-            pass
+        # Focus the table in the newly activated tab
+        if table := self._get_active_table():
+            table.focus()
+        else:
+            return
 
         if table.loaded_rows == 0:
             table._setup_table()
@@ -187,7 +186,7 @@ class DataFrameViewer(App):
             if active_pane := tabbed.active_pane:
                 return active_pane.query_one(DataFrameTable)
         except (NoMatches, AttributeError):
-            pass
+            self.notify("No active table found", title="Locate", severity="error")
         return None
 
     def _handle_file_open(self, filename: str) -> None:
