@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dataframe-textual"
-version = "0.6.0"
+version = "0.7.0"
 description = "Interactive CSV/Excel viewer for the terminal (Textual TUI)"
 readme = "README.md"
 requires-python = ">=3.11"

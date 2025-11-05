@@ -190,7 +190,7 @@ class DataFrameTable(DataTable):
         self,
         df: pl.DataFrame | pl.LazyFrame,
         filename: str = "",
-        tabname: str = "",
+        name: str = "",
         **kwargs,
     ):
         """Initialize the DataFrameTable with a dataframe and manage all state.
@@ -200,13 +200,12 @@ class DataFrameTable(DataTable):
             filename: Optional filename of the source CSV
             kwargs: Additional keyword arguments for DataTable
         """
-        super().__init__(**kwargs)
+        super().__init__(name=(name or Path(filename).stem), **kwargs)
 
         # DataFrame state
         self.lazyframe = df.lazy()  # Original dataframe
         self.df = self.lazyframe.collect()  # Internal/working dataframe
         self.filename = filename  # Current filename
-        self.tabname = tabname or Path(filename).stem  # Current tab name
 
         # Pagination & Loading
         self.loaded_rows = 0  # Track how many rows are currently loaded
@@ -264,7 +263,8 @@ class DataFrameTable(DataTable):
 
     def on_mount(self) -> None:
         """Initialize table display when widget is mounted."""
-        self._setup_table()
+        # self._setup_table()
+        pass
 
     def _should_highlight(
         self,
@@ -652,7 +652,7 @@ class DataFrameTable(DataTable):
         self.loaded_rows = stop
 
         self.notify(
-            f"Loaded [$accent]{self.loaded_rows}/{len(self.df)}[/] rows from [$success]{self.tabname}[/]",
+            f"Loaded [$accent]{self.loaded_rows}/{len(self.df)}[/] rows from [$success]{self.name}[/]",
             title="Load",
         )
 

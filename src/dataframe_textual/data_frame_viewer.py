@@ -118,23 +118,22 @@ class DataFrameViewer(App):
             self.notify(f"Switched to theme: [$success]{self.theme}[/]", title="Theme")
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
-        """Handle tab changes (only for multiple tabs)."""
-        # Only process if we have multiple files
-        if len(self.tabs) <= 1:
-            return
-
-        # Apply background color to active tab
-        event.tab.add_class("active")
-        for tab in self.tabbed.query(ContentTab):
-            if tab != event.tab:
-                tab.remove_class("active")
-
+        """Handle tab changes"""
         try:
             # Focus the table in the newly activated tab
             if table := self._get_active_table():
                 table.focus()
         except NoMatches:
             pass
+
+        if table.loaded_rows == 0:
+            table._setup_table()
+
+        # Apply background color to active tab
+        event.tab.add_class("active")
+        for tab in self.tabbed.query(ContentTab):
+            if tab != event.tab:
+                tab.remove_class("active")
 
     def action_toggle_help_panel(self) -> None:
         """Toggle the HelpPanel on/off."""
