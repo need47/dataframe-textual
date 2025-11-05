@@ -6,7 +6,7 @@ from textual.containers import Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Static
 
-from .common import DtypeConfig, parse_polars_expression
+from .common import NULL, DtypeConfig, parse_polars_expression
 
 
 class YesNoScreen(ModalScreen):
@@ -83,7 +83,7 @@ class YesNoScreen(ModalScreen):
     def compose(self) -> ComposeResult:
         with Static(id="modal-container") as container:
             if self.title:
-                container.border_title = self.title
+                container.border_title = f"[$success bold]{self.title}[/]"
 
             if self.label:
                 if isinstance(self.label, Label):
@@ -292,16 +292,22 @@ class SearchScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen")
 
-    def __init__(self, term, df: pl.DataFrame, cidx: int | None):
-        self.cidx = cidx
-        col_name = df.columns[cidx] if cidx is not None else None
-        col_dtype = df[col_name].dtype if col_name else None
+    def __init__(self, title, term, df: pl.DataFrame, cidx: int, scope="column"):
+        self.cidx = cidx if scope == "column" else None
+        self.scope = scope
+        col_name = df.columns[cidx] if scope == "column" else None
+        col_dtype = df.dtypes[cidx] if scope == "column" else None
 
-        label = f"Search [$primary]{term}[/] ([$accent]{col_dtype}[/])"
+        if scope == "column":
+            label = f"{title} in [$primary]{col_name}[/] ([$warning]{col_dtype}[/]) with value or Polars expression, e.g., $_ > 50, $1 < $2, {NULL}"
+        else:
+            # Global search/find
+            label = f"{title} by value or Polars expression, e.g., 'ABC', '(?i)abc', $_ > 50, $1 < $2, {NULL}"
+
         super().__init__(
-            title="Search" if col_name else "Global Search",
-            label=f"{label} in [$primary]{col_name}[/]" if col_name else label,
-            input={"value": term, "type": DtypeConfig(col_dtype).itype},
+            title=title if scope == "column" else f"Global {title}",
+            label=label,
+            input=term,
             on_yes_callback=self._do_search,
         )
 
@@ -310,11 +316,10 @@ class SearchScreen(YesNoScreen):
         term = self.input.value.strip()
 
         if not term:
-            self.notify("Search term cannot be empty", title="Search", severity="error")
+            self.notify("Term cannot be empty", title=self.title, severity="error")
             return
 
-        # Search term
-        return term, self.cidx
+        return term, self.cidx, self.scope
 
 
 class FilterScreen(YesNoScreen):
@@ -457,7 +462,7 @@ class EditColumnScreen(YesNoScreen):
         self.df = df
         super().__init__(
             title="Edit Column",
-            label="Enter expression (e.g., 'abc', pl.lit(7), $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.arange(0, pl.len()))",
+            label="Enter Polars expression,  e.g., 'abc', pl.lit(7), $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.arange(0, pl.len())",
             input="$_",
             on_yes_callback=self._validate_expression,
         )
@@ -498,7 +503,7 @@ class AddColumnScreen(YesNoScreen):
         self.existing_columns = set(df.columns)
         super().__init__(
             title="Add Column",
-            label="Enter column name and expression separated by ';' (e.g., 'col_name ; $_ * 2)",
+            label="Enter column name and Polars expression separated by ';' (e.g., 'col_name ; $_ * 2)",
             input="col_name",
             on_yes_callback=self._validate_column,
         )

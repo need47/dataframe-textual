@@ -91,10 +91,14 @@ class DataFrameTable(DataTable):
         - *(Multi-column sort supported)*
 
         ## 🔍 Search & Filter
-        - **|** - 🔎 Search in current column
-        - **/** - 🌐 Global search using cursor value
-        - **?** - 🌐 Global search (all columns)
-        - **\\\\** - 🔍 Search current column using cell value
+        - **|** - 🔎 Search in current column with expression
+        - **Ctrl+|** - 🌐 Global search with expression
+        - **\\\\** - 🔎 Search in current column using cursor value
+        - **Ctrl+\\\\** - 🌐 Global search using cursor value
+        - **/** - 🔎 Find in current column with cursor value
+        - **Ctrl+/** - 🌐 Global find using cursor value
+        - **?** - 🔎 Find in current column with expression
+        - **Ctrl+Shift+/** - 🌐 Global find with expression
         - **v** - 👁️ View/filter rows by cell or selected rows
         - **V** - 🔧 View/filter rows by expression
 
@@ -138,6 +142,7 @@ class DataFrameTable(DataTable):
         *Use `?` to see app-level controls*
     """).strip()
 
+    # fmt: off
     BINDINGS = [
         ("g", "jump_top", "Jump to top"),
         ("G", "jump_bottom", "Jump to bottom"),
@@ -159,10 +164,14 @@ class DataFrameTable(DataTable):
         ("m", "rename_column", "Rename column"),
         ("a", "add_column", "Add column"),
         ("A", "add_column_expr", "Add column with expression"),
-        ("backslash", "search_cursor_value", "Search column with value"),  # `\`
-        ("vertical_line", "search", "Search column"),  # `|`
-        ("slash", "search_global_cursor_value", "Global search with value"),  # `/`
-        ("question_mark", "search_global", "Global search"),  # `?`
+        ("backslash", "search_cursor_value", "Search column with cursor value"),  # `\`
+        ("ctrl+backslash", "search_cursor_value('global')", "Global search column with cursor value"),  # `Ctrl+\`
+        ("vertical_line", "search_expr", "Search column with expression"),  # `|`
+        ("ctrl+shift+backslash", "search_expr('global')", "Global search column with expression"),  # `Ctrl+|`, `Ctrl+Shift+\`
+        ("slash", "find_cursor_value", "Find in column with cursor value"),  # `/`
+        ("ctrl+slash", "find_cursor_value('global')", "Global find with cursor value"),  # `Ctrl+/`
+        ("question_mark", "find_expr", "Find in column with expression"),  # `?`
+        ("ctrl+shift+slash", "find_expr('global')", "Global find with expression"),  # `Ctrl+?`, `Ctrl+Shift+/`
         ("apostrophe", "make_selections", "Toggle row selection"),  # `'`
         ("t", "toggle_selections", "Toggle all row selections"),
         ("T", "clear_selections", "Clear selections"),
@@ -185,6 +194,7 @@ class DataFrameTable(DataTable):
         ("dollar_sign", "cast_column_dtype('bool')", "Cast column dtype to bool"),  # `$`
         ("circumflex_accent", "cast_column_dtype('string')", "Cast column dtype to string"),  # `^`
     ]
+    # fmt: on
 
     def __init__(
         self,
@@ -260,6 +270,11 @@ class DataFrameTable(DataTable):
     def cursor_col_name(self) -> str:
         """Get the current cursor column name as in dataframe."""
         return self.cursor_col_key.value
+
+    @property
+    def cursor_value(self) -> any:
+        """Get the current cursor cell value."""
+        return self.df.item(self.cursor_row_idx, self.cursor_col_idx)
 
     def on_mount(self) -> None:
         """Initialize table display when widget is mounted."""
@@ -436,21 +451,37 @@ class DataFrameTable(DataTable):
         """Clear the current cell (set to None)."""
         self._clear_cell()
 
-    def action_search_cursor_value(self) -> None:
-        """Search current column using cursor value."""
-        self._search_cursor_value()
+    def action_search_cursor_value(self, scope="column") -> None:
+        """Search current column using cursor value.
 
-    def action_search(self) -> None:
-        """Search in the current column."""
-        self._search()
+        Args:
+            scope: "column" to search in current column, "global" to search across all columns.
+        """
+        self._search_cursor_value(scope=scope)
 
-    def action_search_global_cursor_value(self) -> None:
-        """Search across all columns using cursor value."""
-        self._search_global_cursor_value()
+    def action_search_expr(self, scope="column") -> None:
+        """Search in the current column.
 
-    def action_search_global(self) -> None:
-        """Search across all columns."""
-        self._search(all_columns=True)
+        Args:
+            scope: "column" to search in current column, "global" to search across all columns.
+        """
+        self._search_expr(scope=scope)
+
+    def action_find_cursor_value(self, scope="column") -> None:
+        """Find by cursor value.
+
+        Args:
+            scope: "column" to find in current column, "global" to find across all columns.
+        """
+        self._find_cursor_value(scope=scope)
+
+    def action_find_expr(self, scope="column") -> None:
+        """Find by expression.
+
+        Args:
+            scope: "column" to find in current column, "global" to find across all columns.
+        """
+        self._find_expr(scope=scope)
 
     def action_make_selections(self) -> None:
         """Toggle selection for the current row."""
@@ -651,10 +682,7 @@ class DataFrameTable(DataTable):
         # Update loaded rows count
         self.loaded_rows = stop
 
-        self.notify(
-            f"Loaded [$accent]{self.loaded_rows}/{len(self.df)}[/] rows from [$success]{self.name}[/]",
-            title="Load",
-        )
+        # self.notify(f"Loaded [$accent]{stop}/{len(self.df)}[/] rows from [$success]{self.name}[/]", title="Load")
 
     def _check_and_load_more(self) -> None:
         """Check if we need to load more rows and load them."""
@@ -756,7 +784,7 @@ class DataFrameTable(DataTable):
         # Recreate the table for display
         self._setup_table()
 
-        self.notify(f"Reverted: {history.description}", title="Undo")
+        # self.notify(f"Reverted: {history.description}", title="Undo")
 
     # View
     def _view_row_detail(self) -> None:
@@ -1510,82 +1538,115 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to cast column: {str(e)}", title="Cast", severity="error")
             raise e
 
-    def _search(self, all_columns: bool = False) -> None:
-        """Open modal to search in the selected column."""
-        ridx = self.cursor_row_idx
-        cidx = self.cursor_col_idx
+    def _search_cursor_value(self, scope="column") -> None:
+        """Search with cursor value.
+
+        Args:
+            scope: "column" to search in current column, "global" to search across all columns.
+        """
+        cidx = self.cursor_col_idx if scope == "column" else None
+
+        # Get the value of the currently selected cell
+        term = NULL if self.cursor_value is None else str(self.cursor_value)
+
+        self._do_search((term, cidx, scope))
+
+    def _search_expr(self, scope="column") -> None:
+        """Open screen to search for a term.
+
+        Args:
+            scope: "column" to search in current column, "global" to search across all columns."""
+        cidx = self.cursor_col_idx if scope == "column" else None
 
         # Use current cell value as default search term
-        term = self.df.item(ridx, cidx)
-        term = NULL if term is None else str(term)
-
-        # For global search, set cidx to None
-        if all_columns:
-            cidx = None
+        term = NULL if self.cursor_value is None else str(self.cursor_value)
 
         # Push the search modal screen
         self.app.push_screen(
-            SearchScreen(term, self.df, cidx),
+            SearchScreen("Search", term, self.df, cidx, scope),
             callback=self._do_search,
         )
 
     def _do_search(self, result) -> None:
-        """Handle result from SearchScreen."""
+        """Handle result from search screen and perform the search for a term in current column."""
         if result is None:
             return
 
-        term, cidx = result
-        if cidx is None:
-            # Perform search in all columns
-            self._search_global(term)
-        else:
-            # Perform search in the specified column
-            self._search_column(term, cidx)
-
-    def _search_column(self, term: str, cidx: int) -> None:
-        """Search for a term in a single column and update selected rows.
-
-        Args:
-            term: The search term to find
-            cidx: The index of the column
-        """
+        term, cidx, scope = result
         df_ridx = self.df.with_row_index("__ridx__")
         if False in self.visible_rows:
             df_ridx = df_ridx.filter(self.visible_rows)
 
-        col_name = self.df.columns[cidx]
-        col_dtype = self.df.dtypes[cidx]
+        # Search within a specific column
+        if scope == "column":
+            col_name = self.df.columns[cidx]
+            col_dtype = self.df.dtypes[cidx]
 
-        # Perform type-aware search based on column dtype
-        if term == NULL:
-            masks = df_ridx[col_name].is_null()
-        elif "$" in term or "pl." in term:
+            if term == NULL:
+                masks = df_ridx[col_name].is_null()
+
             # Support for polars expressions
-            try:
-                expr_str = parse_polars_expression(term, self.df, cidx)
-                masks = eval(expr_str)
-            except Exception as e:
-                self.notify(
-                    f"Failed to parse expression: [$error]{str(e)}[/]",
-                    title="Search",
-                    severity="error",
-                )
-                return
-        elif col_dtype == pl.String:
-            masks = df_ridx[col_name].str.contains(term)
-        elif col_dtype == pl.Boolean:
-            masks = df_ridx[col_name] == BOOLS[term.lower()]
-        elif col_dtype in (pl.Int32, pl.Int64):
-            masks = df_ridx[col_name] == int(term)
-        elif col_dtype in (pl.Float32, pl.Float64):
-            masks = df_ridx[col_name] == float(term)
+            elif "$" in term or "pl." in term:
+                try:
+                    expr_str = parse_polars_expression(term, self.df, cidx)
+                    masks = eval(expr_str)
+                except Exception as e:
+                    self.notify(
+                        f"Failed to parse expression: [$error]{str(e)}[/]",
+                        title="Search",
+                        severity="error",
+                    )
+                    return
+
+            # Perform type-aware search based on column dtype
+            else:
+                dtype = DtypeConfig(col_dtype).dtype
+                try:
+                    if dtype == "string":
+                        masks = df_ridx[col_name].str.contains(term)
+                    elif dtype == "boolean":
+                        masks = df_ridx[col_name] == BOOLS[term.lower()]
+                    elif dtype == "integer":
+                        masks = df_ridx[col_name] == int(term)
+                    elif dtype == "float":
+                        masks = df_ridx[col_name] == float(term)
+                    else:
+                        self.notify(
+                            f"Search not yet supported for column type: [$warning]{col_dtype}[/]",
+                            title="Search",
+                            severity="warning",
+                        )
+                        return
+                except Exception as e:
+                    self.notify(
+                        f"[$accent]{term}[/] not found in [$warning]{col_name}[/]: {str(e)}",
+                        title="Search",
+                        severity="warning",
+                    )
+                    return
+
+        # Global search across all columns
         else:
-            self.notify(
-                f"Search not yet supported for column type: [$success]{col_dtype}[/]",
-                title="Search",
-                severity="warning",
-            )
-            return
+            if term == NULL:
+                masks = df_ridx.select(
+                    [pl.any_horizontal([pl.col(col).is_null() for col in df_ridx.columns[1:]])]
+                ).to_series()
+            elif "$" in term or "pl." in term:
+                # Support for polars expressions
+                try:
+                    expr_str = parse_polars_expression(term, self.df, self.cursor_col_idx)
+                    masks = eval(expr_str)
+                except Exception as e:
+                    self.notify(
+                        f"Failed to parse expression: [$error]{str(e)}[/]",
+                        title="Search",
+                        severity="error",
+                    )
+                    return
+            else:
+                masks = df_ridx.select(
+                    [pl.any_horizontal([pl.col(col).cast(pl.String).str.contains(term) for col in df_ridx.columns[1:]])]
+                ).to_series()
 
         # Apply filter to get matched row indices
         matches = set(df_ridx.filter(masks)["__ridx__"].to_list())
@@ -1593,23 +1654,27 @@ class DataFrameTable(DataTable):
         match_count = len(matches)
         if match_count == 0:
             self.notify(
-                f"No matches found for: [$success]{term}[/]",
+                f"No matches found for [$warning]{term}[/]. Try [$accent](?i)abc[/] for case-insensitive search.",
                 title="Search",
                 severity="warning",
             )
             return
 
         # Add to history
-        self._add_history(f"Searched and highlighted [$accent]{term}[/] in column [$success]{col_name}[/]")
+        self._add_history(
+            f"Searched [$accent]{term}[/] in column [$success]{col_name}[/]"
+            if scope == "column"
+            else f"Searched [$accent]{term}[/] across all columns"
+        )
 
         # Update selected rows to include new matches
         for m in matches:
             self.selected_rows[m] = True
 
-        # Add to matches
-        cidx = self.df.columns.index(col_name)
-        for ridx in matches:
-            self.matches[ridx].add(cidx)
+        # Remove selected rows from matches
+        for ridx in list(self.matches.keys()):
+            if ridx not in matches:
+                del self.matches[ridx]
 
         # Highlight matches
         self._do_highlight()
@@ -1619,50 +1684,68 @@ class DataFrameTable(DataTable):
             title="Search",
         )
 
-    def _search_global(self, term: str) -> None:
-        """Search for a term across all columns and highlight matching cells.
+    def _find_cursor_value(self, scope="column") -> None:
+        """Find by cursor value.
 
         Args:
-            term: The search term to find
+            scope: "column" to find in current column, "global" to find across all columns.
         """
+        # Get the value of the currently selected cell
+        term = NULL if self.cursor_value is None else str(self.cursor_value)
+        cidx = self.cursor_col_idx if scope == "column" else None
+        self._do_find((term, cidx, scope))
+
+    def _find_expr(self, scope="column") -> None:
+        """Open screen to find by expression.
+
+        Args:
+            scope: "column" to find in current column, "global" to find across all columns.
+        """
+        # Use current cell value as default search term
+        term = NULL if self.cursor_value is None else str(self.cursor_value)
+        cidx = self.cursor_col_idx if scope == "column" else None
+
+        # Push the search modal screen
+        self.app.push_screen(
+            SearchScreen("Find", term, self.df, cidx, scope=scope),
+            callback=self._do_find,
+        )
+
+    def _do_find(self, result) -> None:
+        """Find a term."""
+        if result is None:
+            return
+        term, cidx, scope = result
+
         df_ridx = self.df.with_row_index("__ridx__")
         if False in self.visible_rows:
             df_ridx = df_ridx.filter(self.visible_rows)
 
         matches: dict[int, set[int]] = {}
         match_count = 0
-        if term == NULL:
-            # Search for NULL values across all columns
-            for col_idx, col in enumerate(df_ridx.columns[1:]):
-                masks = df_ridx[col].is_null()
-                matched_ridxs = set(df_ridx.filter(masks)["__ridx__"].to_list())
-                for ridx in matched_ridxs:
-                    if ridx not in matches:
-                        matches[ridx] = set()
-                    matches[ridx].add(col_idx)
-                    match_count += 1
-        else:
-            # Search for the term in all columns
-            for col_idx, col in enumerate(df_ridx.columns[1:]):
-                col_series = df_ridx[col].cast(pl.String)
-                masks = col_series.str.contains(term)
-                matched_ridxs = set(df_ridx.filter(masks)["__ridx__"].to_list())
-                for ridx in matched_ridxs:
-                    if ridx not in matches:
-                        matches[ridx] = set()
-                    matches[ridx].add(col_idx)
-                    match_count += 1
+
+        # Determine which columns to find in
+        # Note: skip first column which is the row index
+        col_indices_to_check = [cidx + 1] if scope == "column" else list(range(len(df_ridx.columns)))[1:]
+
+        for col_idx in col_indices_to_check:
+            col = df_ridx.columns[col_idx]
+            col_series = df_ridx[col].cast(pl.String)
+            masks = col_series.is_null() if term is NULL else col_series.str.contains(term)
+            matched_ridxs = set(df_ridx.filter(masks)["__ridx__"].to_list())
+            for ridx in matched_ridxs:
+                if ridx not in matches:
+                    matches[ridx] = set()
+                matches[ridx].add(col_idx - 1)  # Adjust for __ridx__ column
+                match_count += 1
 
         if match_count == 0:
             self.notify(
-                f"No matches found for: [$success]{term}[/] in any column",
-                title="Global Search",
+                f"No matches found for [$warning]{term}[/] in any column. Try [$accent](?i)abc[/] for case-insensitive search.",
+                title="Global Find" if cidx is None else "Find",
                 severity="warning",
             )
             return
-
-        # Ensure all matching rows are loaded
-        self._load_rows(max(matches.keys()) + 1)
 
         # Add to history
         self._add_history(f"Searched and highlighted [$success]{term}[/] across all columns")
@@ -1671,35 +1754,13 @@ class DataFrameTable(DataTable):
         for ridx, col_idxs in matches.items():
             self.matches[ridx].update(col_idxs)
 
-        # Highlight matching cells directly
-        self._highlight_table()
+        # Highlight matches
+        self._do_highlight()
 
         self.notify(
             f"Found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns",
-            title="Global Search",
+            title="Global Find" if cidx is None else "Find",
         )
-
-    def _search_cursor_value(self) -> None:
-        """Search in the current column using the value of the currently selected cell."""
-        ridx = self.cursor_row_idx
-        cidx = self.cursor_col_idx
-
-        # Get the value of the currently selected cell
-        term = self.df.item(ridx, cidx)
-        term = NULL if term is None else str(term)
-
-        self._do_search((term, cidx))
-
-    def _search_global_cursor_value(self) -> None:
-        """Search across all columns using the cursor value."""
-        ridx = self.cursor_row_idx
-        cidx = self.cursor_col_idx
-
-        # Get the value of the currently selected cell
-        term = self.df.item(ridx, cidx)
-        term = NULL if term is None else str(term)
-
-        self._do_search((term, None))
 
     def _toggle_selections(self) -> None:
         """Toggle selected rows highlighting on/off."""
@@ -1719,6 +1780,11 @@ class DataFrameTable(DataTable):
 
         # Check if we're highlighting or un-highlighting
         if new_selected_count := self.selected_rows.count(True):
+            # Remove selected rows from matches
+            for ridx in list(self.matches.keys()):
+                if self.selected_rows[ridx]:
+                    del self.matches[ridx]
+
             self.notify(
                 f"Toggled selection for [$accent]{new_selected_count}[/] rows",
                 title="Toggle",
@@ -1736,8 +1802,11 @@ class DataFrameTable(DataTable):
             # There are matched cells - select rows with matches
             for ridx in self.matches.keys():
                 self.selected_rows[ridx] = True
+
+            # Clear matches after selection
+            self.matches.clear()
         else:
-            # No matched cells - toggle current row selection
+            # No matched cells - select/deselect the current row
             ridx = self.cursor_row_idx
             self.selected_rows[ridx] = not self.selected_rows[ridx]
 
@@ -1889,7 +1958,7 @@ class DataFrameTable(DataTable):
         # self.notify(f"Changed cursor type to [$success]{next_type}[/]", title="Cursor")
 
     def _save_to_file(self) -> None:
-        """Open save file dialog."""
+        """Open screen to save file."""
         self.app.push_screen(SaveFileScreen(self.filename), callback=self._do_save_file)
 
     def _do_save_file(self, filename: str | None, all_tabs: bool = False) -> None:

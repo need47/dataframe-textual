@@ -143,8 +143,8 @@ class DataFrameViewer(App):
             self.mount(self.help_panel)
 
     def action_add_tab(self) -> None:
-        """Open file dialog to load file to new tab."""
-        self.push_screen(OpenFileScreen(), self._handle_file_open)
+        """Open screen to load file to new tab."""
+        self.push_screen(OpenFileScreen(), self._do_add_tab)
 
     def action_save_all_tabs(self) -> None:
         """Save all tabs to a Excel file."""
@@ -189,19 +189,22 @@ class DataFrameViewer(App):
             self.notify("No active table found", title="Locate", severity="error")
         return None
 
-    def _handle_file_open(self, filename: str) -> None:
-        """Handle file selection from dialog."""
+    def _do_add_tab(self, filename: str) -> None:
+        """Add a tab for the opened file."""
         if filename and os.path.exists(filename):
             try:
-                df = pl.read_csv(filename)
-                self._add_tab(df, filename)
-                self.notify(f"Opened: [$success]{Path(filename).name}[/]", title="Open")
+                n_tab = 0
+                for lf, filename, tabname in _load_file(filename, prefix_sheet=True):
+                    self._add_tab(lf.collect(), filename, tabname)
+                    n_tab += 1
+                self.notify(f"Added [$accent]{n_tab}[/] tabs for [$success]{filename}[/]", title="Open")
             except Exception as e:
-                self.notify(f"Error: {e}", severity="error")
+                self.notify(f"Error: {e}", title="Open", severity="error")
+        else:
+            self.notify(f"File does not exist: [$warning]{filename}[/]", title="Open", severity="warning")
 
-    def _add_tab(self, df: pl.DataFrame, filename: str) -> None:
-        """Add new table tab. If single file, replace table; if multiple, add tab."""
-        tabname = Path(filename).stem
+    def _add_tab(self, df: pl.DataFrame, filename: str, tabname: str) -> None:
+        """Add new tab for the given file. For Exel, only use the first sheet."""
         if any(tab.name == tabname for tab in self.tabs):
             tabname = f"{tabname}_{len(self.tabs) + 1}"
 
@@ -241,7 +244,9 @@ class DataFrameViewer(App):
             pass
 
 
-def _load_file(filename: str, multi_sheets: bool = False) -> list[tuple[pl.DataFrame | pl.LazyFrame, str, str]]:
+def _load_file(
+    filename: str, first_sheet: bool = False, prefix_sheet: bool = False
+) -> list[tuple[pl.LazyFrame, str, str]]:
     """Load a single file and return list of sources.
 
     For Excel files, when single_file=True, returns one entry per sheet.
@@ -249,9 +254,8 @@ def _load_file(filename: str, multi_sheets: bool = False) -> list[tuple[pl.DataF
 
     Args:
         filename: Path to file
-        filepath: Path object for file
-        ext: File extension (lowercase)
-        multi_sheets: If True, only load first sheet for Excel files
+        first_sheet: If True, only load first sheet for Excel files
+        prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files
 
     Returns:
         List of tuples of (DataFrame/LazyFrame, filename, tabname)
@@ -265,15 +269,16 @@ def _load_file(filename: str, multi_sheets: bool = False) -> list[tuple[pl.DataF
         lf = pl.scan_csv(filename)
         sources.append((lf, filename, filepath.stem))
     elif ext in (".xlsx", ".xls"):
-        if multi_sheets:
+        if first_sheet:
             # Read only the first sheet for multiple files
-            df = pl.read_excel(filename)
-            sources.append((df, filename, filepath.stem))
+            lf = pl.read_excel(filename).lazy()
+            sources.append((lf, filename, filepath.stem))
         else:
             # For single file, expand all sheets
             sheets = pl.read_excel(filename, sheet_id=0)
             for sheet_name, df in sheets.items():
-                sources.append((df, filename, sheet_name))
+                tabname = f"{filepath.stem}_{sheet_name}" if prefix_sheet else sheet_name
+                sources.append((df.lazy(), filename, tabname))
     elif ext in (".tsv", ".tab"):
         lf = pl.scan_csv(filename, separator="\t")
         sources.append((lf, filename, filepath.stem))
@@ -326,10 +331,9 @@ def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame | pl.LazyFr
 
             sources.append((lf, "stdin.csv", "stdin"))
         else:
-            sources.extend(_load_file(filename, multi_sheets=False))
+            sources.extend(_load_file(filename))
     # Multiple files
     else:
         for filename in filenames:
-            sources.extend(_load_file(filename, multi_sheets=True))
-
+            sources.extend(_load_file(filename, prefix_sheet=True))
     return sources

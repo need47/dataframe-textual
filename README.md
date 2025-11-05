@@ -1,13 +1,13 @@
 # DataFrame Textual
 
-A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/JSON/NDJSON built with Python, Polars, and Textual. Inspired by VisiData, this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in your terminal. Now with **multi-file support for simultaneous data comparison**!
+A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/JSON/NDJSON built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in your terminal. Now with **multi-file support for simultaneous data comparison**!
 
 ![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshot.png)
 
 ## Features
 
 ### Core Data Viewing
-- 🚀 **Fast Loading** - Powered by Polars for efficient data handling with lazy pagination
+- 🚀 **Fast Loading** - Powered by Polars for efficient data handling
 - 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with automatic type detection
 - ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls for browsing, editing, and manipulating data
 - 📊 **Flexible Input** - Read from files or stdin (pipes/redirects)
@@ -182,10 +182,14 @@ When multiple files are opened:
 
 | Key | Action |
 |-----|--------|
-| `\|` (pipe) | Search in current column (case-insensitive) |
-| `/` (slash) | Global search using current cell value |
-| `?` | Global search across all columns |
-| `\` | Search current column using cell value |
+| `\|` (pipe) | Search in current column with expression |
+| `Ctrl+\|` | Global search with expression |
+| `\` | Search in current column using cursor value |
+| `Ctrl+\` | Global search using cursor value |
+| `/` | Find in current column with cursor value |
+| `Ctrl+/` | Global find using cursor value |
+| `?` | Find in current column with expression |
+| `Ctrl+Shift+/` | Global find with expression |
 | `'` | Select/deselect current row |
 | `t` | Toggle highlighting of all selected rows (invert) |
 | `T` | Clear all selected rows |
@@ -224,7 +228,7 @@ When multiple files are opened:
 |-----|--------|
 | `p` | Pin rows and columns |
 | `Ctrl+C` | Copy current cell to clipboard |
-| `Ctrl+S` | Save current tab to CSV/TSV file |
+| `Ctrl+S` | Save current tab to file |
 | `u` | Undo last action |
 | `U` | Reset to original data |
 
@@ -265,55 +269,91 @@ Press `Enter` on any row to open a modal showing all column values for that row.
 
 ### 3. Search & Filtering
 
-**Column Search** (`|`):
-- Search for values in the current column
-- Case-insensitive substring matching
-- All matching rows are highlighted in red
-- Multiple searches accumulate selections
+The application provides multiple search modes for different use cases:
 
-**Global Search** (`?`):
-- Search for a term across all columns simultaneously
-- Cell-level highlighting in red for each matching cell
-- Useful for finding a value anywhere in the dataset
-- Automatically loads rows if matches extend beyond visible area
-- Type-aware matching: converts values to strings before comparing
+**Search Operations** - Direct value/expression matching in current column:
+- **`|` - Column Expression Search**: Opens dialog to search current column with custom expression
+- **`\` - Column Cursor Search**: Instantly search current column using the current cell's value
+- **`Ctrl+\` - Global Cursor Search**: Instantly search all columns using the current cell's value
 
-**Global Search with Cell Value** (`/`):
-- Automatically search across all columns using the current cell's value
-- Quick way to find all occurrences of a value anywhere in the dataset
-- Same highlighting and matching as `?` but pre-populated with cell value
+**Find Operations** - Quick cursor value matching:
+- **`/` - Column Find**: Find current cell value within current column
+- **`Ctrl+/` - Global Find**: Find current cell value across all columns
+- **`?` - Column Expression Find**: Open dialog to search current column with expression
+- **`Ctrl+Shift+/` - Global Expression Find**: Open dialog to search all columns with expression
 
-**Cell-Value Search** (`\`):
-- Automatically search in the current column using the current cell's value
-- Quick way to find all occurrences of a value in that specific column
+**Selection & Filtering**:
+- **`'` - Toggle Row Selection**: Select/deselect current row (marks it for filtering)
+- **`t` - Invert All Selections**: Flip selection state of all rows at once
+- **`T` - Clear Selections**: Remove all row selections and highlights
+- **`"` - Filter Selected**: Display only the selected rows (others hidden but preserved)
+- **`v` - View by Value**: Filter/view rows by selected rows or current cell value
+- **`V` - View by Expression**: Filter/view rows using custom Polars expression
 
-**Row Filtering** (`"`):
-- Display only the selected (highlighted) rows
-- Other rows are hidden but preserved
-- Use undo (`u`) to restore
+**How It Works:**
+- Search results highlight matching rows/cells in **red**
+- Multiple searches **accumulate selections** - each new search adds to the highlight
+- Type-aware matching automatically converts values to strings for comparison
+- Large datasets automatically load additional rows if matches extend beyond visible area
+- Use `u` (undo) to restore original view
+
+**Quick Tips:**
+- Use `\` for instant searching without opening a dialog
+- Use `Ctrl+\` to search all columns without typing
+- Use `"` after selecting rows to hide everything except your selection
+- Use `u` to undo any search or filter
 
 ### 4. Filter by Expression
 
-Press `f` to open a powerful filter expression dialog. This allows you to write complex filter conditions using a special syntax:
+Complex filters can be applied via Polars expressions using the `V` key. The following special syntax is supported:
 
 **Column References:**
 - `$_` - Current column (based on cursor position)
 - `$1`, `$2`, etc. - Column by 1-based index
-- `$age`, `$salary` - Column by name
+- `$age`, `$salary` - Column by name (use actual column names)
 
-**Operators:**
-- Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
-- Logical: `&&` (AND), `||` (OR)
-- Arithmetic: `+`, `-`, `*`, `/`, `%`
-
-**Examples:**
+**Basic Comparisons:**
 - `$_ > 50` - Current column greater than 50
 - `$salary >= 100000` - Salary at least 100,000
-- `$age < 30 && $status == 'active'` - Age less than 30 AND status is active
-- `$name == 'Alice' || $name == 'Bob'` - Name is Alice or Bob
-- `$salary / 1000 >= 50` - Salary divided by 1,000 is at least 50
+- `$age < 30` - Age less than 30
+- `$status == 'active'` - Status exactly matches 'active'
+- `$name != 'Unknown'` - Name is not 'Unknown'
 
-See [FILTER_EXPRESSION_GUIDE.md](FILTER_EXPRESSION_GUIDE.md) for comprehensive syntax documentation.
+**Logical Operators:**
+- `&` - AND (both conditions true)
+- `|` - OR (either condition true)
+- `~` - NOT (negate condition)
+
+**Practical Examples:**
+- `$age < 30 & $status == 'active'` - Age less than 30 AND status is active
+- `$name == 'Alice' | $name == 'Bob'` - Name is Alice or Bob
+- `$salary / 1000 >= 50` - Salary divided by 1,000 is at least 50
+- `$department == 'Sales' & $bonus > 5000` - Sales department with bonus over 5,000
+- `$score >= 80 & $score <= 90` - Score between 80 and 90
+- `~($status == 'inactive')` - Status is not inactive
+- `$revenue > $expenses` - Revenue exceeds expenses
+
+**String Matching:**
+- `$name.str.contains("John")` - Name contains "John" (case-sensitive)
+- `$name.str.contains("(?i)john")` - Name contains "john" (case-insensitive)
+- `$email.str.ends_with("@company.com")` - Email ends with domain
+- `$code.str.starts_with("ABC")` - Code starts with "ABC"
+
+**Number Operations:**
+- `$age * 2 > 100` - Double age greater than 100
+- `($salary + $bonus) > 150000` - Total compensation over 150,000
+- `$percentage >= 50` - Percentage at least 50%
+
+**Null Handling:**
+- `$column.is_null()` - Find null/missing values
+- `$column.is_not_null()` - Find non-null values
+
+**Tips:**
+- Use column names that match exactly (case-sensitive)
+- String literals must be in single or double quotes
+- Numbers don't need quotes
+- Use parentheses to clarify complex expressions: `($a & $b) | ($c && $d)`
+- Press `q` or `Escape` to cancel the filter dialog without filtering
 
 ### 5. Sorting
 
@@ -355,8 +395,6 @@ Press `s` to see summary statistics for the current column, or press `S` for sta
 
 **Dataframe Statistics** (`S`):
 - Shows statistics for all numeric and applicable columns simultaneously
-- Compare statistical measures across multiple columns side-by-side
-- First column (statistics labels) has no styling
 - Data columns are color-coded by their type (Int64, Float64, String, etc.)
 
 **In the Statistics Modal**:
@@ -403,7 +441,7 @@ This is useful for:
 This is useful for:
 - Focusing on specific columns without deleting data
 - Temporarily removing cluttered or unnecessary columns
-- Comparing different column sets (hide/show to compare)
+- Comparing different column sets via hide/show
 - Preserving all data while simplifying the view
 
 ### 10. Duplicate Column
@@ -451,13 +489,12 @@ Press `p` to open the pin dialog:
 - Enter two numbers: `<rows> <columns>` (space-separated)
 - Example: `2 3` pins top 2 rows and left 3 columns
 
-### 14. Save to CSV
+### 14. Save File
 
 Press `Ctrl+S` to save:
-- Save filtered, edited, or sorted data back to CSV
+- Save filtered, edited, or sorted data back to file
 - Choose filename in modal dialog
 - Confirm if file already exists
-- Automatic .tsv or .csv detection
 
 ### 15. Undo/Redo
 
@@ -537,37 +574,20 @@ grep "Fire" pokemon.csv | dataframe-textual
 cat data.csv | sort -t',' -k2 | dataframe-textual
 ```
 
-### Multi-File Examples
+### Multi-File/Tab Examples
 
 ```bash
-# Compare two versions of a dataset
-dataframe-textual pokemon_v1.csv pokemon_v2.csv
+# Open multiple sheets as tabs in a single Excel
+dataframe-textual sales.csv
 
-# Side-by-side analysis of related files
-dataframe-textual sales_2022.csv sales_2023.csv forecast_2024.csv
-
-# Cross-reference datasets
-dataframe-textual customers.csv orders.csv products.csv
+# Open multiple files
+dataframe-textual pokemon.csv titanic.csv
 
 # Start with one file, open others using Ctrl+O
 dataframe-textual initial_data.csv
 # Then press Ctrl+O to open more files interactively
 ```
 
-### Advanced Workflows
-
-```bash
-# Start with a filtered file, compare with original
-grep "status=active" data.csv > filtered.csv
-dataframe-textual data.csv filtered.csv
-# Now compare the full dataset with the filtered version in separate tabs
-
-# Multi-step analysis
-# 1. Open multiple related CSVs
-# 2. Use Ctrl+O to open additional files as you discover relationships
-# 3. Each tab maintains independent sort/filter/search state
-# 4. Use Ctrl+W to close tabs when done analyzing
-```
 
 ## Performance
 
@@ -576,16 +596,13 @@ dataframe-textual data.csv filtered.csv
 - **Smooth scrolling**: No lag when paging through large files
 - **Memory efficient**: Handles datasets larger than RAM
 
-Tested with:
-- 10,000+ row CSV files
-- Wide datasets (100+ columns)
-- Various data types and sizes
 
 ## Dependencies
 
-- **polars**: Fast DataFrame library for CSV processing
+- **polars**: Fast DataFrame library for data processing
 - **textual**: Terminal UI framework
-- **rich**: Rich text and formatting in the terminal
+- **fastexcel**: Read Excel files
+- **xlsxwriter**: Write Excel files
 
 ## Architecture Overview
 
