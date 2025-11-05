@@ -150,7 +150,7 @@ class DataFrameViewer(App):
 
     def action_save_all_tabs(self) -> None:
         """Save all tabs to a Excel file."""
-        callback = partial(self._get_active_table()._on_save_file_screen, all_tabs=True)
+        callback = partial(self._get_active_table()._do_save_file, all_tabs=True)
         self.push_screen(
             SaveFileScreen("all-tabs.xlsx", title="Save All Tabs"),
             callback=callback,

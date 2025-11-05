@@ -195,10 +195,10 @@ class EditCellScreen(YesNoScreen):
     def __init__(self, ridx: int, cidx: int, df: pl.DataFrame):
         self.ridx = ridx
         self.cidx = cidx
-        col_dtype = df.dtypes[cidx]
+        self.col_dtype = df.dtypes[cidx]
 
         # Label
-        content = f"[$primary]{df.columns[cidx]}[/] ([$accent]{col_dtype}[/])"
+        content = f"[$primary]{df.columns[cidx]}[/] ([$accent]{self.col_dtype}[/])"
 
         # Input
         df_value = df.item(ridx, cidx)
@@ -209,7 +209,7 @@ class EditCellScreen(YesNoScreen):
             label=content,
             input={
                 "value": self.input_value,
-                "type": DtypeConfig(col_dtype).itype,
+                "type": DtypeConfig(self.col_dtype).itype,
             },
             on_yes_callback=self._save_edit,
         )
@@ -235,6 +235,7 @@ class EditCellScreen(YesNoScreen):
             except Exception as e:
                 new_value = None
                 self.notify(f"Invalid value: {str(e)}", title="Edit", severity="error")
+                return None
 
         # New value
         return self.ridx, self.cidx, new_value
@@ -291,11 +292,12 @@ class SearchScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen")
 
-    def __init__(self, term, col_dtype: pl.DataType, col_name: str | None = None):
-        label = f"Search [$primary]{term}[/] ([$accent]{col_dtype}[/])"
-        self.col_name = col_name
-        self.col_dtype = col_dtype
+    def __init__(self, term, df: pl.DataFrame, cidx: int | None):
+        self.cidx = cidx
+        col_name = df.columns[cidx] if cidx is not None else None
+        col_dtype = df[col_name].dtype if col_name else None
 
+        label = f"Search [$primary]{term}[/] ([$accent]{col_dtype}[/])"
         super().__init__(
             title="Search" if col_name else "Global Search",
             label=f"{label} in [$primary]{col_name}[/]" if col_name else label,
@@ -312,7 +314,7 @@ class SearchScreen(YesNoScreen):
             return
 
         # Search term
-        return term, self.col_dtype, self.col_name
+        return term, self.cidx
 
 
 class FilterScreen(YesNoScreen):
@@ -330,7 +332,7 @@ class FilterScreen(YesNoScreen):
         self.cidx = cidx
         super().__init__(
             title="Filter by Expression",
-            label="e.g., $1 > 50, $name == 'text', $_ > 100, $a < $b",
+            label="e.g., $1 > 50, $name == 'text', $_ > 100, $a < $b, $_.str.contains('sub'), $_.is_null()",
             input=f"$_ == {cell_value}",
             on_yes_callback=self._validate_filter,
         )
@@ -455,7 +457,7 @@ class EditColumnScreen(YesNoScreen):
         self.df = df
         super().__init__(
             title="Edit Column",
-            label="Enter expression (e.g., $_ * 2, $1 + $2, $_.str.to_uppercase())",
+            label="Enter expression (e.g., 'abc', pl.lit(7), $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.arange(0, pl.len()))",
             input="$_",
             on_yes_callback=self._validate_expression,
         )
@@ -471,21 +473,16 @@ class EditColumnScreen(YesNoScreen):
         try:
             # Parse the expression to replace $_ with pl.col(col_name)
             expr_str = parse_polars_expression(expression, self.df, self.cid)
+            expr = eval(expr_str, {"pl": pl})
 
-            try:
-                # Test the expression by evaluating it
-                expr = eval(expr_str, {"pl": pl})
+            if not isinstance(expr, pl.Expr):
+                self.notify(f"Not a valid Polars expression: [$error]{expr_str}[/]", title="Edit", severity="error")
+                return None
 
-                # Expression is valid - return column index, original column name, and expression
-                return self.cid, expr_str, expr
-            except Exception as e:
-                self.notify(
-                    f"Error evaluating expression: {str(e)}",
-                    title="Edit",
-                    severity="error",
-                )
-        except ValueError as ve:
-            self.notify(f"Invalid expression: {str(ve)}", title="Edit", severity="error")
+            # Expression is valid - return column index, original column name, and expression
+            return self.cid, expr_str, expr
+        except Exception as e:
+            self.notify(f"Invalid Polars expression: {str(e)}", title="Edit", severity="error")
 
         return None
 
@@ -500,9 +497,9 @@ class AddColumnScreen(YesNoScreen):
         self.df = df
         self.existing_columns = set(df.columns)
         super().__init__(
-            title="Add New Column",
-            label="Enter column name and expression separated by ';' (e.g., 'new_col ; $_ * 2)",
-            input="new_column",
+            title="Add Column",
+            label="Enter column name and expression separated by ';' (e.g., 'col_name ; $_ * 2)",
+            input="col_name",
             on_yes_callback=self._validate_column,
         )
 

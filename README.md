@@ -190,8 +190,8 @@ When multiple files are opened:
 | `t` | Toggle highlighting of all selected rows (invert) |
 | `T` | Clear all selected rows |
 | `"` (quote) | Filter to show only selected rows |
-| `v` | Filter by selected rows (if any) or current cell value |
-| `V` | Filter by expression (Polars expression syntax) |
+| `v` | View/filter rows by selected rows or current cell value |
+| `V` | View/filter rows by expression (Polars expression syntax) |
 
 #### Sorting
 

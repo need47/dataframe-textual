@@ -13,7 +13,7 @@ from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
-from .common import DtypeConfig, _format_row
+from .common import NULL, NULL_DISPLAY, DtypeConfig, _format_row
 
 
 class TableScreen(ModalScreen):
@@ -31,7 +31,6 @@ class TableScreen(ModalScreen):
         TableScreen > DataTable {
             width: auto;
             min-width: 30;
-            height: auto;
             border: solid $primary;
         }
     """
@@ -67,7 +66,7 @@ class TableScreen(ModalScreen):
             event.stop()
 
     def _filter_or_highlight_selected_value(
-        self, col_name_value: tuple[str, str] | None, action: str = "filter"
+        self, col_name_value: tuple[str, Any] | None, action: str = "filter"
     ) -> None:
         """Apply filter or highlight action by the selected value from the frequency table.
 
@@ -81,7 +80,7 @@ class TableScreen(ModalScreen):
         col_name, col_value = col_name_value
 
         # Handle NULL values
-        if col_value == "-":
+        if col_value == NULL:
             # Create expression for NULL values
             expr = pl.col(col_name).is_null()
             value_display = "[on $primary]NULL[/]"
@@ -359,9 +358,6 @@ class FrequencyScreen(TableScreen):
 
     def _sort_by_column(self, descending: bool) -> None:
         """Sort the dataframe by the selected column and refresh the main table."""
-
-        self.log(self.df)
-
         row_idx, col_idx = self.table.cursor_coordinate
         col_sort = col_idx if col_idx == 0 else 1
 
@@ -376,7 +372,7 @@ class FrequencyScreen(TableScreen):
         self.sorted_columns[col_sort] = descending
 
         col_name = self.df.columns[col_sort]
-        self.df = self.df.sort(col_name, descending=descending)
+        self.df = self.df.sort(col_name, descending=descending, nulls_last=True)
 
         # Rebuild the frequency table
         self.table.clear(columns=True)
@@ -384,19 +380,18 @@ class FrequencyScreen(TableScreen):
 
         self.table.move_cursor(row=row_idx, column=col_idx)
 
-        # Notify the user
-        order = "desc" if descending else "asc"
-        self.notify(f"Sorted by [on $primary]{col_name}[/] ({order})", title="Sort")
+        # order = "desc" if descending else "asc"
+        # self.notify(f"Sorted by [on $primary]{col_name}[/] ({order})", title="Sort")
 
     def _get_col_name_value(self) -> tuple[str, str] | None:
         row_idx = self.table.cursor_row
-        if row_idx >= len(self.df.columns):
-            return None  # Skip total row
+        if row_idx >= len(self.df[:, 0]):  # first column
+            return None  # Skip the last `Total` row
 
-        col_name = self.df.columns[self.col_idx]
-        col_dtype = self.df.dtypes[self.col_idx]
+        col_name = self.dftable.df.columns[self.col_idx]
+        col_dtype = self.dftable.df.dtypes[self.col_idx]
 
         cell_value = self.table.get_cell_at(Coordinate(row_idx, 0))
-        col_value = cell_value.plain
+        col_value = NULL if cell_value.plain == NULL_DISPLAY else DtypeConfig(col_dtype).convert(cell_value.plain)
 
-        return col_name, DtypeConfig(col_dtype).convert(col_value)
+        return col_name, col_value

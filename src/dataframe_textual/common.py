@@ -25,42 +25,42 @@ BOOLS = {
     "0": False,
 }
 
-# itype is used by Input widget for input validation
-# fmt: off
-STYLES = {
-    "Int32": {"style": "cyan", "justify": "right", "itype": "integer", "convert": int},
-    "Int64": {"style": "cyan", "justify": "right", "itype": "integer", "convert": int},
-    "Float32": {"style": "magenta", "justify": "right", "itype": "number", "convert": float},
-    "Float64": {"style": "magenta", "justify": "right", "itype": "number", "convert": float},
-    "String": {"style": "green", "justify": "left", "itype": "text", "convert": str},
-    "Boolean": {"style": "blue", "justify": "center", "itype": "text", "convert": lambda x: BOOLS[x.lower()]},
-    "Date": {"style": "yellow", "justify": "center", "itype": "text", "convert": str},
-    "Datetime": {"style": "yellow", "justify": "center", "itype": "text", "convert": str},
-}
-# fmt: on
-
 
 @dataclass
-class DtypeConfig:
+class DtypeClass:
     style: str
     justify: str
     itype: str
     convert: Any
 
-    def __init__(self, dtype: pl.DataType):
-        dt = str(dtype)
-        if not (dc := STYLES.get(dt)):
-            if dt.startswith("Datetime"):
-                dc = STYLES["Datetime"]
-            elif dt.startswith("Date"):
-                dc = STYLES["Date"]
-            else:
-                dc = {"style": "", "justify": "", "itype": "text", "convert": str}
 
-        self.style = dc["style"]
-        self.justify = dc["justify"]
-        self.itype = dc["itype"]
-        self.convert = dc["convert"]
+# itype is used by Input widget for input validation
+# fmt: off
+STYLES = {
+    # str
+    pl.String: DtypeClass(style="green", justify="left", itype="text", convert=str),
+    # int
+    pl.Int8: DtypeClass(style="cyan", justify="right", itype="integer", convert=int),
+    pl.Int16: DtypeClass(style="cyan", justify="right", itype="integer", convert=int),
+    pl.Int32: DtypeClass(style="cyan", justify="right", itype="integer", convert=int),
+    pl.Int64: DtypeClass(style="cyan", justify="right", itype="integer", convert=int),
+    pl.Int128: DtypeClass(style="cyan", justify="right", itype="integer", convert=int),
+    pl.UInt8: DtypeClass(style="cyan", justify="right", itype="integer", convert=int),
+    pl.UInt16: DtypeClass(style="cyan", justify="right", itype="integer", convert=int),
+    pl.UInt32: DtypeClass(style="cyan", justify="right", itype="integer", convert=int),
+    pl.UInt64: DtypeClass(style="cyan", justify="right", itype="integer", convert=int),
+    # float
+    pl.Float32: DtypeClass(style="magenta", justify="right", itype="number", convert=float),
+    pl.Float64: DtypeClass(style="magenta", justify="right", itype="number", convert=float),
+    pl.Decimal: DtypeClass(style="magenta", justify="right", itype="number", convert=float),
+    # bool
+    pl.Boolean: DtypeClass(style="blue", justify="center", itype="text", convert=lambda x: BOOLS[x.lower()]),
+    # temporal
+    pl.Date: DtypeClass(style="yellow", justify="center", itype="text", convert=str),
+    pl.Datetime: DtypeClass(style="yellow", justify="center", itype="text", convert=str),
+    pl.Time: DtypeClass(style="yellow", justify="center", itype="text", convert=str),
+}
+# fmt: on
 
 
 # Subscript digits mapping for sort indicators
@@ -85,6 +85,18 @@ INITIAL_BATCH_SIZE = 100  # Load this many rows initially
 BATCH_SIZE = 50  # Load this many rows when scrolling
 
 
+def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
+    """Get the DtypeClass configuration for a given Polars data type."""
+    if dc := STYLES.get(dtype):
+        return dc
+    elif isinstance(dtype, pl.Datetime):
+        return STYLES[pl.Datetime]
+    elif isinstance(dtype, pl.Date):
+        return STYLES[pl.Date]
+    else:
+        return DtypeClass(style="", justify="", itype="text", convert=str)
+
+
 def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
     """Format a single row with proper styling and justification.
 
@@ -97,7 +109,6 @@ def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
 
     for val, dtype in zip(vals, dtypes, strict=True):
         dc = DtypeConfig(dtype)
-        print(dc)
 
         # Format the value
         if val is None:
@@ -161,9 +172,13 @@ def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: 
         ValueError: If a column reference is invalid.
     """
     # Early return if no $ present
-    # This may be valid Polars expression already
     if "$" not in expression:
-        return expression
+        if "pl." in expression:
+            # This may be valid Polars expression already
+            return expression
+        else:
+            # Return as a literal string
+            return f"pl.lit({expression})"
 
     # Pattern to match $ followed by either:
     # - _ (single underscore)
