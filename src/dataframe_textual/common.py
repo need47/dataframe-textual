@@ -60,6 +60,8 @@ STYLES = {
     pl.Date: DtypeClass(dtype="temporal", style="yellow", justify="center", itype="text", convert=str),
     pl.Datetime: DtypeClass(dtype="temporal", style="yellow", justify="center", itype="text", convert=str),
     pl.Time: DtypeClass(dtype="temporal", style="yellow", justify="center", itype="text", convert=str),
+    # unknown
+    pl.Unknown: DtypeClass(dtype="unknown", style="", justify="", itype="text", convert=str),
 }
 # fmt: on
 
@@ -97,7 +99,7 @@ def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
     elif isinstance(dtype, pl.Time):
         return STYLES[pl.Time]
     else:
-        return DtypeClass()
+        return STYLES[pl.Unknown]
 
 
 def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:

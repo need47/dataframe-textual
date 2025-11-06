@@ -301,7 +301,7 @@ class FrequencyScreen(TableScreen):
     def build_table(self) -> None:
         # Create frequency table
         column = self.dftable.df.columns[self.col_idx]
-        dtype = str(self.dftable.df.dtypes[self.col_idx])
+        dtype = self.dftable.df.dtypes[self.col_idx]
         dc = DtypeConfig(dtype)
 
         # Calculate frequencies using Polars
@@ -328,8 +328,8 @@ class FrequencyScreen(TableScreen):
             self.table.add_column(Text(header_text, justify=justify), key=key)
 
         # Get style config for Int64 and Float64
-        ds_int = DtypeConfig("Int64")
-        ds_float = DtypeConfig("Float64")
+        ds_int = DtypeConfig(pl.Int64)
+        ds_float = DtypeConfig(pl.Float64)
 
         # Add rows to the frequency table
         for row_idx, row in enumerate(self.df.rows()):
