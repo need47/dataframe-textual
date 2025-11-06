@@ -154,11 +154,13 @@ def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: 
 
     Replaces column references with Polars col() expressions:
     - $_ - Current selected column
+    - $# - Row index (1-based, requires '__ridx__' column to be present)
     - $1, $2, etc. - Column by 1-based index
     - $col_name - Column by name (valid identifier starting with _ or letter)
 
     Examples:
     - "$_ > 50" -> "pl.col('current_col') > 50"
+    - "$# > 10" -> "pl.col('__ridx__') > 10"
     - "$1 > 50" -> "pl.col('col0') > 50"
     - "$name == 'Alex'" -> "pl.col('name') == 'Alex'"
     - "$age < $salary" -> "pl.col('age') < pl.col('salary')"
@@ -185,9 +187,10 @@ def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: 
 
     # Pattern to match $ followed by either:
     # - _ (single underscore)
+    # - # (hash for row index)
     # - digits (integer)
     # - identifier (starts with letter or _, followed by letter/digit/_)
-    pattern = r"\$(_|\d+|[a-zA-Z_]\w*)"
+    pattern = r"\$(_|#|\d+|[a-zA-Z_]\w*)"
 
     def replace_column_ref(match):
         col_ref = match.group(1)
@@ -195,6 +198,9 @@ def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: 
         if col_ref == "_":
             # Current selected column
             col_name = df.columns[current_col_idx]
+        elif col_ref == "#":
+            # __ridx__ is used to store 0-based row index; add 1 for 1-based index
+            return "(pl.col('__ridx__') + 1)"
         elif col_ref.isdigit():
             # Column by 1-based index
             col_idx = int(col_ref) - 1

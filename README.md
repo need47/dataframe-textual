@@ -165,9 +165,9 @@ When multiple files are opened:
 
 | Key | Action |
 |-----|--------|
+| `Double-click` | Edit cell or rename column header |
 | `e` | Edit current cell (respects data type) |
 | `E` | Edit entire column with expression |
-| `m` | Rename current column |
 | `a` | Add empty column after current |
 | `A` | Add column with name and optional expression (separated by `;`) |
 | `x` | Delete current row |
@@ -274,13 +274,12 @@ The application provides multiple search modes for different use cases:
 **Search Operations** - Direct value/expression matching in current column:
 - **`|` - Column Expression Search**: Opens dialog to search current column with custom expression
 - **`\` - Column Cursor Search**: Instantly search current column using the current cell's value
-- **`Ctrl+\` - Global Cursor Search**: Instantly search all columns using the current cell's value
 
-**Find Operations** - Quick cursor value matching:
+**Find Operations** - Find by value/expression:
 - **`/` - Column Find**: Find current cell value within current column
-- **`Ctrl+/` - Global Find**: Find current cell value across all columns
 - **`?` - Column Expression Find**: Open dialog to search current column with expression
-- **`Ctrl+Shift+/` - Global Expression Find**: Open dialog to search all columns with expression
+- **`f` - Global Find**: Find current cell value across all columns
+- **`Ctrl+f` - Global Expression Find**: Open dialog to search all columns with expression
 
 **Selection & Filtering**:
 - **`'` - Toggle Row Selection**: Select/deselect current row (marks it for filtering)
@@ -411,11 +410,15 @@ This is useful for:
 
 ### 8. Data Editing
 
-**Edit Cell** (`e`):
+**Edit Cell** (`e` or **Double-click**):
 - Opens modal for editing current cell
 - Validates input based on column data type
 - Shows column name and type
 - Integer, number, and text inputs available
+- **Double-click**: Quick edit without pressing `e` - double-click any cell to edit it
+
+**Rename Column Header** (**Double-click** column header):
+- Quick rename by double-clicking the column header
 
 **Delete Row** (`d`):
 - Delete single row at cursor

@@ -179,10 +179,15 @@ class StatisticsScreen(TableScreen):
 
     def _build_column_stats(self) -> None:
         """Build statistics for a single column."""
-        col_name = self.dftable.df.columns[self.col_idx]
+        col_name = self.df.columns[self.col_idx]
+        lf = self.df.lazy()
+
+        # Apply only to visible rows
+        if False in self.dftable.visible_rows:
+            lf = lf.filter(self.dftable.visible_rows)
 
         # Get column statistics
-        stats_df = self.dftable.df.select(pl.col(col_name)).describe()
+        stats_df = lf.select(pl.col(col_name)).collect().describe()
         if len(stats_df) == 0:
             return
 
@@ -211,8 +216,14 @@ class StatisticsScreen(TableScreen):
 
     def _build_dataframe_stats(self) -> None:
         """Build statistics for the entire dataframe."""
+        lf = self.df.lazy()
+
+        # Apply only to visible rows
+        if False in self.dftable.visible_rows:
+            lf = lf.filter(self.dftable.visible_rows)
+
         # Get dataframe statistics
-        stats_df = self.dftable.df.describe()
+        stats_df = lf.collect().describe()
 
         # Add columns for each dataframe column with appropriate styling
         for idx, (col_name, col_dtype) in enumerate(zip(stats_df.columns, stats_df.dtypes), 0):

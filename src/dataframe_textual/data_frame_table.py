@@ -9,6 +9,7 @@ from textwrap import dedent
 import polars as pl
 from rich.text import Text
 from textual.coordinate import Coordinate
+from textual.events import Click
 from textual.widgets import DataTable, TabPane
 from textual.widgets._data_table import (
     CellDoesNotExist,
@@ -92,13 +93,11 @@ class DataFrameTable(DataTable):
 
         ## 🔍 Search & Filter
         - **|** - 🔎 Search in current column with expression
-        - **Ctrl+|** - 🌐 Global search with expression
         - **\\\\** - 🔎 Search in current column using cursor value
-        - **Ctrl+\\\\** - 🌐 Global search using cursor value
         - **/** - 🔎 Find in current column with cursor value
-        - **Ctrl+/** - 🌐 Global find using cursor value
         - **?** - 🔎 Find in current column with expression
-        - **Ctrl+Shift+/** - 🌐 Global find with expression
+        - **f** - 🌐 Global find using cursor value
+        - **Ctrl+f** - 🌐 Global find with expression
         - **v** - 👁️ View/filter rows by cell or selected rows
         - **V** - 🔧 View/filter rows by expression
 
@@ -109,9 +108,9 @@ class DataFrameTable(DataTable):
         - **T** - 🧹 Clear all selections
 
         ## ✏️ Edit & Modify
+        - **Double-click** - ✍️ Edit cell or rename column header
         - **e** - ✍️ Edit current cell
         - **E** - 📊 Edit entire column with expression
-        - **m** - 📝 Rename current column
         - **a** - ➕ Add empty column after current
         - **A** - ➕ Add column with name and optional expression
         - **x** - 🗑️ Delete current row
@@ -134,8 +133,8 @@ class DataFrameTable(DataTable):
 
         ## 💾 Data Management
         - **p** - 📌 Pin/freeze rows and columns
-        - **Ctrl+C** - 📋 Copy cell to clipboard
-        - **Ctrl+S** - 💾 Save current tab to file
+        - **Ctrl+c** - 📋 Copy cell to clipboard
+        - **Ctrl+s** - 💾 Save current tab to file
         - **u** - ↩️ Undo last action
         - **U** - 🔄 Reset to original data
 
@@ -146,63 +145,66 @@ class DataFrameTable(DataTable):
     BINDINGS = [
         ("g", "jump_top", "Jump to top"),
         ("G", "jump_bottom", "Jump to bottom"),
-        ("enter", "view_row_detail", "View row details"),
-        ("minus", "delete_column", "Delete column"),  # `-`
         ("h", "hide_column", "Hide column"),
         ("H", "show_column", "Show columns"),
-        ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
-        ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
         ("ctrl+c", "copy_cell", "Copy cell"),
         ("ctrl+s", "save_to_file", "Save to file"),
+        ("enter", "view_row_detail", "View row details"),
+        # Frequency & Statistics
         ("F", "show_frequency", "Show frequency"),
         ("s", "show_statistics", "Show statistics for column"),
         ("S", "show_statistics('dataframe')", "Show statistics for dataframe"),
+        # Sorting
+        ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
+        ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
+        # View
         ("v", "view_rows", "View rows"),
         ("V", "view_rows_expr", "View rows by expression"),
+        # Search
+        ("backslash", "search_cursor_value", "Search column with cursor value"),  # `\`
+        ("vertical_line", "search_expr", "Search column with expression"),  # `|`
+        # Find
+        ("slash", "find_cursor_value", "Find in column with cursor value"),  # `/`
+        ("question_mark", "find_expr", "Find in column with expression"),  # `?`
+        ("f", "find_cursor_value('global')", "Global find with cursor value"),  # `f`
+        ("ctrl+f", "find_expr('global')", "Global find with expression"),  # `Ctrl+F`
+        # Selection
+        ("apostrophe", "make_selections", "Toggle row selection"),  # `'`
+        ("t", "toggle_selections", "Toggle all row selections"),
+        ("T", "clear_selections", "Clear selections"),
+        ("quotation_mark", "filter_selected_rows", "Filter selected"),  # `"`
+        # Edit
+        ("minus", "delete_column", "Delete column"),  # `-`
+        ("x", "delete_row", "Delete row"),
+        ("X", "clear_cell", "Clear cell"),
+        ("d", "duplicate_column", "Duplicate column"),
+        ("D", "duplicate_row", "Duplicate row"),
         ("e", "edit_cell", "Edit cell"),
         ("E", "edit_column", "Edit column"),
         ("m", "rename_column", "Rename column"),
         ("a", "add_column", "Add column"),
         ("A", "add_column_expr", "Add column with expression"),
-        ("backslash", "search_cursor_value", "Search column with cursor value"),  # `\`
-        ("ctrl+backslash", "search_cursor_value('global')", "Global search column with cursor value"),  # `Ctrl+\`
-        ("vertical_line", "search_expr", "Search column with expression"),  # `|`
-        ("ctrl+shift+backslash", "search_expr('global')", "Global search column with expression"),  # `Ctrl+|`, `Ctrl+Shift+\`
-        ("slash", "find_cursor_value", "Find in column with cursor value"),  # `/`
-        ("ctrl+slash", "find_cursor_value('global')", "Global find with cursor value"),  # `Ctrl+/`
-        ("question_mark", "find_expr", "Find in column with expression"),  # `?`
-        ("ctrl+shift+slash", "find_expr('global')", "Global find with expression"),  # `Ctrl+?`, `Ctrl+Shift+/`
-        ("apostrophe", "make_selections", "Toggle row selection"),  # `'`
-        ("t", "toggle_selections", "Toggle all row selections"),
-        ("T", "clear_selections", "Clear selections"),
-        ("quotation_mark", "filter_selected_rows", "Filter selected"),  # `"`
-        ("x", "delete_row", "Delete row"),
-        ("X", "clear_cell", "Clear cell"),
-        ("d", "duplicate_column", "Duplicate column"),
-        ("D", "duplicate_row", "Duplicate row"),
-        ("u", "undo", "Undo"),
-        ("U", "reset", "Reset to original"),
+        # Reorder
         ("shift+left", "move_column_left", "Move column left"),
         ("shift+right", "move_column_right", "Move column right"),
         ("shift+up", "move_row_up", "Move row up"),
         ("shift+down", "move_row_down", "Move row down"),
-        ("at", "toggle_row_labels", "Toggle row labels"),  # `@`
-        ("exclamation_mark", "cycle_cursor_type", "Cycle cursor mode"),  # `!`
-        ("p", "open_pin_screen", "Pin rows/columns"),
+        # Type Conversion
         ("number_sign", "cast_column_dtype('int')", "Cast column dtype to int"),  # `#`
         ("percent_sign", "cast_column_dtype('float')", "Cast column dtype to float"),  # `%`
         ("dollar_sign", "cast_column_dtype('bool')", "Cast column dtype to bool"),  # `$`
         ("circumflex_accent", "cast_column_dtype('string')", "Cast column dtype to string"),  # `^`
+        # Misc
+        ("at", "toggle_row_labels", "Toggle row labels"),  # `@`
+        ("exclamation_mark", "cycle_cursor_type", "Cycle cursor mode"),  # `!`
+        ("p", "open_pin_screen", "Pin rows/columns"),
+        # Undo/Redo
+        ("u", "undo", "Undo"),
+        ("U", "reset", "Reset to original"),
     ]
     # fmt: on
 
-    def __init__(
-        self,
-        df: pl.DataFrame | pl.LazyFrame,
-        filename: str = "",
-        name: str = "",
-        **kwargs,
-    ):
+    def __init__(self, df: pl.DataFrame | pl.LazyFrame, filename: str = "", name: str = "", **kwargs):
         """Initialize the DataFrameTable with a dataframe and manage all state.
 
         Args:
@@ -281,12 +283,7 @@ class DataFrameTable(DataTable):
         # self._setup_table()
         pass
 
-    def _should_highlight(
-        self,
-        cursor: Coordinate,
-        target_cell: Coordinate,
-        type_of_cursor: CursorType,
-    ) -> bool:
+    def _should_highlight(self, cursor: Coordinate, target_cell: Coordinate, type_of_cursor: CursorType) -> bool:
         """Determine if the given cell should be highlighted because of the cursor.
 
         In "cell" mode, also highlights the row and column headers. In "row" and "column"
@@ -368,6 +365,17 @@ class DataFrameTable(DataTable):
         if event.key in ("pagedown", "down"):
             # Let the table handle the navigation first
             self._check_and_load_more()
+
+    def on_click(self, event: Click):
+        if self.cursor_type == "cell" and event.chain > 1:  # only on double-click or more
+            row_idx = event.style.meta["row"]
+            # col_idx = event.style.meta["column"]
+
+            # header row
+            if row_idx == -1:
+                self._rename_column()
+            else:
+                self._edit_cell()
 
     # Action handlers for BINDINGS
     def action_jump_top(self) -> None:
@@ -451,21 +459,13 @@ class DataFrameTable(DataTable):
         """Clear the current cell (set to None)."""
         self._clear_cell()
 
-    def action_search_cursor_value(self, scope="column") -> None:
-        """Search current column using cursor value.
+    def action_search_cursor_value(self) -> None:
+        """Search cursor value in the current column."""
+        self._search_cursor_value()
 
-        Args:
-            scope: "column" to search in current column, "global" to search across all columns.
-        """
-        self._search_cursor_value(scope=scope)
-
-    def action_search_expr(self, scope="column") -> None:
-        """Search in the current column.
-
-        Args:
-            scope: "column" to search in current column, "global" to search across all columns.
-        """
-        self._search_expr(scope=scope)
+    def action_search_expr(self) -> None:
+        """Search by expression in the current column."""
+        self._search_expr()
 
     def action_find_cursor_value(self, scope="column") -> None:
         """Find by cursor value.
@@ -894,10 +894,7 @@ class DataFrameTable(DataTable):
         if col_idx >= len(self.columns):
             self.move_cursor(column=len(self.columns) - 1)
 
-        self.notify(
-            f"Hid column [$accent]{col_name}[/]. Press [$success]H[/] to show hidden columns",
-            title="Hide",
-        )
+        # self.notify(f"Hid column [$accent]{col_name}[/]. Press [$success]H[/] to show hidden columns", title="Hide")
 
     def _show_column(self) -> None:
         """Show all hidden columns by recreating the table with all dataframe columns."""
@@ -914,13 +911,13 @@ class DataFrameTable(DataTable):
         # Add to history
         self._add_history(f"Showed {len(hidden_cols)} hidden column(s)")
 
+        # Clear hidden columns tracking
+        self.hidden_columns.clear()
+
         # Recreate table with all columns
         self._setup_table()
 
-        self.notify(
-            f"Showed [$accent]{len(hidden_cols)}[/] hidden column(s)",
-            title="Column",
-        )
+        self.notify(f"Showed [$accent]{len(hidden_cols)}[/] hidden column(s)", title="Column")
 
     def _duplicate_column(self) -> None:
         """Duplicate the currently selected column, inserting it right after the current column."""
@@ -959,27 +956,28 @@ class DataFrameTable(DataTable):
         Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.
         """
         old_count = len(self.df)
-        filter_expr = [True] * len(self.df)
+        predicates = [True] * len(self.df)
 
         # Delete all selected rows
         if selected_count := self.selected_rows.count(True):
             history_desc = f"Deleted {selected_count} selected row(s)"
 
-            for i, is_selected in enumerate(self.selected_rows):
-                if is_selected:
-                    filter_expr[i] = False
+            for ridx, selected in enumerate(self.selected_rows):
+                if selected:
+                    predicates[ridx] = False
+
         # Delete the row at the cursor
         else:
             ridx = self.cursor_row_idx
-            filter_expr[ridx] = False
             history_desc = f"Deleted row [$success]{ridx + 1}[/]"
+            predicates[ridx] = False
 
         # Add to history
         self._add_history(history_desc)
 
         # Apply the filter to remove rows
         try:
-            df = self.df.with_row_index("__ridx__").filter(filter_expr)
+            df = self.df.with_row_index("__ridx__").filter(predicates)
         except Exception as e:
             self.notify(f"Error deleting row(s): {e}", title="Delete", severity="error")
             self.histories.pop()  # Remove last history entry
@@ -992,8 +990,8 @@ class DataFrameTable(DataTable):
         self.selected_rows = [selected for i, selected in enumerate(self.selected_rows) if i in old_row_indices]
         self.visible_rows = [visible for i, visible in enumerate(self.visible_rows) if i in old_row_indices]
 
-        # Delete from matches
-        self.matches = {k: v for k, v in self.matches.items() if k in old_row_indices}
+        # Clear all matches since row indices have changed
+        self.matches = defaultdict(set)
 
         # Recreate the table display
         self._setup_table()
@@ -1025,16 +1023,16 @@ class DataFrameTable(DataTable):
         self.selected_rows = new_selected_rows
         self.visible_rows = new_visible_rows
 
+        # Clear all matches since row indices have changed
+        self.matches = defaultdict(set)
+
         # Recreate the table display
         self._setup_table()
 
         # Move cursor to the new duplicated row
         self.move_cursor(row=ridx + 1)
 
-        self.notify(
-            f"Duplicated row [$success]{ridx + 1}[/]",
-            title="Row",
-        )
+        # self.notify(f"Duplicated row [$success]{ridx + 1}[/]", title="Row")
 
     def _move_column(self, direction: str) -> None:
         """Move the current column left or right.
@@ -1173,13 +1171,8 @@ class DataFrameTable(DataTable):
         # Check if this column is already in the sort keys
         old_desc = self.sorted_columns.get(col_name)
         if old_desc == descending:
-            # Same direction - remove this column from sort
-            self.notify(
-                f"Already sorted by [$success]{col_name}[/] ({'desc' if descending else 'asc'})",
-                title="Sort",
-                severity="warning",
-            )
-            return
+            # Same direction - reverse to the other direction
+            descending = not descending
 
         # Add to history
         self._add_history(f"Sorted on column [$success]{col_name}[/]")
@@ -1187,7 +1180,7 @@ class DataFrameTable(DataTable):
             # Add new column to sort
             self.sorted_columns[col_name] = descending
         else:
-            # Toggle direction and move to end of sort order
+            # Move to end of sort order
             del self.sorted_columns[col_name]
             self.sorted_columns[col_name] = descending
 
@@ -1211,11 +1204,10 @@ class DataFrameTable(DataTable):
         self.move_cursor(column=col_idx, row=0)
 
     # Edit
-    def _edit_cell(self) -> None:
+    def _edit_cell(self, ridx: int = None, cidx: int = None) -> None:
         """Open modal to edit the selected cell."""
-        row_key, col_key = self.cursor_key
-        ridx = self.cursor_row_idx
-        cidx = self.cursor_col_idx
+        ridx = self.cursor_row_idx if ridx is None else ridx
+        cidx = self.cursor_col_idx if cidx is None else cidx
         col_name = self.df.columns[cidx]
 
         # Save current state to history
@@ -1255,7 +1247,7 @@ class DataFrameTable(DataTable):
             cell_value = self.df.item(ridx, cidx)
             if cell_value is None:
                 cell_value = NULL_DISPLAY
-            dtype = self.df.dtypes[ridx]
+            dtype = self.df.dtypes[cidx]
             dc = DtypeConfig(dtype)
             formatted_value = Text(str(cell_value), style=dc.style, justify=dc.justify)
 
@@ -1538,118 +1530,96 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to cast column: {str(e)}", title="Cast", severity="error")
             raise e
 
-    def _search_cursor_value(self, scope="column") -> None:
-        """Search with cursor value.
-
-        Args:
-            scope: "column" to search in current column, "global" to search across all columns.
-        """
-        cidx = self.cursor_col_idx if scope == "column" else None
+    def _search_cursor_value(self) -> None:
+        """Search with cursor value in current column."""
+        cidx = self.cursor_col_idx
 
         # Get the value of the currently selected cell
         term = NULL if self.cursor_value is None else str(self.cursor_value)
 
-        self._do_search((term, cidx, scope))
+        self._do_search((term, cidx))
 
-    def _search_expr(self, scope="column") -> None:
-        """Open screen to search for a term.
-
-        Args:
-            scope: "column" to search in current column, "global" to search across all columns."""
-        cidx = self.cursor_col_idx if scope == "column" else None
+    def _search_expr(self) -> None:
+        """Search by expression in current column."""
+        cidx = self.cursor_col_idx
 
         # Use current cell value as default search term
         term = NULL if self.cursor_value is None else str(self.cursor_value)
 
         # Push the search modal screen
         self.app.push_screen(
-            SearchScreen("Search", term, self.df, cidx, scope),
+            SearchScreen("Search", term, self.df, cidx),
             callback=self._do_search,
         )
 
     def _do_search(self, result) -> None:
-        """Handle result from search screen and perform the search for a term in current column."""
+        """Search for a term in current column."""
         if result is None:
             return
+        term, cidx = result
 
-        term, cidx, scope = result
-        df_ridx = self.df.with_row_index("__ridx__")
+        # Lazyframe for filtering
+        lf = self.df.lazy().with_row_index("__ridx__")
         if False in self.visible_rows:
-            df_ridx = df_ridx.filter(self.visible_rows)
+            lf = lf.filter(self.visible_rows)
 
         # Search within a specific column
-        if scope == "column":
-            col_name = self.df.columns[cidx]
-            col_dtype = self.df.dtypes[cidx]
+        col_name = self.df.columns[cidx]
+        col_dtype = self.df.dtypes[cidx]
 
-            if term == NULL:
-                masks = df_ridx[col_name].is_null()
+        if term == NULL:
+            expr = pl.col(col_name).is_null()
 
-            # Support for polars expressions
-            elif "$" in term or "pl." in term:
-                try:
-                    expr_str = parse_polars_expression(term, self.df, cidx)
-                    masks = eval(expr_str)
-                except Exception as e:
+        # Support for polars expressions
+        elif "$" in term or "pl." in term:
+            try:
+                expr_str = parse_polars_expression(term, self.df, cidx)
+                expr = eval(expr_str)
+            except Exception as e:
+                self.notify(
+                    f"Failed to parse expression: [$error]{str(e)}[/]",
+                    title="Search",
+                    severity="error",
+                )
+                return
+
+        # Perform type-aware search based on column dtype
+        else:
+            dtype = DtypeConfig(col_dtype).dtype
+            try:
+                if dtype == "string":
+                    expr = pl.col(col_name).str.contains(term)
+                elif dtype == "boolean":
+                    expr = pl.col(col_name) == BOOLS[term.lower()]
+                elif dtype == "integer":
+                    expr = pl.col(col_name) == int(term)
+                elif dtype == "float":
+                    expr = pl.col(col_name) == float(term)
+                else:
+                    expr = pl.col(col_name).cast(pl.String).str.contains(term)
                     self.notify(
-                        f"Failed to parse expression: [$error]{str(e)}[/]",
-                        title="Search",
-                        severity="error",
-                    )
-                    return
-
-            # Perform type-aware search based on column dtype
-            else:
-                dtype = DtypeConfig(col_dtype).dtype
-                try:
-                    if dtype == "string":
-                        masks = df_ridx[col_name].str.contains(term)
-                    elif dtype == "boolean":
-                        masks = df_ridx[col_name] == BOOLS[term.lower()]
-                    elif dtype == "integer":
-                        masks = df_ridx[col_name] == int(term)
-                    elif dtype == "float":
-                        masks = df_ridx[col_name] == float(term)
-                    else:
-                        self.notify(
-                            f"Search not yet supported for column type: [$warning]{col_dtype}[/]",
-                            title="Search",
-                            severity="warning",
-                        )
-                        return
-                except Exception as e:
-                    self.notify(
-                        f"[$accent]{term}[/] not found in [$warning]{col_name}[/]: {str(e)}",
+                        f"Unknown column type [$warning]{col_dtype}[/], treated as string.",
                         title="Search",
                         severity="warning",
                     )
-                    return
-
-        # Global search across all columns
-        else:
-            if term == NULL:
-                masks = df_ridx.select(
-                    [pl.any_horizontal([pl.col(col).is_null() for col in df_ridx.columns[1:]])]
-                ).to_series()
-            elif "$" in term or "pl." in term:
-                # Support for polars expressions
-                try:
-                    expr_str = parse_polars_expression(term, self.df, self.cursor_col_idx)
-                    masks = eval(expr_str)
-                except Exception as e:
-                    self.notify(
-                        f"Failed to parse expression: [$error]{str(e)}[/]",
-                        title="Search",
-                        severity="error",
-                    )
-                    return
-            else:
-                masks = df_ridx.select(
-                    [pl.any_horizontal([pl.col(col).cast(pl.String).str.contains(term) for col in df_ridx.columns[1:]])]
-                ).to_series()
+            except Exception as e:
+                self.notify(
+                    f"[$accent]{term}[/] not found in [$warning]{col_name}[/]: {str(e)}",
+                    title="Search",
+                    severity="warning",
+                )
+                return
 
         # Apply filter to get matched row indices
-        matches = set(df_ridx.filter(masks)["__ridx__"].to_list())
+        try:
+            matches = set(lf.filter(expr).select("__ridx__").collect().to_series().to_list())
+        except Exception as e:
+            self.notify(
+                f"Error applying search filter: [$error]{str(e)}[/]",
+                title="Search",
+                severity="error",
+            )
+            return
 
         match_count = len(matches)
         if match_count == 0:
@@ -1661,28 +1631,16 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self._add_history(
-            f"Searched [$accent]{term}[/] in column [$success]{col_name}[/]"
-            if scope == "column"
-            else f"Searched [$accent]{term}[/] across all columns"
-        )
+        self._add_history(f"Searched [$accent]{term}[/] in column [$success]{col_name}[/]")
 
         # Update selected rows to include new matches
         for m in matches:
             self.selected_rows[m] = True
 
-        # Remove selected rows from matches
-        for ridx in list(self.matches.keys()):
-            if ridx not in matches:
-                del self.matches[ridx]
-
         # Highlight matches
         self._do_highlight()
 
-        self.notify(
-            f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]",
-            title="Search",
-        )
+        self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Search")
 
     def _find_cursor_value(self, scope="column") -> None:
         """Find by cursor value.
@@ -1692,8 +1650,12 @@ class DataFrameTable(DataTable):
         """
         # Get the value of the currently selected cell
         term = NULL if self.cursor_value is None else str(self.cursor_value)
-        cidx = self.cursor_col_idx if scope == "column" else None
-        self._do_find((term, cidx, scope))
+
+        if scope == "column":
+            cidx = self.cursor_col_idx
+            self._do_find((term, cidx))
+        else:
+            self._do_find_global((term, None))
 
     def _find_expr(self, scope="column") -> None:
         """Open screen to find by expression.
@@ -1707,48 +1669,131 @@ class DataFrameTable(DataTable):
 
         # Push the search modal screen
         self.app.push_screen(
-            SearchScreen("Find", term, self.df, cidx, scope=scope),
-            callback=self._do_find,
+            SearchScreen("Find", term, self.df, cidx),
+            callback=self._do_find if scope == "column" else self._do_find_global,
         )
 
     def _do_find(self, result) -> None:
-        """Find a term."""
+        """Find a term in current column."""
         if result is None:
             return
-        term, cidx, scope = result
+        term, cidx = result
 
-        df_ridx = self.df.with_row_index("__ridx__")
+        # Lazyframe for filtering
+        lf = self.df.lazy().with_row_index("__ridx__")
         if False in self.visible_rows:
-            df_ridx = df_ridx.filter(self.visible_rows)
+            lf = lf.filter(self.visible_rows)
 
-        matches: dict[int, set[int]] = {}
+        matches: dict[int, set[int]] = defaultdict(set)
         match_count = 0
+        col = self.df.columns[cidx]
 
-        # Determine which columns to find in
-        # Note: skip first column which is the row index
-        col_indices_to_check = [cidx + 1] if scope == "column" else list(range(len(df_ridx.columns)))[1:]
+        if term == NULL:
+            expr = pl.col(col).is_null()
+        elif "$" in term or "pl." in term:
+            # Support for polars expressions
+            try:
+                expr_str = parse_polars_expression(term, self.df, cidx)
+                expr = eval(expr_str)
+            except Exception as e:
+                self.notify(
+                    f"Error parsing expression: {e}",
+                    title="Find",
+                    severity="error",
+                )
+                return
+        else:
+            expr = pl.col(col).cast(pl.String).str.contains(term)
 
-        for col_idx in col_indices_to_check:
-            col = df_ridx.columns[col_idx]
-            col_series = df_ridx[col].cast(pl.String)
-            masks = col_series.is_null() if term is NULL else col_series.str.contains(term)
-            matched_ridxs = set(df_ridx.filter(masks)["__ridx__"].to_list())
-            for ridx in matched_ridxs:
-                if ridx not in matches:
-                    matches[ridx] = set()
-                matches[ridx].add(col_idx - 1)  # Adjust for __ridx__ column
-                match_count += 1
+        try:
+            matched_ridxs = set(lf.filter(expr).select("__ridx__").collect().to_series().to_list())
+        except Exception as e:
+            self.notify(
+                f"Error applying filter [$error]{expr}[/]: {str(e)}",
+                title="Find",
+                severity="error",
+            )
+            return
+
+        for ridx in matched_ridxs:
+            matches[ridx].add(cidx)
+            match_count += 1
 
         if match_count == 0:
             self.notify(
-                f"No matches found for [$warning]{term}[/] in any column. Try [$accent](?i)abc[/] for case-insensitive search.",
-                title="Global Find" if cidx is None else "Find",
+                f"No matches found for [$warning]{term}[/] in current column. Try [$accent](?i)abc[/] for case-insensitive search.",
+                title="Find",
                 severity="warning",
             )
             return
 
         # Add to history
-        self._add_history(f"Searched and highlighted [$success]{term}[/] across all columns")
+        self._add_history(f"Found [$accent]{term}[/] in column [$success]{col}[/]")
+
+        # Add to matches
+        for ridx, col_idxs in matches.items():
+            self.matches[ridx].update(col_idxs)
+
+        # Highlight matches
+        self._do_highlight()
+
+        self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Find")
+
+    def _do_find_global(self, result) -> None:
+        """Global find a term across all columns."""
+        if result is None:
+            return
+        term, cidx = result
+
+        df_ridx = self.df.with_row_index("__ridx__")
+        if False in self.visible_rows:
+            df_ridx = df_ridx.filter(self.visible_rows)
+
+        matches: dict[int, set[int]] = defaultdict(set)
+        match_count = 0
+
+        for col_idx, col in enumerate(df_ridx.columns[1:]):
+            if term == NULL:
+                expr = df_ridx[col].is_null()
+            elif "$" in term or "pl." in term:
+                # Support for polars expressions
+                try:
+                    expr_str = parse_polars_expression(term, self.df, self.cursor_col_idx)
+                    expr = eval(expr_str)
+                except Exception as e:
+                    self.notify(
+                        f"Error parsing expression: {e}",
+                        title="Find",
+                        severity="error",
+                    )
+                    return
+            else:
+                expr = df_ridx[col].cast(pl.String).str.contains(term)
+
+            try:
+                matched_ridxs = set(df_ridx.filter(expr)["__ridx__"].to_list())
+            except Exception as e:
+                self.notify(
+                    f"Error applying filter [$error]{expr}[/]: {str(e)}",
+                    title="Find",
+                    severity="error",
+                )
+                return
+
+            for ridx in matched_ridxs:
+                matches[ridx].add(col_idx)
+                match_count += 1
+
+        if match_count == 0:
+            self.notify(
+                f"No matches found for [$warning]{term}[/] in any column. Try [$accent](?i)abc[/] for case-insensitive search.",
+                title="Global Find",
+                severity="warning",
+            )
+            return
+
+        # Add to history
+        self._add_history(f"Global found [$success]{term}[/] across all columns")
 
         # Add to matches
         for ridx, col_idxs in matches.items():
@@ -1758,8 +1803,8 @@ class DataFrameTable(DataTable):
         self._do_highlight()
 
         self.notify(
-            f"Found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns",
-            title="Global Find" if cidx is None else "Find",
+            f"Global found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns",
+            title="Global Find",
         )
 
     def _toggle_selections(self) -> None:
@@ -1780,11 +1825,6 @@ class DataFrameTable(DataTable):
 
         # Check if we're highlighting or un-highlighting
         if new_selected_count := self.selected_rows.count(True):
-            # Remove selected rows from matches
-            for ridx in list(self.matches.keys()):
-                if self.selected_rows[ridx]:
-                    del self.matches[ridx]
-
             self.notify(
                 f"Toggled selection for [$accent]{new_selected_count}[/] rows",
                 title="Toggle",
@@ -1802,9 +1842,6 @@ class DataFrameTable(DataTable):
             # There are matched cells - select rows with matches
             for ridx in self.matches.keys():
                 self.selected_rows[ridx] = True
-
-            # Clear matches after selection
-            self.matches.clear()
         else:
             # No matched cells - select/deselect the current row
             ridx = self.cursor_row_idx
@@ -1821,11 +1858,11 @@ class DataFrameTable(DataTable):
         """Clear all selected rows without removing them from the dataframe."""
         # Check if any selected rows or matches
         if True not in self.selected_rows and len(self.matches) == 0:
-            self.notify("No rows selected to clear", title="Clear", severity="warning")
+            self.notify("No selections to clear", title="Clear", severity="warning")
             return
 
-        selected_count = sum(
-            1 if selected or idx in self.matches else 0 for idx, selected in enumerate(self.selected_rows)
+        row_count = sum(
+            1 if (selected or idx in self.matches) else 0 for idx, selected in enumerate(self.selected_rows)
         )
 
         # Save current state to history
@@ -1834,10 +1871,10 @@ class DataFrameTable(DataTable):
         # Clear all selections and refresh highlighting
         self._do_highlight(clear=True)
 
-        self.notify(f"Cleared selections for [$accent]{selected_count}[/] rows", title="Clear")
+        self.notify(f"Cleared selections for [$accent]{row_count}[/] rows", title="Clear")
 
     def _filter_selected_rows(self) -> None:
-        """Display only the selected rows."""
+        """Display only the selected rows and remove unselected ones."""
         selected_count = self.selected_rows.count(True)
         if selected_count == 0:
             self.notify("No rows selected to filter", title="Filter", severity="warning")
@@ -1858,6 +1895,31 @@ class DataFrameTable(DataTable):
             title="Filter",
         )
 
+    def _view_rows(self) -> None:
+        """View rows.
+
+        If there are selected rows, view those rows.
+        Otherwise, view based on the value of the currently selected cell.
+        """
+
+        if True in self.selected_rows:
+            expr = self.selected_rows
+            expr_str = "selected rows"
+        else:
+            ridx = self.cursor_row_idx
+            cidx = self.cursor_col_idx
+
+            cell_value = self.df.item(ridx, cidx)
+
+            if cell_value is None:
+                expr = pl.col(self.df.columns[cidx]).is_null()
+                expr_str = NULL
+            else:
+                expr = pl.col(self.df.columns[cidx]) == cell_value
+                expr_str = f"$_ == {repr(cell_value)}"
+
+        self._do_view_rows((expr_str, expr))
+
     def _view_rows_expr(self) -> None:
         """Open the filter screen to enter an expression."""
         ridx = self.cursor_row_idx
@@ -1869,29 +1931,25 @@ class DataFrameTable(DataTable):
 
         self.app.push_screen(
             FilterScreen(self.df, cidx, cell_value),
-            callback=self._do_filter,
+            callback=self._do_view_rows,
         )
 
-    def _do_filter(self, result) -> None:
-        """Handle result from FilterScreen.
-
-        Args:
-            expression: The filter expression or None if cancelled.
-        """
+    def _do_view_rows(self, result) -> None:
+        """Show only those matching rows and hide others. Do not modify the dataframe."""
         if result is None:
             return
         expr_str, expr = result
 
-        # Add a row index column to track original row indices
-        df_with_ridx = self.df.with_row_index("__ridx__")
+        # Lazyframe with row indices
+        lf = self.df.lazy().with_row_index("__ridx__")
 
         # Apply existing visibility filter first
         if False in self.visible_rows:
-            df_with_ridx = df_with_ridx.filter(self.visible_rows)
+            lf = lf.filter(self.visible_rows)
 
         # Apply the filter expression
         try:
-            df_filtered = df_with_ridx.filter(expr)
+            df_filtered = lf.filter(expr).collect()
         except Exception as e:
             self.notify(f"Error: {e}", title="Filter", severity="error")
             self.histories.pop()  # Remove last history entry
@@ -1924,31 +1982,6 @@ class DataFrameTable(DataTable):
             f"Filtered to [$accent]{matched_count}[/] matching rows",
             title="Filter",
         )
-
-    def _view_rows(self) -> None:
-        """View rows.
-
-        If there are selected rows, view those rows.
-        Otherwise, view based on the value of the currently selected cell.
-        """
-
-        if True in self.selected_rows:
-            expr = self.selected_rows
-            expr_str = "selected rows"
-        else:
-            ridx = self.cursor_row_idx
-            cidx = self.cursor_col_idx
-
-            cell_value = self.df.item(ridx, cidx)
-
-            if cell_value is None:
-                expr = pl.col(self.df.columns[cidx]).is_null()
-                expr_str = NULL
-            else:
-                expr = pl.col(self.df.columns[cidx]) == cell_value
-                expr_str = f"$_ == {repr(cell_value)}"
-
-        self._do_filter((expr_str, expr))
 
     def _cycle_cursor_type(self) -> None:
         """Cycle through cursor types: cell -> row -> column -> cell."""

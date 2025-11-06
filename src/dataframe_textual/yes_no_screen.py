@@ -292,20 +292,18 @@ class SearchScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen")
 
-    def __init__(self, title, term, df: pl.DataFrame, cidx: int, scope="column"):
-        self.cidx = cidx if scope == "column" else None
-        self.scope = scope
-        col_name = df.columns[cidx] if scope == "column" else None
-        col_dtype = df.dtypes[cidx] if scope == "column" else None
+    def __init__(self, title, term, df: pl.DataFrame, cidx: int):
+        self.cidx = cidx
 
-        if scope == "column":
+        if "Search" in title:
+            col_name = df.columns[cidx]
+            col_dtype = df.dtypes[cidx]
             label = f"{title} in [$primary]{col_name}[/] ([$warning]{col_dtype}[/]) with value or Polars expression, e.g., $_ > 50, $1 < $2, {NULL}"
         else:
-            # Global search/find
             label = f"{title} by value or Polars expression, e.g., 'ABC', '(?i)abc', $_ > 50, $1 < $2, {NULL}"
 
         super().__init__(
-            title=title if scope == "column" else f"Global {title}",
+            title=title,
             label=label,
             input=term,
             on_yes_callback=self._do_search,
@@ -319,7 +317,7 @@ class SearchScreen(YesNoScreen):
             self.notify("Term cannot be empty", title=self.title, severity="error")
             return
 
-        return term, self.cidx, self.scope
+        return term, self.cidx
 
 
 class FilterScreen(YesNoScreen):
