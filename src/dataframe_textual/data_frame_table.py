@@ -181,7 +181,6 @@ class DataFrameTable(DataTable):
         ("D", "duplicate_row", "Duplicate row"),
         ("e", "edit_cell", "Edit cell"),
         ("E", "edit_column", "Edit column"),
-        ("m", "rename_column", "Rename column"),
         ("a", "add_column", "Add column"),
         ("A", "add_column_expr", "Add column with expression"),
         # Reorder
