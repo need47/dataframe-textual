@@ -25,6 +25,7 @@ from .common import (
     INITIAL_BATCH_SIZE,
     NULL,
     NULL_DISPLAY,
+    RIDX,
     SUBSCRIPT_DIGITS,
     DtypeConfig,
     format_row,
@@ -42,6 +43,7 @@ from .yes_no_screen import (
     FilterScreen,
     PinScreen,
     RenameColumnScreen,
+    ReplaceScreen,
     SaveFileScreen,
     SearchScreen,
 )
@@ -63,6 +65,24 @@ class History:
     fixed_columns: int
     cursor_coordinate: Coordinate
     matches: dict[int, set[int]]
+
+
+@dataclass
+class ReplaceState:
+    """Class to track state during interactive replace operations."""
+
+    term_find: str
+    term_replace: str
+    col_name: str
+    rows: list[int]  # List of row indices
+    cols_per_row: list[list[int]]  # List of list of column indices per row
+    current_rpos: int  # Current row position index in rows
+    current_cpos: int  # Current column position index within current row's cols
+    current_occurrence: int  # Current occurrence count (for display)
+    total_occurrence: int  # Total number of occurrences
+    replaced_occurrence: int  # Number of occurrences already replaced
+    skipped_occurrence: int  # Number of occurrences skipped
+    done: bool = False  # Whether the replace operation is complete
 
 
 class DataFrameTable(DataTable):
@@ -100,6 +120,10 @@ class DataFrameTable(DataTable):
         - **Ctrl+f** - 🌐 Global find with expression
         - **v** - 👁️ View/filter rows by cell or selected rows
         - **V** - 🔧 View/filter rows by expression
+
+        ## ✏️ Replace
+        - **r** - 🔄 Replace in current column (interactive or all)
+        - **R** - 🔄 Replace across all columns (interactive or all)
 
         ## ✅ Selection & Filtering
         - **'** - ✓️ Select/deselect current row
@@ -168,6 +192,9 @@ class DataFrameTable(DataTable):
         ("question_mark", "find_expr", "Find in column with expression"),  # `?`
         ("f", "find_cursor_value('global')", "Global find with cursor value"),  # `f`
         ("ctrl+f", "find_expr('global')", "Global find with expression"),  # `Ctrl+F`
+        # Replace
+        ("r", "replace", "Replace in column"),  # `r`
+        ("R", "replace_global", "Replace global"),  # `Shift+R`
         # Selection
         ("apostrophe", "make_selections", "Toggle row selection"),  # `'`
         ("t", "toggle_selections", "Toggle all row selections"),
@@ -482,6 +509,14 @@ class DataFrameTable(DataTable):
         """
         self._find_expr(scope=scope)
 
+    def action_replace(self) -> None:
+        """Replace values in current column."""
+        self._replace()
+
+    def action_replace_global(self) -> None:
+        """Replace values across all columns."""
+        self._replace_global()
+
     def action_make_selections(self) -> None:
         """Toggle selection for the current row."""
         self._make_selections()
@@ -697,7 +732,7 @@ class DataFrameTable(DataTable):
             self._load_rows(self.loaded_rows + BATCH_SIZE)
 
     def _do_highlight(self, clear: bool = False) -> None:
-        """Update all rows, highlighting selected ones in red and restoring others to default.
+        """Update all rows, highlighting selected ones and restoring others to default.
 
         Args:
             clear: If True, clear all highlights.
@@ -976,16 +1011,16 @@ class DataFrameTable(DataTable):
 
         # Apply the filter to remove rows
         try:
-            df = self.df.with_row_index("__ridx__").filter(predicates)
+            df = self.df.with_row_index(RIDX).filter(predicates)
         except Exception as e:
             self.notify(f"Error deleting row(s): {e}", title="Delete", severity="error")
             self.histories.pop()  # Remove last history entry
             return
 
-        self.df = df.drop("__ridx__")
+        self.df = df.drop(RIDX)
 
         # Update selected and visible rows tracking
-        old_row_indices = set(df["__ridx__"].to_list())
+        old_row_indices = set(df[RIDX].to_list())
         self.selected_rows = [selected for i, selected in enumerate(self.selected_rows) if i in old_row_indices]
         self.visible_rows = [visible for i, visible in enumerate(self.visible_rows) if i in old_row_indices]
 
@@ -1186,15 +1221,15 @@ class DataFrameTable(DataTable):
         # Apply multi-column sort
         sort_cols = list(self.sorted_columns.keys())
         descending_flags = list(self.sorted_columns.values())
-        df_sorted = self.df.with_row_index("__ridx__").sort(sort_cols, descending=descending_flags, nulls_last=True)
+        df_sorted = self.df.with_row_index(RIDX).sort(sort_cols, descending=descending_flags, nulls_last=True)
 
         # Updated selected_rows and visible_rows to match new order
-        old_row_indices = df_sorted["__ridx__"].to_list()
+        old_row_indices = df_sorted[RIDX].to_list()
         self.selected_rows = [self.selected_rows[i] for i in old_row_indices]
         self.visible_rows = [self.visible_rows[i] for i in old_row_indices]
 
         # Update the dataframe
-        self.df = df_sorted.drop("__ridx__")
+        self.df = df_sorted.drop(RIDX)
 
         # Recreate the table for display
         self._setup_table()
@@ -1610,13 +1645,13 @@ class DataFrameTable(DataTable):
                     )
 
         # Lazyframe for filtering
-        lf = self.df.lazy().with_row_index("__ridx__")
+        lf = self.df.lazy().with_row_index(RIDX)
         if False in self.visible_rows:
             lf = lf.filter(self.visible_rows)
 
         # Apply filter to get matched row indices
         try:
-            matches = set(lf.filter(expr).select("__ridx__").collect().to_series().to_list())
+            matches = set(lf.filter(expr).select(RIDX).collect().to_series().to_list())
         except Exception as e:
             self.notify(
                 f"Error applying search filter: [$error]{str(e)}[/]",
@@ -1645,6 +1680,58 @@ class DataFrameTable(DataTable):
         self._do_highlight()
 
         self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Search")
+
+    def _find_matches(self, term: str, cidx: int | None = None) -> dict[int, set[int]]:
+        """Find matches for a term in the dataframe.
+
+        Args:
+            term: The search term (can be NULL, expression, or plain text)
+            cidx: Column index for column-specific search. If None, searches all columns.
+
+        Returns:
+            Dictionary mapping row indices to sets of column indices containing matches.
+            For column-specific search, each matched row has a set with single cidx.
+            For global search, each matched row has a set of all matching cidxs in that row.
+
+        Raises:
+            Exception: If expression validation or filtering fails.
+        """
+        matches: dict[int, set[int]] = defaultdict(set)
+
+        # Lazyframe for filtering
+        lf = self.df.lazy().with_row_index(RIDX)
+        if False in self.visible_rows:
+            lf = lf.filter(self.visible_rows)
+
+        # Determine which columns to search: single column or all columns
+        if cidx is not None:
+            columns_to_search = [(cidx, self.df.columns[cidx])]
+        else:
+            columns_to_search = list(enumerate(self.df.columns))
+
+        # Search each column consistently
+        for col_idx, col_name in columns_to_search:
+            # Build expression based on term type
+            if term == NULL:
+                expr = pl.col(col_name).is_null()
+            elif tentative_expr(term):
+                try:
+                    expr = validate_expr(term, self.df, col_idx)
+                except Exception as e:
+                    raise Exception(f"Error validating Polars expression: {str(e)}")
+            else:
+                expr = pl.col(col_name).cast(pl.String).str.contains(term)
+
+            # Get matched row indices
+            try:
+                matched_ridxs = lf.filter(expr).select(RIDX).collect().to_series().to_list()
+            except Exception as e:
+                raise Exception(f"Error applying filter: {str(e)}")
+
+            for ridx in matched_ridxs:
+                matches[ridx].add(col_idx)
+
+        return matches
 
     def _find_cursor_value(self, scope="column") -> None:
         """Find by cursor value.
@@ -1683,44 +1770,19 @@ class DataFrameTable(DataTable):
             return
         term, cidx = result
 
-        # Lazyframe for filtering
-        lf = self.df.lazy().with_row_index("__ridx__")
-        if False in self.visible_rows:
-            lf = lf.filter(self.visible_rows)
-
-        matches: dict[int, set[int]] = defaultdict(set)
-        match_count = 0
-        col = self.df.columns[cidx]
-
-        if term == NULL:
-            expr = pl.col(col).is_null()
-        elif tentative_expr(term):
-            # Support for polars expressions
-            try:
-                expr = validate_expr(term, self.df, cidx)
-            except Exception as e:
-                self.notify(
-                    f"Error validating Polars expression [$error]{term}[/]: {str(e)}", title="Find", severity="error"
-                )
-                return
-        else:
-            expr = pl.col(col).cast(pl.String).str.contains(term)
+        col_name = self.df.columns[cidx]
 
         try:
-            matched_ridxs = set(lf.filter(expr).select("__ridx__").collect().to_series().to_list())
+            matches = self._find_matches(term, cidx)
         except Exception as e:
             self.notify(
-                f"Error applying filter [$error]{expr}[/]: {str(e)}",
+                f"Error finding matches: [$error]{str(e)}[/]",
                 title="Find",
                 severity="error",
             )
             return
 
-        for ridx in matched_ridxs:
-            matches[ridx].add(cidx)
-            match_count += 1
-
-        if match_count == 0:
+        if not matches:
             self.notify(
                 f"No matches found for [$warning]{term}[/] in current column. Try [$accent](?i)abc[/] for case-insensitive search.",
                 title="Find",
@@ -1729,11 +1791,13 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self._add_history(f"Found [$accent]{term}[/] in column [$success]{col}[/]")
+        self._add_history(f"Found [$accent]{term}[/] in column [$success]{col_name}[/]")
 
-        # Add to matches
+        # Add to matches and count total
+        match_count = 0
         for ridx, col_idxs in matches.items():
             self.matches[ridx].update(col_idxs)
+            match_count += len(col_idxs)
 
         # Highlight matches
         self._do_highlight()
@@ -1746,45 +1810,17 @@ class DataFrameTable(DataTable):
             return
         term, cidx = result
 
-        df_ridx = self.df.with_row_index("__ridx__")
-        if False in self.visible_rows:
-            df_ridx = df_ridx.filter(self.visible_rows)
+        try:
+            matches = self._find_matches(term, cidx=None)
+        except Exception as e:
+            self.notify(
+                f"Error finding matches: [$error]{str(e)}[/]",
+                title="Find",
+                severity="error",
+            )
+            return
 
-        matches: dict[int, set[int]] = defaultdict(set)
-        match_count = 0
-
-        for col_idx, col in enumerate(df_ridx.columns[1:]):
-            if term == NULL:
-                expr = df_ridx[col].is_null()
-            elif tentative_expr(term):
-                # Support for polars expressions
-                try:
-                    expr = validate_expr(term, self.df, self.cursor_col_idx)
-                except Exception as e:
-                    self.notify(
-                        f"Error validating Polars expression [$error]{term}[/]: {str(e)}",
-                        title="Find",
-                        severity="error",
-                    )
-                    return
-            else:
-                expr = df_ridx[col].cast(pl.String).str.contains(term)
-
-            try:
-                matched_ridxs = set(df_ridx.filter(expr)["__ridx__"].to_list())
-            except Exception as e:
-                self.notify(
-                    f"Error applying filter [$error]{expr}[/]: {str(e)}",
-                    title="Find",
-                    severity="error",
-                )
-                return
-
-            for ridx in matched_ridxs:
-                matches[ridx].add(col_idx)
-                match_count += 1
-
-        if match_count == 0:
+        if not matches:
             self.notify(
                 f"No matches found for [$warning]{term}[/] in any column. Try [$accent](?i)abc[/] for case-insensitive search.",
                 title="Global Find",
@@ -1793,9 +1829,10 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self._add_history(f"Global found [$success]{term}[/] across all columns")
+        self._add_history(f"Found [$success]{term}[/] across all columns")
 
-        # Add to matches
+        # Add to matches and count total
+        match_count = sum(len(col_idxs) for col_idxs in matches.values())
         for ridx, col_idxs in matches.items():
             self.matches[ridx].update(col_idxs)
 
@@ -1803,9 +1840,270 @@ class DataFrameTable(DataTable):
         self._do_highlight()
 
         self.notify(
-            f"Global found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns",
+            f"Found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns",
             title="Global Find",
         )
+
+    def _replace(self) -> None:
+        """Open replace screen for current column."""
+        # Push the replace modal screen
+        self.app.push_screen(
+            ReplaceScreen(self),
+            callback=self._do_replace,
+        )
+
+    def _do_replace(self, result) -> None:
+        """Handle replace in current column."""
+        if result is None:
+            return
+        term_find, term_replace, replace_all = result
+
+        cidx = self.cursor_col_idx
+        col_name = self.df.columns[cidx]
+
+        # Find all matches
+        matches = self._find_matches(term_find, cidx)
+
+        if not matches:
+            self.notify(
+                f"No matches found for [$warning]{term_find}[/]",
+                title="Replace",
+                severity="warning",
+            )
+            return
+
+        # Add to history
+        self._add_history(
+            f"Replacing [$accent]{term_find}[/] with [$success]{term_replace}[/] in column [$accent]{col_name}[/]"
+        )
+
+        # Update matches
+        self.matches = {ridx: {cidx} for ridx in matches.keys()}
+
+        # Highlight matches
+        self._do_highlight()
+
+        # Store state for interactive replacement using dataclass
+        self._replace_state = ReplaceState(
+            term_find=term_find,
+            term_replace=term_replace,
+            col_name=col_name,
+            rows=sorted(list(self.matches.keys())),
+            cols_per_row=[sorted(list(col_idxs)) for col_idxs in self.matches.values()],
+            current_rpos=0,
+            current_cpos=0,
+            current_occurrence=0,
+            total_occurrence=len(self.matches),
+            replaced_occurrence=0,
+            skipped_occurrence=0,
+            done=False,
+        )
+
+        try:
+            if replace_all:
+                # Replace all occurrences
+                self._do_replace_all(term_find, term_replace)
+            else:
+                # Replace with confirmation for each occurrence
+                self._do_replace_interactive(term_find, term_replace)
+
+        except Exception as e:
+            self.notify(
+                f"Error replacing [$accent]{term_find}[/] with [$error]{term_replace}[/]: {str(e)}",
+                title="Replace",
+                severity="error",
+            )
+
+    def _replace_global(self) -> None:
+        """Open replace screen for all columns."""
+        # Push the replace modal screen
+        self.app.push_screen(
+            ReplaceScreen(self),
+            callback=self._do_replace_global,
+        )
+
+    def _do_replace_global(self, result) -> None:
+        """Handle replace across all columns."""
+        if result is None:
+            return
+        term_find, term_replace, replace_all = result
+
+        # Find all matches
+        matches = self._find_matches(term_find, cidx=None)
+
+        if not matches:
+            self.notify(
+                f"No matches found for [$warning]{term_find}[/]",
+                title="Replace",
+                severity="warning",
+            )
+            return
+
+        # Add to history
+        self._add_history(f"Global replace of [$accent]{term_find}[/] with [$success]{term_replace}[/]")
+
+        # Update matches (sorted)
+        self.matches = {ridx: sorted(col_idxs) for ridx, col_idxs in sorted(matches.items())}
+
+        # Recreate the table display
+        self._setup_table()
+
+        # Store state for interactive replacement using dataclass
+        total_occurrence = sum(len(col_idxs) for col_idxs in matches.values())
+        self._replace_state = ReplaceState(
+            term_find=term_find,
+            term_replace=term_replace,
+            col_name="all columns",
+            rows=sorted(list(self.matches.keys())),
+            cols_per_row=[sorted(list(col_idxs)) for col_idxs in self.matches.values()],
+            current_rpos=0,
+            current_cpos=0,
+            current_occurrence=0,
+            total_occurrence=total_occurrence,
+            replaced_occurrence=0,
+            done=False,
+        )
+
+        try:
+            if replace_all:
+                # Replace all occurrences
+                self._do_replace_all(term_find, term_replace)
+            else:
+                # Replace with confirmation for each occurrence
+                self._do_replace_interactive(term_find, term_replace)
+
+            self.notify(
+                f"Replaced [$accent]{term_find}[/] with [$success]{term_replace}[/] globally",
+                title="Replace",
+            )
+        except Exception as e:
+            self.notify(
+                f"Error replacing [$accent]{term_find}[/] with [$error]{term_replace}[/]: {str(e)}",
+                title="Replace",
+                severity="error",
+            )
+
+    def _do_replace_all(self, term_find: str, term_replace: str) -> None:
+        """Replace all occurrences."""
+        state = self._replace_state
+        self.app.push_screen(
+            ConfirmScreen(
+                "Replace All",
+                label=f"Replace [$accent]{term_find}[/] with [$success]{term_replace}[/] for all [$accent]{state.total_occurrence}[/] occurrences?",
+            ),
+            callback=self._handle_replace_all_confirmation,
+        )
+
+    def _handle_replace_all_confirmation(self, result) -> None:
+        """Handle user's confirmation for replace all."""
+        if result is None:
+            return
+
+        state = self._replace_state
+        rows = state.rows
+        cols_per_row = state.cols_per_row
+
+        # Replace in each matched row/column
+        for ridx, col_idxs in zip(rows, cols_per_row):
+            for cidx in col_idxs:
+                col_name = self.df.columns[cidx]
+                self.df = self.df.with_columns(
+                    pl.when(pl.arange(0, len(self.df)) == ridx)
+                    .then(pl.lit(state.term_replace))
+                    .otherwise(pl.col(col_name))
+                    .alias(col_name)
+                )
+                state.replaced_occurrence += 1
+
+        # Recreate the table display
+        self._setup_table()
+
+        self.notify(
+            f"Replaced [$accent]{state.replaced_occurrence}[/] of [$accent]{state.total_occurrence}[/] in [$success]{state.col_name}[/]",
+            title="Replace",
+        )
+
+    def _do_replace_interactive(self, term_find: str, term_replace: str) -> None:
+        """Replace with user confirmation for each occurrence."""
+        try:
+            # Start with first match
+            self._show_next_replace_confirmation()
+        except Exception as e:
+            self.notify(
+                f"Error replacing [$accent]{term_find}[/] with [$error]{term_replace}[/]: {str(e)}",
+                title="Replace",
+                severity="error",
+            )
+
+    def _show_next_replace_confirmation(self) -> None:
+        """Show confirmation for next replacement."""
+        state = self._replace_state
+        if state.done:
+            # All done - show final notification
+            msg = f"Replaced [$accent]{state.replaced_occurrence}[/] of [$accent]{state.total_occurrence}[/] in [$success]{state.col_name}[/]"
+            if state.skipped_occurrence > 0:
+                msg += f", [$warning]{state.skipped_occurrence}[/] skipped"
+            self.notify(msg, title="Replace")
+            return
+
+        # Move cursor to next match
+        ridx = state.rows[state.current_rpos]
+        cidx = state.cols_per_row[state.current_rpos][state.current_cpos]
+        self.move_cursor(row=ridx, column=cidx)
+
+        state.current_occurrence += 1
+
+        # Show confirmation
+        cell_value = self.df.item(ridx, cidx)
+        label = f"Replace [$warning]{cell_value}[/] with [$success]{state.term_replace}[/] (Occurrence {state.current_occurrence} of {state.total_occurrence})?"
+
+        self.app.push_screen(
+            ConfirmScreen("Replace", label=label, maybe="Skip"),
+            callback=self._handle_replace_confirmation,
+        )
+
+    def _handle_replace_confirmation(self, result) -> None:
+        """Handle user's confirmation response."""
+        state = self._replace_state
+        if state.done:
+            return
+
+        ridx = state.rows[state.current_rpos]
+        cidx = state.cols_per_row[state.current_rpos][state.current_cpos]
+        col_name = self.df.columns[cidx]
+
+        if result is True:
+            # Replace
+            self.df = self.df.with_columns(
+                pl.when(pl.arange(0, len(self.df)) == ridx)
+                .then(pl.lit(state.term_replace))
+                .otherwise(pl.col(col_name))
+                .alias(col_name)
+            )
+            state.replaced_occurrence += 1
+        elif result is False:
+            state.skipped_occurrence += 1
+        else:
+            # Cancel
+            state.done = True
+            self._setup_table()
+            return
+
+        # Move to next
+        if state.current_cpos + 1 < len(state.cols_per_row[state.current_rpos]):
+            state.current_cpos += 1
+        else:
+            state.current_cpos = 0
+            state.current_rpos += 1
+
+        if state.current_rpos >= len(state.rows):
+            state.done = True
+
+        # Recreate the table display
+        self._setup_table()
+
+        # Show next confirmation
+        self._show_next_replace_confirmation()
 
     def _toggle_selections(self) -> None:
         """Toggle selected rows highlighting on/off."""
@@ -1961,7 +2259,7 @@ class DataFrameTable(DataTable):
                     )
 
         # Lazyframe with row indices
-        lf = self.df.lazy().with_row_index("__ridx__")
+        lf = self.df.lazy().with_row_index(RIDX)
 
         # Apply existing visibility filter first
         if False in self.visible_rows:
@@ -1988,7 +2286,7 @@ class DataFrameTable(DataTable):
         self._add_history(f"Filtered by expression [$success]{expr}[/]")
 
         # Mark unfiltered rows as invisible and unselected
-        filtered_row_indices = set(df_filtered["__ridx__"].to_list())
+        filtered_row_indices = set(df_filtered[RIDX].to_list())
         if filtered_row_indices:
             for ridx in range(len(self.visible_rows)):
                 if ridx not in filtered_row_indices:

@@ -87,6 +87,9 @@ CURSOR_TYPES = ["row", "column", "cell"]
 INITIAL_BATCH_SIZE = 100  # Load this many rows initially
 BATCH_SIZE = 50  # Load this many rows when scrolling
 
+# For row index column
+RIDX = "^_ridx_^"
+
 
 def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
     """Get the DtypeClass configuration for a given Polars data type."""

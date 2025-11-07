@@ -197,6 +197,13 @@ When multiple files are opened:
 | `v` | View/filter rows by selected rows or current cell value |
 | `V` | View/filter rows by expression (Polars expression syntax) |
 
+#### Find & Replace
+
+| Key | Action |
+|-----|--------|
+| `r` | Replace in current column (interactive or replace all) |
+| `R` | Replace across all columns (interactive or replace all) |
+
 #### Sorting
 
 | Key | Action |
@@ -301,6 +308,81 @@ The application provides multiple search modes for different use cases:
 - Use `Ctrl+\` to search all columns without typing
 - Use `"` after selecting rows to hide everything except your selection
 - Use `u` to undo any search or filter
+
+### 3b. Find & Replace
+
+The application provides powerful find and replace functionality for both single-column and global replacements.
+
+**Replace Operations**:
+- **`r` - Column Replace**: Replace values in the current column
+- **`R` - Global Replace**: Replace values across all columns
+
+**How It Works:**
+
+When you press `r` or `R`, a dialog opens where you can enter:
+1. **Find term**: The value or expression to search for
+2. **Replace term**: What to replace matches with
+3. **Replace option**:
+   - Choose **"Replace All"** to replace all matches at once (with confirmation)
+   - Otherwise, review and confirm each match individually
+
+**Replace All** (`r` or `R` → Choose "Replace All"):
+- Shows a confirmation dialog with the number of matches and replacements
+- Replaces all matches with a single operation
+- Full undo support with `u`
+- Useful for bulk replacements when you're confident about the change
+
+**Replace Interactive** (`r` or `R` → Choose "Replace Interactive"):
+- Shows each match one at a time with a preview of the replacement
+- For each match, press:
+  - `Enter` or press the `Yes` button - **Replace this occurrence** and move to next
+  - Press the `Skip` button - **Skip this occurrence** and move to next
+  - `Escape` or press the `No` button - **Cancel** remaining replacements (but keep already-made replacements)
+- Displays progress: `Occurrence X of Y` (Y = total matches, X = current)
+- Shows the value that will be replaced and what it will become
+- Useful for careful replacements where you want to review each change
+
+**Search Term Types:**
+- **Plain text**: Exact string match (e.g., "John" finds "John")
+- **NULL**: Replace null/missing values (type `NULL`)
+- **Expression**: Polars expressions for complex matching (e.g., `$_ > 50` for column replace)
+- **Case sensitivity**: Use `(?i)` for case-insensitive matching (e.g., `(?i)john`)
+
+**Examples:**
+
+```
+Find: "John"
+Replace: "Jane"
+→ All occurrences of "John" become "Jane"
+
+Find: "NULL"
+Replace: "Unknown"
+→ All null/missing values become "Unknown"
+
+Find: "(?i)active"        # Case-insensitive
+Replace: "inactive"
+→ "Active", "ACTIVE", "active" all become "inactive"
+```
+
+**For Global Replace (`R`)**:
+- Searches and replaces across all columns simultaneously
+- Each column can have different matching behavior (string matching for text, numeric for numbers)
+- Preview shows which columns contain matches before replacement
+- Useful for standardizing values across multiple columns
+
+**Features:**
+- **Full history support**: Use `u` (undo) to revert any replacement
+- **Visual feedback**: Matching cells are highlighted before you choose replacement mode
+- **Safe operations**: Requires confirmation before replacing
+- **Progress tracking**: Shows how many replacements have been made during interactive mode
+- **Type-aware**: Respects column data types when matching and replacing
+
+**Tips:**
+- Use interactive mode for one-time replacements to be absolutely sure
+- Use "Replace All" for routine replacements (e.g., fixing typos, standardizing formats)
+- Use `u` immediately if you accidentally replace something wrong
+- For complex replacements, use Polars expressions in the find term
+- Test with a small dataset first before large replacements
 
 ### 4. Filter by Expression
 

@@ -1,10 +1,15 @@
 """Modal screens with Yes/No buttons and their specialized variants."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .data_frame_table import DataFrameTable
+
 import polars as pl
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Static
+from textual.widgets import Button, Checkbox, Input, Label, Static
 
 from .common import NULL, DtypeConfig, tentative_expr, validate_expr
 
@@ -35,6 +40,7 @@ class YesNoScreen(ModalScreen):
         }
 
         YesNoScreen Container {
+            margin: 1 0 0 0;
             height: auto;
             width: 100%;
         }
@@ -45,21 +51,30 @@ class YesNoScreen(ModalScreen):
         }
 
         YesNoScreen Input {
-            margin: 1 0;
+            margin: 1 0 0 0;
         }
 
         YesNoScreen Input:blur {
             border: solid $secondary;
         }
 
+        YesNoScreen Checkbox {
+            margin: 1 0 0 0;
+        }
+
+        YesNoScreen Checkbox:blur {
+            border: solid $secondary;
+        }
+
         YesNoScreen #button-container {
+            margin: 1 0 0 0;
             width: 100%;
             height: 3;
             align: center middle;
         }
 
         YesNoScreen Button {
-            margin: 0 1;
+            margin: 0 2;
         }
     """
 
@@ -70,7 +85,9 @@ class YesNoScreen(ModalScreen):
         input: str | dict | Input = None,
         label2: str | dict | Label = None,
         input2: str | dict | Input = None,
+        checkbox: str | dict | Checkbox = None,
         yes: str | dict | Button = "Yes",
+        maybe: str | dict | Button = None,
         no: str | dict | Button = "No",
         on_yes_callback=None,
     ):
@@ -90,7 +107,9 @@ class YesNoScreen(ModalScreen):
         self.input = input
         self.label2 = label2
         self.input2 = input2
+        self.checkbox = checkbox
         self.yes = yes
+        self.maybe = maybe
         self.no = no
         self.on_yes_callback = on_yes_callback
 
@@ -141,7 +160,16 @@ class YesNoScreen(ModalScreen):
                         self.input2.select_all()
                         yield self.input2
 
-            if self.yes or self.no:
+            if self.checkbox:
+                if isinstance(self.checkbox, Checkbox):
+                    pass
+                elif isinstance(self.checkbox, dict):
+                    self.checkbox = Checkbox(**self.checkbox)
+                else:
+                    self.checkbox = Checkbox(self.checkbox)
+                yield self.checkbox
+
+            if self.yes or self.no or self.maybe:
                 with Horizontal(id="button-container"):
                     if self.yes:
                         if isinstance(self.yes, Button):
@@ -152,6 +180,17 @@ class YesNoScreen(ModalScreen):
                             self.yes = Button(self.yes, id="yes", variant="success")
 
                         yield self.yes
+
+                    if self.maybe:
+                        if isinstance(self.maybe, Button):
+                            pass
+                        elif isinstance(self.maybe, dict):
+                            self.maybe = Button(**self.maybe, id="maybe", variant="warning")
+                        else:
+                            self.maybe = Button(self.maybe, id="maybe", variant="warning")
+
+                        yield self.maybe
+
                     if self.no:
                         if isinstance(self.no, Button):
                             pass
@@ -165,6 +204,8 @@ class YesNoScreen(ModalScreen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "yes":
             self._handle_yes()
+        elif event.button.id == "maybe":
+            self.dismiss(False)
         elif event.button.id == "no":
             self.dismiss(None)
 
@@ -214,14 +255,21 @@ class ConfirmScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ConfirmScreen")
 
-    def __init__(self, title: str):
+    def __init__(self, title: str, label=None, yes="Yes", maybe: str = None, no="No"):
         super().__init__(
             title=title,
-            on_yes_callback=self.handle_confirm,
+            label=label,
+            yes=yes,
+            maybe=maybe,
+            no=no,
+            on_yes_callback=self.handle_yes,
         )
 
-    def handle_confirm(self) -> None:
+    def handle_yes(self) -> bool:
         return True
+
+    def handle_maybe(self) -> bool:
+        return False
 
 
 class EditCellScreen(YesNoScreen):
@@ -515,7 +563,7 @@ class AddColumnScreen(YesNoScreen):
             try:
                 value = DtypeConfig(dtype).convert(term)
                 return self.cidx, col_name, pl.lit(value)
-            except Exception as e:
+            except Exception:
                 self.notify(
                     f"Unable to convert [$accent]{term}[/] to [$warning]{dtype}[/]. Cast to string.",
                     title="Add Column",
@@ -529,22 +577,24 @@ class ReplaceScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ReplaceScreen")
 
-    def __init__(self, cidx: int, df: pl.DataFrame):
-        self.cidx = cidx
-        self.df = df
+    def __init__(self, dftable: DataFrameTable):
+        term_find = str(dftable.cursor_value)
         super().__init__(
-            title="Replace Column Values",
-            label="with value or Polars expression, e.g., abc, pl.lit(7), NULL, $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.arange(0, pl.len())",
-            input="$_",
+            title="Find and Replace",
+            label="Find",
+            input=term_find,
+            label2="Replace with",
+            input2="new value or expression",
+            checkbox="Replace all occurrences",
+            yes="Replace",
+            no="Cancel",
             on_yes_callback=self._get_input,
         )
 
     def _get_input(self) -> tuple[str, int]:
         """Get input."""
-        term = self.input.value.strip()
-        try:
-            expr = validate_expr(term, self.df, self.cidx)
-            return expr, self.cidx
-        except ValueError as ve:
-            self.notify(f"Invalid expression: [$accent]{str(ve)}[/]", title="Replace Column Values", severity="error")
-            return None
+        term_find = self.input.value.strip()
+        term_replace = self.input2.value.strip()
+        replace_all = self.checkbox.value if self.checkbox else False
+
+        return term_find, term_replace, replace_all
