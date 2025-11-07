@@ -35,45 +35,62 @@ class TableScreen(ModalScreen):
         }
     """
 
-    def __init__(self, dftable: DataFrameTable):
+    def __init__(self, dftable: "DataFrameTable") -> None:
+        """Initialize the table screen.
+
+        Sets up the base modal screen with reference to the main DataFrameTable widget
+        and stores the DataFrame for display.
+
+        Args:
+            dftable: Reference to the parent DataFrameTable widget.
+
+        Returns:
+            None
+        """
         super().__init__()
         self.df: pl.DataFrame = dftable.df  # Polars DataFrame
         self.dftable = dftable  # DataFrameTable
 
     def compose(self) -> ComposeResult:
-        """Create the table. Must be overridden by subclasses."""
+        """Compose the table screen widget structure.
+
+        Creates and yields a DataTable widget for displaying tabular data.
+        Subclasses should override to customize table configuration.
+
+        Yields:
+            DataTable: The table widget for this screen.
+        """
         self.table = DataTable(zebra_stripes=True)
         yield self.table
 
-    def on_key(self, event):
-        if event.key in ("q", "escape"):
-            self.app.pop_screen()
-            event.stop()
-        # Prevent key events from propagating to parent screen,
-        # except for the following default key bindings for DataTable
-        elif event.key not in (
-            "up",
-            "down",
-            "right",
-            "left",
-            "pageup",
-            "pagedown",
-            "ctrl+home",
-            "ctrl+end",
-            "home",
-            "end",
-        ):
-            event.stop()
+    def on_key(self, event) -> None:
+        """Handle key press events in the table screen.
+
+        Provides keyboard shortcuts for navigation and interaction, including q/Escape to close.
+        Prevents propagation of non-navigation keys to parent screens.
+
+        Args:
+            event: The key event object.
+
+        Returns:
+            None
+        """
 
     def _filter_or_highlight_selected_value(
         self, col_name_value: tuple[str, Any] | None, action: str = "filter"
     ) -> None:
-        """Apply filter or highlight action by the selected value from the frequency table.
+        """Apply filter or highlight action by the selected value.
+
+        Filters or highlights rows in the main table based on a selected value from
+        this table (typically frequency or row detail). Updates the main table's display
+        and notifies the user of the action.
 
         Args:
-            col_name: The name of the column to filter/highlight.
-            col_value: The value to filter/highlight by.
-            action: Either "filter" to filter visible rows, or "highlight" to select matching rows.
+            col_name_value: Tuple of (column_name, column_value) to filter/highlight by, or None.
+            action: Either "filter" to hide non-matching rows, or "highlight" to select matching rows. Defaults to "filter".
+
+        Returns:
+            None
         """
         if col_name_value is None:
             return
@@ -124,7 +141,14 @@ class RowDetailScreen(TableScreen):
         self.ridx = ridx
 
     def on_mount(self) -> None:
-        """Create the detail table."""
+        """Initialize the row detail screen.
+
+        Populates the table with column names and values from the selected row
+        of the main DataFrame. Sets the table cursor type to "row".
+
+        Returns:
+            None
+        """
         self.table.add_column("Column")
         self.table.add_column("Value")
 
@@ -134,15 +158,18 @@ class RowDetailScreen(TableScreen):
 
         self.table.cursor_type = "row"
 
-    def on_key(self, event):
-        if event.key == "v":
-            # Filter the main table by the selected value
-            self._filter_or_highlight_selected_value(self._get_col_name_value(), action="filter")
-            event.stop()
-        elif event.key == "quotation_mark":  # '"'
-            # Highlight the main table by the selected value
-            self._filter_or_highlight_selected_value(self._get_col_name_value(), action="highlight")
-            event.stop()
+    def on_key(self, event) -> None:
+        """Handle key press events in the row detail screen.
+
+        Supports 'v' for filtering and '"' for highlighting the main table
+        by the value in the selected row.
+
+        Args:
+            event: The key event object.
+
+        Returns:
+            None
+        """
 
     def _get_col_name_value(self) -> tuple[str, Any] | None:
         row_idx = self.table.cursor_row

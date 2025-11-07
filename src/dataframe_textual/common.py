@@ -92,7 +92,17 @@ RIDX = "^_ridx_^"
 
 
 def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
-    """Get the DtypeClass configuration for a given Polars data type."""
+    """Get the DtypeClass configuration for a given Polars data type.
+
+    Retrieves styling and formatting configuration based on the Polars data type,
+    including style (color), justification, and type conversion function.
+
+    Args:
+        dtype: A Polars data type to get configuration for.
+
+    Returns:
+        A DtypeClass containing style, justification, input type, and conversion function.
+    """
     if dc := STYLES.get(dtype):
         return dc
     elif isinstance(dtype, pl.Datetime):
@@ -108,10 +118,16 @@ def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
 def format_row(vals, dtypes, apply_justify=True) -> list[Text]:
     """Format a single row with proper styling and justification.
 
+    Converts raw row values to formatted Rich Text objects with appropriate
+    styling (colors), justification, and null value handling based on data types.
+
     Args:
         vals: The list of values in the row.
         dtypes: The list of data types corresponding to each value.
         apply_justify: Whether to apply justification styling. Defaults to True.
+
+    Returns:
+        A list of Rich Text objects with proper formatting applied.
     """
     formatted_row = []
 
@@ -138,7 +154,18 @@ def format_row(vals, dtypes, apply_justify=True) -> list[Text]:
 
 
 def rindex(lst: list, value) -> int:
-    """Return the last index of value in a list. Return -1 if not found."""
+    """Return the last index of value in a list. Return -1 if not found.
+
+    Searches through the list in reverse order to find the last occurrence
+    of the given value.
+
+    Args:
+        lst: The list to search through.
+        value: The value to find.
+
+    Returns:
+        The index (0-based) of the last occurrence, or -1 if not found.
+    """
     for i, item in enumerate(reversed(lst)):
         if item == value:
             return len(lst) - 1 - i
@@ -146,7 +173,22 @@ def rindex(lst: list, value) -> int:
 
 
 def get_next_item(lst: list[Any], current, offset=1) -> Any:
-    """Return the next item in the list after the current item, cycling if needed."""
+    """Return the next item in the list after the current item, cycling if needed.
+
+    Finds the current item in the list and returns the item at position (current_index + offset),
+    wrapping around to the beginning if necessary.
+
+    Args:
+        lst: The list to cycle through.
+        current: The current item (must be in the list).
+        offset: The number of positions to advance. Defaults to 1.
+
+    Returns:
+        The next item in the list after advancing by the offset.
+
+    Raises:
+        ValueError: If the current item is not found in the list.
+    """
     if current not in lst:
         raise ValueError("Current item not in list")
     current_index = lst.index(current)
@@ -225,7 +267,17 @@ def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: 
 
 
 def tentative_expr(term: str) -> bool:
-    """Check if the given term could be a Polars expression."""
+    """Check if the given term could be a Polars expression.
+
+    Heuristically determines whether a string might represent a Polars expression
+    based on common patterns like column references ($) or direct Polars syntax (pl.).
+
+    Args:
+        term: The string to check.
+
+    Returns:
+        True if the term appears to be a Polars expression, False otherwise.
+    """
     if term.startswith("$") and not term.endswith("$"):
         return True
     if "pl." in term:
@@ -236,16 +288,19 @@ def tentative_expr(term: str) -> bool:
 def validate_expr(term: str, df: pl.DataFrame, current_col_idx: int) -> pl.Expr | None:
     """Validate and return the expression.
 
+    Parses a user-provided expression string and validates it as a valid Polars expression.
+    Converts special syntax like $_ references to proper Polars col() expressions.
+
     Args:
         term: The input expression as a string.
-        df: The DataFrame to validate column references.
+        df: The DataFrame to validate column references against.
         current_col_idx: The index of the currently selected column (0-based). Used for $_ reference.
 
     Returns:
-        A tuple of (expression string, Polars expression) if valid, else None.
+        A valid Polars expression object if validation succeeds.
 
     Raises:
-        ValueError: If the expression is invalid or cannot be evaluated.
+        ValueError: If the expression is invalid, contains non-existent column references, or cannot be evaluated.
     """
     term = term.strip()
 

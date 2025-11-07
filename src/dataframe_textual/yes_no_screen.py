@@ -90,16 +90,25 @@ class YesNoScreen(ModalScreen):
         maybe: str | dict | Button = None,
         no: str | dict | Button = "No",
         on_yes_callback=None,
-    ):
+    ) -> None:
         """Initialize the modal screen.
 
+        Creates a customizable Yes/No dialog with optional input fields, labels, and checkboxes.
+
         Args:
-            title: The title to display in the border
-            label: Optional label to display below title as a Label
-            input: Optional input value to pre-fill an Input widget. If None, no Input is shown. If it is a 2-value tuple, the first value is the pre-filled input, and the second value is the type of input (e.g., "integer", "number", "text")
-            yes: Text for the Yes button. If None, hides the Yes button
-            no: Text for the No button. If None, hides the No button
-            on_yes_callback: Optional callable that takes no args and returns the value to dismiss with when Yes is pressed
+            title: The title to display in the border. Defaults to None.
+            label: Optional label to display below title as a Label. Defaults to None.
+            input: Optional input widget or value to pre-fill. If None, no Input is shown. Defaults to None.
+            label2: Optional second label widget. Defaults to None.
+            input2: Optional second input widget or value. Defaults to None.
+            checkbox: Optional checkbox widget or label. Defaults to None.
+            yes: Text or dict for the Yes button. If None, hides the Yes button. Defaults to "Yes".
+            maybe: Optional Maybe button text/dict. Defaults to None.
+            no: Text or dict for the No button. If None, hides the No button. Defaults to "No".
+            on_yes_callback: Optional callable that takes no args and returns the value to dismiss with when Yes is pressed. Defaults to None.
+
+        Returns:
+            None
         """
         super().__init__()
         self.title = title
@@ -114,6 +123,14 @@ class YesNoScreen(ModalScreen):
         self.on_yes_callback = on_yes_callback
 
     def compose(self) -> ComposeResult:
+        """Compose the modal screen widget structure.
+
+        Builds the widget hierarchy with optional title, labels, inputs, checkboxes,
+        and action buttons based on initialization parameters.
+
+        Yields:
+            Widget: The components of the modal screen in rendering order.
+        """
         with Static(id="modal-container") as container:
             if self.title:
                 container.border_title = self.title

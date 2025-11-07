@@ -2,6 +2,7 @@
 
 from textwrap import dedent
 
+from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.css.query import NoMatches
 from textual.widget import Widget
@@ -68,7 +69,16 @@ class DataFrameHelpPanel(Widget):
 
     DEFAULT_CLASSES = "-textual-system"
 
-    def on_mount(self):
+    def on_mount(self) -> None:
+        """Set up help panel when mounted.
+
+        Initializes the help panel by setting up a watcher for focused widget changes
+        to dynamically update help text based on which widget has focus.
+
+        Returns:
+            None
+        """
+
         def update_help(focused_widget: Widget | None):
             self.update_help(focused_widget)
 
@@ -94,5 +104,13 @@ class DataFrameHelpPanel(Widget):
             except NoMatches:
                 pass
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
+        """Compose the help panel widget structure.
+
+        Creates and returns the widget hierarchy for the help panel,
+        including a VerticalScroll container with a Markdown display area.
+
+        Yields:
+            VerticalScroll: The main container with Markdown widget for help text.
+        """
         yield VerticalScroll(Markdown(id="widget-help"))

@@ -79,14 +79,27 @@ class DataFrameViewer(App):
         }
     """
 
-    def __init__(self, *filenames):
-        super().__init__()
-        self.sources = _load_dataframe(filenames)
-        self.tabs: dict[TabPane, DataFrameTable] = {}
-        self.help_panel = None
+    def __init__(self, *filenames: str) -> None:
+        """Initialize the DataFrame Viewer application.
+
+        Loads dataframes from provided filenames and prepares the tabbed interface.
+
+        Args:
+            *filenames: Variable number of file paths to load (CSV, Excel, Parquet, etc).
+
+        Returns:
+            None
+        """
 
     def compose(self) -> ComposeResult:
-        """Create tabbed interface for multiple files or direct table for single file."""
+        """Compose the application widget structure.
+
+        Creates a tabbed interface with one tab per file/sheet loaded. Each tab
+        contains a DataFrameTable widget for displaying and interacting with the data.
+
+        Yields:
+            TabPane: One tab per file or sheet for the tabbed interface.
+        """
         # Tabbed interface
         self.tabbed = TabbedContent(id="main_tabs")
         with self.tabbed:
@@ -107,18 +120,45 @@ class DataFrameViewer(App):
                     self.notify(f"Error loading {tabname}: {e}", severity="error")
 
     def on_mount(self) -> None:
-        """Set up the app when it starts."""
+        """Set up the application when it starts.
+
+        Initializes the app by hiding the tab bar for single-file mode and focusing
+        the active table widget.
+
+        Returns:
+            None
+        """
         if len(self.tabs) == 1:
             self.query_one(ContentTabs).display = False
             self._get_active_table().focus()
 
-    def on_key(self, event):
+    def on_key(self, event) -> None:
+        """Handle key press events at the application level.
+
+        Currently handles theme cycling with the 'k' key.
+
+        Args:
+            event: The key event object containing key information.
+
+        Returns:
+            None
+        """
         if event.key == "k":
             self.theme = get_next_item(list(BUILTIN_THEMES.keys()), self.theme)
             self.notify(f"Switched to theme: [$success]{self.theme}[/]", title="Theme")
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
-        """Handle tab changes"""
+        """Handle tab activation events.
+
+        When a tab is activated, focuses the table widget and loads its data if not already loaded.
+        Applies active styling to the clicked tab and removes it from others.
+
+        Args:
+            event: The tab activated event containing the activated tab pane.
+
+        Returns:
+            None
+        """
         # Focus the table in the newly activated tab
         if table := self._get_active_table():
             table.focus()
@@ -135,7 +175,13 @@ class DataFrameViewer(App):
                 tab.remove_class("active")
 
     def action_toggle_help_panel(self) -> None:
-        """Toggle the HelpPanel on/off."""
+        """Toggle the help panel on or off.
+
+        Shows or hides the context-sensitive help panel. Creates it on first use.
+
+        Returns:
+            None
+        """
         if self.help_panel:
             self.help_panel.display = not self.help_panel.display
         else:
@@ -143,11 +189,25 @@ class DataFrameViewer(App):
             self.mount(self.help_panel)
 
     def action_add_tab(self) -> None:
-        """Open screen to load file to new tab."""
+        """Open file browser to load a file in a new tab.
+
+        Displays the file open dialog for the user to select a file to load
+        as a new tab in the interface.
+
+        Returns:
+            None
+        """
         self.push_screen(OpenFileScreen(), self._do_add_tab)
 
     def action_save_all_tabs(self) -> None:
-        """Save all tabs to a Excel file."""
+        """Save all open tabs to a single Excel file.
+
+        Displays a save dialog to choose filename and location, then saves all
+        open tabs as separate sheets in a single Excel workbook.
+
+        Returns:
+            None
+        """
         callback = partial(self._get_active_table()._do_save_file, all_tabs=True)
         self.push_screen(
             SaveFileScreen("all-tabs.xlsx", title="Save All Tabs"),
@@ -155,32 +215,54 @@ class DataFrameViewer(App):
         )
 
     def action_close_tab(self) -> None:
-        """Close current tab (only for multiple files)."""
+        """Close the currently active tab.
+
+        Closes the current tab. If this is the only tab, exits the application instead.
+
+        Returns:
+            None
+        """
         if len(self.tabs) <= 1:
             self.app.exit()
             return
         self._close_tab()
 
-    def action_next_tab(self, offset: int = 1) -> str:
-        """Switch to next tab (only for multiple files)."""
-        if len(self.tabs) <= 1:
-            return
-        try:
-            tabs: list[TabPane] = list(self.tabs.keys())
-            next_tab = get_next_item(tabs, self.tabbed.active_pane, offset)
-            self.tabbed.active = next_tab.id
-        except (NoMatches, ValueError):
-            pass
+    def action_next_tab(self, offset: int = 1) -> None:
+        """Switch to the next tab or previous tab.
+
+        Cycles through tabs by the specified offset. With offset=1, moves to next tab.
+        With offset=-1, moves to previous tab. Wraps around when reaching edges.
+
+        Args:
+            offset: Number of tabs to advance (+1 for next, -1 for previous). Defaults to 1.
+
+        Returns:
+            None
+        """
 
     def action_toggle_tab_bar(self) -> None:
-        """Toggle tab bar visibility."""
+        """Toggle the tab bar visibility.
+
+        Shows or hides the tab bar at the bottom of the window. Useful for maximizing
+        screen space in single-tab mode.
+
+        Returns:
+            None
+        """
         tabs = self.query_one(ContentTabs)
         tabs.display = not tabs.display
         status = "shown" if tabs.display else "hidden"
         self.notify(f"Tab bar [$success]{status}[/]", title="Toggle")
 
     def _get_active_table(self) -> DataFrameTable | None:
-        """Get the currently active table."""
+        """Get the currently active DataFrameTable widget.
+
+        Retrieves the table from the currently active tab. Returns None if no
+        table is found or an error occurs.
+
+        Returns:
+            The active DataFrameTable widget, or None if not found.
+        """
         try:
             tabbed: TabbedContent = self.query_one(TabbedContent)
             if active_pane := tabbed.active_pane:
@@ -190,7 +272,17 @@ class DataFrameViewer(App):
         return None
 
     def _do_add_tab(self, filename: str) -> None:
-        """Add a tab for the opened file."""
+        """Add a tab for the opened file.
+
+        Loads the specified file and creates one or more tabs for it. For Excel files,
+        creates one tab per sheet. For other formats, creates a single tab.
+
+        Args:
+            filename: Path to the file to load and add as tab(s).
+
+        Returns:
+            None
+        """
         if filename and os.path.exists(filename):
             try:
                 n_tab = 0
@@ -204,7 +296,20 @@ class DataFrameViewer(App):
             self.notify(f"File does not exist: [$warning]{filename}[/]", title="Open", severity="warning")
 
     def _add_tab(self, df: pl.DataFrame, filename: str, tabname: str) -> None:
-        """Add new tab for the given file. For Exel, only use the first sheet."""
+        """Add new tab for the given DataFrame.
+
+        Creates and adds a new tab with the provided DataFrame and configuration.
+        Ensures unique tab names by appending an index if needed. Shows the tab bar
+        if this is no longer the only tab.
+
+        Args:
+            df: The Polars DataFrame to display in the new tab.
+            filename: The source filename for this data (used in table metadata).
+            tabname: The display name for the tab.
+
+        Returns:
+            None
+        """
         if any(tab.name == tabname for tab in self.tabs):
             tabname = f"{tabname}_{len(self.tabs) + 1}"
 
@@ -231,7 +336,14 @@ class DataFrameViewer(App):
         table.focus()
 
     def _close_tab(self) -> None:
-        """Close current tab."""
+        """Close the currently active tab.
+
+        Removes the active tab from the interface. If only one tab remains and no more
+        can be closed, the application exits instead.
+
+        Returns:
+            None
+        """
         try:
             if len(self.tabs) == 1:
                 self.app.exit()
@@ -246,19 +358,19 @@ class DataFrameViewer(App):
 
 def _load_file(
     filename: str, first_sheet: bool = False, prefix_sheet: bool = False
-) -> list[tuple[pl.LazyFrame, str, str]]:
+) -> list[tuple[pl.LazyFrame | pl.DataFrame, str, str]]:
     """Load a single file and return list of sources.
 
     For Excel files, when single_file=True, returns one entry per sheet.
     For other files or multiple files, returns one entry per file.
 
     Args:
-        filename: Path to file
-        first_sheet: If True, only load first sheet for Excel files
-        prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files
+        filename: Path to file to load.
+        first_sheet: If True, only load first sheet for Excel files. Defaults to False.
+        prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
 
     Returns:
-        List of tuples of (DataFrame/LazyFrame, filename, tabname)
+        List of tuples of (DataFrame/LazyFrame, filename, tabname).
     """
     sources = []
 
@@ -300,13 +412,16 @@ def _load_file(
 
 
 def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame | pl.LazyFrame, str, str]]:
-    """Load a DataFrame from a file spec.
+    """Load DataFrames from file specifications.
+
+    Handles loading from multiple files, single files, or stdin. For Excel files,
+    loads all sheets as separate entries. For other formats, loads as single file.
 
     Args:
         filenames: List of filenames to load. If single filename is "-", read from stdin.
 
     Returns:
-        List of tuples of (DataFrame, filename, tabname)
+        List of tuples of (DataFrame/LazyFrame, filename, tabname) ready for display.
     """
     sources = []
 

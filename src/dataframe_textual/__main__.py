@@ -7,8 +7,18 @@ from pathlib import Path
 from .data_frame_viewer import DataFrameViewer
 
 
-def main():
-    """Run the DataFrame Viewer application."""
+def main() -> None:
+    """Run the DataFrame Viewer application.
+
+    Parses command-line arguments to determine input files or stdin, validates
+    file existence, and launches the interactive DataFrame Viewer application.
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If invalid arguments are provided or required files are missing.
+    """
     parser = argparse.ArgumentParser(
         description="Interactive CSV/Excel viewer for the terminal (Textual version)",
         formatter_class=argparse.RawDescriptionHelpFormatter,

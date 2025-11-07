@@ -5,6 +5,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
+from typing import Any
 
 import polars as pl
 from rich.text import Text
@@ -230,13 +231,20 @@ class DataFrameTable(DataTable):
     ]
     # fmt: on
 
-    def __init__(self, df: pl.DataFrame | pl.LazyFrame, filename: str = "", name: str = "", **kwargs):
+    def __init__(self, df: pl.DataFrame | pl.LazyFrame, filename: str = "", name: str = "", **kwargs) -> None:
         """Initialize the DataFrameTable with a dataframe and manage all state.
 
+        Sets up the table widget with display configuration, loads the dataframe, and
+        initializes all state tracking variables for row/column operations.
+
         Args:
-            df: The Polars DataFrame to display
-            filename: Optional filename of the source CSV
-            kwargs: Additional keyword arguments for DataTable
+            df: The Polars DataFrame or LazyFrame to display and edit.
+            filename: Optional source filename for the data (used in save operations). Defaults to "".
+            name: Optional display name for the table tab. Defaults to "" (uses filename stem).
+            **kwargs: Additional keyword arguments passed to the parent DataTable widget.
+
+        Returns:
+            None
         """
         super().__init__(name=(name or Path(filename).stem), **kwargs)
 
@@ -267,45 +275,86 @@ class DataFrameTable(DataTable):
 
     @property
     def cursor_key(self) -> CellKey:
-        """Get the current cursor position as a CellKey."""
+        """Get the current cursor position as a CellKey.
+
+        Returns:
+            CellKey: A CellKey object representing the current cursor position.
+        """
         return self.coordinate_to_cell_key(self.cursor_coordinate)
 
     @property
     def cursor_row_key(self) -> RowKey:
-        """Get the current cursor row as a RowKey."""
+        """Get the current cursor row as a RowKey.
+
+        Returns:
+            RowKey: The row key for the row containing the cursor.
+        """
         return self.cursor_key.row_key
 
     @property
     def cursor_col_key(self) -> ColumnKey:
-        """Get the current cursor column as a ColumnKey."""
+        """Get the current cursor column as a ColumnKey.
+
+        Returns:
+            ColumnKey: The column key for the column containing the cursor.
+        """
         return self.cursor_key.column_key
 
     @property
     def cursor_row_idx(self) -> int:
-        """Get the current cursor row index (0-based) as in dataframe."""
+        """Get the current cursor row index (0-based) as in dataframe.
+
+        Returns:
+            int: The 0-based row index of the cursor position.
+
+        Raises:
+            AssertionError: If the cursor row index is out of bounds.
+        """
         ridx = int(self.cursor_row_key.value)
         assert 0 <= ridx < len(self.df), "Cursor row index is out of bounds"
         return ridx
 
     @property
     def cursor_col_idx(self) -> int:
-        """Get the current cursor column index (0-based) as in dataframe."""
+        """Get the current cursor column index (0-based) as in dataframe.
+
+        Returns:
+            int: The 0-based column index of the cursor position.
+
+        Raises:
+            AssertionError: If the cursor column index is out of bounds.
+        """
         cidx = self.df.columns.index(self.cursor_col_key.value)
         assert 0 <= cidx < len(self.df.columns), "Cursor column index is out of bounds"
         return cidx
 
     @property
     def cursor_col_name(self) -> str:
-        """Get the current cursor column name as in dataframe."""
+        """Get the current cursor column name as in dataframe.
+
+        Returns:
+            str: The name of the column containing the cursor.
+        """
         return self.cursor_col_key.value
 
     @property
-    def cursor_value(self) -> any:
-        """Get the current cursor cell value."""
+    def cursor_value(self) -> Any:
+        """Get the current cursor cell value.
+
+        Returns:
+            Any: The value of the cell at the cursor position.
+        """
         return self.df.item(self.cursor_row_idx, self.cursor_col_idx)
 
     def on_mount(self) -> None:
-        """Initialize table display when widget is mounted."""
+        """Initialize table display when the widget is mounted.
+
+        Called by Textual when the widget is first added to the display tree.
+        Currently a placeholder as table setup is deferred until first use.
+
+        Returns:
+            None
+        """
         # self._setup_table()
         pass
 
@@ -318,10 +367,10 @@ class DataFrameTable(DataTable):
         Args:
             cursor: The current position of the cursor.
             target_cell: The cell we're checking for the need to highlight.
-            type_of_cursor: The type of cursor that is currently active.
+            type_of_cursor: The type of cursor that is currently active ("cell", "row", or "column").
 
         Returns:
-            Whether or not the given cell should be highlighted.
+            bool: True if the target cell should be highlighted, False otherwise.
         """
         if type_of_cursor == "cell":
             # Return true if the cursor is over the target cell
@@ -343,12 +392,18 @@ class DataFrameTable(DataTable):
             return False
 
     def watch_cursor_coordinate(self, old_coordinate: Coordinate, new_coordinate: Coordinate) -> None:
-        """Refresh highlighting when cursor coordinate changes.
+        """Handle cursor position changes and refresh highlighting.
 
-        This explicitly refreshes cells that need to change their highlight state
-        to fix the delay issue with column label highlighting. Also emits CellSelected
-        message when cursor type is "cell" for keyboard navigation only (mouse clicks
-        already trigger the parent class's CellSelected message).
+        This method is called by Textual whenever the cursor moves. It refreshes cells that need
+        to change their highlight state. Also emits CellSelected message when cursor type is "cell"
+        for keyboard navigation only (mouse clicks already trigger it).
+
+        Args:
+            old_coordinate: The previous cursor coordinate.
+            new_coordinate: The new cursor coordinate.
+
+        Returns:
+            None
         """
         if old_coordinate != new_coordinate:
             # Emit CellSelected message for cell cursor type (keyboard navigation only)
@@ -387,21 +442,32 @@ class DataFrameTable(DataTable):
                 self._scroll_cursor_into_view()
 
     def on_key(self, event) -> None:
-        """Handle keyboard events for table operations and navigation."""
+        """Handle key press events for pagination.
+
+        Currently handles "pagedown" and "down" keys to trigger lazy loading of additional rows
+        when scrolling near the end of the loaded data.
+
+        Args:
+            event: The key event object.
+
+        Returns:
+            None
+        """
         if event.key in ("pagedown", "down"):
             # Let the table handle the navigation first
             self._check_and_load_more()
 
-    def on_click(self, event: Click):
-        if self.cursor_type == "cell" and event.chain > 1:  # only on double-click or more
-            row_idx = event.style.meta["row"]
-            # col_idx = event.style.meta["column"]
+    def on_click(self, event: Click) -> None:
+        """Handle mouse click events on the table.
 
-            # header row
-            if row_idx == -1:
-                self._rename_column()
-            else:
-                self._edit_cell()
+        Supports double-click editing of cells and renaming of column headers.
+
+        Args:
+            event: The click event containing row and column information.
+
+        Returns:
+            None
+        """
 
     # Action handlers for BINDINGS
     def action_jump_top(self) -> None:
