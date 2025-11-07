@@ -13,7 +13,7 @@ from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
-from .common import NULL, NULL_DISPLAY, DtypeConfig, _format_row
+from .common import NULL, NULL_DISPLAY, DtypeConfig, format_row
 
 
 class TableScreen(ModalScreen):
@@ -130,7 +130,7 @@ class RowDetailScreen(TableScreen):
 
         # Get all columns and values from the dataframe row
         for col, val, dtype in zip(self.df.columns, self.df.row(self.ridx), self.df.dtypes):
-            self.table.add_row(*_format_row([col, val], [None, dtype], apply_justify=False))
+            self.table.add_row(*format_row([col, val], [None, dtype], apply_justify=False))
 
         self.table.cursor_type = "row"
 

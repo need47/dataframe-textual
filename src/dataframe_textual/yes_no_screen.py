@@ -6,7 +6,7 @@ from textual.containers import Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Static
 
-from .common import NULL, DtypeConfig, parse_polars_expression
+from .common import NULL, DtypeConfig, validate_expr
 
 
 class YesNoScreen(ModalScreen):
@@ -29,6 +29,7 @@ class YesNoScreen(ModalScreen):
             max-width: 60;
             height: auto;
             border: solid $primary;
+            border-title-color: $primary-lighten-3;
             background: $surface;
             padding: 2;
         }
@@ -83,7 +84,7 @@ class YesNoScreen(ModalScreen):
     def compose(self) -> ComposeResult:
         with Static(id="modal-container") as container:
             if self.title:
-                container.border_title = f"[$success bold]{self.title}[/]"
+                container.border_title = self.title
 
             if self.label:
                 if isinstance(self.label, Label):
@@ -162,9 +163,9 @@ class SaveFileScreen(YesNoScreen):
 
     def handle_save(self):
         if self.input:
-            filename_input = self.input.value.strip()
-            if filename_input:
-                return filename_input
+            input_filename = self.input.value.strip()
+            if input_filename:
+                return input_filename
             else:
                 self.notify("Filename cannot be empty", title="Save", severity="error")
                 return None
@@ -195,26 +196,26 @@ class EditCellScreen(YesNoScreen):
     def __init__(self, ridx: int, cidx: int, df: pl.DataFrame):
         self.ridx = ridx
         self.cidx = cidx
-        self.col_dtype = df.dtypes[cidx]
+        self.dtype = df.dtypes[cidx]
 
         # Label
-        content = f"[$primary]{df.columns[cidx]}[/] ([$accent]{self.col_dtype}[/])"
+        content = f"[$success]{df.columns[cidx]}[/] ([$accent]{self.dtype}[/])"
 
         # Input
         df_value = df.item(ridx, cidx)
-        self.input_value = str(df_value) if df_value is not None else ""
+        self.input_value = "" if df_value is None else str(df_value).strip()
 
         super().__init__(
             title="Edit Cell",
             label=content,
             input={
                 "value": self.input_value,
-                "type": DtypeConfig(self.col_dtype).itype,
+                "type": DtypeConfig(self.dtype).itype,
             },
-            on_yes_callback=self._save_edit,
+            on_yes_callback=self._validate_input,
         )
 
-    def _save_edit(self) -> None:
+    def _validate_input(self) -> None:
         """Validate and save the edited value."""
         new_value_str = self.input.value.strip()
 
@@ -222,7 +223,9 @@ class EditCellScreen(YesNoScreen):
         if not new_value_str:
             new_value = None
             self.notify(
-                "Empty value provided. If you want to clear the cell, press 'c'.", title="Edit", severity="warning"
+                "Empty value provided. If you want to clear the cell, press [$accent]x[/].",
+                title="Edit",
+                severity="warning",
             )
         # Check if value changed
         elif new_value_str == self.input_value:
@@ -231,10 +234,13 @@ class EditCellScreen(YesNoScreen):
         else:
             # Parse and validate based on column dtype
             try:
-                new_value = DtypeConfig(self.col_dtype).convert(new_value_str)
+                new_value = DtypeConfig(self.dtype).convert(new_value_str)
             except Exception as e:
-                new_value = None
-                self.notify(f"Invalid value: {str(e)}", title="Edit", severity="error")
+                self.notify(
+                    f"Failed to convert [$accent]{new_value_str}[/] to [$error]{self.dtype}[/]: {str(e)}",
+                    title="Edit",
+                    severity="error",
+                )
                 return None
 
         # New value
@@ -252,16 +258,16 @@ class RenameColumnScreen(YesNoScreen):
         self.existing_columns = [c for c in existing_columns if c != col_name]
 
         # Label
-        content = f"Rename [$primary]{col_name}[/] to:"
+        content = f"Rename header [$success]{col_name}[/]"
 
         super().__init__(
             title="Rename Column",
             label=content,
             input={"value": col_name},
-            on_yes_callback=self._save_rename,
+            on_yes_callback=self._validate_input,
         )
 
-    def _save_rename(self) -> None:
+    def _validate_input(self) -> None:
         """Validate and save the new column name."""
         new_name = self.input.value.strip()
 
@@ -295,22 +301,24 @@ class SearchScreen(YesNoScreen):
     def __init__(self, title, term, df: pl.DataFrame, cidx: int):
         self.cidx = cidx
 
+        EXPR = f"ABC, (?i)abc, ^abc$, {NULL}, $_ > 50, $1 < $HP, $_.str.contains('sub')"
+
         if "Search" in title:
             col_name = df.columns[cidx]
             col_dtype = df.dtypes[cidx]
-            label = f"{title} in [$primary]{col_name}[/] ([$warning]{col_dtype}[/]) with value or Polars expression, e.g., $_ > 50, $1 < $2, {NULL}"
+            label = f"{title} in [$success]{col_name}[/] ([$warning]{col_dtype}[/]) with value or Polars expression, e.g., {EXPR}"
         else:
-            label = f"{title} by value or Polars expression, e.g., 'ABC', '(?i)abc', $_ > 50, $1 < $2, {NULL}"
+            label = f"{title} by value or Polars expression, e.g., {EXPR}"
 
         super().__init__(
             title=title,
             label=label,
             input=term,
-            on_yes_callback=self._do_search,
+            on_yes_callback=self._validate_input,
         )
 
-    def _do_search(self) -> None:
-        """Perform the search."""
+    def _validate_input(self) -> None:
+        """Validate the input and return it."""
         term = self.input.value.strip()
 
         if not term:
@@ -325,45 +333,20 @@ class FilterScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "FilterScreen")
 
-    def __init__(
-        self,
-        df: pl.DataFrame,
-        cidx: int | None = None,
-        cell_value: str | None = None,
-    ):
+    def __init__(self, df: pl.DataFrame, cidx: int, input_value: str | None = None):
         self.df = df
         self.cidx = cidx
         super().__init__(
             title="Filter by Expression",
-            label="e.g., $1 > 50, $name == 'text', $_ > 100, $a < $b, $_.str.contains('sub'), $_.is_null()",
-            input=f"$_ == {cell_value}",
-            on_yes_callback=self._validate_filter,
+            label="e.g., NULL, $1 > 50, $name == 'text', $_ > 100, $a < $b, $_.str.contains('sub')",
+            input=input_value,
+            on_yes_callback=self._get_input,
         )
 
-    def _validate_filter(self) -> pl.Expr | None:
-        """Validate and return the filter expression."""
-        expression = self.input.value.strip()
-
-        try:
-            # Try to parse the expression to ensure it's valid
-            expr_str = parse_polars_expression(expression, self.df, self.cidx)
-
-            try:
-                # Test the expression by evaluating it
-                expr = eval(expr_str, {"pl": pl})
-
-                # Expression is valid
-                return expr_str, expr
-            except Exception as e:
-                self.notify(
-                    f"Error evaluating expression: {str(e)}",
-                    title="Filter",
-                    severity="error",
-                )
-        except ValueError as ve:
-            self.notify(f"Invalid expression: {str(ve)}", title="Filter", severity="error")
-
-        return None
+    def _get_input(self) -> tuple[str, int]:
+        """Get input."""
+        term = self.input.value.strip()
+        return term, self.cidx
 
 
 class PinScreen(YesNoScreen):
@@ -455,39 +438,20 @@ class EditColumnScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "EditColumnScreen")
 
-    def __init__(self, cid: int, df: pl.DataFrame):
-        self.cid = cid
+    def __init__(self, cidx: int, df: pl.DataFrame):
+        self.cidx = cidx
         self.df = df
         super().__init__(
             title="Edit Column",
-            label="Enter Polars expression,  e.g., 'abc', pl.lit(7), $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.arange(0, pl.len())",
+            label=f"by value or Polars expression, e.g., abc, pl.lit(7), {NULL}, $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.arange(0, pl.len())",
             input="$_",
-            on_yes_callback=self._validate_expression,
+            on_yes_callback=self._get_input,
         )
 
-    def _validate_expression(self) -> tuple[int, str, str] | None:
-        """Validate and return the column expression."""
-        expression = self.input.value.strip()
-
-        if not expression:
-            self.notify("Expression cannot be empty", title="Edit", severity="error")
-            return None
-
-        try:
-            # Parse the expression to replace $_ with pl.col(col_name)
-            expr_str = parse_polars_expression(expression, self.df, self.cid)
-            expr = eval(expr_str, {"pl": pl})
-
-            if not isinstance(expr, pl.Expr):
-                self.notify(f"Not a valid Polars expression: [$error]{expr_str}[/]", title="Edit", severity="error")
-                return None
-
-            # Expression is valid - return column index, original column name, and expression
-            return self.cid, expr_str, expr
-        except Exception as e:
-            self.notify(f"Invalid Polars expression: {str(e)}", title="Edit", severity="error")
-
-        return None
+    def _get_input(self) -> tuple[str, int]:
+        """Get input."""
+        term = self.input.value.strip()
+        return term, self.cidx
 
 
 class AddColumnScreen(YesNoScreen):
@@ -503,22 +467,22 @@ class AddColumnScreen(YesNoScreen):
             title="Add Column",
             label="Enter column name and Polars expression separated by ';' (e.g., 'col_name ; $_ * 2)",
             input="col_name",
-            on_yes_callback=self._validate_column,
+            on_yes_callback=self._get_input,
         )
 
-    def _validate_column(self) -> tuple[int, str, str] | None:
+    def _get_input(self) -> tuple[int, str, str] | None:
         """Validate and return the new column configuration."""
-        input_text = self.input.value.strip()
+        term = self.input.value.strip()
 
-        if not input_text:
+        if not term:
             self.notify("Input cannot be empty", title="Add Column", severity="error")
             return None
 
         # Split input into column name and expression
         # Format: "col_name ; expression" or just "col_name" (defaults to an empty column)
-        parts = input_text.split(";")
+        parts = term.split(";")
         col_name = parts[0].strip()
-        expr_str = parts[1].strip() if len(parts) > 1 else None
+        expression = parts[1].strip() if len(parts) > 1 else None
 
         # Validate column name
         if not col_name:
@@ -533,27 +497,13 @@ class AddColumnScreen(YesNoScreen):
             )
             return None
 
-        if expr_str is None:
+        if expression is None:
             # No expression provided - add empty column
-            return self.cidx, col_name, "NULL", pl.lit(None)
+            return self.cidx, col_name, NULL, pl.lit(None)
 
         try:
-            # Parse the expression to replace $_ with pl.col(current_col_name)
-            expr_str = parse_polars_expression(expr_str, self.df, self.cidx)
-
-            try:
-                # Test the expression by evaluating it
-                expr = eval(expr_str, {"pl": pl})
-
-                # Expression is valid - return column index, new column name, and expression
-                return self.cidx, col_name, expr_str, expr
-            except Exception as e:
-                self.notify(
-                    f"Error evaluating expression: [$accent]{str(e)}[/]",
-                    title="Add Column",
-                    severity="error",
-                )
+            expr = validate_expr(expression, self.df, self.cidx)
+            return self.cidx, col_name, expr
         except ValueError as ve:
             self.notify(f"Invalid expression: [$accent]{str(ve)}[/]", title="Add Column", severity="error")
-
-        return None
+            return None

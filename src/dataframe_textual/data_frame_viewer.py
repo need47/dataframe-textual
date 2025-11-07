@@ -13,7 +13,7 @@ from textual.theme import BUILTIN_THEMES
 from textual.widgets import TabbedContent, TabPane
 from textual.widgets.tabbed_content import ContentTab, ContentTabs
 
-from .common import _next
+from .common import get_next_item
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
 from .yes_no_screen import OpenFileScreen, SaveFileScreen
@@ -114,7 +114,7 @@ class DataFrameViewer(App):
 
     def on_key(self, event):
         if event.key == "k":
-            self.theme = _next(list(BUILTIN_THEMES.keys()), self.theme)
+            self.theme = get_next_item(list(BUILTIN_THEMES.keys()), self.theme)
             self.notify(f"Switched to theme: [$success]{self.theme}[/]", title="Theme")
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
@@ -167,7 +167,7 @@ class DataFrameViewer(App):
             return
         try:
             tabs: list[TabPane] = list(self.tabs.keys())
-            next_tab = _next(tabs, self.tabbed.active_pane, offset)
+            next_tab = get_next_item(tabs, self.tabbed.active_pane, offset)
             self.tabbed.active = next_tab.id
         except (NoMatches, ValueError):
             pass

@@ -102,7 +102,7 @@ def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
         return STYLES[pl.Unknown]
 
 
-def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
+def format_row(vals, dtypes, apply_justify=True) -> list[Text]:
     """Format a single row with proper styling and justification.
 
     Args:
@@ -134,7 +134,7 @@ def _format_row(vals, dtypes, apply_justify=True) -> list[Text]:
     return formatted_row
 
 
-def _rindex(lst: list, value) -> int:
+def rindex(lst: list, value) -> int:
     """Return the last index of value in a list. Return -1 if not found."""
     for i, item in enumerate(reversed(lst)):
         if item == value:
@@ -142,7 +142,7 @@ def _rindex(lst: list, value) -> int:
     return -1
 
 
-def _next(lst: list[Any], current, offset=1) -> Any:
+def get_next_item(lst: list[Any], current, offset=1) -> Any:
     """Return the next item in the list after the current item, cycling if needed."""
     if current not in lst:
         raise ValueError("Current item not in list")
@@ -152,7 +152,7 @@ def _next(lst: list[Any], current, offset=1) -> Any:
 
 
 def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: int) -> str:
-    """Parse and convert a filter expression to Polars syntax.
+    """Parse and convert an expression to Polars syntax.
 
     Replaces column references with Polars col() expressions:
     - $_ - Current selected column
@@ -168,7 +168,7 @@ def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: 
     - "$age < $salary" -> "pl.col('age') < pl.col('salary')"
 
     Args:
-        expression: The filter expression as a string.
+        expression: The input expression as a string.
         df: The DataFrame to validate column references.
         current_col_idx: The index of the currently selected column (0-based). Used for $_ reference.
 
@@ -219,3 +219,46 @@ def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: 
 
     result = re.sub(pattern, replace_column_ref, expression)
     return result
+
+
+def tentative_expr(term: str) -> bool:
+    """Check if the given term could be a Polars expression."""
+    if term.startswith("$") and not term.endswith("$"):
+        return True
+    if "pl." in term:
+        return True
+    return False
+
+
+def validate_expr(term: str, df: pl.DataFrame, current_col_idx: int) -> pl.Expr | None:
+    """Validate and return the expression.
+
+    Args:
+        term: The input expression as a string.
+        df: The DataFrame to validate column references.
+        current_col_idx: The index of the currently selected column (0-based). Used for $_ reference.
+
+    Returns:
+        A tuple of (expression string, Polars expression) if valid, else None.
+
+    Raises:
+        ValueError: If the expression is invalid or cannot be evaluated.
+    """
+    term = term.strip()
+
+    try:
+        # Parse the expression
+        expr_str = parse_polars_expression(term, df, current_col_idx)
+
+        # Validate by evaluating it
+        try:
+            expr = eval(expr_str, {"pl": pl})
+            if not isinstance(expr, pl.Expr):
+                raise ValueError(f"Expression evaluated to `{type(expr).__name__}` instead of a Polars expression")
+
+            # Expression is valid
+            return expr
+        except Exception as e:
+            raise ValueError(f"Failed to evaluate expression `{expr_str}`: {e}") from e
+    except Exception as ve:
+        raise ValueError(f"Failed to validate expression `{term}`: {ve}") from ve

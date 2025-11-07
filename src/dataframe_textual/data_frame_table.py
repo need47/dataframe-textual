@@ -21,17 +21,17 @@ from textual.widgets._data_table import (
 
 from .common import (
     BATCH_SIZE,
-    BOOLS,
     CURSOR_TYPES,
     INITIAL_BATCH_SIZE,
     NULL,
     NULL_DISPLAY,
     SUBSCRIPT_DIGITS,
     DtypeConfig,
-    _format_row,
-    _next,
-    _rindex,
-    parse_polars_expression,
+    format_row,
+    get_next_item,
+    rindex,
+    tentative_expr,
+    validate_expr,
 )
 from .table_screen import FrequencyScreen, RowDetailScreen, StatisticsScreen
 from .yes_no_screen import (
@@ -674,7 +674,7 @@ class DataFrameTable(DataTable):
                     continue  # Skip hidden columns
                 vals.append(val)
                 dtypes.append(dtype)
-            formatted_row = _format_row(vals, dtypes)
+            formatted_row = format_row(vals, dtypes)
             # Always add labels so they can be shown/hidden via CSS
             self.add_row(*formatted_row, key=str(row_idx), label=str(row_idx + 1))
 
@@ -707,7 +707,7 @@ class DataFrameTable(DataTable):
             self.matches = defaultdict(set)
 
         # Ensure all selected rows or matches are loaded
-        stop = _rindex(self.selected_rows, True) + 1
+        stop = rindex(self.selected_rows, True) + 1
         stop = max(stop, max(self.matches.keys(), default=0) + 1)
 
         self._load_rows(stop)
@@ -1270,19 +1270,38 @@ class DataFrameTable(DataTable):
         )
 
     def _do_edit_column(self, result) -> None:
-        """Handle result from EditColumnScreen."""
+        """Edit a column."""
         if result is None:
             return
-
-        cidx, expr_str, expr = result
-        if expr_str is None:
-            self.app.push_screen(
-                EditColumnScreen(cidx, self.df),
-                callback=self._do_edit_column,
-            )
-            return
+        term, cidx = result
 
         col_name = self.df.columns[cidx]
+
+        # Null case
+        if term is None or term == NULL:
+            expr = pl.lit(None)
+
+        # Check if term is a valid expression
+        elif tentative_expr(term):
+            try:
+                expr = validate_expr(term, self.df, cidx)
+            except Exception as e:
+                self.notify(f"Error validating expression [$error]{term}[/]: {str(e)}", title="Edit", severity="error")
+                return
+
+        # Otherwise, treat term as a literal value
+        else:
+            dtype = self.df.dtypes[cidx]
+            try:
+                value = DtypeConfig(dtype).convert(term)
+                expr = pl.lit(value)
+            except Exception:
+                self.notify(
+                    f"Unable to convert [$accent]{term}[/] to [$error]{dtype}[/]. Cast to string.",
+                    title="Edit",
+                    severity="error",
+                )
+                expr = pl.lit(str(term))
 
         # Add to history
         self._add_history(f"Edited column [$accent]{col_name}[/] with expression")
@@ -1298,7 +1317,7 @@ class DataFrameTable(DataTable):
         self._setup_table()
 
         self.notify(
-            f"Column [$accent]{col_name}[/] updated with expression [$success]{expr_str}[/]",
+            f"Column [$accent]{col_name}[/] updated with [$success]{expr}[/]",
             title="Edit",
         )
 
@@ -1434,14 +1453,14 @@ class DataFrameTable(DataTable):
         )
 
     def _do_add_column_expr(self, result: tuple[int, str, str, pl.Expr] | None) -> None:
-        """Handle the result from AddColumnScreen."""
+        """Add a new column with an expression."""
         if result is None:
             return
 
-        cidx, col_name, expr_str, expr = result
+        cidx, col_name, expr = result
 
         # Add to history
-        self._add_history(f"Added column [$success]{col_name}[/] with expression: {expr_str}")
+        self._add_history(f"Added column [$success]{col_name}[/] with expression {expr}.")
 
         try:
             # Create the column
@@ -1539,7 +1558,7 @@ class DataFrameTable(DataTable):
         self._do_search((term, cidx))
 
     def _search_expr(self) -> None:
-        """Search by expression in current column."""
+        """Search by expression."""
         cidx = self.cursor_col_idx
 
         # Use current cell value as default search term
@@ -1552,31 +1571,22 @@ class DataFrameTable(DataTable):
         )
 
     def _do_search(self, result) -> None:
-        """Search for a term in current column."""
+        """Search for a term."""
         if result is None:
             return
         term, cidx = result
-
-        # Lazyframe for filtering
-        lf = self.df.lazy().with_row_index("__ridx__")
-        if False in self.visible_rows:
-            lf = lf.filter(self.visible_rows)
-
-        # Search within a specific column
         col_name = self.df.columns[cidx]
-        col_dtype = self.df.dtypes[cidx]
 
         if term == NULL:
             expr = pl.col(col_name).is_null()
 
         # Support for polars expressions
-        elif "$" in term or "pl." in term:
+        elif tentative_expr(term):
             try:
-                expr_str = parse_polars_expression(term, self.df, cidx)
-                expr = eval(expr_str)
+                expr = validate_expr(term, self.df, cidx)
             except Exception as e:
                 self.notify(
-                    f"Failed to parse expression: [$error]{str(e)}[/]",
+                    f"Failed to validate Polars expression [$error]{term}[/]: {str(e)}",
                     title="Search",
                     severity="error",
                 )
@@ -1584,30 +1594,25 @@ class DataFrameTable(DataTable):
 
         # Perform type-aware search based on column dtype
         else:
-            dtype = DtypeConfig(col_dtype).dtype
-            try:
-                if dtype == "string":
-                    expr = pl.col(col_name).str.contains(term)
-                elif dtype == "boolean":
-                    expr = pl.col(col_name) == BOOLS[term.lower()]
-                elif dtype == "integer":
-                    expr = pl.col(col_name) == int(term)
-                elif dtype == "float":
-                    expr = pl.col(col_name) == float(term)
-                else:
+            dtype = self.df.dtypes[cidx]
+            if dtype == pl.String:
+                expr = pl.col(col_name).str.contains(term)
+            else:
+                try:
+                    value = DtypeConfig(dtype).convert(term)
+                    expr = pl.col(col_name) == value
+                except Exception:
                     expr = pl.col(col_name).cast(pl.String).str.contains(term)
                     self.notify(
-                        f"Unknown column type [$warning]{col_dtype}[/], treated as string.",
+                        f"Unable to convert [$accent]{term}[/] to [$error]{dtype}[/]. Cast to string.",
                         title="Search",
                         severity="warning",
                     )
-            except Exception as e:
-                self.notify(
-                    f"[$accent]{term}[/] not found in [$warning]{col_name}[/]: {str(e)}",
-                    title="Search",
-                    severity="warning",
-                )
-                return
+
+        # Lazyframe for filtering
+        lf = self.df.lazy().with_row_index("__ridx__")
+        if False in self.visible_rows:
+            lf = lf.filter(self.visible_rows)
 
         # Apply filter to get matched row indices
         try:
@@ -1689,16 +1694,13 @@ class DataFrameTable(DataTable):
 
         if term == NULL:
             expr = pl.col(col).is_null()
-        elif "$" in term or "pl." in term:
+        elif tentative_expr(term):
             # Support for polars expressions
             try:
-                expr_str = parse_polars_expression(term, self.df, cidx)
-                expr = eval(expr_str)
+                expr = validate_expr(term, self.df, cidx)
             except Exception as e:
                 self.notify(
-                    f"Error parsing expression: {e}",
-                    title="Find",
-                    severity="error",
+                    f"Error validating Polars expression [$error]{term}[/]: {str(e)}", title="Find", severity="error"
                 )
                 return
         else:
@@ -1754,14 +1756,13 @@ class DataFrameTable(DataTable):
         for col_idx, col in enumerate(df_ridx.columns[1:]):
             if term == NULL:
                 expr = df_ridx[col].is_null()
-            elif "$" in term or "pl." in term:
+            elif tentative_expr(term):
                 # Support for polars expressions
                 try:
-                    expr_str = parse_polars_expression(term, self.df, self.cursor_col_idx)
-                    expr = eval(expr_str)
+                    expr = validate_expr(term, self.df, self.cursor_col_idx)
                 except Exception as e:
                     self.notify(
-                        f"Error parsing expression: {e}",
+                        f"Error validating Polars expression [$error]{term}[/]: {str(e)}",
                         title="Find",
                         severity="error",
                     )
@@ -1901,35 +1902,24 @@ class DataFrameTable(DataTable):
         Otherwise, view based on the value of the currently selected cell.
         """
 
+        cidx = self.cursor_col_idx
+
         if True in self.selected_rows:
-            expr = self.selected_rows
-            expr_str = "selected rows"
+            term = self.selected_rows
         else:
             ridx = self.cursor_row_idx
-            cidx = self.cursor_col_idx
+            term = self.df.item(ridx, cidx)
 
-            cell_value = self.df.item(ridx, cidx)
-
-            if cell_value is None:
-                expr = pl.col(self.df.columns[cidx]).is_null()
-                expr_str = NULL
-            else:
-                expr = pl.col(self.df.columns[cidx]) == cell_value
-                expr_str = f"$_ == {repr(cell_value)}"
-
-        self._do_view_rows((expr_str, expr))
+        self._do_view_rows((term, cidx))
 
     def _view_rows_expr(self) -> None:
         """Open the filter screen to enter an expression."""
         ridx = self.cursor_row_idx
         cidx = self.cursor_col_idx
-
-        cell_value = self.df.item(ridx, cidx)
-        if self.df.dtypes[cidx] == pl.String and cell_value is not None:
-            cell_value = repr(cell_value)
+        cursor_value = str(self.df.item(ridx, cidx))
 
         self.app.push_screen(
-            FilterScreen(self.df, cidx, cell_value),
+            FilterScreen(self.df, cidx, cursor_value),
             callback=self._do_view_rows,
         )
 
@@ -1937,7 +1927,38 @@ class DataFrameTable(DataTable):
         """Show only those matching rows and hide others. Do not modify the dataframe."""
         if result is None:
             return
-        expr_str, expr = result
+        term, cidx = result
+
+        col_name = self.df.columns[cidx]
+
+        if term == NULL:
+            expr = pl.col(col_name).is_null()
+        elif isinstance(term, (list, pl.Series)):
+            expr = term
+        elif tentative_expr(term):
+            # Support for polars expressions
+            try:
+                expr = validate_expr(term, self.df, cidx)
+            except Exception as e:
+                self.notify(
+                    f"Error validating Polars expression [$error]{term}[/]: {str(e)}", title="Filter", severity="error"
+                )
+                return
+        else:
+            dtype = self.df.dtypes[cidx]
+            if dtype == pl.String:
+                expr = pl.col(col_name).str.contains(term)
+            else:
+                try:
+                    value = DtypeConfig(dtype).convert(term)
+                    expr = pl.col(col_name) == value
+                except Exception:
+                    expr = pl.col(col_name).cast(pl.String).str.contains(term)
+                    self.notify(
+                        f"Unknown column type [$warning]{dtype}[/]. Cast to string.",
+                        title="Filter",
+                        severity="warning",
+                    )
 
         # Lazyframe with row indices
         lf = self.df.lazy().with_row_index("__ridx__")
@@ -1950,21 +1971,21 @@ class DataFrameTable(DataTable):
         try:
             df_filtered = lf.filter(expr).collect()
         except Exception as e:
-            self.notify(f"Error: {e}", title="Filter", severity="error")
+            self.notify(f"Failed to apply filter [$error]{expr}[/]: {str(e)}", title="Filter", severity="error")
             self.histories.pop()  # Remove last history entry
             return
 
         matched_count = len(df_filtered)
         if not matched_count:
             self.notify(
-                f"No rows match the expression: [$success]{expr_str}[/]",
+                f"No rows match the expression: [$success]{expr}[/]",
                 title="Filter",
                 severity="warning",
             )
             return
 
         # Add to history
-        self._add_history(f"Filtered by expression [$success]{expr_str}[/]")
+        self._add_history(f"Filtered by expression [$success]{expr}[/]")
 
         # Mark unfiltered rows as invisible and unselected
         filtered_row_indices = set(df_filtered["__ridx__"].to_list())
@@ -1984,7 +2005,7 @@ class DataFrameTable(DataTable):
 
     def _cycle_cursor_type(self) -> None:
         """Cycle through cursor types: cell -> row -> column -> cell."""
-        next_type = _next(CURSOR_TYPES, self.cursor_type)
+        next_type = get_next_item(CURSOR_TYPES, self.cursor_type)
         self.cursor_type = next_type
 
         # self.notify(f"Changed cursor type to [$success]{next_type}[/]", title="Cursor")
