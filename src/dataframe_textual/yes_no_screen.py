@@ -2,11 +2,11 @@
 
 import polars as pl
 from textual.app import ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Static
 
-from .common import NULL, DtypeConfig, validate_expr
+from .common import NULL, DtypeConfig, tentative_expr, validate_expr
 
 
 class YesNoScreen(ModalScreen):
@@ -25,13 +25,18 @@ class YesNoScreen(ModalScreen):
 
         YesNoScreen > Static {
             width: auto;
-            min-width: 30;
+            min-width: 40;
             max-width: 60;
             height: auto;
-            border: solid $primary;
+            border: heavy $primary;
             border-title-color: $primary-lighten-3;
             background: $surface;
             padding: 2;
+        }
+
+        YesNoScreen Container {
+            height: auto;
+            width: 100%;
         }
 
         YesNoScreen Label {
@@ -41,6 +46,10 @@ class YesNoScreen(ModalScreen):
 
         YesNoScreen Input {
             margin: 1 0;
+        }
+
+        YesNoScreen Input:blur {
+            border: solid $secondary;
         }
 
         YesNoScreen #button-container {
@@ -59,6 +68,8 @@ class YesNoScreen(ModalScreen):
         title: str = None,
         label: str | dict | Label = None,
         input: str | dict | Input = None,
+        label2: str | dict | Label = None,
+        input2: str | dict | Input = None,
         yes: str | dict | Button = "Yes",
         no: str | dict | Button = "No",
         on_yes_callback=None,
@@ -77,6 +88,8 @@ class YesNoScreen(ModalScreen):
         self.title = title
         self.label = label
         self.input = input
+        self.label2 = label2
+        self.input2 = input2
         self.yes = yes
         self.no = no
         self.on_yes_callback = on_yes_callback
@@ -86,24 +99,47 @@ class YesNoScreen(ModalScreen):
             if self.title:
                 container.border_title = self.title
 
-            if self.label:
-                if isinstance(self.label, Label):
-                    pass
-                elif isinstance(self.label, dict):
-                    self.label = Label(**self.label)
-                else:
-                    self.label = Label(self.label)
-                yield self.label
+            if self.label or self.input:
+                with Container(id="input-container"):
+                    if self.label:
+                        if isinstance(self.label, Label):
+                            pass
+                        elif isinstance(self.label, dict):
+                            self.label = Label(**self.label)
+                        else:
+                            self.label = Label(self.label)
+                        yield self.label
 
-            if self.input:
-                if isinstance(self.input, Input):
-                    pass
-                elif isinstance(self.input, dict):
-                    self.input = Input(**self.input)
-                else:
-                    self.input = Input(self.input)
-                self.input.select_all()
-                yield self.input
+                    if self.input:
+                        if isinstance(self.input, Input):
+                            pass
+                        elif isinstance(self.input, dict):
+                            self.input = Input(**self.input)
+                        else:
+                            self.input = Input(self.input)
+                        self.input.select_all()
+                        yield self.input
+
+            if self.label2 or self.input2:
+                with Container(id="input-container-2"):
+                    if self.label2:
+                        if isinstance(self.label2, Label):
+                            pass
+                        elif isinstance(self.label2, dict):
+                            self.label2 = Label(**self.label2)
+                        else:
+                            self.label2 = Label(self.label2)
+                        yield self.label2
+
+                    if self.input2:
+                        if isinstance(self.input2, Input):
+                            pass
+                        elif isinstance(self.input2, dict):
+                            self.input2 = Input(**self.input2)
+                        else:
+                            self.input2 = Input(self.input2)
+                        self.input2.select_all()
+                        yield self.input2
 
             if self.yes or self.no:
                 with Horizontal(id="button-container"):
@@ -359,54 +395,28 @@ class PinScreen(YesNoScreen):
 
     def __init__(self):
         super().__init__(
-            title="Pin Rows and Columns",
-            label="Enter number of fixed rows and columns (space-separated)",
-            input="1",
-            on_yes_callback=self._parse_pin_input,
+            title="Pin Rows / Columns",
+            label="Enter number of fixed rows",
+            input={"value": "0", "type": "number"},
+            label2="Enter number of fixed columns",
+            input2={"value": "0", "type": "number"},
+            on_yes_callback=self._get_input,
         )
 
-    def _parse_pin_input(self) -> tuple[int, int] | None:
+    def _get_input(self) -> tuple[int, int] | None:
         """Parse and validate the pin input.
 
         Returns:
             Tuple of (fixed_rows, fixed_columns) or None if invalid.
         """
-        input_str = self.input.value.strip()
+        fixed_rows = int(self.input.value.strip())
+        fixed_cols = int(self.input2.value.strip())
 
-        if not input_str:
-            self.notify("Input cannot be empty", title="Pin", severity="error")
+        if fixed_rows < 0 or fixed_cols < 0:
+            self.notify("Values must be non-negative", title="Pin", severity="error")
             return None
 
-        parts = input_str.split()
-
-        if len(parts) == 1:
-            # Only fixed rows provided
-            try:
-                fixed_rows = int(parts[0])
-                if fixed_rows < 0:
-                    raise ValueError("must be non-negative")
-                return (fixed_rows, 0)
-            except ValueError as e:
-                self.notify(f"Invalid fixed rows value: {str(e)}", title="Pin", severity="error")
-                return None
-        elif len(parts) == 2:
-            # Both fixed rows and columns provided
-            try:
-                fixed_rows = int(parts[0])
-                fixed_cols = int(parts[1])
-                if fixed_rows < 0 or fixed_cols < 0:
-                    raise ValueError("values must be non-negative")
-                return (fixed_rows, fixed_cols)
-            except ValueError as e:
-                self.notify(f"Invalid input values: {str(e)}", title="Pin", severity="error")
-                return None
-        else:
-            self.notify(
-                "Provide one or two space-separated integers",
-                title="Pin",
-                severity="error",
-            )
-            return None
+        return fixed_rows, fixed_cols
 
 
 class OpenFileScreen(YesNoScreen):
@@ -465,24 +475,17 @@ class AddColumnScreen(YesNoScreen):
         self.existing_columns = set(df.columns)
         super().__init__(
             title="Add Column",
-            label="Enter column name and Polars expression separated by ';' (e.g., 'col_name ; $_ * 2)",
-            input="col_name",
+            label="Enter column name",
+            input="column name",
+            label2="Enter value or Polars expression, e.g., 123, NULL, $_ * 2",
+            input2="column value or expression",
             on_yes_callback=self._get_input,
         )
 
     def _get_input(self) -> tuple[int, str, str] | None:
         """Validate and return the new column configuration."""
-        term = self.input.value.strip()
-
-        if not term:
-            self.notify("Input cannot be empty", title="Add Column", severity="error")
-            return None
-
-        # Split input into column name and expression
-        # Format: "col_name ; expression" or just "col_name" (defaults to an empty column)
-        parts = term.split(";")
-        col_name = parts[0].strip()
-        expression = parts[1].strip() if len(parts) > 1 else None
+        col_name = self.input.value.strip()
+        term = self.input2.value.strip()
 
         # Validate column name
         if not col_name:
@@ -497,13 +500,51 @@ class AddColumnScreen(YesNoScreen):
             )
             return None
 
-        if expression is None:
-            # No expression provided - add empty column
-            return self.cidx, col_name, NULL, pl.lit(None)
+        if term == NULL:
+            return self.cidx, col_name, pl.lit(None)
+        elif tentative_expr(term):
+            try:
+                expr = validate_expr(term, self.df, self.cidx)
+                return self.cidx, col_name, expr
+            except ValueError as e:
+                self.notify(f"Invalid expression [$error]{term}[/]: {str(e)}", title="Add Column", severity="error")
+            return None
+        else:
+            # Treat as literal value
+            dtype = self.df.dtypes[self.cidx]
+            try:
+                value = DtypeConfig(dtype).convert(term)
+                return self.cidx, col_name, pl.lit(value)
+            except Exception as e:
+                self.notify(
+                    f"Unable to convert [$accent]{term}[/] to [$warning]{dtype}[/]. Cast to string.",
+                    title="Add Column",
+                    severity="warning",
+                )
+                return self.cidx, col_name, pl.lit(term)
 
+
+class ReplaceScreen(YesNoScreen):
+    """Modal screen to replace column values with an expression."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ReplaceScreen")
+
+    def __init__(self, cidx: int, df: pl.DataFrame):
+        self.cidx = cidx
+        self.df = df
+        super().__init__(
+            title="Replace Column Values",
+            label="with value or Polars expression, e.g., abc, pl.lit(7), NULL, $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.arange(0, pl.len())",
+            input="$_",
+            on_yes_callback=self._get_input,
+        )
+
+    def _get_input(self) -> tuple[str, int]:
+        """Get input."""
+        term = self.input.value.strip()
         try:
-            expr = validate_expr(expression, self.df, self.cidx)
-            return self.cidx, col_name, expr
+            expr = validate_expr(term, self.df, self.cidx)
+            return expr, self.cidx
         except ValueError as ve:
-            self.notify(f"Invalid expression: [$accent]{str(ve)}[/]", title="Add Column", severity="error")
+            self.notify(f"Invalid expression: [$accent]{str(ve)}[/]", title="Replace Column Values", severity="error")
             return None

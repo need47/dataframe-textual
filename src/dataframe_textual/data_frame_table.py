@@ -1445,7 +1445,7 @@ class DataFrameTable(DataTable):
             raise e
 
     def _add_column_expr(self) -> None:
-        """Open AddColumnScreen to add a new column with optional expression."""
+        """Open screen to add a new column with optional expression."""
         cidx = self.cursor_col_idx
         self.app.push_screen(
             AddColumnScreen(cidx, self.df),
