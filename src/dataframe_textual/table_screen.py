@@ -35,11 +35,7 @@ class TableScreen(ModalScreen):
         }
     """
 
-<<<<<<< HEAD
-    def __init__(self, dftable: "DataFrameTable") -> None:
-=======
     def __init__(self, dftable: DataFrameTable) -> None:
->>>>>>> 085c829 (use '@' to make a URL column clickable with Ctrl/Cmd + click.)
         """Initialize the table screen.
 
         Sets up the base modal screen with reference to the main DataFrameTable widget
@@ -79,8 +75,6 @@ class TableScreen(ModalScreen):
         Returns:
             None
         """
-<<<<<<< HEAD
-=======
         if event.key in ("q", "escape"):
             self.app.pop_screen()
             event.stop()
@@ -99,7 +93,6 @@ class TableScreen(ModalScreen):
             "end",
         ):
             event.stop()
->>>>>>> 085c829 (use '@' to make a URL column clickable with Ctrl/Cmd + click.)
 
     def _filter_or_highlight_selected_value(
         self, col_name_value: tuple[str, Any] | None, action: str = "filter"
@@ -195,8 +188,6 @@ class RowDetailScreen(TableScreen):
         Returns:
             None
         """
-<<<<<<< HEAD
-=======
         if event.key == "v":
             # Filter the main table by the selected value
             self._filter_or_highlight_selected_value(self._get_col_name_value(), action="filter")
@@ -205,7 +196,6 @@ class RowDetailScreen(TableScreen):
             # Highlight the main table by the selected value
             self._filter_or_highlight_selected_value(self._get_col_name_value(), action="highlight")
             event.stop()
->>>>>>> 085c829 (use '@' to make a URL column clickable with Ctrl/Cmd + click.)
 
     def _get_col_name_value(self) -> tuple[str, Any] | None:
         row_idx = self.table.cursor_row

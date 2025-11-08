@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
-from typing import Any
 
 import polars as pl
 from rich.text import Text
@@ -464,7 +463,17 @@ class DataFrameTable(DataTable):
             # Let the table handle the navigation first
             self._check_and_load_more()
 
-    def on_click(self, event: Click):
+    def on_click(self, event: Click) -> None:
+        """Handle mouse click events on the table.
+
+        Supports double-click editing of cells and renaming of column headers.
+
+        Args:
+            event: The click event containing row and column information.
+
+        Returns:
+            None
+        """
         if self.cursor_type == "cell" and event.chain > 1:  # only on double-click or more
             row_idx = event.style.meta["row"]
             # col_idx = event.style.meta["column"]

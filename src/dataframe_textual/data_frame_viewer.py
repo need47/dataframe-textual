@@ -79,7 +79,17 @@ class DataFrameViewer(App):
         }
     """
 
-    def __init__(self, *filenames):
+    def __init__(self, *filenames: str) -> None:
+        """Initialize the DataFrame Viewer application.
+
+        Loads dataframes from provided filenames and prepares the tabbed interface.
+
+        Args:
+            *filenames: Variable number of file paths to load (CSV, Excel, Parquet, etc).
+
+        Returns:
+            None
+        """
         super().__init__()
         self.sources = _load_dataframe(filenames)
         self.tabs: dict[TabPane, DataFrameTable] = {}
@@ -221,8 +231,18 @@ class DataFrameViewer(App):
             return
         self._close_tab()
 
-    def action_next_tab(self, offset: int = 1) -> str:
-        """Switch to next tab (only for multiple files)."""
+    def action_next_tab(self, offset: int = 1) -> None:
+        """Switch to the next tab or previous tab.
+
+        Cycles through tabs by the specified offset. With offset=1, moves to next tab.
+        With offset=-1, moves to previous tab. Wraps around when reaching edges.
+
+        Args:
+            offset: Number of tabs to advance (+1 for next, -1 for previous). Defaults to 1.
+
+        Returns:
+            None
+        """
         if len(self.tabs) <= 1:
             return
         try:
@@ -350,7 +370,7 @@ class DataFrameViewer(App):
 
 def _load_file(
     filename: str, first_sheet: bool = False, prefix_sheet: bool = False
-) -> list[tuple[pl.LazyFrame | pl.DataFrame, str, str]]:
+) -> list[tuple[pl.LazyFrame, str, str]]:
     """Load a single file and return list of sources.
 
     For Excel files, when single_file=True, returns one entry per sheet.
@@ -362,7 +382,7 @@ def _load_file(
         prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
 
     Returns:
-        List of tuples of (DataFrame/LazyFrame, filename, tabname)
+        List of tuples of (LazyFrame, filename, tabname).
     """
     sources = []
 
@@ -403,14 +423,17 @@ def _load_file(
     return sources
 
 
-def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame | pl.LazyFrame, str, str]]:
-    """Load a DataFrame from a file spec.
+def _load_dataframe(filenames: list[str]) -> list[tuple[pl.LazyFrame, str, str]]:
+    """Load DataFrames from file specifications.
+
+    Handles loading from multiple files, single files, or stdin. For Excel files,
+    loads all sheets as separate entries. For other formats, loads as single file.
 
     Args:
         filenames: List of filenames to load. If single filename is "-", read from stdin.
 
     Returns:
-        List of tuples of (DataFrame, filename, tabname)
+        List of tuples of (LazyFrame, filename, tabname) ready for display.
     """
     sources = []
 
