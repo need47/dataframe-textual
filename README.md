@@ -158,8 +158,8 @@ When multiple files are opened:
 | `F` | Show frequency distribution for column |
 | `s` | Show statistics for current column |
 | `S` | Show statistics for entire dataframe |
-| `!` | Cycle cursor type: cell → row → column → cell |
-| `@` | Toggle row labels visibility |
+| `K` | Cycle cursor type: cell → row → column → cell |
+| `~` | Toggle row labels |
 
 #### Data Editing
 
@@ -226,8 +226,14 @@ When multiple files are opened:
 |-----|--------|
 | `#` | Cast current column to integer (Int64) |
 | `%` | Cast current column to float (Float64) |
-| `$` | Cast current column to boolean |
-| `^` | Cast current column to string |
+| `!` | Cast current column to boolean |
+| `$` | Cast current column to string |
+
+#### URL Handling
+
+| Key | Action |
+|-----|--------|
+| `@` | Make URLs in current column clickable with Ctrl/Cmd + click|
 
 #### Data Management
 
@@ -296,6 +302,16 @@ The application provides multiple search modes for different use cases:
 - **`v` - View by Value**: Filter/view rows by selected rows or current cell value
 - **`V` - View by Expression**: Filter/view rows using custom Polars expression
 
+**Advanced Matching Options**:
+
+When searching or finding, you can use checkboxes in the dialog to enable:
+- **Case Insensitive**: Ignore case differences (e.g., "john", "John", "JOHN" all match)
+- **Whole Word**: Match complete words only, not partial words (e.g., "cat" won't match in "catfish")
+
+These options work with plain text searches. Use Polars regex patterns in expressions for more control:
+- **Case-insensitive matching in expressions**: Use `(?i)` prefix in regex (e.g., `(?i)john`)
+- **Word boundaries in expressions**: Use `\b` in regex (e.g., `\bjohn\b` matches whole word)
+
 **How It Works:**
 - Search results highlight matching rows/cells in **red**
 - Multiple searches **accumulate selections** - each new search adds to the highlight
@@ -306,6 +322,8 @@ The application provides multiple search modes for different use cases:
 **Quick Tips:**
 - Use `\` for instant searching without opening a dialog
 - Use `Ctrl+\` to search all columns without typing
+- Enable **Case Insensitive** for fuzzy name matching (e.g., find all variations of "John")
+- Enable **Whole Word** to avoid partial matches (e.g., search for "is" without matching "this")
 - Use `"` after selecting rows to hide everything except your selection
 - Use `u` to undo any search or filter
 
@@ -322,7 +340,10 @@ The application provides powerful find and replace functionality for both single
 When you press `r` or `R`, a dialog opens where you can enter:
 1. **Find term**: The value or expression to search for
 2. **Replace term**: What to replace matches with
-3. **Replace option**:
+3. **Matching options**:
+   - **Case Insensitive**: Ignore case differences when matching (unchecked by default)
+   - **Whole Word**: Match complete words only, not partial words (unchecked by default)
+4. **Replace option**:
    - Choose **"Replace All"** to replace all matches at once (with confirmation)
    - Otherwise, review and confirm each match individually
 
@@ -344,9 +365,13 @@ When you press `r` or `R`, a dialog opens where you can enter:
 
 **Search Term Types:**
 - **Plain text**: Exact string match (e.g., "John" finds "John")
+  - Use **Case Insensitive** checkbox to match regardless of case (e.g., find "john", "John", "JOHN")
+  - Use **Whole Word** checkbox to match complete words only (e.g., find "cat" but not in "catfish")
 - **NULL**: Replace null/missing values (type `NULL`)
 - **Expression**: Polars expressions for complex matching (e.g., `$_ > 50` for column replace)
-- **Case sensitivity**: Use `(?i)` for case-insensitive matching (e.g., `(?i)john`)
+- **Regex patterns**: Use Polars regex syntax for advanced matching
+  - Case-insensitive: Use `(?i)` prefix (e.g., `(?i)john`)
+  - Whole word: Use `\b` boundary markers (e.g., `\bjohn\b`)
 
 **Examples:**
 
@@ -354,6 +379,16 @@ When you press `r` or `R`, a dialog opens where you can enter:
 Find: "John"
 Replace: "Jane"
 → All occurrences of "John" become "Jane"
+
+Find: "john"
+Replace: "jane"
+Case Insensitive: ✓ (checked)
+→ "John", "JOHN", "john" all become "jane"
+
+Find: "cat"
+Replace: "dog"
+Whole Word: ✓ (checked)
+→ "cat" becomes "dog", but "catfish" is not matched
 
 Find: "NULL"
 Replace: "Unknown"
@@ -376,12 +411,15 @@ Replace: "inactive"
 - **Safe operations**: Requires confirmation before replacing
 - **Progress tracking**: Shows how many replacements have been made during interactive mode
 - **Type-aware**: Respects column data types when matching and replacing
+- **Flexible matching**: Support for case-insensitive and whole-word matching
 
 **Tips:**
 - Use interactive mode for one-time replacements to be absolutely sure
 - Use "Replace All" for routine replacements (e.g., fixing typos, standardizing formats)
+- Use **Case Insensitive** for matching variations of names or titles
+- Use **Whole Word** to avoid unintended partial replacements
 - Use `u` immediately if you accidentally replace something wrong
-- For complex replacements, use Polars expressions in the find term
+- For complex replacements, use Polars expressions or regex patterns in the find term
 - Test with a small dataset first before large replacements
 
 ### 4. Filter by Expression
@@ -595,8 +633,8 @@ Press the type conversion keys to instantly cast the current column to a differe
 **Type Conversion Shortcuts**:
 - `#` - Cast to **Integer (Int64)**
 - `%` - Cast to **Float (Float64)**
-- `$` - Cast to **Boolean**
-- `*` - Cast to **String**
+- `!` - Cast to **Boolean**
+- `$` - Cast to **String**
 
 **Examples**:
 - Convert string numbers to integers: Move to column, press `#`
@@ -614,14 +652,34 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 ### 17. Cursor Type Cycling
 
-Press `!` to cycle through selection modes:
+Press `K` to cycle through selection modes:
 1. **Cell mode**: Highlight individual cell (and its row/column headers)
 2. **Row mode**: Highlight entire row
 3. **Column mode**: Highlight entire column
 
 Visual feedback shows which mode is active.
 
-### 18. Clipboard Operations
+### 18. URL Handling
+
+Press `@` to make URLs in the current column clickable:
+- **Scans** all cells in the current column for URLs
+- **Detects** URLs starting with `http://` or `https://`
+- **Applies** link styling to make them clickable
+- **String columns only**: Non-string columns are ignored with a warning
+- **No data modification**: Styling is applied only to the display, dataframe remains unchanged
+
+**Features**:
+- Works on all loaded rows in the column
+- Provides feedback on how many URLs were made clickable
+- Helpful error messages if column is wrong type or contains no URLs
+- Requires string data type to function
+
+**Example**:
+- Column contains: `https://github.com/user/repo`, `https://example.com`, `not-a-url`
+- Press `@` to make the two URLs clickable
+- Click on URLs to open them in your default browser
+
+### 19. Clipboard Operations
 
 Press `Ctrl+C` to copy:
 - Copies current cell value to system clipboard

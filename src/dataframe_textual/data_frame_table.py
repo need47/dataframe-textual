@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
+from typing import Any
 
 import polars as pl
 from rich.text import Text
@@ -104,8 +105,8 @@ class DataFrameTable(DataTable):
         - **F** - 📊 Show frequency distribution
         - **s** - 📈 Show statistics for current column
         - **S** - 📊 Show statistics for entire dataframe
-        - **!** - 🔄 Cycle cursor (cell → row → column → cell)
-        - **@** - 🏷️ Toggle row labels
+        - **K** - 🔄 Cycle cursor (cell → row → column → cell)
+        - **~** - 🏷️ Toggle row labels
 
         ## ↕️ Sorting
         - **[** - 🔼 Sort column ascending
@@ -121,10 +122,12 @@ class DataFrameTable(DataTable):
         - **Ctrl+f** - 🌐 Global find with expression
         - **v** - 👁️ View/filter rows by cell or selected rows
         - **V** - 🔧 View/filter rows by expression
+        - *(All search/find support case-insensitive & whole-word matching)*
 
         ## ✏️ Replace
         - **r** - 🔄 Replace in current column (interactive or all)
         - **R** - 🔄 Replace across all columns (interactive or all)
+        - *(Supports case-insensitive & whole-word matching)*
 
         ## ✅ Selection & Filtering
         - **'** - ✓️ Select/deselect current row
@@ -153,10 +156,13 @@ class DataFrameTable(DataTable):
         ## 🎨 Type Conversion
         - **#** - 🔢 Cast column to integer
         - **%** - 🔢 Cast column to float
-        - **$** - ✅ Cast column to boolean
-        - **^** - 📝 Cast column to string
+        - **!** - ✅ Cast column to boolean
+        - **$** - 📝 Cast column to string
 
-        ## 💾 Data Management
+        ## � URL Handling
+        - **@** - 🔗 Make URLs in current column clickable
+
+        ## �💾 Data Management
         - **p** - 📌 Pin/freeze rows and columns
         - **Ctrl+c** - 📋 Copy cell to clipboard
         - **Ctrl+s** - 💾 Save current tab to file
@@ -219,11 +225,12 @@ class DataFrameTable(DataTable):
         # Type Conversion
         ("number_sign", "cast_column_dtype('int')", "Cast column dtype to int"),  # `#`
         ("percent_sign", "cast_column_dtype('float')", "Cast column dtype to float"),  # `%`
-        ("dollar_sign", "cast_column_dtype('bool')", "Cast column dtype to bool"),  # `$`
-        ("circumflex_accent", "cast_column_dtype('string')", "Cast column dtype to string"),  # `^`
+        ("exclamation_mark", "cast_column_dtype('bool')", "Cast column dtype to bool"),  # `!`
+        ("dollar_sign", "cast_column_dtype('string')", "Cast column dtype to string"),  # `$`
+        ("at", "make_cell_clickable", "Make cell clickable"),  # `@`
         # Misc
-        ("at", "toggle_row_labels", "Toggle row labels"),  # `@`
-        ("exclamation_mark", "cycle_cursor_type", "Cycle cursor mode"),  # `!`
+        ("tilde", "toggle_row_labels", "Toggle row labels"),  # `~`
+        ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
         ("p", "open_pin_screen", "Pin rows/columns"),
         # Undo/Redo
         ("u", "undo", "Undo"),
@@ -457,17 +464,16 @@ class DataFrameTable(DataTable):
             # Let the table handle the navigation first
             self._check_and_load_more()
 
-    def on_click(self, event: Click) -> None:
-        """Handle mouse click events on the table.
+    def on_click(self, event: Click):
+        if self.cursor_type == "cell" and event.chain > 1:  # only on double-click or more
+            row_idx = event.style.meta["row"]
+            # col_idx = event.style.meta["column"]
 
-        Supports double-click editing of cells and renaming of column headers.
-
-        Args:
-            event: The click event containing row and column information.
-
-        Returns:
-            None
-        """
+            # header row
+            if row_idx == -1:
+                self._rename_column()
+            else:
+                self._edit_cell()
 
     # Action handlers for BINDINGS
     def action_jump_top(self) -> None:
@@ -647,8 +653,8 @@ class DataFrameTable(DataTable):
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility."""
         self.show_row_labels = not self.show_row_labels
-        status = "shown" if self.show_row_labels else "hidden"
-        self.notify(f"Row labels {status}", title="Labels")
+        # status = "shown" if self.show_row_labels else "hidden"
+        # self.notify(f"Row labels {status}", title="Labels")
 
     def action_cast_column_dtype(self, dtype: str | pl.DataType) -> None:
         """Cast the current column to a different data type."""
@@ -675,6 +681,45 @@ class DataFrameTable(DataTable):
             self.notify(f"Copied: [$success]{cell_str[:50]}[/]", title="Clipboard")
         except (FileNotFoundError, IndexError):
             self.notify("Error copying cell", title="Clipboard", severity="error")
+
+    def action_make_cell_clickable(self) -> None:
+        """Make cells with URLs in current column clickable."""
+        self._make_cell_clickable()
+
+    def _make_cell_clickable(self) -> None:
+        """Make cells with URLs in the current column clickable.
+
+        Scans all loaded rows in the current column for cells containing URLs
+        (starting with 'http://' or 'https://') and applies Textual link styling
+        to make them clickable. Does not modify the dataframe.
+
+        Returns:
+            None
+        """
+        cidx = self.cursor_col_idx
+        col_key = self.cursor_col_key
+        dtype = self.df.dtypes[cidx]
+
+        # Only process string columns
+        if dtype != pl.String:
+            return
+
+        # Count how many URLs were made clickable
+        url_count = 0
+
+        # Iterate through all loaded rows and make URLs clickable
+        for row in self.ordered_rows:
+            cell_text: Text = self.get_cell(row.key, col_key)
+            if cell_text.plain.startswith(("http://", "https://")):
+                cell_text.style = f"#00afff link {cell_text.plain}" # sky blue
+                self.update_cell(row.key, col_key, cell_text)
+                url_count += 1
+
+        if url_count:
+            self.notify(
+                f"Made [$accent]{url_count}[/] cell(s) clickable in column [$success]{col_key.value}[/]",
+                title="Make Clickable",
+            )
 
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
@@ -816,6 +861,9 @@ class DataFrameTable(DataTable):
 
     def _highlight_table(self) -> None:
         """Highlight selected rows/cells in red."""
+        if not any(self.selected_rows) and not self.matches:
+            return  # Nothing to highlight
+
         # Update all rows based on selected state
         for row in self.ordered_rows:
             row_idx = int(row.key.value)  # 0-based index
@@ -824,15 +872,15 @@ class DataFrameTable(DataTable):
 
             # Update all cells in this row
             for col_idx, col in enumerate(self.ordered_columns):
+                if not (is_selected or col_idx in match_cols):
+                    continue  # No highlight needed
+
                 cell_text: Text = self.get_cell(row.key, col.key)
-                dtype = self.df.dtypes[col_idx]
+                cell_text.style = "red"
 
-                # Get style config based on dtype
-                dc = DtypeConfig(dtype)
-
-                # Use red for selected rows, default style for others
-                style = "red" if is_selected or col_idx in match_cols else dc.style
-                cell_text.style = style
+                # # Get style config based on dtype
+                # dtype = self.df.dtypes[col_idx]
+                # dc = DtypeConfig(dtype)
 
                 # Update the cell in the table
                 self.update_cell(row.key, col.key, cell_text)
@@ -1675,7 +1723,7 @@ class DataFrameTable(DataTable):
         """Search for a term."""
         if result is None:
             return
-        term, cidx = result
+        term, cidx, case_insensitive, full_match = result
         col_name = self.df.columns[cidx]
 
         if term == NULL:
@@ -1697,12 +1745,20 @@ class DataFrameTable(DataTable):
         else:
             dtype = self.df.dtypes[cidx]
             if dtype == pl.String:
+                if full_match:
+                    term = f"^{term}$"
+                if case_insensitive:
+                    term = f"(?i){term}"
                 expr = pl.col(col_name).str.contains(term)
             else:
                 try:
                     value = DtypeConfig(dtype).convert(term)
                     expr = pl.col(col_name) == value
                 except Exception:
+                    if full_match:
+                        term = f"^{term}$"
+                    if case_insensitive:
+                        term = f"(?i){term}"
                     expr = pl.col(col_name).cast(pl.String).str.contains(term)
                     self.notify(
                         f"Unable to convert [$accent]{term}[/] to [$error]{dtype}[/]. Cast to string.",
@@ -1747,7 +1803,9 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Search")
 
-    def _find_matches(self, term: str, cidx: int | None = None) -> dict[int, set[int]]:
+    def _find_matches(
+        self, term: str, cidx: int | None = None, case_insensitive: bool = False, full_match: bool = False
+    ) -> dict[int, set[int]]:
         """Find matches for a term in the dataframe.
 
         Args:
@@ -1786,6 +1844,10 @@ class DataFrameTable(DataTable):
                 except Exception as e:
                     raise Exception(f"Error validating Polars expression: {str(e)}")
             else:
+                if full_match:
+                    term = f"^{term}$"
+                if case_insensitive:
+                    term = f"(?i){term}"
                 expr = pl.col(col_name).cast(pl.String).str.contains(term)
 
             # Get matched row indices
@@ -1812,7 +1874,7 @@ class DataFrameTable(DataTable):
             cidx = self.cursor_col_idx
             self._do_find((term, cidx))
         else:
-            self._do_find_global((term, None))
+            self._do_find_global((term, None, False, False))
 
     def _find_expr(self, scope="column") -> None:
         """Open screen to find by expression.
@@ -1834,12 +1896,12 @@ class DataFrameTable(DataTable):
         """Find a term in current column."""
         if result is None:
             return
-        term, cidx = result
+        term, cidx, case_insensitive, full_match = result
 
         col_name = self.df.columns[cidx]
 
         try:
-            matches = self._find_matches(term, cidx)
+            matches = self._find_matches(term, cidx, case_insensitive, full_match)
         except Exception as e:
             self.notify(
                 f"Error finding matches: [$error]{str(e)}[/]",
@@ -1874,10 +1936,10 @@ class DataFrameTable(DataTable):
         """Global find a term across all columns."""
         if result is None:
             return
-        term, cidx = result
+        term, cidx, case_insensitive, full_match = result
 
         try:
-            matches = self._find_matches(term, cidx=None)
+            matches = self._find_matches(term, cidx=None, case_insensitive=case_insensitive, full_match=full_match)
         except Exception as e:
             self.notify(
                 f"Error finding matches: [$error]{str(e)}[/]",
@@ -2291,7 +2353,7 @@ class DataFrameTable(DataTable):
         """Show only those matching rows and hide others. Do not modify the dataframe."""
         if result is None:
             return
-        term, cidx = result
+        term, cidx, case_insensitive, full_match = result
 
         col_name = self.df.columns[cidx]
 
@@ -2311,12 +2373,20 @@ class DataFrameTable(DataTable):
         else:
             dtype = self.df.dtypes[cidx]
             if dtype == pl.String:
+                if full_match:
+                    term = f"^{term}$"
+                if case_insensitive:
+                    term = f"(?i){term}"
                 expr = pl.col(col_name).str.contains(term)
             else:
                 try:
                     value = DtypeConfig(dtype).convert(term)
                     expr = pl.col(col_name) == value
                 except Exception:
+                    if full_match:
+                        term = f"^{term}$"
+                    if case_insensitive:
+                        term = f"(?i){term}"
                     expr = pl.col(col_name).cast(pl.String).str.contains(term)
                     self.notify(
                         f"Unknown column type [$warning]{dtype}[/]. Cast to string.",

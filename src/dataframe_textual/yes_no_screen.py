@@ -36,7 +36,7 @@ class YesNoScreen(ModalScreen):
             border: heavy $primary;
             border-title-color: $primary-lighten-3;
             background: $surface;
-            padding: 2;
+            padding: 1 2;
         }
 
         YesNoScreen Container {
@@ -58,8 +58,14 @@ class YesNoScreen(ModalScreen):
             border: solid $secondary;
         }
 
-        YesNoScreen Checkbox {
+        YesNoScreen #checkbox-container {
             margin: 1 0 0 0;
+            height: auto;
+            align: left middle;
+        }
+
+        YesNoScreen Checkbox {
+            margin: 0;
         }
 
         YesNoScreen Checkbox:blur {
@@ -86,6 +92,7 @@ class YesNoScreen(ModalScreen):
         label2: str | dict | Label = None,
         input2: str | dict | Input = None,
         checkbox: str | dict | Checkbox = None,
+        checkbox2: str | dict | Checkbox = None,
         yes: str | dict | Button = "Yes",
         maybe: str | dict | Button = None,
         no: str | dict | Button = "No",
@@ -117,6 +124,7 @@ class YesNoScreen(ModalScreen):
         self.label2 = label2
         self.input2 = input2
         self.checkbox = checkbox
+        self.checkbox2 = checkbox2
         self.yes = yes
         self.maybe = maybe
         self.no = no
@@ -177,14 +185,25 @@ class YesNoScreen(ModalScreen):
                         self.input2.select_all()
                         yield self.input2
 
-            if self.checkbox:
-                if isinstance(self.checkbox, Checkbox):
-                    pass
-                elif isinstance(self.checkbox, dict):
-                    self.checkbox = Checkbox(**self.checkbox)
-                else:
-                    self.checkbox = Checkbox(self.checkbox)
-                yield self.checkbox
+            if self.checkbox or self.checkbox2:
+                with Horizontal(id="checkbox-container"):
+                    if self.checkbox:
+                        if isinstance(self.checkbox, Checkbox):
+                            pass
+                        elif isinstance(self.checkbox, dict):
+                            self.checkbox = Checkbox(**self.checkbox)
+                        else:
+                            self.checkbox = Checkbox(self.checkbox)
+                        yield self.checkbox
+
+                    if self.checkbox2:
+                        if isinstance(self.checkbox2, Checkbox):
+                            pass
+                        elif isinstance(self.checkbox2, dict):
+                            self.checkbox2 = Checkbox(**self.checkbox2)
+                        else:
+                            self.checkbox2 = Checkbox(self.checkbox2)
+                        yield self.checkbox2
 
             if self.yes or self.no or self.maybe:
                 with Horizontal(id="button-container"):
@@ -415,6 +434,8 @@ class SearchScreen(YesNoScreen):
             title=title,
             label=label,
             input=term,
+            checkbox="Match NoCase",
+            checkbox2="Match Whole Word",
             on_yes_callback=self._validate_input,
         )
 
@@ -426,7 +447,7 @@ class SearchScreen(YesNoScreen):
             self.notify("Term cannot be empty", title=self.title, severity="error")
             return
 
-        return term, self.cidx
+        return term, self.cidx, self.checkbox.value, self.checkbox2.value
 
 
 class FilterScreen(YesNoScreen):
@@ -441,13 +462,15 @@ class FilterScreen(YesNoScreen):
             title="Filter by Expression",
             label="e.g., NULL, $1 > 50, $name == 'text', $_ > 100, $a < $b, $_.str.contains('sub')",
             input=input_value,
+            checkbox="Match NoCase",
+            checkbox2="Match Whole Word",
             on_yes_callback=self._get_input,
         )
 
-    def _get_input(self) -> tuple[str, int]:
+    def _get_input(self) -> tuple[str, int, bool]:
         """Get input."""
         term = self.input.value.strip()
-        return term, self.cidx
+        return term, self.cidx, self.checkbox.value, self.checkbox2.value
 
 
 class PinScreen(YesNoScreen):

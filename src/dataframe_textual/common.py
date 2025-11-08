@@ -1,6 +1,5 @@
 """Common utilities and constants for dataframe_viewer."""
 
-import re
 from dataclasses import dataclass
 from typing import Any
 

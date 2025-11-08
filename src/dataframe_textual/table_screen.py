@@ -13,7 +13,7 @@ from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
-from .common import NULL, NULL_DISPLAY, DtypeConfig, format_row
+from .common import NULL, NULL_DISPLAY, RIDX, DtypeConfig, format_row
 
 
 class TableScreen(ModalScreen):
@@ -35,7 +35,11 @@ class TableScreen(ModalScreen):
         }
     """
 
+<<<<<<< HEAD
     def __init__(self, dftable: "DataFrameTable") -> None:
+=======
+    def __init__(self, dftable: DataFrameTable) -> None:
+>>>>>>> 085c829 (use '@' to make a URL column clickable with Ctrl/Cmd + click.)
         """Initialize the table screen.
 
         Sets up the base modal screen with reference to the main DataFrameTable widget
@@ -75,6 +79,27 @@ class TableScreen(ModalScreen):
         Returns:
             None
         """
+<<<<<<< HEAD
+=======
+        if event.key in ("q", "escape"):
+            self.app.pop_screen()
+            event.stop()
+        # Prevent key events from propagating to parent screen,
+        # except for the following default key bindings for DataTable
+        elif event.key not in (
+            "up",
+            "down",
+            "right",
+            "left",
+            "pageup",
+            "pagedown",
+            "ctrl+home",
+            "ctrl+end",
+            "home",
+            "end",
+        ):
+            event.stop()
+>>>>>>> 085c829 (use '@' to make a URL column clickable with Ctrl/Cmd + click.)
 
     def _filter_or_highlight_selected_value(
         self, col_name_value: tuple[str, Any] | None, action: str = "filter"
@@ -100,13 +125,13 @@ class TableScreen(ModalScreen):
         if col_value == NULL:
             # Create expression for NULL values
             expr = pl.col(col_name).is_null()
-            value_display = "[on $primary]NULL[/]"
+            value_display = "[$success]NULL[/]"
         else:
             # Create expression for the selected value
             expr = pl.col(col_name) == col_value
-            value_display = f"[on $primary]{col_value}[/]"
+            value_display = f"[$success]{col_value}[/]"
 
-        matched_indices = set(self.dftable.df.with_row_index("__rid__").filter(expr)["__rid__"].to_list())
+        matched_indices = set(self.dftable.df.with_row_index(RIDX).filter(expr)[RIDX].to_list())
 
         # Apply the action
         if action == "filter":
@@ -114,13 +139,13 @@ class TableScreen(ModalScreen):
             for i in range(len(self.dftable.visible_rows)):
                 self.dftable.visible_rows[i] = i in matched_indices
             title = "Filter"
-            message = f"Filtered by [on $primary]{col_name}[/] = {value_display}"
+            message = f"Filtered by [$accent]{col_name}[/] == [$success]{value_display}[/]"
         else:  # action == "highlight"
             # Update selected_rows to reflect the highlights
             for i in range(len(self.dftable.selected_rows)):
                 self.dftable.selected_rows[i] = i in matched_indices
             title = "Highlight"
-            message = f"Highlighted [on $primary]{col_name}[/] = {value_display}"
+            message = f"Highlighted [$accent]{col_name}[/] == [$success]{value_display}[/]"
 
         # Recreate the table display with updated data in the main app
         self.dftable._setup_table()
@@ -170,6 +195,17 @@ class RowDetailScreen(TableScreen):
         Returns:
             None
         """
+<<<<<<< HEAD
+=======
+        if event.key == "v":
+            # Filter the main table by the selected value
+            self._filter_or_highlight_selected_value(self._get_col_name_value(), action="filter")
+            event.stop()
+        elif event.key == "quotation_mark":  # '"'
+            # Highlight the main table by the selected value
+            self._filter_or_highlight_selected_value(self._get_col_name_value(), action="highlight")
+            event.stop()
+>>>>>>> 085c829 (use '@' to make a URL column clickable with Ctrl/Cmd + click.)
 
     def _get_col_name_value(self) -> tuple[str, Any] | None:
         row_idx = self.table.cursor_row

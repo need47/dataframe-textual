@@ -79,17 +79,11 @@ class DataFrameViewer(App):
         }
     """
 
-    def __init__(self, *filenames: str) -> None:
-        """Initialize the DataFrame Viewer application.
-
-        Loads dataframes from provided filenames and prepares the tabbed interface.
-
-        Args:
-            *filenames: Variable number of file paths to load (CSV, Excel, Parquet, etc).
-
-        Returns:
-            None
-        """
+    def __init__(self, *filenames):
+        super().__init__()
+        self.sources = _load_dataframe(filenames)
+        self.tabs: dict[TabPane, DataFrameTable] = {}
+        self.help_panel = None
 
     def compose(self) -> ComposeResult:
         """Compose the application widget structure.
@@ -227,18 +221,16 @@ class DataFrameViewer(App):
             return
         self._close_tab()
 
-    def action_next_tab(self, offset: int = 1) -> None:
-        """Switch to the next tab or previous tab.
-
-        Cycles through tabs by the specified offset. With offset=1, moves to next tab.
-        With offset=-1, moves to previous tab. Wraps around when reaching edges.
-
-        Args:
-            offset: Number of tabs to advance (+1 for next, -1 for previous). Defaults to 1.
-
-        Returns:
-            None
-        """
+    def action_next_tab(self, offset: int = 1) -> str:
+        """Switch to next tab (only for multiple files)."""
+        if len(self.tabs) <= 1:
+            return
+        try:
+            tabs: list[TabPane] = list(self.tabs.keys())
+            next_tab = get_next_item(tabs, self.tabbed.active_pane, offset)
+            self.tabbed.active = next_tab.id
+        except (NoMatches, ValueError):
+            pass
 
     def action_toggle_tab_bar(self) -> None:
         """Toggle the tab bar visibility.
@@ -370,7 +362,7 @@ def _load_file(
         prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
 
     Returns:
-        List of tuples of (DataFrame/LazyFrame, filename, tabname).
+        List of tuples of (DataFrame/LazyFrame, filename, tabname)
     """
     sources = []
 
@@ -412,16 +404,13 @@ def _load_file(
 
 
 def _load_dataframe(filenames: list[str]) -> list[tuple[pl.DataFrame | pl.LazyFrame, str, str]]:
-    """Load DataFrames from file specifications.
-
-    Handles loading from multiple files, single files, or stdin. For Excel files,
-    loads all sheets as separate entries. For other formats, loads as single file.
+    """Load a DataFrame from a file spec.
 
     Args:
         filenames: List of filenames to load. If single filename is "-", read from stdin.
 
     Returns:
-        List of tuples of (DataFrame/LazyFrame, filename, tabname) ready for display.
+        List of tuples of (DataFrame, filename, tabname)
     """
     sources = []
 
