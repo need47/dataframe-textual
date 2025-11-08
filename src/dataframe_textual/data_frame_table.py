@@ -1713,7 +1713,7 @@ class DataFrameTable(DataTable):
         # Get the value of the currently selected cell
         term = NULL if self.cursor_value is None else str(self.cursor_value)
 
-        self._do_search((term, cidx))
+        self._do_search((term, cidx, False, False))
 
     def _search_expr(self) -> None:
         """Search by expression."""
@@ -1881,7 +1881,7 @@ class DataFrameTable(DataTable):
 
         if scope == "column":
             cidx = self.cursor_col_idx
-            self._do_find((term, cidx))
+            self._do_find((term, cidx, False, False))
         else:
             self._do_find_global((term, None, False, False))
 
@@ -2345,7 +2345,7 @@ class DataFrameTable(DataTable):
             ridx = self.cursor_row_idx
             term = self.df.item(ridx, cidx)
 
-        self._do_view_rows((term, cidx))
+        self._do_view_rows((term, cidx, False, False))
 
     def _view_rows_expr(self) -> None:
         """Open the filter screen to enter an expression."""
