@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from typing import Any
+import re
 
 import polars as pl
 from rich.text import Text
