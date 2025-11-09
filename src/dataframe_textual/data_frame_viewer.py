@@ -388,8 +388,10 @@ def _load_dataframe(
     """
     sources = []
 
+    prefix_sheet = len(filenames) > 1
+
     for filename in filenames:
-        sources.extend(_load_file(filename, prefix_sheet=True, file_format=file_format, has_header=has_header))
+        sources.extend(_load_file(filename, prefix_sheet=prefix_sheet, file_format=file_format, has_header=has_header))
     return sources
 
 

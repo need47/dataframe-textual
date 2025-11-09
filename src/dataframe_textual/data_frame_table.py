@@ -912,9 +912,6 @@ class DataFrameTable(DataTable):
 
     def _highlight_table(self) -> None:
         """Highlight selected rows/cells in red."""
-        if True not in self.selected_rows and not self.matches:
-            return  # Nothing to highlight
-
         # Update all rows based on selected state
         for row in self.ordered_rows:
             row_idx = int(row.key.value)  # 0-based index
@@ -923,15 +920,12 @@ class DataFrameTable(DataTable):
 
             # Update all cells in this row
             for col_idx, col in enumerate(self.ordered_columns):
-                if not (is_selected or col_idx in match_cols):
-                    continue  # No highlight needed
-
                 cell_text: Text = self.get_cell(row.key, col.key)
-                cell_text.style = "red"
 
-                # # Get style config based on dtype
-                # dtype = self.df.dtypes[col_idx]
-                # dc = DtypeConfig(dtype)
+                # Get style config based on dtype
+                dtype = self.df.dtypes[col_idx]
+                dc = DtypeConfig(dtype)
+                cell_text.style = "red" if is_selected or col_idx in match_cols else dc.style
 
                 # Update the cell in the table
                 self.update_cell(row.key, col.key, cell_text)
@@ -2350,7 +2344,7 @@ class DataFrameTable(DataTable):
         self.notify(f"Cleared selections for [$accent]{row_count}[/] rows", title="Clear")
 
     def _filter_selected_rows(self) -> None:
-        """Display only the selected rows and remove unselected ones."""
+        """Keep only the selected rows and remove unselected ones."""
         selected_count = self.selected_rows.count(True)
         if selected_count == 0:
             self.notify("No rows selected to filter", title="Filter", severity="warning")
@@ -2476,13 +2470,16 @@ class DataFrameTable(DataTable):
         # Add to history
         self._add_history(f"Filtered by expression [$success]{expr}[/]")
 
-        # Mark unfiltered rows as invisible and unselected
+        # Clear existing selections and matches
+        self.selected_rows = [False] * len(self.df)
+        self.matches = defaultdict(set)
+
+        # Mark unfiltered rows as invisible
         filtered_row_indices = set(df_filtered[RIDX].to_list())
         if filtered_row_indices:
             for ridx in range(len(self.visible_rows)):
                 if ridx not in filtered_row_indices:
                     self.visible_rows[ridx] = False
-                    self.selected_rows[ridx] = False
 
         # Recreate the table for display
         self._setup_table()

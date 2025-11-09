@@ -50,6 +50,7 @@ class TableScreen(ModalScreen):
         super().__init__()
         self.df: pl.DataFrame = dftable.df  # Polars DataFrame
         self.dftable = dftable  # DataFrameTable
+        self.thousand_separator = False  # Whether to use thousand separators in numbers
 
     def compose(self) -> ComposeResult:
         """Compose the table screen widget structure.
@@ -62,6 +63,17 @@ class TableScreen(ModalScreen):
         """
         self.table = DataTable(zebra_stripes=True)
         yield self.table
+
+    def build_table(self) -> None:
+        """Build the table content.
+
+        Subclasses should implement this method to populate the DataTable
+        with appropriate columns and rows based on the specific screen's purpose.
+
+        Returns:
+            None
+        """
+        raise NotImplementedError("Subclasses must implement build_table method.")
 
     def on_key(self, event) -> None:
         """Handle key press events in the table screen.
@@ -77,6 +89,10 @@ class TableScreen(ModalScreen):
         """
         if event.key in ("q", "escape"):
             self.app.pop_screen()
+            event.stop()
+        elif event.key == "comma":
+            self.thousand_separator = not self.thousand_separator
+            self.build_table()
             event.stop()
         # Prevent key events from propagating to parent screen,
         # except for the following default key bindings for DataTable
@@ -167,12 +183,19 @@ class RowDetailScreen(TableScreen):
         Returns:
             None
         """
+        self.build_table()
+
+    def build_table(self) -> None:
+        """Build the row detail table."""
+        self.table.clear(columns=True)
         self.table.add_column("Column")
         self.table.add_column("Value")
 
         # Get all columns and values from the dataframe row
         for col, val, dtype in zip(self.df.columns, self.df.row(self.ridx), self.df.dtypes):
-            self.table.add_row(*format_row([col, val], [None, dtype], apply_justify=False))
+            self.table.add_row(
+                *format_row([col, val], [None, dtype], apply_justify=False, thousand_separator=self.thousand_separator)
+            )
 
         self.table.cursor_type = "row"
 
@@ -195,6 +218,8 @@ class RowDetailScreen(TableScreen):
         elif event.key == "quotation_mark":  # '"'
             # Highlight the main table by the selected value
             self._filter_or_highlight_selected_value(self._get_col_name_value(), action="highlight")
+            event.stop()
+        elif event.key == "comma":
             event.stop()
 
     def _get_col_name_value(self) -> tuple[str, Any] | None:
@@ -223,6 +248,8 @@ class StatisticsScreen(TableScreen):
 
     def build_table(self) -> None:
         """Build the statistics table."""
+        self.table.clear(columns=True)
+
         if self.col_idx is None:
             # Dataframe statistics
             self._build_dataframe_stats()
@@ -256,15 +283,19 @@ class StatisticsScreen(TableScreen):
         # Add rows
         for row in stats_df.rows():
             stat_label, stat_value = row
+            value = stat_value
+            if stat_value is None:
+                value = NULL_DISPLAY
+            elif dc.gtype == "int" and self.thousand_separator:
+                value = f"{stat_value:,}"
+            elif dc.gtype == "float":
+                value = f"{stat_value:,.3f}" if self.thousand_separator else f"{stat_value:.3f}"
+            else:
+                value = str(stat_value)
+
             self.table.add_row(
                 Text(stat_label, justify="left"),
-                Text(
-                    "-"
-                    if stat_value is None
-                    else (f"{stat_value:.4g}" if str(col_dtype).startswith("Float") else str(stat_value)),
-                    style=dc.style,
-                    justify=dc.justify,
-                ),
+                Text(value, style=dc.style, justify=dc.justify),
             )
 
     def _build_dataframe_stats(self) -> None:
@@ -301,15 +332,18 @@ class StatisticsScreen(TableScreen):
 
                 col_dtype = stats_df.dtypes[idx]
                 dc = DtypeConfig(col_dtype)
-                formatted_row.append(
-                    Text(
-                        "-"
-                        if stat_value is None
-                        else (f"{stat_value:.4g}" if str(col_dtype).startswith("Float") else str(stat_value)),
-                        style=dc.style,
-                        justify=dc.justify,
-                    )
-                )
+
+                value = stat_value
+                if stat_value is None:
+                    value = NULL_DISPLAY
+                elif dc.gtype == "int" and self.thousand_separator:
+                    value = f"{stat_value:,}"
+                elif dc.gtype == "float":
+                    value = f"{stat_value:,.3f}" if self.thousand_separator else f"{stat_value:.3f}"
+                else:
+                    value = str(stat_value)
+
+                formatted_row.append(Text(value, style=dc.style, justify=dc.justify))
 
             self.table.add_row(*formatted_row)
 
@@ -352,6 +386,9 @@ class FrequencyScreen(TableScreen):
             event.stop()
 
     def build_table(self) -> None:
+        """Build the frequency table."""
+        self.table.clear(columns=True)
+
         # Create frequency table
         column = self.dftable.df.columns[self.col_idx]
         dtype = self.dftable.df.dtypes[self.col_idx]
@@ -386,18 +423,25 @@ class FrequencyScreen(TableScreen):
 
         # Add rows to the frequency table
         for row_idx, row in enumerate(self.df.rows()):
-            value, count = row
+            column, count = row
             percentage = (count / total_count) * 100
 
+            if column is None:
+                value = NULL_DISPLAY
+            elif dc.gtype == "int" and self.thousand_separator:
+                value = f"{column:,}"
+            elif dc.gtype == "float":
+                value = f"{column:,.3f}" if self.thousand_separator else f"{column:.3f}"
+            else:
+                value = str(column)
+
             self.table.add_row(
+                Text(value, style=dc.style, justify=dc.justify),
                 Text(
-                    "-" if value is None else str(value),
-                    style=dc.style,
-                    justify=dc.justify,
+                    f"{count:,}" if self.thousand_separator else str(count), style=ds_int.style, justify=ds_int.justify
                 ),
-                Text(str(count), style=ds_int.style, justify=ds_int.justify),
                 Text(
-                    f"{percentage:.2f}",
+                    f"{percentage:,.3f}" if self.thousand_separator else f"{percentage:.3f}",
                     style=ds_float.style,
                     justify=ds_float.justify,
                 ),

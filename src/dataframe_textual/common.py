@@ -136,7 +136,7 @@ def format_row(vals, dtypes, apply_justify=True, thousand_separator=False) -> li
         elif dc.gtype == "integer" and thousand_separator:
             text_val = f"{val:,}"
         elif dc.gtype == "float":
-            text_val = f"{val:,.4g}" if thousand_separator else f"{val:.4g}"
+            text_val = f"{val:,.3f}" if thousand_separator else f"{val:.3f}"
         else:
             text_val = str(val)
 
