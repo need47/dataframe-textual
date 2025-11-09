@@ -21,9 +21,7 @@ from textual.widgets._data_table import (
 )
 
 from .common import (
-    BATCH_SIZE,
     CURSOR_TYPES,
-    INITIAL_BATCH_SIZE,
     NULL,
     NULL_DISPLAY,
     RIDX,
@@ -262,6 +260,8 @@ class DataFrameTable(DataTable):
         self.filename = filename  # Current filename
 
         # Pagination & Loading
+        self.INITIAL_BATCH_SIZE = (self.app.size.height // 100 + 1) * 100
+        self.BATCH_SIZE = self.INITIAL_BATCH_SIZE // 2
         self.loaded_rows = 0  # Track how many rows are currently loaded
 
         # State tracking (all 0-based indexing)
@@ -764,7 +764,7 @@ class DataFrameTable(DataTable):
             if not visible:
                 continue
             visible_count += 1
-            if visible_count >= INITIAL_BATCH_SIZE:
+            if visible_count >= self.INITIAL_BATCH_SIZE:
                 stop = row_idx + 1
                 break
 
@@ -854,7 +854,7 @@ class DataFrameTable(DataTable):
 
         # If visible area is close to the end of loaded rows, load more
         if bottom_visible_row >= self.loaded_rows - 10:
-            self._load_rows(self.loaded_rows + BATCH_SIZE)
+            self._load_rows(self.loaded_rows + self.BATCH_SIZE)
 
     def _do_highlight(self, clear: bool = False) -> None:
         """Update all rows, highlighting selected ones and restoring others to default.

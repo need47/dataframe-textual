@@ -1,8 +1,8 @@
 """Common utilities and constants for dataframe_viewer."""
 
+import re
 from dataclasses import dataclass
 from typing import Any
-import re
 
 import polars as pl
 from rich.text import Text
@@ -82,10 +82,6 @@ SUBSCRIPT_DIGITS = {
 
 # Cursor types ("none" removed)
 CURSOR_TYPES = ["row", "column", "cell"]
-
-# Pagination settings
-INITIAL_BATCH_SIZE = 100  # Load this many rows initially
-BATCH_SIZE = 50  # Load this many rows when scrolling
 
 # For row index column
 RIDX = "^_ridx_^"
