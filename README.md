@@ -1,6 +1,6 @@
 # DataFrame Textual
 
-A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/JSON/NDJSON built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in your terminal. Now with **multi-file support for simultaneous data comparison**!
+A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/JSON/NDJSON built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in your terminal with multi-tab support for multiple files!
 
 ![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshot.png)
 
@@ -646,6 +646,8 @@ Press `u` to undo:
 - Works for edits, deletions, sorts, searches, etc.
 - Shows description of reverted action
 
+Press `U` to revert to when data was initially loaded
+
 ### 16. Column Type Conversion
 
 Press the type conversion keys to instantly cast the current column to a different data type:
@@ -787,19 +789,6 @@ The `DataFrameApp` coordinates multiple independent `DataFrameTable` instances:
 - **Seamless switching**: Switch between files without losing context or state
 - **File management**: Open/close files dynamically without restarting the application
 
-### State Isolation
-
-Each `DataFrameTable` instance owns:
-- DataFrame (`self.df`)
-- Sorted columns (`self.sorted_columns`)
-- Selected rows (`self.selected_rows`)
-- Edit history (`self.histories`)
-- Cursor state (position, type)
-- Search/filter state
-- And 8 more internal state variables
-
-This ensures perfect isolation between tabs with zero cross-contamination.
-
 ## Requirements
 
 - Python 3.11+
@@ -810,4 +799,3 @@ This ensures perfect isolation between tabs with zero cross-contamination.
 
 - Inspired by [VisiData](https://visidata.org/)
 - Built with [Textual](https://textual.textualize.io/), [Polars](https://www.pola.rs/), and [Rich](https://rich.readthedocs.io/)
-- All code created through iterative development

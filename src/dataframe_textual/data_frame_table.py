@@ -912,7 +912,7 @@ class DataFrameTable(DataTable):
 
     def _highlight_table(self) -> None:
         """Highlight selected rows/cells in red."""
-        if not any(self.selected_rows) and not self.matches:
+        if True not in self.selected_rows and not self.matches:
             return  # Nothing to highlight
 
         # Update all rows based on selected state
@@ -1066,8 +1066,11 @@ class DataFrameTable(DataTable):
             del self.sorted_columns[col_name]
 
         # Remove from matches
-        for match_cols in self.matches.values():
-            match_cols.discard(col_idx)
+        for row_idx in list(self.matches.keys()):
+            self.matches[row_idx].discard(col_idx)
+            # Remove empty entries
+            if not self.matches[row_idx]:
+                del self.matches[row_idx]
 
         # Remove from dataframe
         self.df = self.df.drop(col_name)
@@ -1973,10 +1976,9 @@ class DataFrameTable(DataTable):
         self._add_history(f"Found [$accent]{term}[/] in column [$success]{col_name}[/]")
 
         # Add to matches and count total
-        match_count = 0
+        match_count = sum(len(col_idxs) for col_idxs in matches.values())
         for ridx, col_idxs in matches.items():
             self.matches[ridx].update(col_idxs)
-            match_count += len(col_idxs)
 
         # Highlight matches
         self._do_highlight()
@@ -2081,7 +2083,6 @@ class DataFrameTable(DataTable):
 
         # Update matches
         self.matches = {ridx: set(col_idxs) for ridx, col_idxs in matches.items()}
-        self.log(f"Replace matches: {self.matches}")
 
         # Highlight matches
         self._do_highlight()
@@ -2103,9 +2104,6 @@ class DataFrameTable(DataTable):
             skipped_occurrence=0,
             done=False,
         )
-
-        self.log(f"rows: {self._replace_state.rows}")
-        self.log(f"cols_per_row: {self._replace_state.cols_per_row}")
 
         try:
             if replace_all:
@@ -2205,8 +2203,6 @@ class DataFrameTable(DataTable):
                 msg += f", [$warning]{state.skipped_occurrence}[/] skipped"
             self.notify(msg, title="Replace")
             return
-
-        self.log(f"{state.current_rpos=}, {state.current_cpos=}")
 
         # Move cursor to next match
         ridx = state.rows[state.current_rpos]
@@ -2337,7 +2333,7 @@ class DataFrameTable(DataTable):
     def _clear_selections(self) -> None:
         """Clear all selected rows without removing them from the dataframe."""
         # Check if any selected rows or matches
-        if True not in self.selected_rows and len(self.matches) == 0:
+        if True not in self.selected_rows and not self.matches:
             self.notify("No selections to clear", title="Clear", severity="warning")
             return
 
@@ -2385,8 +2381,10 @@ class DataFrameTable(DataTable):
         cidx = self.cursor_col_idx
 
         # If there are selected rows or matches, use those
-        if True in self.selected_rows or len(self.matches) > 0:
-            term = [selected or idx in self.matches for idx, selected in enumerate(self.selected_rows)]
+        if True in self.selected_rows or self.matches:
+            term = [
+                True if (selected or idx in self.matches) else False for idx, selected in enumerate(self.selected_rows)
+            ]
         # Otherwise, use the current cell value
         else:
             ridx = self.cursor_row_idx
