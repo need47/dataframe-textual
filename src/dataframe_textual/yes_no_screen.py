@@ -97,6 +97,7 @@ class YesNoScreen(ModalScreen):
         maybe: str | dict | Button = None,
         no: str | dict | Button = "No",
         on_yes_callback=None,
+        on_maybe_callback=None,
     ) -> None:
         """Initialize the modal screen.
 
@@ -109,6 +110,7 @@ class YesNoScreen(ModalScreen):
             label2: Optional second label widget. Defaults to None.
             input2: Optional second input widget or value. Defaults to None.
             checkbox: Optional checkbox widget or label. Defaults to None.
+            checkbox2: Optional second checkbox widget or label. Defaults to None.
             yes: Text or dict for the Yes button. If None, hides the Yes button. Defaults to "Yes".
             maybe: Optional Maybe button text/dict. Defaults to None.
             no: Text or dict for the No button. If None, hides the No button. Defaults to "No".
@@ -129,6 +131,7 @@ class YesNoScreen(ModalScreen):
         self.maybe = maybe
         self.no = no
         self.on_yes_callback = on_yes_callback
+        self.on_maybe_callback = on_maybe_callback
 
     def compose(self) -> ComposeResult:
         """Compose the modal screen widget structure.
@@ -241,7 +244,7 @@ class YesNoScreen(ModalScreen):
         if event.button.id == "yes":
             self._handle_yes()
         elif event.button.id == "maybe":
-            self.dismiss(False)
+            self._handle_maybe()
         elif event.button.id == "no":
             self.dismiss(None)
 
@@ -260,6 +263,14 @@ class YesNoScreen(ModalScreen):
             self.dismiss(result)
         else:
             self.dismiss(True)
+
+    def _handle_maybe(self) -> None:
+        """Handle Maybe button press."""
+        if self.on_maybe_callback:
+            result = self.on_maybe_callback()
+            self.dismiss(result)
+        else:
+            self.dismiss(False)
 
 
 class SaveFileScreen(YesNoScreen):
@@ -439,7 +450,7 @@ class SearchScreen(YesNoScreen):
             on_yes_callback=self._validate_input,
         )
 
-    def _validate_input(self) -> None:
+    def _validate_input(self) -> tuple[str, int, bool, bool]:
         """Validate the input and return it."""
         term = self.input.value.strip()
 
@@ -447,7 +458,10 @@ class SearchScreen(YesNoScreen):
             self.notify("Term cannot be empty", title=self.title, severity="error")
             return
 
-        return term, self.cidx, self.checkbox.value, self.checkbox2.value
+        match_nocase = self.checkbox.value
+        match_whole_word = self.checkbox2.value
+
+        return term, self.cidx, match_nocase, match_whole_word
 
 
 class FilterScreen(YesNoScreen):
@@ -467,10 +481,13 @@ class FilterScreen(YesNoScreen):
             on_yes_callback=self._get_input,
         )
 
-    def _get_input(self) -> tuple[str, int, bool]:
+    def _get_input(self) -> tuple[str, int, bool, bool]:
         """Get input."""
         term = self.input.value.strip()
-        return term, self.cidx, self.checkbox.value, self.checkbox2.value
+        match_nocase = self.checkbox.value
+        match_whole_word = self.checkbox2.value
+
+        return term, self.cidx, match_nocase, match_whole_word
 
 
 class PinScreen(YesNoScreen):
@@ -625,16 +642,31 @@ class ReplaceScreen(YesNoScreen):
             input=term_find,
             label2="Replace with",
             input2="new value or expression",
-            checkbox="Replace all occurrences",
+            checkbox="Match NoCase",
+            checkbox2="Match Whole Word",
             yes="Replace",
+            maybe="Replace All",
             no="Cancel",
             on_yes_callback=self._get_input,
+            on_maybe_callback=self._get_input_replace_all,
         )
 
-    def _get_input(self) -> tuple[str, int]:
+    def _get_input(self) -> tuple[str, str, bool, bool, bool]:
         """Get input."""
         term_find = self.input.value.strip()
         term_replace = self.input2.value.strip()
-        replace_all = self.checkbox.value if self.checkbox else False
+        match_nocase = self.checkbox.value
+        match_whole_word = self.checkbox2.value
+        replace_all = False
 
-        return term_find, term_replace, replace_all
+        return term_find, term_replace, match_nocase, match_whole_word, replace_all
+
+    def _get_input_replace_all(self) -> tuple[str, str, bool, bool, bool]:
+        """Get input for 'Replace All'."""
+        term_find = self.input.value.strip()
+        term_replace = self.input2.value.strip()
+        match_nocase = self.checkbox.value
+        match_whole_word = self.checkbox2.value
+        replace_all = True
+
+        return term_find, term_replace, match_nocase, match_whole_word, replace_all

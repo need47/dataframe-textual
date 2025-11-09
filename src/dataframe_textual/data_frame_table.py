@@ -74,7 +74,9 @@ class ReplaceState:
 
     term_find: str
     term_replace: str
-    col_name: str
+    match_nocase: bool
+    match_whole_word: bool
+    cidx: int  # Column index to search in, could be None for all columns
     rows: list[int]  # List of row indices
     cols_per_row: list[list[int]]  # List of list of column indices per row
     current_rpos: int  # Current row position index in rows
@@ -475,8 +477,11 @@ class DataFrameTable(DataTable):
             None
         """
         if self.cursor_type == "cell" and event.chain > 1:  # only on double-click or more
-            row_idx = event.style.meta["row"]
-            # col_idx = event.style.meta["column"]
+            try:
+                row_idx = event.style.meta["row"]
+                # col_idx = event.style.meta["column"]
+            except (KeyError, TypeError):
+                return  # Unable to get row/column info
 
             # header row
             if row_idx == -1:
@@ -720,7 +725,7 @@ class DataFrameTable(DataTable):
         for row in self.ordered_rows:
             cell_text: Text = self.get_cell(row.key, col_key)
             if cell_text.plain.startswith(("http://", "https://")):
-                cell_text.style = f"#00afff link {cell_text.plain}" # sky blue
+                cell_text.style = f"#00afff link {cell_text.plain}"  # sky blue
                 self.update_cell(row.key, col_key, cell_text)
                 url_count += 1
 
@@ -1732,7 +1737,7 @@ class DataFrameTable(DataTable):
         """Search for a term."""
         if result is None:
             return
-        term, cidx, case_insensitive, full_match = result
+        term, cidx, match_nocase, match_whole_word = result
         col_name = self.df.columns[cidx]
 
         if term == NULL:
@@ -1754,9 +1759,9 @@ class DataFrameTable(DataTable):
         else:
             dtype = self.df.dtypes[cidx]
             if dtype == pl.String:
-                if full_match:
+                if match_whole_word:
                     term = f"^{term}$"
-                if case_insensitive:
+                if match_nocase:
                     term = f"(?i){term}"
                 expr = pl.col(col_name).str.contains(term)
             else:
@@ -1764,9 +1769,9 @@ class DataFrameTable(DataTable):
                     value = DtypeConfig(dtype).convert(term)
                     expr = pl.col(col_name) == value
                 except Exception:
-                    if full_match:
+                    if match_whole_word:
                         term = f"^{term}$"
-                    if case_insensitive:
+                    if match_nocase:
                         term = f"(?i){term}"
                     expr = pl.col(col_name).cast(pl.String).str.contains(term)
                     self.notify(
@@ -1813,7 +1818,7 @@ class DataFrameTable(DataTable):
         self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Search")
 
     def _find_matches(
-        self, term: str, cidx: int | None = None, case_insensitive: bool = False, full_match: bool = False
+        self, term: str, cidx: int | None = None, match_nocase: bool = False, match_whole_word: bool = False
     ) -> dict[int, set[int]]:
         """Find matches for a term in the dataframe.
 
@@ -1853,9 +1858,9 @@ class DataFrameTable(DataTable):
                 except Exception as e:
                     raise Exception(f"Error validating Polars expression: {str(e)}")
             else:
-                if full_match:
+                if match_whole_word:
                     term = f"^{term}$"
-                if case_insensitive:
+                if match_nocase:
                     term = f"(?i){term}"
                 expr = pl.col(col_name).cast(pl.String).str.contains(term)
 
@@ -1905,12 +1910,12 @@ class DataFrameTable(DataTable):
         """Find a term in current column."""
         if result is None:
             return
-        term, cidx, case_insensitive, full_match = result
+        term, cidx, match_nocase, match_whole_word = result
 
         col_name = self.df.columns[cidx]
 
         try:
-            matches = self._find_matches(term, cidx, case_insensitive, full_match)
+            matches = self._find_matches(term, cidx, match_nocase, match_whole_word)
         except Exception as e:
             self.notify(
                 f"Error finding matches: [$error]{str(e)}[/]",
@@ -1945,10 +1950,10 @@ class DataFrameTable(DataTable):
         """Global find a term across all columns."""
         if result is None:
             return
-        term, cidx, case_insensitive, full_match = result
+        term, cidx, match_nocase, match_whole_word = result
 
         try:
-            matches = self._find_matches(term, cidx=None, case_insensitive=case_insensitive, full_match=full_match)
+            matches = self._find_matches(term, cidx=None, match_nocase=match_nocase, match_whole_word=match_whole_word)
         except Exception as e:
             self.notify(
                 f"Error finding matches: [$error]{str(e)}[/]",
@@ -1991,15 +1996,38 @@ class DataFrameTable(DataTable):
 
     def _do_replace(self, result) -> None:
         """Handle replace in current column."""
+        self._handle_replace(result, self.cursor_col_idx)
+
+    def _replace_global(self) -> None:
+        """Open replace screen for all columns."""
+        # Push the replace modal screen
+        self.app.push_screen(
+            ReplaceScreen(self),
+            callback=self._do_replace_global,
+        )
+
+    def _do_replace_global(self, result) -> None:
+        """Handle replace across all columns."""
+        self._handle_replace(result, None)
+
+    def _handle_replace(self, result, cidx) -> None:
+        """Handle replace result from ReplaceScreen.
+
+        Args:
+            result: Result tuple from ReplaceScreen
+            cidx: Column index to perform replacement. If None, replace across all columns.
+        """
         if result is None:
             return
-        term_find, term_replace, replace_all = result
+        term_find, term_replace, match_nocase, match_whole_word, replace_all = result
 
-        cidx = self.cursor_col_idx
-        col_name = self.df.columns[cidx]
+        if cidx is None:
+            col_name = "all columns"
+        else:
+            col_name = self.df.columns[cidx]
 
         # Find all matches
-        matches = self._find_matches(term_find, cidx)
+        matches = self._find_matches(term_find, cidx, match_nocase, match_whole_word)
 
         if not matches:
             self.notify(
@@ -2015,7 +2043,8 @@ class DataFrameTable(DataTable):
         )
 
         # Update matches
-        self.matches = {ridx: {cidx} for ridx in matches.keys()}
+        self.matches = {ridx: set(col_idxs) for ridx, col_idxs in matches.items()}
+        self.log(f"Replace matches: {self.matches}")
 
         # Highlight matches
         self._do_highlight()
@@ -2024,9 +2053,11 @@ class DataFrameTable(DataTable):
         self._replace_state = ReplaceState(
             term_find=term_find,
             term_replace=term_replace,
-            col_name=col_name,
+            match_nocase=match_nocase,
+            match_whole_word=match_whole_word,
+            cidx=cidx,
             rows=sorted(list(self.matches.keys())),
-            cols_per_row=[sorted(list(col_idxs)) for col_idxs in self.matches.values()],
+            cols_per_row=[sorted(list(self.matches[ridx])) for ridx in sorted(self.matches.keys())],
             current_rpos=0,
             current_cpos=0,
             current_occurrence=0,
@@ -2036,70 +2067,8 @@ class DataFrameTable(DataTable):
             done=False,
         )
 
-        try:
-            if replace_all:
-                # Replace all occurrences
-                self._do_replace_all(term_find, term_replace)
-            else:
-                # Replace with confirmation for each occurrence
-                self._do_replace_interactive(term_find, term_replace)
-
-        except Exception as e:
-            self.notify(
-                f"Error replacing [$accent]{term_find}[/] with [$error]{term_replace}[/]: {str(e)}",
-                title="Replace",
-                severity="error",
-            )
-
-    def _replace_global(self) -> None:
-        """Open replace screen for all columns."""
-        # Push the replace modal screen
-        self.app.push_screen(
-            ReplaceScreen(self),
-            callback=self._do_replace_global,
-        )
-
-    def _do_replace_global(self, result) -> None:
-        """Handle replace across all columns."""
-        if result is None:
-            return
-        term_find, term_replace, replace_all = result
-
-        # Find all matches
-        matches = self._find_matches(term_find, cidx=None)
-
-        if not matches:
-            self.notify(
-                f"No matches found for [$warning]{term_find}[/]",
-                title="Replace",
-                severity="warning",
-            )
-            return
-
-        # Add to history
-        self._add_history(f"Global replace of [$accent]{term_find}[/] with [$success]{term_replace}[/]")
-
-        # Update matches (sorted)
-        self.matches = {ridx: sorted(col_idxs) for ridx, col_idxs in sorted(matches.items())}
-
-        # Recreate the table display
-        self._setup_table()
-
-        # Store state for interactive replacement using dataclass
-        total_occurrence = sum(len(col_idxs) for col_idxs in matches.values())
-        self._replace_state = ReplaceState(
-            term_find=term_find,
-            term_replace=term_replace,
-            col_name="all columns",
-            rows=sorted(list(self.matches.keys())),
-            cols_per_row=[sorted(list(col_idxs)) for col_idxs in self.matches.values()],
-            current_rpos=0,
-            current_cpos=0,
-            current_occurrence=0,
-            total_occurrence=total_occurrence,
-            replaced_occurrence=0,
-            done=False,
-        )
+        self.log(f"rows: {self._replace_state.rows}")
+        self.log(f"cols_per_row: {self._replace_state.cols_per_row}")
 
         try:
             if replace_all:
@@ -2109,10 +2078,6 @@ class DataFrameTable(DataTable):
                 # Replace with confirmation for each occurrence
                 self._do_replace_interactive(term_find, term_replace)
 
-            self.notify(
-                f"Replaced [$accent]{term_find}[/] with [$success]{term_replace}[/] globally",
-                title="Replace",
-            )
         except Exception as e:
             self.notify(
                 f"Error replacing [$accent]{term_find}[/] with [$error]{term_replace}[/]: {str(e)}",
@@ -2144,19 +2109,39 @@ class DataFrameTable(DataTable):
         for ridx, col_idxs in zip(rows, cols_per_row):
             for cidx in col_idxs:
                 col_name = self.df.columns[cidx]
-                self.df = self.df.with_columns(
-                    pl.when(pl.arange(0, len(self.df)) == ridx)
-                    .then(pl.lit(state.term_replace))
-                    .otherwise(pl.col(col_name))
-                    .alias(col_name)
-                )
+                dtype = self.df.dtypes[cidx]
+
+                # Only applicable to string columns for substring matches
+                if dtype == pl.String and not state.match_whole_word:
+                    term_find = f"(?i){state.term_find}" if state.match_nocase else state.term_find
+                    self.df = self.df.with_columns(
+                        pl.when(pl.arange(0, len(self.df)) == ridx)
+                        .then(pl.col(col_name).str.replace_all(term_find, state.term_replace))
+                        .otherwise(pl.col(col_name))
+                        .alias(col_name)
+                    )
+                else:
+                    # try to convert replacement value to column dtype
+                    try:
+                        value = DtypeConfig(dtype).convert(state.term_replace)
+                    except Exception:
+                        value = state.term_replace
+
+                    self.df = self.df.with_columns(
+                        pl.when(pl.arange(0, len(self.df)) == ridx)
+                        .then(pl.lit(value))
+                        .otherwise(pl.col(col_name))
+                        .alias(col_name)
+                    )
+
                 state.replaced_occurrence += 1
 
         # Recreate the table display
         self._setup_table()
 
+        col_name = "all columns" if state.cidx is None else self.df.columns[state.cidx]
         self.notify(
-            f"Replaced [$accent]{state.replaced_occurrence}[/] of [$accent]{state.total_occurrence}[/] in [$success]{state.col_name}[/]",
+            f"Replaced [$accent]{state.replaced_occurrence}[/] of [$accent]{state.total_occurrence}[/] in [$success]{col_name}[/]",
             title="Replace",
         )
 
@@ -2177,11 +2162,14 @@ class DataFrameTable(DataTable):
         state = self._replace_state
         if state.done:
             # All done - show final notification
-            msg = f"Replaced [$accent]{state.replaced_occurrence}[/] of [$accent]{state.total_occurrence}[/] in [$success]{state.col_name}[/]"
+            col_name = "all columns" if state.cidx is None else self.df.columns[state.cidx]
+            msg = f"Replaced [$accent]{state.replaced_occurrence}[/] of [$accent]{state.total_occurrence}[/] in [$success]{col_name}[/]"
             if state.skipped_occurrence > 0:
                 msg += f", [$warning]{state.skipped_occurrence}[/] skipped"
             self.notify(msg, title="Replace")
             return
+
+        self.log(f"{state.current_rpos=}, {state.current_cpos=}")
 
         # Move cursor to next match
         ridx = state.rows[state.current_rpos]
@@ -2191,8 +2179,7 @@ class DataFrameTable(DataTable):
         state.current_occurrence += 1
 
         # Show confirmation
-        cell_value = self.df.item(ridx, cidx)
-        label = f"Replace [$warning]{cell_value}[/] with [$success]{state.term_replace}[/] (Occurrence {state.current_occurrence} of {state.total_occurrence})?"
+        label = f"Replace [$warning]{state.term_find}[/] with [$success]{state.term_replace}[/] (Occurrence {state.current_occurrence} of {state.total_occurrence})?"
 
         self.app.push_screen(
             ConfirmScreen("Replace", label=label, maybe="Skip"),
@@ -2208,20 +2195,41 @@ class DataFrameTable(DataTable):
         ridx = state.rows[state.current_rpos]
         cidx = state.cols_per_row[state.current_rpos][state.current_cpos]
         col_name = self.df.columns[cidx]
+        dtype = self.df.dtypes[cidx]
 
+        # Replace
         if result is True:
-            # Replace
-            self.df = self.df.with_columns(
-                pl.when(pl.arange(0, len(self.df)) == ridx)
-                .then(pl.lit(state.term_replace))
-                .otherwise(pl.col(col_name))
-                .alias(col_name)
-            )
+            # Only applicable to string columns for substring matches
+            if dtype == pl.String and not state.match_whole_word:
+                term_find = f"(?i){state.term_find}" if state.match_nocase else state.term_find
+                self.df = self.df.with_columns(
+                    pl.when(pl.arange(0, len(self.df)) == ridx)
+                    .then(pl.col(col_name).str.replace_all(term_find, state.term_replace))
+                    .otherwise(pl.col(col_name))
+                    .alias(col_name)
+                )
+            else:
+                # try to convert replacement value to column dtype
+                try:
+                    value = DtypeConfig(dtype).convert(state.term_replace)
+                except Exception:
+                    value = state.term_replace
+
+                self.df = self.df.with_columns(
+                    pl.when(pl.arange(0, len(self.df)) == ridx)
+                    .then(pl.lit(value))
+                    .otherwise(pl.col(col_name))
+                    .alias(col_name)
+                )
+
             state.replaced_occurrence += 1
+
+        # Skip
         elif result is False:
             state.skipped_occurrence += 1
+
+        # Cancel
         else:
-            # Cancel
             state.done = True
             self._setup_table()
             return
@@ -2362,7 +2370,7 @@ class DataFrameTable(DataTable):
         """Show only those matching rows and hide others. Do not modify the dataframe."""
         if result is None:
             return
-        term, cidx, case_insensitive, full_match = result
+        term, cidx, match_nocase, match_whole_word = result
 
         col_name = self.df.columns[cidx]
 
@@ -2382,9 +2390,9 @@ class DataFrameTable(DataTable):
         else:
             dtype = self.df.dtypes[cidx]
             if dtype == pl.String:
-                if full_match:
+                if match_whole_word:
                     term = f"^{term}$"
-                if case_insensitive:
+                if match_nocase:
                     term = f"(?i){term}"
                 expr = pl.col(col_name).str.contains(term)
             else:
@@ -2392,9 +2400,9 @@ class DataFrameTable(DataTable):
                     value = DtypeConfig(dtype).convert(term)
                     expr = pl.col(col_name) == value
                 except Exception:
-                    if full_match:
+                    if match_whole_word:
                         term = f"^{term}$"
-                    if case_insensitive:
+                    if match_nocase:
                         term = f"(?i){term}"
                     expr = pl.col(col_name).cast(pl.String).str.contains(term)
                     self.notify(
