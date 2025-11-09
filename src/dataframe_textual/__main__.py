@@ -6,6 +6,8 @@ from pathlib import Path
 
 from .data_frame_viewer import DataFrameViewer
 
+SUPPORTED_FORMATS = ["csv", "excel", "tsv", "parquet", "json", "ndjson"]
+
 
 def main() -> None:
     """Run the DataFrame Viewer application.
@@ -20,35 +22,43 @@ def main() -> None:
         SystemExit: If invalid arguments are provided or required files are missing.
     """
     parser = argparse.ArgumentParser(
-        description="Interactive CSV/Excel viewer for the terminal (Textual version)",
+        description="Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Examples:\n"
-        "  dataframe-viewer data.csv\n"
-        "  dataframe-viewer file1.csv file2.csv file3.csv\n"
-        "  dataframe-viewer data.xlsx  (opens all sheets in tabs)\n"
-        "  cat data.csv | dataframe-viewer\n",
+        "  dataframe-textual data.csv\n"
+        "  dataframe-textual file1.csv file2.csv file3.csv\n"
+        "  dataframe-textual data.xlsx  (opens all sheets in tabs)\n"
+        "  cat data.csv | dataframe-textual --format csv\n",
     )
-    parser.add_argument("files", nargs="*", help="CSV or Excel files to view (or read from stdin)")
+    parser.add_argument("files", nargs="*", help="Files to view (or read from stdin)")
+    parser.add_argument(
+        "-f",
+        "--format",
+        choices=SUPPORTED_FORMATS,
+        default="tsv",
+        help="Specify the format of the input files (csv, excel, tsv etc.)",
+    )
+    parser.add_argument("-H", "--no-header", action="store_true", help="Specify that input files have no header row")
 
     args = parser.parse_args()
     filenames = []
 
     # Check if reading from stdin (pipe or redirect)
     if not sys.stdin.isatty():
-        filenames = ["-"]
-    elif args.files:
+        filenames.append("-")
+    if args.files:
         # Validate all files exist
         for filename in args.files:
             if not Path(filename).exists():
                 print(f"File not found: {filename}")
                 sys.exit(1)
-        filenames = args.files
+        filenames.extend(args.files)
 
     if not filenames:
         parser.print_help()
         sys.exit(1)
 
-    app = DataFrameViewer(*filenames)
+    app = DataFrameViewer(*filenames, file_format=args.format, has_header=not args.no_header)
     app.run()
 
 

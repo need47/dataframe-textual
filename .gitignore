@@ -13,3 +13,4 @@ wheels/
 *.xlsx
 test.py
 *.parquet
+*.tsv

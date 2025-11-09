@@ -79,19 +79,21 @@ class DataFrameViewer(App):
         }
     """
 
-    def __init__(self, *filenames: str) -> None:
+    def __init__(self, *filenames: str, file_format: str | None = None, has_header: bool = True) -> None:
         """Initialize the DataFrame Viewer application.
 
         Loads dataframes from provided filenames and prepares the tabbed interface.
 
         Args:
             *filenames: Variable number of file paths to load (CSV, Excel, Parquet, etc).
+            file_format: Optional format specifier for input files (e.g., 'csv', 'excel').
+            has_header: Whether the input files have a header row. Defaults to True.
 
         Returns:
             None
         """
         super().__init__()
-        self.sources = _load_dataframe(filenames)
+        self.sources = _load_dataframe(filenames, file_format, has_header=has_header)
         self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel = None
 
@@ -368,31 +370,76 @@ class DataFrameViewer(App):
             pass
 
 
+def _load_dataframe(
+    filenames: list[str], file_format: str | None = None, has_header: bool = True
+) -> list[tuple[pl.LazyFrame, str, str]]:
+    """Load DataFrames from file specifications.
+
+    Handles loading from multiple files, single files, or stdin. For Excel files,
+    loads all sheets as separate entries. For other formats, loads as single file.
+
+    Args:
+        filenames: List of filenames to load. If single filename is "-", read from stdin.
+        file_format: Optional format specifier for input files (e.g., 'csv', 'excel').
+        has_header: Whether the input files have a header row. Defaults to True.
+
+    Returns:
+        List of tuples of (LazyFrame, filename, tabname) ready for display.
+    """
+    sources = []
+
+    for filename in filenames:
+        sources.extend(_load_file(filename, prefix_sheet=True, file_format=file_format, has_header=has_header))
+    return sources
+
+
 def _load_file(
-    filename: str, first_sheet: bool = False, prefix_sheet: bool = False
+    filename: str,
+    first_sheet: bool = False,
+    prefix_sheet: bool = False,
+    file_format: str | None = None,
+    has_header: bool = True,
 ) -> list[tuple[pl.LazyFrame, str, str]]:
     """Load a single file and return list of sources.
 
-    For Excel files, when single_file=True, returns one entry per sheet.
+    For Excel files, when `first_sheet` is True, returns only the first sheet. Otherwise, returns one entry per sheet.
     For other files or multiple files, returns one entry per file.
 
     Args:
         filename: Path to file to load.
         first_sheet: If True, only load first sheet for Excel files. Defaults to False.
         prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
+        file_format: Optional format specifier for input files (e.g., 'csv', 'excel', 'tsv', 'parquet', 'json', 'ndjson').
 
     Returns:
         List of tuples of (LazyFrame, filename, tabname).
     """
     sources = []
 
+    if filename == "-":
+        from io import StringIO
+
+        # Read from stdin into memory first (stdin is not seekable)
+        stdin_data = sys.stdin.read()
+        lf = pl.scan_csv(StringIO(stdin_data), has_header=has_header, separator="\t" if file_format == "tsv" else ",")
+
+        # Reopen stdin to /dev/tty for proper terminal interaction
+        try:
+            tty = open("/dev/tty")
+            os.dup2(tty.fileno(), sys.stdin.fileno())
+        except (OSError, FileNotFoundError):
+            pass
+
+        sources.append((lf, "stdin.tsv" if file_format == "tsv" else "stdin.csv", "stdin"))
+        return sources
+
     filepath = Path(filename)
     ext = filepath.suffix.lower()
 
-    if ext == ".csv":
-        lf = pl.scan_csv(filename)
+    if file_format == "csv" or ext == ".csv":
+        lf = pl.scan_csv(filename, has_header=has_header)
         sources.append((lf, filename, filepath.stem))
-    elif ext in (".xlsx", ".xls"):
+    elif file_format == "excel" or ext in (".xlsx", ".xls"):
         if first_sheet:
             # Read only the first sheet for multiple files
             lf = pl.read_excel(filename).lazy()
@@ -403,64 +450,21 @@ def _load_file(
             for sheet_name, df in sheets.items():
                 tabname = f"{filepath.stem}_{sheet_name}" if prefix_sheet else sheet_name
                 sources.append((df.lazy(), filename, tabname))
-    elif ext in (".tsv", ".tab"):
-        lf = pl.scan_csv(filename, separator="\t")
+    elif file_format == "tsv" or ext in (".tsv", ".tab"):
+        lf = pl.scan_csv(filename, has_header=has_header, separator="\t")
         sources.append((lf, filename, filepath.stem))
-    elif ext == ".parquet":
+    elif file_format == "parquet" or ext == ".parquet":
         lf = pl.scan_parquet(filename)
         sources.append((lf, filename, filepath.stem))
-    elif ext == ".json":
+    elif file_format == "json" or ext == ".json":
         df = pl.read_json(filename)
         sources.append((df, filename, filepath.stem))
-    elif ext == ".ndjson":
+    elif file_format == "ndjson" or ext == ".ndjson":
         lf = pl.scan_ndjson(filename)
         sources.append((lf, filename, filepath.stem))
     else:
         # Treat other formats as CSV
-        lf = pl.scan_csv(filename)
+        lf = pl.scan_csv(filename, has_header=has_header)
         sources.append((lf, filename, filepath.stem))
 
-    return sources
-
-
-def _load_dataframe(filenames: list[str]) -> list[tuple[pl.LazyFrame, str, str]]:
-    """Load DataFrames from file specifications.
-
-    Handles loading from multiple files, single files, or stdin. For Excel files,
-    loads all sheets as separate entries. For other formats, loads as single file.
-
-    Args:
-        filenames: List of filenames to load. If single filename is "-", read from stdin.
-
-    Returns:
-        List of tuples of (LazyFrame, filename, tabname) ready for display.
-    """
-    sources = []
-
-    # Single file
-    if len(filenames) == 1:
-        filename = filenames[0]
-
-        # Handle stdin
-        if filename == "-" or not sys.stdin.isatty():
-            from io import StringIO
-
-            # Read CSV from stdin into memory first (stdin is not seekable)
-            stdin_data = sys.stdin.read()
-            lf = pl.scan_csv(StringIO(stdin_data))
-
-            # Reopen stdin to /dev/tty for proper terminal interaction
-            try:
-                tty = open("/dev/tty")
-                os.dup2(tty.fileno(), sys.stdin.fileno())
-            except (OSError, FileNotFoundError):
-                pass
-
-            sources.append((lf, "stdin.csv", "stdin"))
-        else:
-            sources.extend(_load_file(filename))
-    # Multiple files
-    else:
-        for filename in filenames:
-            sources.extend(_load_file(filename, prefix_sheet=True))
     return sources
