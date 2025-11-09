@@ -445,8 +445,8 @@ class SearchScreen(YesNoScreen):
             title=title,
             label=label,
             input=term,
-            checkbox="Match NoCase",
-            checkbox2="Match Whole Word",
+            checkbox="Match Nocase",
+            checkbox2="Match Whole",
             on_yes_callback=self._validate_input,
         )
 
@@ -459,9 +459,9 @@ class SearchScreen(YesNoScreen):
             return
 
         match_nocase = self.checkbox.value
-        match_whole_word = self.checkbox2.value
+        match_whole = self.checkbox2.value
 
-        return term, self.cidx, match_nocase, match_whole_word
+        return term, self.cidx, match_nocase, match_whole
 
 
 class FilterScreen(YesNoScreen):
@@ -476,8 +476,8 @@ class FilterScreen(YesNoScreen):
             title="Filter by Expression",
             label="e.g., NULL, $1 > 50, $name == 'text', $_ > 100, $a < $b, $_.str.contains('sub')",
             input=input_value,
-            checkbox="Match NoCase",
-            checkbox2="Match Whole Word",
+            checkbox="Match Nocase",
+            checkbox2="Match Whole",
             on_yes_callback=self._get_input,
         )
 
@@ -485,9 +485,9 @@ class FilterScreen(YesNoScreen):
         """Get input."""
         term = self.input.value.strip()
         match_nocase = self.checkbox.value
-        match_whole_word = self.checkbox2.value
+        match_whole = self.checkbox2.value
 
-        return term, self.cidx, match_nocase, match_whole_word
+        return term, self.cidx, match_nocase, match_whole
 
 
 class PinScreen(YesNoScreen):
@@ -642,8 +642,8 @@ class ReplaceScreen(YesNoScreen):
             input=term_find,
             label2="Replace with",
             input2="new value or expression",
-            checkbox="Match NoCase",
-            checkbox2="Match Whole Word",
+            checkbox="Match Nocase",
+            checkbox2="Match Whole",
             yes="Replace",
             maybe="Replace All",
             no="Cancel",
@@ -656,17 +656,17 @@ class ReplaceScreen(YesNoScreen):
         term_find = self.input.value.strip()
         term_replace = self.input2.value.strip()
         match_nocase = self.checkbox.value
-        match_whole_word = self.checkbox2.value
+        match_whole = self.checkbox2.value
         replace_all = False
 
-        return term_find, term_replace, match_nocase, match_whole_word, replace_all
+        return term_find, term_replace, match_nocase, match_whole, replace_all
 
     def _get_input_replace_all(self) -> tuple[str, str, bool, bool, bool]:
         """Get input for 'Replace All'."""
         term_find = self.input.value.strip()
         term_replace = self.input2.value.strip()
         match_nocase = self.checkbox.value
-        match_whole_word = self.checkbox2.value
+        match_whole = self.checkbox2.value
         replace_all = True
 
-        return term_find, term_replace, match_nocase, match_whole_word, replace_all
+        return term_find, term_replace, match_nocase, match_whole, replace_all

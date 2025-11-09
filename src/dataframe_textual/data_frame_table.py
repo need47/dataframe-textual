@@ -73,7 +73,7 @@ class ReplaceState:
     term_find: str
     term_replace: str
     match_nocase: bool
-    match_whole_word: bool
+    match_whole: bool
     cidx: int  # Column index to search in, could be None for all columns
     rows: list[int]  # List of row indices
     cols_per_row: list[list[int]]  # List of list of column indices per row
@@ -1737,7 +1737,7 @@ class DataFrameTable(DataTable):
         """Search for a term."""
         if result is None:
             return
-        term, cidx, match_nocase, match_whole_word = result
+        term, cidx, match_nocase, match_whole = result
         col_name = self.df.columns[cidx]
 
         if term == NULL:
@@ -1759,7 +1759,7 @@ class DataFrameTable(DataTable):
         else:
             dtype = self.df.dtypes[cidx]
             if dtype == pl.String:
-                if match_whole_word:
+                if match_whole:
                     term = f"^{term}$"
                 if match_nocase:
                     term = f"(?i){term}"
@@ -1769,7 +1769,7 @@ class DataFrameTable(DataTable):
                     value = DtypeConfig(dtype).convert(term)
                     expr = pl.col(col_name) == value
                 except Exception:
-                    if match_whole_word:
+                    if match_whole:
                         term = f"^{term}$"
                     if match_nocase:
                         term = f"(?i){term}"
@@ -1818,7 +1818,7 @@ class DataFrameTable(DataTable):
         self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Search")
 
     def _find_matches(
-        self, term: str, cidx: int | None = None, match_nocase: bool = False, match_whole_word: bool = False
+        self, term: str, cidx: int | None = None, match_nocase: bool = False, match_whole: bool = False
     ) -> dict[int, set[int]]:
         """Find matches for a term in the dataframe.
 
@@ -1858,7 +1858,7 @@ class DataFrameTable(DataTable):
                 except Exception as e:
                     raise Exception(f"Error validating Polars expression: {str(e)}")
             else:
-                if match_whole_word:
+                if match_whole:
                     term = f"^{term}$"
                 if match_nocase:
                     term = f"(?i){term}"
@@ -1910,12 +1910,12 @@ class DataFrameTable(DataTable):
         """Find a term in current column."""
         if result is None:
             return
-        term, cidx, match_nocase, match_whole_word = result
+        term, cidx, match_nocase, match_whole = result
 
         col_name = self.df.columns[cidx]
 
         try:
-            matches = self._find_matches(term, cidx, match_nocase, match_whole_word)
+            matches = self._find_matches(term, cidx, match_nocase, match_whole)
         except Exception as e:
             self.notify(
                 f"Error finding matches: [$error]{str(e)}[/]",
@@ -1950,10 +1950,10 @@ class DataFrameTable(DataTable):
         """Global find a term across all columns."""
         if result is None:
             return
-        term, cidx, match_nocase, match_whole_word = result
+        term, cidx, match_nocase, match_whole = result
 
         try:
-            matches = self._find_matches(term, cidx=None, match_nocase=match_nocase, match_whole_word=match_whole_word)
+            matches = self._find_matches(term, cidx=None, match_nocase=match_nocase, match_whole=match_whole)
         except Exception as e:
             self.notify(
                 f"Error finding matches: [$error]{str(e)}[/]",
@@ -2019,7 +2019,7 @@ class DataFrameTable(DataTable):
         """
         if result is None:
             return
-        term_find, term_replace, match_nocase, match_whole_word, replace_all = result
+        term_find, term_replace, match_nocase, match_whole, replace_all = result
 
         if cidx is None:
             col_name = "all columns"
@@ -2027,7 +2027,7 @@ class DataFrameTable(DataTable):
             col_name = self.df.columns[cidx]
 
         # Find all matches
-        matches = self._find_matches(term_find, cidx, match_nocase, match_whole_word)
+        matches = self._find_matches(term_find, cidx, match_nocase, match_whole)
 
         if not matches:
             self.notify(
@@ -2054,7 +2054,7 @@ class DataFrameTable(DataTable):
             term_find=term_find,
             term_replace=term_replace,
             match_nocase=match_nocase,
-            match_whole_word=match_whole_word,
+            match_whole=match_whole,
             cidx=cidx,
             rows=sorted(list(self.matches.keys())),
             cols_per_row=[sorted(list(self.matches[ridx])) for ridx in sorted(self.matches.keys())],
@@ -2112,7 +2112,7 @@ class DataFrameTable(DataTable):
                 dtype = self.df.dtypes[cidx]
 
                 # Only applicable to string columns for substring matches
-                if dtype == pl.String and not state.match_whole_word:
+                if dtype == pl.String and not state.match_whole:
                     term_find = f"(?i){state.term_find}" if state.match_nocase else state.term_find
                     self.df = self.df.with_columns(
                         pl.when(pl.arange(0, len(self.df)) == ridx)
@@ -2200,7 +2200,7 @@ class DataFrameTable(DataTable):
         # Replace
         if result is True:
             # Only applicable to string columns for substring matches
-            if dtype == pl.String and not state.match_whole_word:
+            if dtype == pl.String and not state.match_whole:
                 term_find = f"(?i){state.term_find}" if state.match_nocase else state.term_find
                 self.df = self.df.with_columns(
                     pl.when(pl.arange(0, len(self.df)) == ridx)
@@ -2370,7 +2370,7 @@ class DataFrameTable(DataTable):
         """Show only those matching rows and hide others. Do not modify the dataframe."""
         if result is None:
             return
-        term, cidx, match_nocase, match_whole_word = result
+        term, cidx, match_nocase, match_whole = result
 
         col_name = self.df.columns[cidx]
 
@@ -2390,7 +2390,7 @@ class DataFrameTable(DataTable):
         else:
             dtype = self.df.dtypes[cidx]
             if dtype == pl.String:
-                if match_whole_word:
+                if match_whole:
                     term = f"^{term}$"
                 if match_nocase:
                     term = f"(?i){term}"
@@ -2400,7 +2400,7 @@ class DataFrameTable(DataTable):
                     value = DtypeConfig(dtype).convert(term)
                     expr = pl.col(col_name) == value
                 except Exception:
-                    if match_whole_word:
+                    if match_whole:
                         term = f"^{term}$"
                     if match_nocase:
                         term = f"(?i){term}"
