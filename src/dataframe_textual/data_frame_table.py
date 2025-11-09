@@ -40,9 +40,9 @@ from .yes_no_screen import (
     EditCellScreen,
     EditColumnScreen,
     FilterScreen,
+    FindReplaceScreen,
     FreezeScreen,
     RenameColumnScreen,
-    ReplaceScreen,
     SaveFileScreen,
     SearchScreen,
 )
@@ -2002,7 +2002,7 @@ class DataFrameTable(DataTable):
         """Open replace screen for current column."""
         # Push the replace modal screen
         self.app.push_screen(
-            ReplaceScreen(self),
+            FindReplaceScreen(self),
             callback=self._do_replace,
         )
 
@@ -2014,7 +2014,7 @@ class DataFrameTable(DataTable):
         """Open replace screen for all columns."""
         # Push the replace modal screen
         self.app.push_screen(
-            ReplaceScreen(self),
+            FindReplaceScreen(self),
             callback=self._do_replace_global,
         )
 
@@ -2359,8 +2359,10 @@ class DataFrameTable(DataTable):
 
         cidx = self.cursor_col_idx
 
-        if True in self.selected_rows:
-            term = self.selected_rows
+        # If there are selected rows or matches, use those
+        if True in self.selected_rows or len(self.matches) > 0:
+            term = [selected or idx in self.matches for idx, selected in enumerate(self.selected_rows)]
+        # Otherwise, use the current cell value
         else:
             ridx = self.cursor_row_idx
             term = self.df.item(ridx, cidx)
@@ -2389,6 +2391,7 @@ class DataFrameTable(DataTable):
         if term == NULL:
             expr = pl.col(col_name).is_null()
         elif isinstance(term, (list, pl.Series)):
+            # Support for list of booleans (selected rows)
             expr = term
         elif tentative_expr(term):
             # Support for polars expressions

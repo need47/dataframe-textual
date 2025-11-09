@@ -629,7 +629,7 @@ class AddColumnScreen(YesNoScreen):
                 return self.cidx, col_name, pl.lit(term)
 
 
-class ReplaceScreen(YesNoScreen):
+class FindReplaceScreen(YesNoScreen):
     """Modal screen to replace column values with an expression."""
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ReplaceScreen")

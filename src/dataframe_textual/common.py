@@ -199,13 +199,13 @@ def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: 
 
     Replaces column references with Polars col() expressions:
     - $_ - Current selected column
-    - $# - Row index (1-based, requires '__ridx__' column to be present)
+    - $# - Row index (1-based, requires '^__ridx__^' column to be present)
     - $1, $2, etc. - Column by 1-based index
     - $col_name - Column by name (valid identifier starting with _ or letter)
 
     Examples:
     - "$_ > 50" -> "pl.col('current_col') > 50"
-    - "$# > 10" -> "pl.col('__ridx__') > 10"
+    - "$# > 10" -> "pl.col('^__ridx__^') > 10"
     - "$1 > 50" -> "pl.col('col0') > 50"
     - "$name == 'Alex'" -> "pl.col('name') == 'Alex'"
     - "$age < $salary" -> "pl.col('age') < pl.col('salary')"
@@ -276,7 +276,7 @@ def tentative_expr(term: str) -> bool:
     Returns:
         True if the term appears to be a Polars expression, False otherwise.
     """
-    if term.startswith("$") and not term.endswith("$"):
+    if "$" in term and not term.endswith("$"):
         return True
     if "pl." in term:
         return True

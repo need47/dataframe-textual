@@ -472,7 +472,7 @@ Complex filters can be applied via Polars expressions using the `V` key. The fol
 - Use column names that match exactly (case-sensitive)
 - String literals must be in single or double quotes
 - Numbers don't need quotes
-- Use parentheses to clarify complex expressions: `($a & $b) | ($c && $d)`
+- Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
 - Press `q` or `Escape` to cancel the filter dialog without filtering
 
 ### 5. Sorting
