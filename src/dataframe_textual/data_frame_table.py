@@ -164,7 +164,7 @@ class DataFrameTable(DataTable):
         ## 💾 Data Management
         - **z** - 📌 Freeze rows and columns
         - **,** - 🔢 Toggle thousand separator for numeric display
-        - **Ctrl+c** - 📋 Copy cell to clipboard
+        - **c** - 📋 Copy cell to clipboard
         - **Ctrl+s** - 💾 Save current tab to file
         - **u** - ↩️ Undo last action
         - **U** - 🔄 Reset to original data
@@ -178,7 +178,7 @@ class DataFrameTable(DataTable):
         ("G", "jump_bottom", "Jump to bottom"),
         ("h", "hide_column", "Hide column"),
         ("H", "show_column", "Show columns"),
-        ("ctrl+c", "copy_cell", "Copy cell"),
+        ("c", "copy_cell", "Copy cell"),
         ("ctrl+s", "save_to_file", "Save to file"),
         ("enter", "view_row_detail", "View row details"),
         # Frequency & Statistics
