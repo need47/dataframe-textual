@@ -490,7 +490,7 @@ class FilterScreen(YesNoScreen):
         return term, self.cidx, match_nocase, match_whole
 
 
-class PinScreen(YesNoScreen):
+class FreezeScreen(YesNoScreen):
     """Modal screen to pin rows and columns.
 
     Accepts one value for fixed rows, or two space-separated values for fixed rows and columns.

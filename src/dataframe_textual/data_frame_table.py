@@ -40,7 +40,7 @@ from .yes_no_screen import (
     EditCellScreen,
     EditColumnScreen,
     FilterScreen,
-    PinScreen,
+    FreezeScreen,
     RenameColumnScreen,
     ReplaceScreen,
     SaveFileScreen,
@@ -158,11 +158,12 @@ class DataFrameTable(DataTable):
         - **!** - ✅ Cast column to boolean
         - **$** - 📝 Cast column to string
 
-        ## � URL Handling
-        - **@** - 🔗 Make URLs in current column clickable
+        ## 🔗 URL Handling
+        - **@** - 🔗 Make URLs in current column clickable with Ctrl/Cmd + click
 
-        ## �💾 Data Management
-        - **p** - 📌 Pin/freeze rows and columns
+        ## 💾 Data Management
+        - **z** - 📌 Freeze rows and columns
+        - **,** - 🔢 Toggle thousand separator for numeric display
         - **Ctrl+c** - 📋 Copy cell to clipboard
         - **Ctrl+s** - 💾 Save current tab to file
         - **u** - ↩️ Undo last action
@@ -230,7 +231,8 @@ class DataFrameTable(DataTable):
         # Misc
         ("tilde", "toggle_row_labels", "Toggle row labels"),  # `~`
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
-        ("p", "open_pin_screen", "Pin rows/columns"),
+        ("z", "freeze_row_column", "Freeze rows/columns"),
+        ("comma", "show_thousand_separator", "Toggle thousand separator"),  # `,`
         # Undo/Redo
         ("u", "undo", "Undo"),
         ("U", "reset", "Reset to original"),
@@ -280,6 +282,9 @@ class DataFrameTable(DataTable):
 
         # Pending filename for save operations
         self._pending_filename = ""
+
+        # Whether to use thousand separator for numeric display
+        self.thousand_separator = False
 
     @property
     def cursor_key(self) -> CellKey:
@@ -660,9 +665,9 @@ class DataFrameTable(DataTable):
         """Cycle through cursor types."""
         self._cycle_cursor_type()
 
-    def action_open_pin_screen(self) -> None:
-        """Open the freeze/pin screen."""
-        self._open_pin_screen()
+    def action_freeze_row_column(self) -> None:
+        """Open the freeze screen."""
+        self._freeze_row_column()
 
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility."""
@@ -699,6 +704,13 @@ class DataFrameTable(DataTable):
     def action_make_cell_clickable(self) -> None:
         """Make cells with URLs in current column clickable."""
         self._make_cell_clickable()
+
+    def action_show_thousand_separator(self) -> None:
+        """Toggle thousand separator for numeric display."""
+        self.thousand_separator = not self.thousand_separator
+        self._setup_table()
+        # status = "enabled" if self.thousand_separator else "disabled"
+        # self.notify(f"Thousand separator {status}", title="Display")
 
     def _make_cell_clickable(self) -> None:
         """Make cells with URLs in the current column clickable.
@@ -834,7 +846,7 @@ class DataFrameTable(DataTable):
                     continue  # Skip hidden columns
                 vals.append(val)
                 dtypes.append(dtype)
-            formatted_row = format_row(vals, dtypes)
+            formatted_row = format_row(vals, dtypes, thousand_separator=self.thousand_separator)
             # Always add labels so they can be shown/hidden via CSS
             self.add_row(*formatted_row, key=str(row_idx), label=str(row_idx + 1))
 
@@ -977,11 +989,11 @@ class DataFrameTable(DataTable):
             cidx = self.cursor_col_idx
             self.app.push_screen(StatisticsScreen(self, col_idx=cidx))
 
-    def _open_pin_screen(self) -> None:
-        """Open the pin screen to set fixed rows and columns."""
-        self.app.push_screen(PinScreen(), callback=self._do_pin)
+    def _freeze_row_column(self) -> None:
+        """Open the freeze screen to set fixed rows and columns."""
+        self.app.push_screen(FreezeScreen(), callback=self._do_freeze)
 
-    def _do_pin(self, result: tuple[int, int] | None) -> None:
+    def _do_freeze(self, result: tuple[int, int] | None) -> None:
         """Handle result from PinScreen.
 
         Args:

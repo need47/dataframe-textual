@@ -28,7 +28,7 @@ BOOLS = {
 
 @dataclass
 class DtypeClass:
-    dtype: str
+    gtype: str  # generic, high-level type
     style: str
     justify: str
     itype: str
@@ -39,29 +39,29 @@ class DtypeClass:
 # fmt: off
 STYLES = {
     # str
-    pl.String: DtypeClass(dtype="string", style="green", justify="left", itype="text", convert=str),
+    pl.String: DtypeClass(gtype="string", style="green", justify="left", itype="text", convert=str),
     # int
-    pl.Int8: DtypeClass(dtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.Int16: DtypeClass(dtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.Int32: DtypeClass(dtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.Int64: DtypeClass(dtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.Int128: DtypeClass(dtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.UInt8: DtypeClass(dtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.UInt16: DtypeClass(dtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.UInt32: DtypeClass(dtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.UInt64: DtypeClass(dtype="integer", style="cyan", justify="right", itype="integer", convert=int),
+    pl.Int8: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
+    pl.Int16: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
+    pl.Int32: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
+    pl.Int64: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
+    pl.Int128: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
+    pl.UInt8: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
+    pl.UInt16: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
+    pl.UInt32: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
+    pl.UInt64: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
     # float
-    pl.Float32: DtypeClass(dtype="float", style="magenta", justify="right", itype="number", convert=float),
-    pl.Float64: DtypeClass(dtype="float", style="magenta", justify="right", itype="number", convert=float),
-    pl.Decimal: DtypeClass(dtype="float", style="magenta", justify="right", itype="number", convert=float),
+    pl.Float32: DtypeClass(gtype="float", style="magenta", justify="right", itype="number", convert=float),
+    pl.Float64: DtypeClass(gtype="float", style="magenta", justify="right", itype="number", convert=float),
+    pl.Decimal: DtypeClass(gtype="float", style="magenta", justify="right", itype="number", convert=float),
     # bool
-    pl.Boolean: DtypeClass(dtype="boolean", style="blue", justify="center", itype="text", convert=lambda x: BOOLS[x.lower()]),
+    pl.Boolean: DtypeClass(gtype="boolean", style="blue", justify="center", itype="text", convert=lambda x: BOOLS[x.lower()]),
     # temporal
-    pl.Date: DtypeClass(dtype="temporal", style="yellow", justify="center", itype="text", convert=str),
-    pl.Datetime: DtypeClass(dtype="temporal", style="yellow", justify="center", itype="text", convert=str),
-    pl.Time: DtypeClass(dtype="temporal", style="yellow", justify="center", itype="text", convert=str),
+    pl.Date: DtypeClass(gtype="temporal", style="yellow", justify="center", itype="text", convert=str),
+    pl.Datetime: DtypeClass(gtype="temporal", style="yellow", justify="center", itype="text", convert=str),
+    pl.Time: DtypeClass(gtype="temporal", style="yellow", justify="center", itype="text", convert=str),
     # unknown
-    pl.Unknown: DtypeClass(dtype="unknown", style="", justify="", itype="text", convert=str),
+    pl.Unknown: DtypeClass(gtype="unknown", style="", justify="", itype="text", convert=str),
 }
 # fmt: on
 
@@ -111,7 +111,7 @@ def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
         return STYLES[pl.Unknown]
 
 
-def format_row(vals, dtypes, apply_justify=True) -> list[Text]:
+def format_row(vals, dtypes, apply_justify=True, thousand_separator=False) -> list[Text]:
     """Format a single row with proper styling and justification.
 
     Converts raw row values to formatted Rich Text objects with appropriate
@@ -133,8 +133,10 @@ def format_row(vals, dtypes, apply_justify=True) -> list[Text]:
         # Format the value
         if val is None:
             text_val = NULL_DISPLAY
-        elif str(dtype).startswith("Float"):
-            text_val = f"{val:.4g}"
+        elif dc.gtype == "integer" and thousand_separator:
+            text_val = f"{val:,}"
+        elif dc.gtype == "float":
+            text_val = f"{val:,.4g}" if thousand_separator else f"{val:.4g}"
         else:
             text_val = str(val)
 

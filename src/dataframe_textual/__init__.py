@@ -8,8 +8,8 @@ from .yes_no_screen import (
     ConfirmScreen,
     EditCellScreen,
     FilterScreen,
+    FreezeScreen,
     OpenFileScreen,
-    PinScreen,
     SaveFileScreen,
     SearchScreen,
     YesNoScreen,
@@ -29,7 +29,7 @@ __all__ = [
     "EditCellScreen",
     "SearchScreen",
     "FilterScreen",
-    "PinScreen",
+    "FreezeScreen",
     "OpenFileScreen",
     "_load_dataframe",
 ]

@@ -239,7 +239,8 @@ When multiple files are opened:
 
 | Key | Action |
 |-----|--------|
-| `p` | Pin rows and columns |
+| `z` | Freeze rows and columns |
+| `,` | Toggle thousand separator for numeric display |
 | `Ctrl+C` | Copy current cell to clipboard |
 | `Ctrl+S` | Save current tab to file |
 | `u` | Undo last action |
@@ -605,12 +606,29 @@ This is useful for:
 - Swaps adjacent rows
 - Visual reordering without affecting data
 
-### 13. Pin Rows and Columns
+### 13. Freeze Rows and Columns
 
-Press `p` to open the pin dialog:
-- Enter number of fixed rows: keeps top rows visible while scrolling
-- Enter two numbers: `<rows> <columns>` (space-separated)
-- Example: `2 3` pins top 2 rows and left 3 columns
+Press `z` to open the dialog:
+- Enter number of fixed rows and/or columns: keeps top rows/columns visible while scrolling
+
+### 13.5. Thousand Separator Toggle
+
+Press `,` to toggle thousand separator formatting for numeric data:
+- Applies to **Int64** and **Float64** columns
+- Formats large numbers with commas for readability (e.g., `1000000` → `1,000,000`)
+- Toggle on/off as needed for different viewing preferences
+- Display-only: does not modify underlying data in the dataframe
+- State persists during the session
+
+**Examples**:
+- View: `1234567` vs `1,234,567` (easier to read large numbers)
+- View: `3.14159265` stays as `3.14159265` (decimals not affected)
+
+**Features**:
+- Apply/remove formatting instantly with single keypress
+- Works across all numeric columns in the table
+- Useful for financial data, large datasets, or readability preferences
+- Full undo support if you want to restore previous formatting state
 
 ### 14. Save File
 
