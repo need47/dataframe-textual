@@ -242,6 +242,8 @@ When multiple files are opened:
 | `z` | Freeze rows and columns |
 | `,` | Toggle thousand separator for numeric display |
 | `c` | Copy current cell to clipboard |
+| `Ctrl+C` | Copy column to clipboard |
+| `Ctrl+R` | Copy row to clipboard (tab-separated) |
 | `Ctrl+S` | Save current tab to file |
 | `u` | Undo last action |
 | `U` | Reset to original data |

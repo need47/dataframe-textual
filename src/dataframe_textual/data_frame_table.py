@@ -165,6 +165,8 @@ class DataFrameTable(DataTable):
         - **z** - 📌 Freeze rows and columns
         - **,** - 🔢 Toggle thousand separator for numeric display
         - **c** - 📋 Copy cell to clipboard
+        - **Ctrl+c** - 📊 Copy column to clipboard
+        - **Ctrl+r** - 📝 Copy row to clipboard (tab-separated)
         - **Ctrl+s** - 💾 Save current tab to file
         - **u** - ↩️ Undo last action
         - **U** - 🔄 Reset to original data
@@ -178,7 +180,9 @@ class DataFrameTable(DataTable):
         ("G", "jump_bottom", "Jump to bottom"),
         ("h", "hide_column", "Hide column"),
         ("H", "show_column", "Show columns"),
-        ("c", "copy_cell", "Copy cell"),
+        ("c", "copy_cell", "Copy cell to clipboard"),
+        ("ctrl+c", "copy_column", "Copy column to clipboard"),
+        ("ctrl+r", "copy_row", "Copy row to clipboard"),
         ("ctrl+s", "save_to_file", "Save to file"),
         ("enter", "view_row_detail", "View row details"),
         # Frequency & Statistics
@@ -681,25 +685,46 @@ class DataFrameTable(DataTable):
 
     def action_copy_cell(self) -> None:
         """Copy the current cell to clipboard."""
-        import subprocess
-
         ridx = self.cursor_row_idx
         cidx = self.cursor_col_idx
 
         try:
             cell_str = str(self.df.item(ridx, cidx))
-            subprocess.run(
-                [
-                    "pbcopy" if sys.platform == "darwin" else "xclip",
-                    "-selection",
-                    "clipboard",
-                ],
-                input=cell_str,
-                text=True,
-            )
-            self.notify(f"Copied: [$success]{cell_str[:50]}[/]", title="Clipboard")
-        except (FileNotFoundError, IndexError):
+            self._copy_to_clipboard(cell_str, f"Copied: [$success]{cell_str[:50]}[/]")
+        except IndexError:
             self.notify("Error copying cell", title="Clipboard", severity="error")
+
+    def action_copy_column(self) -> None:
+        """Copy the current column to clipboard (one value per line)."""
+        col_name = self.cursor_col_name
+
+        try:
+            # Get all values in the column and join with newlines
+            col_values = [str(val) for val in self.df[col_name].to_list()]
+            col_str = "\n".join(col_values)
+
+            self._copy_to_clipboard(
+                col_str,
+                f"Copied [$accent]{len(col_values)}[/] values from column [$success]{col_name}[/]",
+            )
+        except (FileNotFoundError, IndexError):
+            self.notify("Error copying column", title="Clipboard", severity="error")
+
+    def action_copy_row(self) -> None:
+        """Copy the current row to clipboard (values separated by tabs)."""
+        ridx = self.cursor_row_idx
+
+        try:
+            # Get all values in the row and join with tabs
+            row_values = [str(val) for val in self.df.row(ridx)]
+            row_str = "\t".join(row_values)
+
+            self._copy_to_clipboard(
+                row_str,
+                f"Copied row [$accent]{ridx + 1}[/] with [$success]{len(row_values)}[/] values",
+            )
+        except (FileNotFoundError, IndexError):
+            self.notify("Error copying row", title="Clipboard", severity="error")
 
     def action_make_cell_clickable(self) -> None:
         """Make cells with URLs in current column clickable."""
@@ -2475,6 +2500,29 @@ class DataFrameTable(DataTable):
         self.cursor_type = next_type
 
         # self.notify(f"Changed cursor type to [$success]{next_type}[/]", title="Cursor")
+
+    def _copy_to_clipboard(self, content: str, message: str) -> None:
+        """Copy content to clipboard using pbcopy (macOS) or xclip (Linux).
+
+        Args:
+            content: The text content to copy to clipboard.
+            message: The notification message to display on success.
+        """
+        import subprocess
+
+        try:
+            subprocess.run(
+                [
+                    "pbcopy" if sys.platform == "darwin" else "xclip",
+                    "-selection",
+                    "clipboard",
+                ],
+                input=content,
+                text=True,
+            )
+            self.notify(message, title="Clipboard")
+        except FileNotFoundError:
+            self.notify("Error copying to clipboard", title="Clipboard", severity="error")
 
     def _save_to_file(self) -> None:
         """Open screen to save file."""
