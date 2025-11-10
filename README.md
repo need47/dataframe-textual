@@ -1,6 +1,6 @@
 # DataFrame Textual
 
-A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/JSON/NDJSON built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in your terminal with multi-tab support for multiple files!
+A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/JSON/NDJSON built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in terminal with multi-tab support for multiple files!
 
 ![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshot.png)
 
@@ -18,13 +18,13 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/J
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
 - ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts
 - 📈 **Sorting & Statistics** - Multi-column sorting and frequency distribution analysis
-- 💾 **Save & Undo** - Save filtered data back to file with full undo/redo support
+- 💾 **Save & Undo** - Save edits back to file with full undo/redo support
 
 ### Advanced Features
-- 📌 **Pin Rows/Columns** - Keep important rows and columns visible while scrolling
-- 🎯 **Cursor Type Cycling** - Switch between cell, row, and column selection modes
 - 📂 **Multi-File Support** - Open multiple files in tabs for side-by-side comparison
 - 🔄 **Tab Management** - Seamlessly switch between open files with keyboard shortcuts
+- 📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
+- 🎯 **Cursor Type Cycling** - Switch between cell, row, and column selection modes
 
 ## Installation
 
@@ -43,7 +43,7 @@ Then run:
 dataframe-textual <csv_file>
 ```
 
-### Using uv
+### Using [uv](https://docs.astral.sh/uv/)
 
 ```bash
 # Quick run using uvx without installation
@@ -53,9 +53,7 @@ uvx https://github.com/need47/dataframe-textual.git <csvfile>
 cd dataframe-textual
 
 # Run directly with uv
-uv run python main.py <csv_file>
-
-#
+uv run main.py <csv_file>
 ```
 
 ### Development installation
@@ -86,9 +84,9 @@ python main.py pokemon.csv
 # Or with uv
 uv run python main.py pokemon.csv
 
-# Read from stdin
-cat data.csv | dataframe-textual
-dataframe-textual < data.csv
+# Read from stdin (auto-detects format; defaults to TSV if not recognized)
+cat data.tsv | dataframe-textual
+dataframe-textual < data.tsv
 ```
 
 ### Multi-File Usage - Multiple Tabs
@@ -100,8 +98,8 @@ dataframe-textual file1.csv file2.csv file3.csv
 # Open multiple sheets in tabs in an Excel file
 dataframe-textual file.xlsx
 
-# Mix files and stdin (file opens first, then read from stdin)
-dataframe-textual data1.csv < data2.csv
+# Mix files and stdin (read from stdin, then open file)
+dataframe-textual data1.tsv < data2.tsv
 ```
 
 When multiple files are opened:
@@ -109,8 +107,7 @@ When multiple files are opened:
 - Switch between tabs using `>` (next) or `<` (previous)
 - Open additional files with `Ctrl+O`
 - Close the current tab with `Ctrl+W`
-- Each file maintains its own state (sort order, selections, history, etc.)
-- Edits and filters are independent per file
+- Each file maintains its own state (edits, sort order, selections, history, etc.)
 
 ## Keyboard Shortcuts
 
@@ -120,7 +117,7 @@ When multiple files are opened:
 
 | Key | Action |
 |-----|--------|
-| `Ctrl+O` | Open new CSV file in a new tab |
+| `Ctrl+O` | Open file in a new tab |
 | `Ctrl+W` | Close current tab |
 | `Ctrl+Shift+S` | Save all open tabs to Excel file |
 | `>` or `b` | Move to next tab |
@@ -147,8 +144,9 @@ When multiple files are opened:
 | `G` | Jump to last row (loads all remaining rows) |
 | `↑` / `↓` | Move up/down one row |
 | `←` / `→` | Move left/right one column |
-| `PageDown` / `PageUp` | Scroll down/up |
-| Arrow keys | Navigate the table |
+| `Home` / `End` | Jump to first/last column in current row |
+| `Ctrl + Home` / `Ctrl + End` | Jump to top/bottom in current page |
+| `PageDown` / `PageUp` | Scroll down/up one page |
 
 #### Viewing & Display
 
@@ -166,15 +164,15 @@ When multiple files are opened:
 | Key | Action |
 |-----|--------|
 | `Double-click` | Edit cell or rename column header |
+| `X` | Clear current cell (set to NULL) |
 | `e` | Edit current cell (respects data type) |
 | `E` | Edit entire column with expression |
 | `a` | Add empty column after current |
-| `A` | Add column with name and optional expression (separated by `;`) |
+| `A` | Add column with name and value/expression |
+| `-` (minus) | Delete current column |
 | `x` | Delete current row |
-| `X` | Clear current cell (set to None) |
-| `D` | Duplicate current row |
-| `-` | Delete current column |
 | `d` | Duplicate current column (appends '_copy' suffix) |
+| `D` | Duplicate current row |
 | `h` | Hide current column |
 | `H` | Show all hidden columns |
 
@@ -182,27 +180,29 @@ When multiple files are opened:
 
 | Key | Action |
 |-----|--------|
-| `\|` (pipe) | Search in current column with expression |
-| `Ctrl+\|` | Global search with expression |
-| `\` | Search in current column using cursor value |
-| `Ctrl+\` | Global search using cursor value |
-| `/` | Find in current column with cursor value |
-| `Ctrl+/` | Global find using cursor value |
-| `?` | Find in current column with expression |
-| `Ctrl+Shift+/` | Global find with expression |
+| `\` | Search in current column using cursor value and select rows |
+| `\|` (pipe) | Search in current column with expression and select rows |
+| `/` | Find in current column with cursor value and highlight matches |
+| `?` | Find in current column with expression and highlight matches |
+| `n` | Go to next match |
+| `N` | Go to previous match |
+| `{` | Go to previous selected row |
+| `}` | Go to next selected row |
 | `'` | Select/deselect current row |
-| `t` | Toggle highlighting of all selected rows (invert) |
-| `T` | Clear all selected rows |
-| `"` (quote) | Filter to show only selected rows |
-| `v` | View/filter rows by selected rows or current cell value |
-| `V` | View/filter rows by expression (Polars expression syntax) |
+| `t` | Toggle selected rows (invert) |
+| `T` | Clear all selected rows and/or matches |
+| `"` (quote) | Filter to selected rows only |
+| `v` | View only rows by selected rows and/or matches or cursor value |
+| `V` | View only rows by expression |
 
 #### Find & Replace
 
 | Key | Action |
 |-----|--------|
-| `r` | Replace in current column (interactive or replace all) |
-| `R` | Replace across all columns (interactive or replace all) |
+| `f` | Find across all columns with cursor value |
+| `Ctrl+F` | Find across all columns with expression |
+| `r` | Find and replace in current column (interactive or replace all) |
+| `R` | Find and replace across all columns (interactive or replace all) |
 
 #### Sorting
 
@@ -228,11 +228,6 @@ When multiple files are opened:
 | `%` | Cast current column to float (Float64) |
 | `!` | Cast current column to boolean |
 | `$` | Cast current column to string |
-
-#### URL Handling
-
-| Key | Action |
-|-----|--------|
 | `@` | Make URLs in current column clickable with Ctrl/Cmd + click|
 
 #### Data Management
@@ -248,39 +243,25 @@ When multiple files are opened:
 | `u` | Undo last action |
 | `U` | Reset to original data |
 
-#### Modal Interactions
-
-**In Frequency Distribution Modal** (opened with `F`):
-- `[` / `]` - Sort frequency table
-- `v` - Filter main table to selected value
-- `"` - Highlight rows with selected value
-- `q` / `Escape` - Close modal
-
-**In Row Detail Modal** (opened with `Enter`):
-- `v` - Filter main table to selected column value
-- `"` - Highlight rows with selected column value
-- `q` / `Escape` - Close modal
-
-**Tip**: Press `?` or `h` to open the context-sensitive help panel which displays all available shortcuts based on your current focus.
-
 ## Features in Detail
 
 ### 1. Color-Coded Data Types
 
 Columns are automatically styled based on their data type:
-- **Int64** (Integers): Cyan text, right-aligned
-- **Float64** (Decimals): Magenta text, right-aligned
-- **String**: Green text, left-aligned
-- **Boolean**: Blue text, centered
-- **Date/Datetime**: Blue text, centered
+- **integer**: Cyan text, right-aligned
+- **float**: Magenta text, right-aligned
+- **string**: Green text, left-aligned
+- **boolean**: Blue text, centered
+- **temporal**: Yellow text, centered
 
 ### 2. Row Detail View
 
-Press `Enter` on any row to open a modal showing all column values for that row. Useful for examining wide datasets where columns don't fit on screen.
+Press `Enter` on any row to open a modal showing all column values for that row.
+Useful for examining wide datasets where columns don't fit on screen.
 
 **In the Row Detail Modal**:
-- Press `v` to **filter** the main table to show only rows with the selected column value
-- Press `"` to **highlight** all rows containing the selected column value
+- Press `v` to **view** the main table to show only rows with the selected column value
+- Press `"` to **filter** all rows containing the selected column value
 - Press `q` or `Escape` to close the modal
 
 ### 3. Search & Filtering
@@ -289,45 +270,36 @@ The application provides multiple search modes for different use cases:
 
 **Search Operations** - Direct value/expression matching in current column:
 - **`|` - Column Expression Search**: Opens dialog to search current column with custom expression
-- **`\` - Column Cursor Search**: Instantly search current column using the current cell's value
+- **`\` - Column Cursor Search**: Instantly search current column using the cursor value
 
 **Find Operations** - Find by value/expression:
-- **`/` - Column Find**: Find current cell value within current column
+- **`/` - Column Find**: Find cursor value within current column
 - **`?` - Column Expression Find**: Open dialog to search current column with expression
-- **`f` - Global Find**: Find current cell value across all columns
+- **`f` - Global Find**: Find cursor value across all columns
 - **`Ctrl+f` - Global Expression Find**: Open dialog to search all columns with expression
 
 **Selection & Filtering**:
 - **`'` - Toggle Row Selection**: Select/deselect current row (marks it for filtering)
-- **`t` - Invert All Selections**: Flip selection state of all rows at once
-- **`T` - Clear Selections**: Remove all row selections and highlights
-- **`"` - Filter Selected**: Display only the selected rows (others hidden but preserved)
-- **`v` - View by Value**: Filter/view rows by selected rows or current cell value
-- **`V` - View by Expression**: Filter/view rows using custom Polars expression
+- **`t` - Invert Selections**: Flip selection state of all rows at once
+- **`T` - Clear Selections**: Remove all row selections and matches
+- **`"` - Filter Selected**: Display only the selected rows and remove others
+- **`v` - View by Value**: Filter/view rows by selected rows or cursor value (others hidden but preserved)
+- **`V` - View by Expression**: Filter/view rows using custom Polars expression (others hidden but preserved)
 
 **Advanced Matching Options**:
 
 When searching or finding, you can use checkboxes in the dialog to enable:
-- **Case Insensitive**: Ignore case differences (e.g., "john", "John", "JOHN" all match)
-- **Whole Word**: Match complete words only, not partial words (e.g., "cat" won't match in "catfish")
+- **Match Nocase**: Ignore case differences (e.g., "john", "John", "JOHN" all match)
+- **Match Whole**: Match complete value, not partial substrings or words (e.g., "cat" won't match in "catfish")
 
 These options work with plain text searches. Use Polars regex patterns in expressions for more control:
 - **Case-insensitive matching in expressions**: Use `(?i)` prefix in regex (e.g., `(?i)john`)
 - **Word boundaries in expressions**: Use `\b` in regex (e.g., `\bjohn\b` matches whole word)
 
-**How It Works:**
-- Search results highlight matching rows/cells in **red**
-- Multiple searches **accumulate selections** - each new search adds to the highlight
-- Type-aware matching automatically converts values to strings for comparison
-- Large datasets automatically load additional rows if matches extend beyond visible area
-- Use `u` (undo) to restore original view
-
 **Quick Tips:**
-- Use `\` for instant searching without opening a dialog
-- Use `Ctrl+\` to search all columns without typing
-- Enable **Case Insensitive** for fuzzy name matching (e.g., find all variations of "John")
-- Enable **Whole Word** to avoid partial matches (e.g., search for "is" without matching "this")
-- Use `"` after selecting rows to hide everything except your selection
+- Search results highlight matching rows/cells in **red**
+- Multiple searches **accumulate selections** - each new search adds to the selections
+- Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 - Use `u` to undo any search or filter
 
 ### 3b. Find & Replace
@@ -344,8 +316,8 @@ When you press `r` or `R`, a dialog opens where you can enter:
 1. **Find term**: The value or expression to search for
 2. **Replace term**: What to replace matches with
 3. **Matching options**:
-   - **Case Insensitive**: Ignore case differences when matching (unchecked by default)
-   - **Whole Word**: Match complete words only, not partial words (unchecked by default)
+   - **Match Nocase**: Ignore case differences when matching (unchecked by default)
+   - **Match Whole**: Match complete words only, not partial words (unchecked by default)
 4. **Replace option**:
    - Choose **"Replace All"** to replace all matches at once (with confirmation)
    - Otherwise, review and confirm each match individually
@@ -368,8 +340,8 @@ When you press `r` or `R`, a dialog opens where you can enter:
 
 **Search Term Types:**
 - **Plain text**: Exact string match (e.g., "John" finds "John")
-  - Use **Case Insensitive** checkbox to match regardless of case (e.g., find "john", "John", "JOHN")
-  - Use **Whole Word** checkbox to match complete words only (e.g., find "cat" but not in "catfish")
+  - Use **Match Nocase** checkbox to match regardless of case (e.g., find "john", "John", "JOHN")
+  - Use **Match Whole** checkbox to match complete words only (e.g., find "cat" but not in "catfish")
 - **NULL**: Replace null/missing values (type `NULL`)
 - **Expression**: Polars expressions for complex matching (e.g., `$_ > 50` for column replace)
 - **Regex patterns**: Use Polars regex syntax for advanced matching
@@ -385,12 +357,12 @@ Replace: "Jane"
 
 Find: "john"
 Replace: "jane"
-Case Insensitive: ✓ (checked)
+Match Nocase: ✓ (checked)
 → "John", "JOHN", "john" all become "jane"
 
 Find: "cat"
 Replace: "dog"
-Whole Word: ✓ (checked)
+Match Whole: ✓ (checked)
 → "cat" becomes "dog", but "catfish" is not matched
 
 Find: "NULL"
@@ -419,20 +391,23 @@ Replace: "inactive"
 **Tips:**
 - Use interactive mode for one-time replacements to be absolutely sure
 - Use "Replace All" for routine replacements (e.g., fixing typos, standardizing formats)
-- Use **Case Insensitive** for matching variations of names or titles
-- Use **Whole Word** to avoid unintended partial replacements
+- Use **Match Nocase** for matching variations of names or titles
+- Use **Match Whole** to avoid unintended partial replacements
 - Use `u` immediately if you accidentally replace something wrong
 - For complex replacements, use Polars expressions or regex patterns in the find term
 - Test with a small dataset first before large replacements
 
-### 4. Filter by Expression
+### 4. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
 
-Complex filters can be applied via Polars expressions using the `V` key. The following special syntax is supported:
+Complex values or filters can be specified via Polars expressions, with the following adaptions for convenience:
 
 **Column References:**
 - `$_` - Current column (based on cursor position)
 - `$1`, `$2`, etc. - Column by 1-based index
 - `$age`, `$salary` - Column by name (use actual column names)
+
+**Row References:**
+- `$#` - Current row index (1-based)
 
 **Basic Comparisons:**
 - `$_ > 50` - Current column greater than 50
@@ -442,16 +417,16 @@ Complex filters can be applied via Polars expressions using the `V` key. The fol
 - `$name != 'Unknown'` - Name is not 'Unknown'
 
 **Logical Operators:**
-- `&` - AND (both conditions true)
-- `|` - OR (either condition true)
-- `~` - NOT (negate condition)
+- `&` - AND
+- `|` - OR
+- `~` - NOT
 
 **Practical Examples:**
-- `$age < 30 & $status == 'active'` - Age less than 30 AND status is active
-- `$name == 'Alice' | $name == 'Bob'` - Name is Alice or Bob
+- `($age < 30) & ($status == 'active')` - Age less than 30 AND status is active
+- `($name == 'Alice') | ($name == 'Bob')` - Name is Alice or Bob
 - `$salary / 1000 >= 50` - Salary divided by 1,000 is at least 50
-- `$department == 'Sales' & $bonus > 5000` - Sales department with bonus over 5,000
-- `$score >= 80 & $score <= 90` - Score between 80 and 90
+- `($department == 'Sales') & ($bonus > 5000)` - Sales department with bonus over 5,000
+- `($score >= 80) & ($score <= 90)` - Score between 80 and 90
 - `~($status == 'inactive')` - Status is not inactive
 - `$revenue > $expenses` - Revenue exceeds expenses
 
@@ -460,6 +435,7 @@ Complex filters can be applied via Polars expressions using the `V` key. The fol
 - `$name.str.contains("(?i)john")` - Name contains "john" (case-insensitive)
 - `$email.str.ends_with("@company.com")` - Email ends with domain
 - `$code.str.starts_with("ABC")` - Code starts with "ABC"
+- `$age.cast(pl.String).str.starts_with("7")` - Age (cast to string first) starts with "7"
 
 **Number Operations:**
 - `$age * 2 > 100` - Double age greater than 100
@@ -469,28 +445,26 @@ Complex filters can be applied via Polars expressions using the `V` key. The fol
 **Null Handling:**
 - `$column.is_null()` - Find null/missing values
 - `$column.is_not_null()` - Find non-null values
+- `NULL` - a value to represent null for convenience
 
 **Tips:**
 - Use column names that match exactly (case-sensitive)
-- String literals must be in single or double quotes
-- Numbers don't need quotes
 - Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
-- Press `q` or `Escape` to cancel the filter dialog without filtering
 
 ### 5. Sorting
 
 - Press `[` to sort current column ascending
 - Press `]` to sort current column descending
 - Multi-column sorting supported (press multiple times on different columns)
-- Press same key twice to toggle direction
-- Frequency view (`F`) shows value distribution with optional sorting
+- Press same key twice to remove the column from sorting
 
 ### 6. Frequency Distribution
 
 Press `F` to see how many times each value appears in the current column. The modal shows:
 - Value
 - Count
-- Percentage of total
+- Percentage
+- Histogram
 - **Total row** at the bottom
 
 **In the Frequency Table**:
@@ -517,7 +491,7 @@ Press `s` to see summary statistics for the current column, or press `S` for sta
 
 **Dataframe Statistics** (`S`):
 - Shows statistics for all numeric and applicable columns simultaneously
-- Data columns are color-coded by their type (Int64, Float64, String, etc.)
+- Data columns are color-coded by their data type (integer, float, string, etc.)
 
 **In the Statistics Modal**:
 - Press `q` or `Escape` to close the statistics table
@@ -536,39 +510,31 @@ This is useful for:
 **Edit Cell** (`e` or **Double-click**):
 - Opens modal for editing current cell
 - Validates input based on column data type
-- Shows column name and type
-- Integer, number, and text inputs available
-- **Double-click**: Quick edit without pressing `e` - double-click any cell to edit it
 
 **Rename Column Header** (**Double-click** column header):
 - Quick rename by double-clicking the column header
 
-**Delete Row** (`d`):
-- Delete single row at cursor
-- Or delete all selected rows at once
-- Deleted rows are marked internally but kept for undo
+**Delete Row** (`x`):
+- Delete all selected rows (if any) at once
+- Or delete single row at cursor
 
 **Delete Column** (`-`):
 - Removes the entire column from view and dataframe
-- Cannot be undone directly (use undo feature)
 
 ### 9. Hide & Show Columns
 
 **Hide Column** (`h`):
 - Temporarily hides the current column from display
 - Column data is preserved in the dataframe
-- Hidden columns don't appear in saves until shown again
+- Hidden columns are included in saves
 
 **Show Hidden Columns** (`H`):
 - Restores all previously hidden columns to the display
 - Returns table to full column view
-- Useful for temporarily removing columns from view without deleting them
 
 This is useful for:
 - Focusing on specific columns without deleting data
 - Temporarily removing cluttered or unnecessary columns
-- Comparing different column sets via hide/show
-- Preserving all data while simplifying the view
 
 ### 10. Duplicate Column
 
@@ -576,13 +542,12 @@ Press `d` to duplicate the current column:
 - Creates a new column immediately after the current column
 - New column has '_copy' suffix (e.g., 'price' → 'price_copy')
 - Duplicate preserves all data from original column
-- New column is inserted into the dataframe using Polars operations
+- New column is inserted into the dataframe
 
 This is useful for:
 - Creating backup copies of columns before transformation
 - Working with alternative versions of column data
 - Comparing original vs. processed column values side-by-side
-- Data preparation and validation workflows
 
 ### 11. Duplicate Row
 
@@ -590,13 +555,10 @@ Press `D` to duplicate the current row:
 - Creates a new row immediately after the current row
 - Duplicate preserves all data from original row
 - New row is inserted into the dataframe
-- Cursor moves to the duplicated row
 
 This is useful for:
 - Creating variations of existing data records
 - Batch adding similar rows with modifications
-- Testing with duplicate data
-- Data validation and comparison workflows
 
 ### 12. Column & Row Reordering
 
@@ -606,31 +568,22 @@ This is useful for:
 
 **Move Rows**: `Shift+↑` and `Shift+↓`
 - Swaps adjacent rows
-- Visual reordering without affecting data
+- Reorder is preserved when saving
 
 ### 13. Freeze Rows and Columns
 
 Press `z` to open the dialog:
-- Enter number of fixed rows and/or columns: keeps top rows/columns visible while scrolling
+- Enter number of fixed rows and/or columns to keep top rows/columns visible while scrolling
 
 ### 13.5. Thousand Separator Toggle
 
 Press `,` to toggle thousand separator formatting for numeric data:
-- Applies to **Int64** and **Float64** columns
+- Applies to **integer** and **float** columns
 - Formats large numbers with commas for readability (e.g., `1000000` → `1,000,000`)
+- Works across all numeric columns in the table
 - Toggle on/off as needed for different viewing preferences
 - Display-only: does not modify underlying data in the dataframe
 - State persists during the session
-
-**Examples**:
-- View: `1234567` vs `1,234,567` (easier to read large numbers)
-- View: `3.14159265` stays as `3.14159265` (decimals not affected)
-
-**Features**:
-- Apply/remove formatting instantly with single keypress
-- Works across all numeric columns in the table
-- Useful for financial data, large datasets, or readability preferences
-- Full undo support if you want to restore previous formatting state
 
 ### 14. Save File
 
@@ -653,24 +606,17 @@ Press `U` to revert to when data was initially loaded
 Press the type conversion keys to instantly cast the current column to a different data type:
 
 **Type Conversion Shortcuts**:
-- `#` - Cast to **Integer (Int64)**
-- `%` - Cast to **Float (Float64)**
-- `!` - Cast to **Boolean**
-- `$` - Cast to **String**
-
-**Examples**:
-- Convert string numbers to integers: Move to column, press `#`
-- Convert integers to decimals: Move to column, press `%`
-- Convert text to string: Move to column, press `*`
-- Convert numeric values to true/false: Move to column, press `$`
+- `#` - Cast to **integer**
+- `%` - Cast to **float**
+- `!` - Cast to **boolean**
+- `$` - Cast to **string**
 
 **Features**:
 - Instant conversion with visual feedback
 - Full undo support - press `u` to revert
-- Automatic error handling with helpful messages
-- Works with Polars' robust type casting
+- Leverage Polars' robust type casting
 
-**Note**: Type conversion attempts to preserve data where possible. Conversions that would lose data (e.g., float to int rounding, invalid boolean strings) will notify you with the reason.
+**Note**: Type conversion attempts to preserve data where possible. Conversions may lose data (e.g., float to int rounding).
 
 ### 17. Cursor Type Cycling
 
@@ -679,44 +625,21 @@ Press `K` to cycle through selection modes:
 2. **Row mode**: Highlight entire row
 3. **Column mode**: Highlight entire column
 
-Visual feedback shows which mode is active.
-
 ### 18. URL Handling
 
 Press `@` to make URLs in the current column clickable:
-- **Scans** all cells in the current column for URLs
-- **Detects** URLs starting with `http://` or `https://`
-- **Applies** link styling to make them clickable
-- **String columns only**: Non-string columns are ignored with a warning
-- **No data modification**: Styling is applied only to the display, dataframe remains unchanged
-
-**Features**:
-- Works on all loaded rows in the column
-- Provides feedback on how many URLs were made clickable
-- Helpful error messages if column is wrong type or contains no URLs
-- Requires string data type to function
-
-**Example**:
-- Column contains: `https://github.com/user/repo`, `https://example.com`, `not-a-url`
-- Press `@` to make the two URLs clickable
-- Click on URLs to open them in your default browser
+- **Ctrl/Cmd + click** on URLs to open them in your default browser
+- **Scans** all cells in the current column for URLs starting with `http://` or `https://`
+- **Applies** link styling to make them clickable and dataframe remains unchanged
 
 ### 19. Clipboard Operations
 
+Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux
+
 Press `Ctrl+C` to copy:
-- Copies current cell value to system clipboard
-- Works on macOS (`pbcopy`) and Linux (`xclip`)
-- Shows confirmation notification
-
-## Data Type Support
-
-- **Int64, Int32, UInt32**: Integer values
-- **Float64, Float32**: Decimal numbers (shown with 4 significant figures)
-- **String**: Text data
-- **Boolean**: True/False values
-- **Date**: ISO date format (YYYY-MM-DD)
-- **Datetime**: ISO datetime format
-- **Null values**: Displayed as `-`
+- Press `c` to copy cursor value
+- Press `Ctrl+C` to copy column values
+- Press `Ctrl+R` to copy row values (delimited by tab)
 
 ## Examples
 
@@ -730,64 +653,34 @@ dataframe-textual pokemon.csv
 dataframe-textual titanic.csv
 
 # Filter and view specific columns
-cut -d',' -f1,2,3 pokemon.csv | dataframe-textual
+cut -d',' -f1,2,3 pokemon.csv | dataframe-textual -f csv
 
 # View with grep filter (then use | search in viewer)
-grep "Fire" pokemon.csv | dataframe-textual
+grep "Fire" pokemon.tsv | dataframe-textual
 
 # Chain with other commands
-cat data.csv | sort -t',' -k2 | dataframe-textual
+cat data.tsv | sort -t',' -k2 | dataframe-textual
 ```
 
 ### Multi-File/Tab Examples
 
 ```bash
 # Open multiple sheets as tabs in a single Excel
-dataframe-textual sales.csv
+dataframe-textual sales.xlsx
 
-# Open multiple files
+# Open multiple files as tabs
 dataframe-textual pokemon.csv titanic.csv
 
-# Start with one file, open others using Ctrl+O
+# Start with one file, then open others using Ctrl+O
 dataframe-textual initial_data.csv
-# Then press Ctrl+O to open more files interactively
 ```
-
-
-## Performance
-
-- **Lazy loading**: Only loads visible rows + 10 rows ahead
-- **Efficient sorting**: Uses Polars' optimized sort algorithms
-- **Smooth scrolling**: No lag when paging through large files
-- **Memory efficient**: Handles datasets larger than RAM
-
 
 ## Dependencies
 
-- **polars**: Fast DataFrame library for data processing
+- **polars**: Fast DataFrame library for data loading/processing
 - **textual**: Terminal UI framework
 - **fastexcel**: Read Excel files
 - **xlsxwriter**: Write Excel files
-
-## Architecture Overview
-
-### Single-Table Design
-
-The core of the application is built around the `DataFrameTable` widget:
-
-- **Self-contained**: Each table instance maintains its own complete state (13 independent variables)
-- **Fully autonomous**: All operations (editing, sorting, filtering, searching) are handled within the table
-- **Event-driven**: Each table owns and handles its keyboard events
-- **Backward compatible**: Works identically in single-file mode
-
-### Multi-Table Design
-
-The `DataFrameApp` coordinates multiple independent `DataFrameTable` instances:
-
-- **Tab-based interface**: Uses Textual's `TabbedContent` for tab management
-- **Independent state**: Each tab has completely separate state (sort order, selections, history)
-- **Seamless switching**: Switch between files without losing context or state
-- **File management**: Open/close files dynamically without restarting the application
 
 ## Requirements
 
@@ -798,4 +691,4 @@ The `DataFrameApp` coordinates multiple independent `DataFrameTable` instances:
 ## Acknowledgments
 
 - Inspired by [VisiData](https://visidata.org/)
-- Built with [Textual](https://textual.textualize.io/), [Polars](https://www.pola.rs/), and [Rich](https://rich.readthedocs.io/)
+- Built with [Textual](https://textual.textualize.io/) and [Polars](https://www.pola.rs/)

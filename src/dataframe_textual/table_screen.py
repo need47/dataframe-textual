@@ -94,21 +94,6 @@ class TableScreen(ModalScreen):
             self.thousand_separator = not self.thousand_separator
             self.build_table()
             event.stop()
-        # Prevent key events from propagating to parent screen,
-        # except for the following default key bindings for DataTable
-        elif event.key not in (
-            "up",
-            "down",
-            "right",
-            "left",
-            "pageup",
-            "pagedown",
-            "ctrl+home",
-            "ctrl+end",
-            "home",
-            "end",
-        ):
-            event.stop()
 
     def _filter_or_highlight_selected_value(
         self, col_name_value: tuple[str, Any] | None, action: str = "filter"
@@ -289,7 +274,7 @@ class StatisticsScreen(TableScreen):
             elif dc.gtype == "int" and self.thousand_separator:
                 value = f"{stat_value:,}"
             elif dc.gtype == "float":
-                value = f"{stat_value:,.3f}" if self.thousand_separator else f"{stat_value:.3f}"
+                value = f"{stat_value:,.2f}" if self.thousand_separator else f"{stat_value:.2f}"
             else:
                 value = str(stat_value)
 
@@ -339,7 +324,7 @@ class StatisticsScreen(TableScreen):
                 elif dc.gtype == "int" and self.thousand_separator:
                     value = f"{stat_value:,}"
                 elif dc.gtype == "float":
-                    value = f"{stat_value:,.3f}" if self.thousand_separator else f"{stat_value:.3f}"
+                    value = f"{stat_value:,.2f}" if self.thousand_separator else f"{stat_value:.2f}"
                 else:
                     value = str(stat_value)
 
@@ -431,7 +416,7 @@ class FrequencyScreen(TableScreen):
             elif dc.gtype == "int" and self.thousand_separator:
                 value = f"{column:,}"
             elif dc.gtype == "float":
-                value = f"{column:,.3f}" if self.thousand_separator else f"{column:.3f}"
+                value = f"{column:,.2f}" if self.thousand_separator else f"{column:.3f}"
             else:
                 value = str(column)
 

@@ -135,8 +135,8 @@ def format_row(vals, dtypes, apply_justify=True, thousand_separator=False) -> li
             text_val = NULL_DISPLAY
         elif dc.gtype == "integer" and thousand_separator:
             text_val = f"{val:,}"
-        elif dc.gtype == "float":
-            text_val = f"{val:,.3f}" if thousand_separator else f"{val:.3f}"
+        elif dc.gtype == "float" and thousand_separator:
+            text_val = f"{val:,}"
         else:
             text_val = str(val)
 
@@ -244,8 +244,8 @@ def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: 
             # Current selected column
             col_name = df.columns[current_col_idx]
         elif col_ref == "#":
-            # __ridx__ is used to store 0-based row index; add 1 for 1-based index
-            return "(pl.col('__ridx__') + 1)"
+            # RIDX is used to store 0-based row index; add 1 for 1-based index
+            return f"(pl.col('{RIDX}') + 1)"
         elif col_ref.isdigit():
             # Column by 1-based index
             col_idx = int(col_ref) - 1

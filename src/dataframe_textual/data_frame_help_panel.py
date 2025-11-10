@@ -20,8 +20,8 @@ class DataFrameHelpPanel(Widget):
         DataFrameHelpPanel {
             split: right;
             width: 33%;
-            min-width: 30;
-            max-width: 60;
+            min-width: 40;
+            max-width: 80;
             border-left: vkey $foreground 30%;
             padding: 0 1;
             height: 1fr;

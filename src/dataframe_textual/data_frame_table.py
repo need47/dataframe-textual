@@ -119,6 +119,8 @@ class DataFrameTable(DataTable):
         - **?** - 🔎 Find in current column with expression
         - **f** - 🌐 Global find using cursor value
         - **Ctrl+f** - 🌐 Global find with expression
+        - **n** - ⬇️ Go to next match
+        - **N** - ⬆️ Go to previous match
         - **v** - 👁️ View/filter rows by cell or selected rows
         - **V** - 🔧 View/filter rows by expression
         - *(All search/find support case-insensitive & whole-word matching)*
@@ -131,6 +133,8 @@ class DataFrameTable(DataTable):
         ## ✅ Selection & Filtering
         - **'** - ✓️ Select/deselect current row
         - **t** - 💡 Toggle row selection (invert all)
+        - **{** - ⬆️ Go to previous selected row
+        - **}** - ⬇️ Go to next selected row
         - **"** - 📍 Filter to show only selected rows
         - **T** - 🧹 Clear all selections
 
@@ -159,7 +163,7 @@ class DataFrameTable(DataTable):
         - **$** - 📝 Cast column to string
 
         ## 🔗 URL Handling
-        - **@** - 🔗 Make URLs in current column clickable with Ctrl/Cmd + click
+        - **@** - 🔗 Make URLs in current column clickable with Ctrl/Cmd
 
         ## 💾 Data Management
         - **z** - 📌 Freeze rows and columns
@@ -170,8 +174,6 @@ class DataFrameTable(DataTable):
         - **Ctrl+s** - 💾 Save current tab to file
         - **u** - ↩️ Undo last action
         - **U** - 🔄 Reset to original data
-
-        *Use `?` to see app-level controls*
     """).strip()
 
     # fmt: off
@@ -198,11 +200,15 @@ class DataFrameTable(DataTable):
         # Search
         ("backslash", "search_cursor_value", "Search column with cursor value"),  # `\`
         ("vertical_line", "search_expr", "Search column with expression"),  # `|`
+        ("right_curly_bracket", "next_selected_row", "Go to next selected row"),  # `}`
+        ("left_curly_bracket", "previous_selected_row", "Go to previous selected row"),  # `{`
         # Find
         ("slash", "find_cursor_value", "Find in column with cursor value"),  # `/`
         ("question_mark", "find_expr", "Find in column with expression"),  # `?`
         ("f", "find_cursor_value('global')", "Global find with cursor value"),  # `f`
         ("ctrl+f", "find_expr('global')", "Global find with expression"),  # `Ctrl+F`
+        ("n", "next_match", "Go to next match"),  # `n`
+        ("N", "previous_match", "Go to previous match"),  # `Shift+n`
         # Replace
         ("r", "replace", "Replace in column"),  # `r`
         ("R", "replace_global", "Replace global"),  # `Shift+R`
@@ -362,6 +368,28 @@ class DataFrameTable(DataTable):
             Any: The value of the cell at the cursor position.
         """
         return self.df.item(self.cursor_row_idx, self.cursor_col_idx)
+
+    @property
+    def ordered_selected_rows(self) -> list[int]:
+        """Get the list of selected row indices in order.
+
+        Returns:
+            list[int]: A list of 0-based row indices that are currently selected.
+        """
+        return [ridx for ridx, selected in enumerate(self.selected_rows) if selected]
+
+    @property
+    def ordered_matches(self) -> list[tuple[int, int]]:
+        """Get the list of matched cell coordinates in order.
+
+        Returns:
+            list[tuple[int, int]]: A list of (row_idx, col_idx) tuples for matched cells.
+        """
+        matches = []
+        for ridx in sorted(self.matches.keys()):
+            for cidx in sorted(self.matches[ridx]):
+                matches.append((ridx, cidx))
+        return matches
 
     def on_mount(self) -> None:
         """Initialize table display when the widget is mounted.
@@ -736,6 +764,22 @@ class DataFrameTable(DataTable):
         self._setup_table()
         # status = "enabled" if self.thousand_separator else "disabled"
         # self.notify(f"Thousand separator {status}", title="Display")
+
+    def action_next_match(self) -> None:
+        """Go to the next matched cell."""
+        self._next_match()
+
+    def action_previous_match(self) -> None:
+        """Go to the previous matched cell."""
+        self._previous_match()
+
+    def action_next_selected_row(self) -> None:
+        """Go to the next selected row."""
+        self._next_selected_row()
+
+    def action_previous_selected_row(self) -> None:
+        """Go to the previous selected row."""
+        self._previous_selected_row()
 
     def _make_cell_clickable(self) -> None:
         """Make cells with URLs in the current column clickable.
@@ -1348,7 +1392,7 @@ class DataFrameTable(DataTable):
             ]
         )
 
-        self.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move")
+        # self.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move")
 
     # Sort
     def _sort_by_column(self, descending: bool = False) -> None:
@@ -1366,24 +1410,27 @@ class DataFrameTable(DataTable):
 
         # Check if this column is already in the sort keys
         old_desc = self.sorted_columns.get(col_name)
-        if old_desc == descending:
-            # Same direction - reverse to the other direction
-            descending = not descending
 
         # Add to history
         self._add_history(f"Sorted on column [$success]{col_name}[/]")
         if old_desc is None:
             # Add new column to sort
             self.sorted_columns[col_name] = descending
+        elif old_desc == descending:
+            # Same direction - remove from sort
+            del self.sorted_columns[col_name]
         else:
             # Move to end of sort order
             del self.sorted_columns[col_name]
             self.sorted_columns[col_name] = descending
 
         # Apply multi-column sort
-        sort_cols = list(self.sorted_columns.keys())
-        descending_flags = list(self.sorted_columns.values())
-        df_sorted = self.df.with_row_index(RIDX).sort(sort_cols, descending=descending_flags, nulls_last=True)
+        if sort_cols := list(self.sorted_columns.keys()):
+            descending_flags = list(self.sorted_columns.values())
+            df_sorted = self.df.with_row_index(RIDX).sort(sort_cols, descending=descending_flags, nulls_last=True)
+        else:
+            # No sort columns - restore original order
+            df_sorted = self.df.with_row_index(RIDX)
 
         # Updated selected_rows and visible_rows to match new order
         old_row_indices = df_sorted[RIDX].to_list()
@@ -1636,6 +1683,9 @@ class DataFrameTable(DataTable):
             # Recreate the table display
             self._setup_table()
 
+            # Move cursor to the new column
+            self.move_cursor(column=cidx + 1)
+
             self.notify(f"Added column [$success]{new_name}[/]", title="Add Column")
         except Exception as e:
             self.notify(f"Failed to add column: {str(e)}", title="Add Column", severity="error")
@@ -1670,12 +1720,15 @@ class DataFrameTable(DataTable):
 
             # Build the new dataframe with columns reordered
             select_cols = cols_before + [col_name] + cols_after
-            self.df = self.df.with_columns(new_col).select(select_cols)
+            self.df = self.df.with_row_index(RIDX).with_columns(new_col).select(select_cols)
 
             # Recreate the table display
             self._setup_table()
 
-            self.notify(f"Added column [$success]{col_name}[/]", title="Add Column")
+            # Move cursor to the new column
+            self.move_cursor(column=cidx + 1)
+
+            # self.notify(f"Added column [$success]{col_name}[/]", title="Add Column")
         except Exception as e:
             self.notify(f"Failed to add column: [$error]{str(e)}[/]", title="Add Column", severity="error")
             raise e
@@ -2019,6 +2072,112 @@ class DataFrameTable(DataTable):
             title="Global Find",
         )
 
+    def _move_cursor(self, ridx: int, cidx: int) -> None:
+        """Move cursor based on the dataframe indices.
+
+        Args:
+            ridx: Row index (0-based) in the dataframe.
+            cidx: Column index (0-based) in the dataframe.
+        """
+        row_key = str(ridx)
+        col_key = self.df.columns[cidx]
+        row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
+        self.move_cursor(row=row_idx, column=col_idx)
+
+    def _next_match(self) -> None:
+        """Move cursor to the next match."""
+        if not self.matches:
+            self.notify("No matches to navigate", title="Next Match", severity="warning")
+            return
+
+        # Get sorted list of matched coordinates
+        ordered_matches = self.ordered_matches
+
+        # Current cursor position
+        current_pos = (self.cursor_row_idx, self.cursor_col_idx)
+
+        # Find the next match after current position
+        for ridx, cidx in ordered_matches:
+            if (ridx, cidx) > current_pos:
+                self._move_cursor(ridx, cidx)
+                return
+
+        # If no next match, wrap around to the first match
+        first_ridx, first_cidx = ordered_matches[0]
+        self._move_cursor(first_ridx, first_cidx)
+
+    def _previous_match(self) -> None:
+        """Move cursor to the previous match."""
+        if not self.matches:
+            self.notify("No matches to navigate", title="Previous Match", severity="warning")
+            return
+
+        # Get sorted list of matched coordinates
+        ordered_matches = self.ordered_matches
+
+        # Current cursor position
+        current_pos = (self.cursor_row_idx, self.cursor_col_idx)
+
+        # Find the previous match before current position
+        for ridx, cidx in reversed(ordered_matches):
+            if (ridx, cidx) < current_pos:
+                row_key = str(ridx)
+                col_key = self.df.columns[cidx]
+                row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
+                self.move_cursor(row=row_idx, column=col_idx)
+                return
+
+        # If no previous match, wrap around to the last match
+        last_ridx, last_cidx = ordered_matches[-1]
+        row_key = str(last_ridx)
+        col_key = self.df.columns[last_cidx]
+        row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
+        self.move_cursor(row=row_idx, column=col_idx)
+
+    def _next_selected_row(self) -> None:
+        """Move cursor to the next selected row."""
+        if not any(self.selected_rows):
+            self.notify("No selected rows to navigate", title="Next Selected Row", severity="warning")
+            return
+
+        # Get list of selected row indices in order
+        selected_row_indices = self.ordered_selected_rows
+
+        # Current cursor row
+        current_ridx = self.cursor_row_idx
+
+        # Find the next selected row after current position
+        for ridx in selected_row_indices:
+            if ridx > current_ridx:
+                self._move_cursor(ridx, self.cursor_col_idx)
+                return
+
+        # If no next selected row, wrap around to the first selected row
+        first_ridx = selected_row_indices[0]
+        self._move_cursor(first_ridx, self.cursor_col_idx)
+
+    def _previous_selected_row(self) -> None:
+        """Move cursor to the previous selected row."""
+        if not any(self.selected_rows):
+            self.notify("No selected rows to navigate", title="Previous Selected Row", severity="warning")
+            return
+
+        # Get list of selected row indices in order
+        selected_row_indices = self.ordered_selected_rows
+
+        # Current cursor row
+        current_ridx = self.cursor_row_idx
+
+        # Find the previous selected row before current position
+        for ridx in reversed(selected_row_indices):
+            if ridx < current_ridx:
+                self._move_cursor(ridx, self.cursor_col_idx)
+                return
+
+        # If no previous selected row, wrap around to the last selected row
+        last_ridx = selected_row_indices[-1]
+        self._move_cursor(last_ridx, self.cursor_col_idx)
+
     def _replace(self) -> None:
         """Open replace screen for current column."""
         # Push the replace modal screen
@@ -2327,7 +2486,7 @@ class DataFrameTable(DataTable):
     def _clear_selections(self) -> None:
         """Clear all selected rows without removing them from the dataframe."""
         # Check if any selected rows or matches
-        if True not in self.selected_rows and not self.matches:
+        if not any(self.selected_rows) and not self.matches:
             self.notify("No selections to clear", title="Clear", severity="warning")
             return
 
@@ -2375,14 +2534,14 @@ class DataFrameTable(DataTable):
         cidx = self.cursor_col_idx
 
         # If there are selected rows or matches, use those
-        if True in self.selected_rows or self.matches:
+        if any(self.selected_rows) or self.matches:
             term = [
                 True if (selected or idx in self.matches) else False for idx, selected in enumerate(self.selected_rows)
             ]
         # Otherwise, use the current cell value
         else:
             ridx = self.cursor_row_idx
-            term = self.df.item(ridx, cidx)
+            term = str(self.df.item(ridx, cidx))
 
         self._do_view_rows((term, cidx, False, False))
 
@@ -2469,10 +2628,6 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self._add_history(f"Filtered by expression [$success]{expr}[/]")
-
-        # Clear existing selections and matches
-        self.selected_rows = [False] * len(self.df)
-        self.matches = defaultdict(set)
 
         # Mark unfiltered rows as invisible
         filtered_row_indices = set(df_filtered[RIDX].to_list())

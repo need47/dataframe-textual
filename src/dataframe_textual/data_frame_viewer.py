@@ -265,8 +265,8 @@ class DataFrameViewer(App):
         """
         tabs = self.query_one(ContentTabs)
         tabs.display = not tabs.display
-        status = "shown" if tabs.display else "hidden"
-        self.notify(f"Tab bar [$success]{status}[/]", title="Toggle")
+        # status = "shown" if tabs.display else "hidden"
+        # self.notify(f"Tab bar [$success]{status}[/]", title="Toggle")
 
     def _get_active_table(self) -> DataFrameTable | None:
         """Get the currently active DataFrameTable widget.
@@ -303,7 +303,7 @@ class DataFrameViewer(App):
                 for lf, filename, tabname in _load_file(filename, prefix_sheet=True):
                     self._add_tab(lf.collect(), filename, tabname)
                     n_tab += 1
-                self.notify(f"Added [$accent]{n_tab}[/] tabs for [$success]{filename}[/]", title="Open")
+                self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open")
             except Exception as e:
                 self.notify(f"Error: {e}", title="Open", severity="error")
         else:
@@ -423,7 +423,7 @@ def _load_file(
 
         # Read from stdin into memory first (stdin is not seekable)
         stdin_data = sys.stdin.read()
-        lf = pl.scan_csv(StringIO(stdin_data), has_header=has_header, separator="\t" if file_format == "tsv" else ",")
+        lf = pl.scan_csv(StringIO(stdin_data), has_header=has_header, separator="," if file_format == "csv" else "\t")
 
         # Reopen stdin to /dev/tty for proper terminal interaction
         try:
@@ -465,8 +465,8 @@ def _load_file(
         lf = pl.scan_ndjson(filename)
         sources.append((lf, filename, filepath.stem))
     else:
-        # Treat other formats as CSV
-        lf = pl.scan_csv(filename, has_header=has_header)
+        # Treat other formats as TSV
+        lf = pl.scan_csv(filename, has_header=has_header, separator="\t")
         sources.append((lf, filename, filepath.stem))
 
     return sources

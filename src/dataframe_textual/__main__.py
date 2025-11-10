@@ -35,7 +35,6 @@ def main() -> None:
         "-f",
         "--format",
         choices=SUPPORTED_FORMATS,
-        default="tsv",
         help="Specify the format of the input files (csv, excel, tsv etc.)",
     )
     parser.add_argument("-H", "--no-header", action="store_true", help="Specify that input files have no header row")
