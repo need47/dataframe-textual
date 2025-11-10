@@ -111,6 +111,26 @@ def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
         return STYLES[pl.Unknown]
 
 
+def format_float(value: float, thousand_separator: bool = False, precision: int = 2) -> str:
+    """Format a float value, keeping integers without decimal point.
+
+    Args:
+        val: The float value to format.
+        thousand_separator: Whether to include thousand separators. Defaults to False.
+
+    Returns:
+        The formatted float as a string.
+    """
+
+    if (val := int(value)) == value:
+        return f"{val:,}" if thousand_separator else str(val)
+    else:
+        if precision > 0:
+            return f"{value:,.{precision}f}" if thousand_separator else f"{value:.{precision}f}"
+        else:
+            return f"{value:,f}" if thousand_separator else str(value)
+
+
 def format_row(vals, dtypes, apply_justify=True, thousand_separator=False) -> list[Text]:
     """Format a single row with proper styling and justification.
 
@@ -135,8 +155,8 @@ def format_row(vals, dtypes, apply_justify=True, thousand_separator=False) -> li
             text_val = NULL_DISPLAY
         elif dc.gtype == "integer" and thousand_separator:
             text_val = f"{val:,}"
-        elif dc.gtype == "float" and thousand_separator:
-            text_val = f"{val:,}"
+        elif dc.gtype == "float":
+            text_val = format_float(val, thousand_separator)
         else:
             text_val = str(val)
 

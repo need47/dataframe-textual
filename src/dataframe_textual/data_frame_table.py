@@ -475,10 +475,10 @@ class DataFrameTable(DataTable):
                 self.refresh_row(new_row)
             elif self.cursor_type == "row":
                 self.refresh_row(old_coordinate.row)
-                self.refresh_row(new_coordinate.row)
+                self._highlight_row(new_coordinate.row)
             elif self.cursor_type == "column":
                 self.refresh_column(old_coordinate.column)
-                self.refresh_column(new_coordinate.column)
+                self._highlight_column(new_coordinate.column)
 
             # Handle scrolling if needed
             if self._require_update_dimensions:

@@ -13,7 +13,7 @@ from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
-from .common import NULL, NULL_DISPLAY, RIDX, DtypeConfig, format_row
+from .common import NULL, NULL_DISPLAY, RIDX, DtypeConfig, format_float, format_row
 
 
 class TableScreen(ModalScreen):
@@ -30,7 +30,7 @@ class TableScreen(ModalScreen):
 
         TableScreen > DataTable {
             width: auto;
-            min-width: 30;
+            min-width: 20;
             border: solid $primary;
         }
     """
@@ -271,10 +271,10 @@ class StatisticsScreen(TableScreen):
             value = stat_value
             if stat_value is None:
                 value = NULL_DISPLAY
-            elif dc.gtype == "int" and self.thousand_separator:
+            elif dc.gtype == "integer" and self.thousand_separator:
                 value = f"{stat_value:,}"
             elif dc.gtype == "float":
-                value = f"{stat_value:,.2f}" if self.thousand_separator else f"{stat_value:.2f}"
+                value = format_float(stat_value, self.thousand_separator)
             else:
                 value = str(stat_value)
 
@@ -321,10 +321,10 @@ class StatisticsScreen(TableScreen):
                 value = stat_value
                 if stat_value is None:
                     value = NULL_DISPLAY
-                elif dc.gtype == "int" and self.thousand_separator:
+                elif dc.gtype == "integer" and self.thousand_separator:
                     value = f"{stat_value:,}"
                 elif dc.gtype == "float":
-                    value = f"{stat_value:,.2f}" if self.thousand_separator else f"{stat_value:.2f}"
+                    value = format_float(stat_value, self.thousand_separator)
                 else:
                     value = str(stat_value)
 
@@ -413,10 +413,10 @@ class FrequencyScreen(TableScreen):
 
             if column is None:
                 value = NULL_DISPLAY
-            elif dc.gtype == "int" and self.thousand_separator:
+            elif dc.gtype == "integer" and self.thousand_separator:
                 value = f"{column:,}"
             elif dc.gtype == "float":
-                value = f"{column:,.2f}" if self.thousand_separator else f"{column:.3f}"
+                value = format_float(column, self.thousand_separator)
             else:
                 value = str(column)
 
