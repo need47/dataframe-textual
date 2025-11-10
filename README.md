@@ -38,9 +38,11 @@ pip install dataframe-textual
 pip install dataframe-textual[excel]
 ```
 
+This installs an executable `dv`.
+
 Then run:
 ```bash
-dataframe-textual <csv_file>
+dv <csv_file>
 ```
 
 ### Using [uv](https://docs.astral.sh/uv/)
@@ -51,9 +53,10 @@ uvx https://github.com/need47/dataframe-textual.git <csvfile>
 
 # Clone or download the project
 cd dataframe-textual
+uv sync --extra excel  # with Excel support
 
 # Run directly with uv
-uv run main.py <csv_file>
+uv run dv <csv_file>
 ```
 
 ### Development installation
@@ -76,7 +79,7 @@ pip install -e ".[excel,dev]"
 
 ```bash
 # After pip install dataframe-textual
-dataframe-textual pokemon.csv
+dv pokemon.csv
 
 # Or if running from source
 python main.py pokemon.csv
@@ -85,21 +88,21 @@ python main.py pokemon.csv
 uv run python main.py pokemon.csv
 
 # Read from stdin (auto-detects format; defaults to TSV if not recognized)
-cat data.tsv | dataframe-textual
-dataframe-textual < data.tsv
+cat data.tsv | dv
+dv < data.tsv
 ```
 
 ### Multi-File Usage - Multiple Tabs
 
 ```bash
 # Open multiple files in tabs
-dataframe-textual file1.csv file2.csv file3.csv
+dv file1.csv file2.csv file3.csv
 
 # Open multiple sheets in tabs in an Excel file
-dataframe-textual file.xlsx
+dv file.xlsx
 
 # Mix files and stdin (read from stdin, then open file)
-dataframe-textual data1.tsv < data2.tsv
+dv data1.tsv < data2.tsv
 ```
 
 When multiple files are opened:
@@ -647,32 +650,23 @@ Press `Ctrl+C` to copy:
 
 ```bash
 # View Pokemon dataset
-dataframe-textual pokemon.csv
+dv pokemon.csv
 
-# View Titanic dataset with analysis
-dataframe-textual titanic.csv
-
-# Filter and view specific columns
-cut -d',' -f1,2,3 pokemon.csv | dataframe-textual -f csv
-
-# View with grep filter (then use | search in viewer)
-grep "Fire" pokemon.tsv | dataframe-textual
-
-# Chain with other commands
-cat data.tsv | sort -t',' -k2 | dataframe-textual
+# Chain with other command and specify input file format
+cut -d',' -f1,2,3 pokemon.csv | dv -f csv
 ```
 
 ### Multi-File/Tab Examples
 
 ```bash
 # Open multiple sheets as tabs in a single Excel
-dataframe-textual sales.xlsx
+dv sales.xlsx
 
 # Open multiple files as tabs
-dataframe-textual pokemon.csv titanic.csv
+dv pokemon.csv titanic.csv
 
 # Start with one file, then open others using Ctrl+O
-dataframe-textual initial_data.csv
+dv initial_data.csv
 ```
 
 ## Dependencies

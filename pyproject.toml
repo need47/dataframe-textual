@@ -4,15 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dataframe-textual"
-version = "1.0.1"
-description = "Interactive CSV/Excel viewer for the terminal (Textual TUI)"
+version = "1.1.1"
+description = "Interactive terminal viewer/editor for tabular data"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "Tiejun Cheng", email = "need47@gmail.com"}
 ]
-keywords = ["csv", "excel", "viewer", "terminal", "tui", "textual", "data-analysis", "polars", "interactive"]
+keywords = ["csv", "excel", "terminal", "tui", "textual", "data-analysis", "polars", "interactive", "viewer", "editor"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -61,4 +61,4 @@ dev = [
 ]
 
 [project.scripts]
-dataframe-textual = "dataframe_textual.__main__:main"
+dv = "dataframe_textual.__main__:main"
