@@ -432,7 +432,7 @@ def _load_file(
         except (OSError, FileNotFoundError):
             pass
 
-        sources.append((lf, "stdin.tsv" if file_format == "tsv" else "stdin.csv", "stdin"))
+        sources.append((lf, f"stdin.{file_format}" if file_format else "stdin", "stdin"))
         return sources
 
     filepath = Path(filename)
