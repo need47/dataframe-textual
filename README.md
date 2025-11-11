@@ -167,17 +167,19 @@ When multiple files are opened:
 | Key | Action |
 |-----|--------|
 | `Double-click` | Edit cell or rename column header |
-| `X` | Clear current cell (set to NULL) |
+| `delete` | Clear current cell (set to NULL) |
 | `e` | Edit current cell (respects data type) |
 | `E` | Edit entire column with expression |
 | `a` | Add empty column after current |
 | `A` | Add column with name and value/expression |
 | `-` (minus) | Delete current column |
 | `x` | Delete current row |
+| `X` | Delete current row and all rows below |
+| `Ctrl+X` | Delete current row and all rows above |
 | `d` | Duplicate current column (appends '_copy' suffix) |
 | `D` | Duplicate current row |
 | `h` | Hide current column |
-| `H` | Show all hidden columns |
+| `H` | Show all hidden rows/columns |
 
 #### Searching & Filtering
 
@@ -521,6 +523,14 @@ This is useful for:
 - Delete all selected rows (if any) at once
 - Or delete single row at cursor
 
+**Delete Row and Below** (`X`):
+- Deletes the current row and all rows below it
+- Useful for removing trailing data or the end of a dataset
+
+**Delete Row and Above** (`Ctrl+X`):
+- Deletes the current row and all rows above it
+- Useful for removing leading rows or the beginning of a dataset
+
 **Delete Column** (`-`):
 - Removes the entire column from view and dataframe
 
@@ -531,9 +541,8 @@ This is useful for:
 - Column data is preserved in the dataframe
 - Hidden columns are included in saves
 
-**Show Hidden Columns** (`H`):
-- Restores all previously hidden columns to the display
-- Returns table to full column view
+**Show Hidden Rows/Columns** (`H`):
+- Restores all previously hidden rows/columns to the display
 
 This is useful for:
 - Focusing on specific columns without deleting data

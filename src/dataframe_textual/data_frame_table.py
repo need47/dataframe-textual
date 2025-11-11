@@ -145,12 +145,14 @@ class DataFrameTable(DataTable):
         - **a** - ➕ Add empty column after current
         - **A** - ➕ Add column with name and optional expression
         - **x** - 🗑️ Delete current row
-        - **X** - ✨ Clear current cell (set to None)
+        - **X** - 🗑️ Delete row and those below
+        - **Ctrl+X** - 🗑️ Delete row and those above
+        - **delete** - ✨ Clear current cell (set to NULL)
         - **D** - 📋 Duplicate current row
         - **-** - ❌ Delete current column
         - **d** - 📋 Duplicate current column
         - **h** - 👁️ Hide current column
-        - **H** - 👀 Show all hidden columns
+        - **H** - 👀 Show all hidden rows/columns
 
         ## 🎯 Reorder
         - **Shift+↑↓** - ⬆️⬇️ Move row up/down
@@ -181,7 +183,7 @@ class DataFrameTable(DataTable):
         ("g", "jump_top", "Jump to top"),
         ("G", "jump_bottom", "Jump to bottom"),
         ("h", "hide_column", "Hide column"),
-        ("H", "show_column", "Show columns"),
+        ("H", "show_hidden_rows_columns", "Show hidden rows/columns"),
         ("c", "copy_cell", "Copy cell to clipboard"),
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
         ("ctrl+r", "copy_row", "Copy row to clipboard"),
@@ -220,7 +222,9 @@ class DataFrameTable(DataTable):
         # Edit
         ("minus", "delete_column", "Delete column"),  # `-`
         ("x", "delete_row", "Delete row"),
-        ("X", "clear_cell", "Clear cell"),
+        ("X", "delete_row_and_below", "Delete row and those below"),
+        ("ctrl+x", "delete_row_and_up", "Delete row and those up"),
+        ("delete", "clear_cell", "Clear cell"),
         ("d", "duplicate_column", "Duplicate column"),
         ("D", "duplicate_row", "Duplicate row"),
         ("e", "edit_cell", "Edit cell"),
@@ -548,9 +552,9 @@ class DataFrameTable(DataTable):
         """Hide the current column."""
         self._hide_column()
 
-    def action_show_column(self) -> None:
-        """Show all hidden columns."""
-        self._show_column()
+    def action_show_hidden_rows_columns(self) -> None:
+        """Show all hidden rows/columns."""
+        self._show_hidden_rows_columns()
 
     def action_sort_ascending(self) -> None:
         """Sort by current column in ascending order."""
@@ -655,6 +659,14 @@ class DataFrameTable(DataTable):
     def action_delete_row(self) -> None:
         """Delete the current row."""
         self._delete_row()
+
+    def action_delete_row_and_below(self) -> None:
+        """Delete the current row and those below."""
+        self._delete_row(more="below")
+
+    def action_delete_row_and_up(self) -> None:
+        """Delete the current row and those above."""
+        self._delete_row(more="above")
 
     def action_duplicate_column(self) -> None:
         """Duplicate the current column."""
@@ -1136,28 +1148,32 @@ class DataFrameTable(DataTable):
 
         # self.notify(f"Hid column [$accent]{col_name}[/]. Press [$success]H[/] to show hidden columns", title="Hide")
 
-    def _show_column(self) -> None:
-        """Show all hidden columns by recreating the table with all dataframe columns."""
+    def _show_hidden_rows_columns(self) -> None:
+        """Show all hidden rows/columns by recreating the table."""
         # Get currently visible columns
         visible_cols = set(col.key for col in self.ordered_columns)
 
-        # Find hidden columns (in dataframe but not in table)
-        hidden_cols = [col for col in self.df.columns if col not in visible_cols]
+        hidden_row_count = sum(0 if visible else 1 for visible in self.visible_rows)
+        hidden_col_count = sum(0 if col in visible_cols else 1 for col in self.df.columns)
 
-        if not hidden_cols:
-            self.notify("No hidden columns to show", title="Column", severity="warning")
+        if not hidden_row_count and not hidden_col_count:
+            self.notify("No hidden columns or rows to show", title="Show", severity="warning")
             return
 
         # Add to history
-        self._add_history(f"Showed {len(hidden_cols)} hidden column(s)")
+        self._add_history("Showed hidden rows/columns")
 
-        # Clear hidden columns tracking
+        # Clear hidden rows/columns tracking
+        self.visible_rows = [True] * len(self.df)
         self.hidden_columns.clear()
 
-        # Recreate table with all columns
+        # Recreate table for display
         self._setup_table()
 
-        self.notify(f"Showed [$accent]{len(hidden_cols)}[/] hidden column(s)", title="Column")
+        self.notify(
+            f"Showed [$accent]{hidden_row_count}[/] hidden row(s) and/or [$accent]{hidden_col_count}[/] hidden column(s)",
+            title="Show",
+        )
 
     def _duplicate_column(self) -> None:
         """Duplicate the currently selected column, inserting it right after the current column."""
@@ -1190,7 +1206,7 @@ class DataFrameTable(DataTable):
             title="Duplicate",
         )
 
-    def _delete_row(self) -> None:
+    def _delete_row(self, more: str = None) -> None:
         """Delete rows from the table and dataframe.
 
         Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.
@@ -1206,11 +1222,27 @@ class DataFrameTable(DataTable):
                 if selected:
                     predicates[ridx] = False
 
+        # Delete current row and those above
+        elif more == "above":
+            ridx = self.cursor_row_idx
+            history_desc = f"Deleted current row [$success]{ridx + 1}[/] and those above"
+            for i in range(ridx + 1):
+                predicates[i] = False
+
+        # Delete current row and those below
+        elif more == "below":
+            ridx = self.cursor_row_idx
+            history_desc = f"Deleted current row [$success]{ridx + 1}[/] and those below"
+            for i in range(ridx, len(self.df)):
+                if self.visible_rows[i]:
+                    predicates[i] = False
+
         # Delete the row at the cursor
         else:
             ridx = self.cursor_row_idx
             history_desc = f"Deleted row [$success]{ridx + 1}[/]"
-            predicates[ridx] = False
+            if self.visible_rows[ridx]:
+                predicates[ridx] = False
 
         # Add to history
         self._add_history(history_desc)
@@ -1238,7 +1270,7 @@ class DataFrameTable(DataTable):
 
         deleted_count = old_count - len(self.df)
         if deleted_count > 1:
-            self.notify(f"Deleted {deleted_count} row(s)", title="Delete")
+            self.notify(f"Deleted [$accent]{deleted_count}[/] row(s)", title="Delete")
 
     def _duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""
