@@ -969,45 +969,55 @@ class DataFrameTable(DataTable):
         if bottom_visible_row >= self.loaded_rows - 10:
             self._load_rows(self.loaded_rows + self.BATCH_SIZE)
 
-    def _do_highlight(self, clear: bool = False) -> None:
+    def _do_highlight(self, force: bool = False) -> None:
         """Update all rows, highlighting selected ones and restoring others to default.
 
         Args:
-            clear: If True, clear all highlights.
+            force: If True, clear all highlights and restore default styles.
         """
-        if clear:
-            self.selected_rows = [False] * len(self.df)
-            self.matches = defaultdict(set)
-
         # Ensure all selected rows or matches are loaded
         stop = rindex(self.selected_rows, True) + 1
         stop = max(stop, max(self.matches.keys(), default=0) + 1)
 
         self._load_rows(stop)
-        self._highlight_table()
+        self._highlight_table(force)
 
-    def _highlight_table(self) -> None:
+    def _highlight_table(self, force: bool = False) -> None:
         """Highlight selected rows/cells in red."""
+        if not force and not any(self.selected_rows) and not self.matches:
+            self.notify("No selections or matches to highlight", title="Highlight")
+            return  # Nothing to highlight
+
         # Update all rows based on selected state
         for row in self.ordered_rows:
             ridx = int(row.key.value)  # 0-based index
             is_selected = self.selected_rows[ridx]
             match_cols = self.matches.get(ridx, set())
 
+            if not force and not is_selected and not match_cols:
+                continue  # No highlight needed for this row
+
             # Update all cells in this row
             for col_idx, col in enumerate(self.ordered_columns):
+                if not force and not is_selected and col_idx not in match_cols:
+                    continue  # No highlight needed for this cell
+
                 cell_text: Text = self.get_cell(row.key, col.key)
+                need_update = False
 
                 if is_selected or col_idx in match_cols:
                     cell_text.style = "red"
-                else:
-                    # Get style config based on dtype
+                    need_update = True
+                elif force:
+                    # Restore original style based on dtype
                     dtype = self.df.schema[col.key.value]
                     dc = DtypeConfig(dtype)
                     cell_text.style = dc.style
+                    need_update = True
 
                 # Update the cell in the table
-                self.update_cell(row.key, col.key, cell_text)
+                if need_update:
+                    self.update_cell(row.key, col.key, cell_text)
 
     # History & Undo
     def _add_history(self, description: str) -> None:
@@ -1051,7 +1061,7 @@ class DataFrameTable(DataTable):
         self.fixed_rows = history.fixed_rows
         self.fixed_columns = history.fixed_columns
         self.cursor_coordinate = history.cursor_coordinate
-        self.matches = {k: v.copy() for k, v in history.matches.items()}
+        self.matches = {k: v.copy() for k, v in history.matches.items()} if history.matches else defaultdict(set)
 
         # Recreate the table for display
         self._setup_table()
@@ -1122,6 +1132,7 @@ class DataFrameTable(DataTable):
         # Get the column to remove
         col_idx = self.cursor_column
         col_name = self.cursor_col_name
+        col_key = self.cursor_col_key
 
         col_names_to_remove = []
         col_keys_to_remove = []
@@ -1248,6 +1259,18 @@ class DataFrameTable(DataTable):
             list(cols_before) + [new_col_name] + list(cols_after)
         )
 
+        # Update matches to account for new column
+        new_matches = defaultdict(set)
+        for row_idx, cols in self.matches.items():
+            new_cols = set()
+            for col_idx_in_set in cols:
+                if col_idx_in_set <= cidx:
+                    new_cols.add(col_idx_in_set)
+                else:
+                    new_cols.add(col_idx_in_set + 1)
+            new_matches[row_idx] = new_cols
+        self.matches = new_matches
+
         # Recreate the table for display
         self._setup_table()
 
@@ -1348,8 +1371,14 @@ class DataFrameTable(DataTable):
         self.selected_rows = new_selected_rows
         self.visible_rows = new_visible_rows
 
-        # Clear all matches since row indices have changed
-        self.matches = defaultdict(set)
+        # Update matches to account for new row
+        new_matches = defaultdict(set)
+        for row_idx, cols in self.matches.items():
+            if row_idx <= ridx:
+                new_matches[row_idx] = cols
+            else:
+                new_matches[row_idx + 1] = cols
+        self.matches = new_matches
 
         # Recreate the table display
         self._setup_table()
@@ -2532,8 +2561,8 @@ class DataFrameTable(DataTable):
                 title="Toggle",
             )
 
-        # Refresh the highlighting (also restores default styles for unselected rows)
-        self._do_highlight()
+        # Refresh the highlighting
+        self._do_highlight(force=True)
 
     def _make_selections(self) -> None:
         """Make selections based on current matches or toggle current row selection."""
@@ -2554,7 +2583,7 @@ class DataFrameTable(DataTable):
             self.notify(f"Selected [$accent]{new_selected_count}[/] rows", title="Toggle")
 
         # Refresh the highlighting (also restores default styles for unselected rows)
-        self._do_highlight()
+        self._do_highlight(force=True)
 
     def _clear_selections_and_matches(self) -> None:
         """Clear all selected rows and matches without removing them from the dataframe."""
@@ -2570,8 +2599,12 @@ class DataFrameTable(DataTable):
         # Save current state to history
         self._add_history("Cleared all selected rows")
 
-        # Clear all selections and refresh highlighting
-        self._do_highlight(clear=True)
+        # Clear all selections
+        self.selected_rows = [False] * len(self.df)
+        self.matches = defaultdict(set)
+
+        # Refresh the highlighting to remove all highlights
+        self._do_highlight(force=True)
 
         self.notify(f"Cleared selections for [$accent]{row_count}[/] rows", title="Clear")
 
