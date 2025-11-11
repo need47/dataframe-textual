@@ -395,17 +395,27 @@ class DataFrameTable(DataTable):
                 matches.append((ridx, cidx))
         return matches
 
-    def on_mount(self) -> None:
-        """Initialize table display when the widget is mounted.
+    def get_row_key(self, row_idx: int) -> RowKey:
+        """Get the row key for a given table row index.
 
-        Called by Textual when the widget is first added to the display tree.
-        Currently a placeholder as table setup is deferred until first use.
+        Args:
+            row_idx: Row index in the table display.
 
         Returns:
-            None
+            Corresponding row key as string.
         """
-        # self._setup_table()
-        pass
+        return self._row_locations.get_key(row_idx)
+
+    def get_column_key(self, col_idx: int) -> ColumnKey:
+        """Get the column key for a given table column index.
+
+        Args:
+            col_idx: Column index in the table display.
+
+        Returns:
+            Corresponding column key as string.
+        """
+        return self._column_locations.get_key(col_idx)
 
     def _should_highlight(self, cursor: Coordinate, target_cell: Coordinate, type_of_cursor: CursorType) -> bool:
         """Determine if the given cell should be highlighted because of the cursor.
@@ -489,6 +499,30 @@ class DataFrameTable(DataTable):
                 self.call_after_refresh(self._scroll_cursor_into_view)
             else:
                 self._scroll_cursor_into_view()
+
+    def move_cursor_to(self, ridx: int, cidx: int) -> None:
+        """Move cursor based on the dataframe indices.
+
+        Args:
+            ridx: Row index (0-based) in the dataframe.
+            cidx: Column index (0-based) in the dataframe.
+        """
+        row_key = str(ridx)
+        col_key = self.df.columns[cidx]
+        row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
+        self.move_cursor(row=row_idx, column=col_idx)
+
+    def on_mount(self) -> None:
+        """Initialize table display when the widget is mounted.
+
+        Called by Textual when the widget is first added to the display tree.
+        Currently a placeholder as table setup is deferred until first use.
+
+        Returns:
+            None
+        """
+        # self._setup_table()
+        pass
 
     def on_key(self, event) -> None:
         """Handle key press events for pagination.
@@ -793,41 +827,6 @@ class DataFrameTable(DataTable):
         """Go to the previous selected row."""
         self._previous_selected_row()
 
-    def _make_cell_clickable(self) -> None:
-        """Make cells with URLs in the current column clickable.
-
-        Scans all loaded rows in the current column for cells containing URLs
-        (starting with 'http://' or 'https://') and applies Textual link styling
-        to make them clickable. Does not modify the dataframe.
-
-        Returns:
-            None
-        """
-        cidx = self.cursor_col_idx
-        col_key = self.cursor_col_key
-        dtype = self.df.dtypes[cidx]
-
-        # Only process string columns
-        if dtype != pl.String:
-            return
-
-        # Count how many URLs were made clickable
-        url_count = 0
-
-        # Iterate through all loaded rows and make URLs clickable
-        for row in self.ordered_rows:
-            cell_text: Text = self.get_cell(row.key, col_key)
-            if cell_text.plain.startswith(("http://", "https://")):
-                cell_text.style = f"#00afff link {cell_text.plain}"  # sky blue
-                self.update_cell(row.key, col_key, cell_text)
-                url_count += 1
-
-        if url_count:
-            self.notify(
-                f"Made [$accent]{url_count}[/] cell(s) clickable in column [$success]{col_key.value}[/]",
-                title="Make Clickable",
-            )
-
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
         self._check_and_load_more()
@@ -921,6 +920,7 @@ class DataFrameTable(DataTable):
         for row_idx, row in enumerate(df_slice.rows(), start):
             if not self.visible_rows[row_idx]:
                 continue  # Skip hidden rows
+
             vals, dtypes = [], []
             for val, col, dtype in zip(row, self.df.columns, self.df.dtypes):
                 if col in self.hidden_columns:
@@ -928,6 +928,7 @@ class DataFrameTable(DataTable):
                 vals.append(val)
                 dtypes.append(dtype)
             formatted_row = format_row(vals, dtypes, thousand_separator=self.thousand_separator)
+
             # Always add labels so they can be shown/hidden via CSS
             self.add_row(*formatted_row, key=str(row_idx), label=str(row_idx + 1))
 
@@ -970,18 +971,21 @@ class DataFrameTable(DataTable):
         """Highlight selected rows/cells in red."""
         # Update all rows based on selected state
         for row in self.ordered_rows:
-            row_idx = int(row.key.value)  # 0-based index
-            is_selected = self.selected_rows[row_idx]
-            match_cols = self.matches.get(row_idx, set())
+            ridx = int(row.key.value)  # 0-based index
+            is_selected = self.selected_rows[ridx]
+            match_cols = self.matches.get(ridx, set())
 
             # Update all cells in this row
             for col_idx, col in enumerate(self.ordered_columns):
                 cell_text: Text = self.get_cell(row.key, col.key)
 
-                # Get style config based on dtype
-                dtype = self.df.dtypes[col_idx]
-                dc = DtypeConfig(dtype)
-                cell_text.style = "red" if is_selected or col_idx in match_cols else dc.style
+                if is_selected or col_idx in match_cols:
+                    cell_text.style = "red"
+                else:
+                    # Get style config based on dtype
+                    dtype = self.df.schema[col.key.value]
+                    dc = DtypeConfig(dtype)
+                    cell_text.style = dc.style
 
                 # Update the cell in the table
                 self.update_cell(row.key, col.key, cell_text)
@@ -2104,18 +2108,6 @@ class DataFrameTable(DataTable):
             title="Global Find",
         )
 
-    def _move_cursor(self, ridx: int, cidx: int) -> None:
-        """Move cursor based on the dataframe indices.
-
-        Args:
-            ridx: Row index (0-based) in the dataframe.
-            cidx: Column index (0-based) in the dataframe.
-        """
-        row_key = str(ridx)
-        col_key = self.df.columns[cidx]
-        row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
-        self.move_cursor(row=row_idx, column=col_idx)
-
     def _next_match(self) -> None:
         """Move cursor to the next match."""
         if not self.matches:
@@ -2131,12 +2123,12 @@ class DataFrameTable(DataTable):
         # Find the next match after current position
         for ridx, cidx in ordered_matches:
             if (ridx, cidx) > current_pos:
-                self._move_cursor(ridx, cidx)
+                self.move_cursor_to(ridx, cidx)
                 return
 
         # If no next match, wrap around to the first match
         first_ridx, first_cidx = ordered_matches[0]
-        self._move_cursor(first_ridx, first_cidx)
+        self.move_cursor_to(first_ridx, first_cidx)
 
     def _previous_match(self) -> None:
         """Move cursor to the previous match."""
@@ -2181,12 +2173,12 @@ class DataFrameTable(DataTable):
         # Find the next selected row after current position
         for ridx in selected_row_indices:
             if ridx > current_ridx:
-                self._move_cursor(ridx, self.cursor_col_idx)
+                self.move_cursor_to(ridx, self.cursor_col_idx)
                 return
 
         # If no next selected row, wrap around to the first selected row
         first_ridx = selected_row_indices[0]
-        self._move_cursor(first_ridx, self.cursor_col_idx)
+        self.move_cursor_to(first_ridx, self.cursor_col_idx)
 
     def _previous_selected_row(self) -> None:
         """Move cursor to the previous selected row."""
@@ -2203,12 +2195,12 @@ class DataFrameTable(DataTable):
         # Find the previous selected row before current position
         for ridx in reversed(selected_row_indices):
             if ridx < current_ridx:
-                self._move_cursor(ridx, self.cursor_col_idx)
+                self.move_cursor_to(ridx, self.cursor_col_idx)
                 return
 
         # If no previous selected row, wrap around to the last selected row
         last_ridx = selected_row_indices[-1]
-        self._move_cursor(last_ridx, self.cursor_col_idx)
+        self.move_cursor_to(last_ridx, self.cursor_col_idx)
 
     def _replace(self) -> None:
         """Open replace screen for current column."""
@@ -2797,4 +2789,39 @@ class DataFrameTable(DataTable):
             self.notify(
                 f"Saved current tab with [$accent]{len(self.df)}[/] rows to [$success]{filename}[/]",
                 title="Save",
+            )
+
+    def _make_cell_clickable(self) -> None:
+        """Make cells with URLs in the current column clickable.
+
+        Scans all loaded rows in the current column for cells containing URLs
+        (starting with 'http://' or 'https://') and applies Textual link styling
+        to make them clickable. Does not modify the dataframe.
+
+        Returns:
+            None
+        """
+        cidx = self.cursor_col_idx
+        col_key = self.cursor_col_key
+        dtype = self.df.dtypes[cidx]
+
+        # Only process string columns
+        if dtype != pl.String:
+            return
+
+        # Count how many URLs were made clickable
+        url_count = 0
+
+        # Iterate through all loaded rows and make URLs clickable
+        for row in self.ordered_rows:
+            cell_text: Text = self.get_cell(row.key, col_key)
+            if cell_text.plain.startswith(("http://", "https://")):
+                cell_text.style = f"#00afff link {cell_text.plain}"  # sky blue
+                self.update_cell(row.key, col_key, cell_text)
+                url_count += 1
+
+        if url_count:
+            self.notify(
+                f"Made [$accent]{url_count}[/] cell(s) clickable in column [$success]{col_key.value}[/]",
+                title="Make Clickable",
             )
