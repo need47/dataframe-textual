@@ -30,8 +30,10 @@ class TableScreen(ModalScreen):
 
         TableScreen > DataTable {
             width: auto;
-            min-width: 20;
+            height: auto;
             border: solid $primary;
+            max-width: 100%;
+            overflow: auto;
         }
     """
 
@@ -290,6 +292,10 @@ class StatisticsScreen(TableScreen):
         # Apply only to visible rows
         if False in self.dftable.visible_rows:
             lf = lf.filter(self.dftable.visible_rows)
+
+        # Apply only to non-hidden columns
+        if self.dftable.hidden_columns:
+            lf = lf.select(pl.exclude(self.dftable.hidden_columns))
 
         # Get dataframe statistics
         stats_df = lf.collect().describe()

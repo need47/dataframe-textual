@@ -985,7 +985,6 @@ class DataFrameTable(DataTable):
     def _highlight_table(self, force: bool = False) -> None:
         """Highlight selected rows/cells in red."""
         if not force and not any(self.selected_rows) and not self.matches:
-            self.notify("No selections or matches to highlight", title="Highlight")
             return  # Nothing to highlight
 
         # Update all rows based on selected state
