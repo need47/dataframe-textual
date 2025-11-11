@@ -1071,9 +1071,9 @@ class DataFrameTable(DataTable):
         self._add_history(f"Pinned [$accent]{fixed_rows}[/] rows and [$success]{fixed_columns}[/] columns")
 
         # Apply the pin settings to the table
-        if fixed_rows > 0:
+        if fixed_rows >= 0:
             self.fixed_rows = fixed_rows
-        if fixed_columns > 0:
+        if fixed_columns >= 0:
             self.fixed_columns = fixed_columns
 
         self.notify(
