@@ -1,7 +1,9 @@
 """Common utilities and constants for dataframe_viewer."""
 
 import re
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import polars as pl
@@ -338,3 +340,106 @@ def validate_expr(term: str, df: pl.DataFrame, current_col_idx: int) -> pl.Expr 
             raise ValueError(f"Failed to evaluate expression `{expr_str}`: {e}") from e
     except Exception as ve:
         raise ValueError(f"Failed to validate expression `{term}`: {ve}") from ve
+
+
+def load_dataframe(
+    filenames: list[str], file_format: str | None = None, has_header: bool = True
+) -> list[tuple[pl.LazyFrame, str, str]]:
+    """Load DataFrames from file specifications.
+
+    Handles loading from multiple files, single files, or stdin. For Excel files,
+    loads all sheets as separate entries. For other formats, loads as single file.
+
+    Args:
+        filenames: List of filenames to load. If single filename is "-", read from stdin.
+        file_format: Optional format specifier for input files (e.g., 'csv', 'excel').
+        has_header: Whether the input files have a header row. Defaults to True.
+
+    Returns:
+        List of tuples of (LazyFrame, filename, tabname) ready for display.
+    """
+    sources = []
+
+    prefix_sheet = len(filenames) > 1
+
+    for filename in filenames:
+        sources.extend(load_file(filename, prefix_sheet=prefix_sheet, file_format=file_format, has_header=has_header))
+    return sources
+
+
+def load_file(
+    filename: str,
+    first_sheet: bool = False,
+    prefix_sheet: bool = False,
+    file_format: str | None = None,
+    has_header: bool = True,
+) -> list[tuple[pl.LazyFrame, str, str]]:
+    """Load a single file and return list of sources.
+
+    For Excel files, when `first_sheet` is True, returns only the first sheet. Otherwise, returns one entry per sheet.
+    For other files or multiple files, returns one entry per file.
+
+    Args:
+        filename: Path to file to load.
+        first_sheet: If True, only load first sheet for Excel files. Defaults to False.
+        prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
+        file_format: Optional format specifier for input files (e.g., 'csv', 'excel', 'tsv', 'parquet', 'json', 'ndjson').
+
+    Returns:
+        List of tuples of (LazyFrame, filename, tabname).
+    """
+    sources = []
+
+    if filename == "-":
+        import os
+        from io import StringIO
+
+        # Read from stdin into memory first (stdin is not seekable)
+        stdin_data = sys.stdin.read()
+        lf = pl.scan_csv(StringIO(stdin_data), has_header=has_header, separator="," if file_format == "csv" else "\t")
+
+        # Reopen stdin to /dev/tty for proper terminal interaction
+        try:
+            tty = open("/dev/tty")
+            os.dup2(tty.fileno(), sys.stdin.fileno())
+        except (OSError, FileNotFoundError):
+            pass
+
+        sources.append((lf, f"stdin.{file_format}" if file_format else "stdin", "stdin"))
+        return sources
+
+    filepath = Path(filename)
+    ext = filepath.suffix.lower()
+
+    if file_format == "csv" or ext == ".csv":
+        lf = pl.scan_csv(filename, has_header=has_header)
+        sources.append((lf, filename, filepath.stem))
+    elif file_format == "excel" or ext in (".xlsx", ".xls"):
+        if first_sheet:
+            # Read only the first sheet for multiple files
+            lf = pl.read_excel(filename).lazy()
+            sources.append((lf, filename, filepath.stem))
+        else:
+            # For single file, expand all sheets
+            sheets = pl.read_excel(filename, sheet_id=0)
+            for sheet_name, df in sheets.items():
+                tabname = f"{filepath.stem}_{sheet_name}" if prefix_sheet else sheet_name
+                sources.append((df.lazy(), filename, tabname))
+    elif file_format == "tsv" or ext in (".tsv", ".tab"):
+        lf = pl.scan_csv(filename, has_header=has_header, separator="\t")
+        sources.append((lf, filename, filepath.stem))
+    elif file_format == "parquet" or ext == ".parquet":
+        lf = pl.scan_parquet(filename)
+        sources.append((lf, filename, filepath.stem))
+    elif file_format == "json" or ext == ".json":
+        df = pl.read_json(filename)
+        sources.append((df, filename, filepath.stem))
+    elif file_format == "ndjson" or ext == ".ndjson":
+        lf = pl.scan_ndjson(filename)
+        sources.append((lf, filename, filepath.stem))
+    else:
+        # Treat other formats as TSV
+        lf = pl.scan_csv(filename, has_header=has_header, separator="\t")
+        sources.append((lf, filename, filepath.stem))
+
+    return sources

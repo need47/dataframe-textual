@@ -1,7 +1,6 @@
 """DataFrame Viewer application and utilities."""
 
 import os
-import sys
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
@@ -13,7 +12,7 @@ from textual.theme import BUILTIN_THEMES
 from textual.widgets import TabbedContent, TabPane
 from textual.widgets.tabbed_content import ContentTab, ContentTabs
 
-from .common import get_next_item
+from .common import get_next_item, load_file
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
 from .yes_no_screen import OpenFileScreen, SaveFileScreen
@@ -79,21 +78,20 @@ class DataFrameViewer(App):
         }
     """
 
-    def __init__(self, *filenames: str, file_format: str | None = None, has_header: bool = True) -> None:
+    def __init__(self, *sources: str) -> None:
         """Initialize the DataFrame Viewer application.
 
-        Loads dataframes from provided filenames and prepares the tabbed interface.
+        Loads data from provided sources and prepares the tabbed interface.
 
         Args:
-            *filenames: Variable number of file paths to load (CSV, Excel, Parquet, etc).
-            file_format: Optional format specifier for input files (e.g., 'csv', 'excel').
-            has_header: Whether the input files have a header row. Defaults to True.
+            sources: sources to load dataframes from, each as a tuple of
+                     (DataFrame | LazyFrame, filename, tabname).
 
         Returns:
             None
         """
         super().__init__()
-        self.sources = _load_dataframe(filenames, file_format, has_header=has_header)
+        self.sources = sources
         self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel = None
 
@@ -111,12 +109,18 @@ class DataFrameViewer(App):
         with self.tabbed:
             seen_names = set()
             for idx, (df, filename, tabname) in enumerate(self.sources, start=1):
+                tab_id = f"tab_{idx}"
+
+                if not tabname:
+                    tabname = Path(filename).stem or tab_id
+
                 # Ensure unique tab names
-                if tabname in seen_names:
-                    tabname = f"{tabname}_{idx}"
+                counter = 1
+                while tabname in seen_names:
+                    tabname = f"{tabname}_{counter}"
+                    counter += 1
                 seen_names.add(tabname)
 
-                tab_id = f"tab_{idx}"
                 try:
                     table = DataFrameTable(df, filename, name=tabname, id=tab_id, zebra_stripes=True)
                     tab = TabPane(tabname, table, name=tabname, id=tab_id)
@@ -300,7 +304,7 @@ class DataFrameViewer(App):
         if filename and os.path.exists(filename):
             try:
                 n_tab = 0
-                for lf, filename, tabname in _load_file(filename, prefix_sheet=True):
+                for lf, filename, tabname in load_file(filename, prefix_sheet=True):
                     self._add_tab(lf.collect(), filename, tabname)
                     n_tab += 1
                 self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open")
@@ -368,105 +372,3 @@ class DataFrameViewer(App):
                     self.notify(f"Closed tab [$success]{active_pane.name}[/]", title="Close")
         except NoMatches:
             pass
-
-
-def _load_dataframe(
-    filenames: list[str], file_format: str | None = None, has_header: bool = True
-) -> list[tuple[pl.LazyFrame, str, str]]:
-    """Load DataFrames from file specifications.
-
-    Handles loading from multiple files, single files, or stdin. For Excel files,
-    loads all sheets as separate entries. For other formats, loads as single file.
-
-    Args:
-        filenames: List of filenames to load. If single filename is "-", read from stdin.
-        file_format: Optional format specifier for input files (e.g., 'csv', 'excel').
-        has_header: Whether the input files have a header row. Defaults to True.
-
-    Returns:
-        List of tuples of (LazyFrame, filename, tabname) ready for display.
-    """
-    sources = []
-
-    prefix_sheet = len(filenames) > 1
-
-    for filename in filenames:
-        sources.extend(_load_file(filename, prefix_sheet=prefix_sheet, file_format=file_format, has_header=has_header))
-    return sources
-
-
-def _load_file(
-    filename: str,
-    first_sheet: bool = False,
-    prefix_sheet: bool = False,
-    file_format: str | None = None,
-    has_header: bool = True,
-) -> list[tuple[pl.LazyFrame, str, str]]:
-    """Load a single file and return list of sources.
-
-    For Excel files, when `first_sheet` is True, returns only the first sheet. Otherwise, returns one entry per sheet.
-    For other files or multiple files, returns one entry per file.
-
-    Args:
-        filename: Path to file to load.
-        first_sheet: If True, only load first sheet for Excel files. Defaults to False.
-        prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
-        file_format: Optional format specifier for input files (e.g., 'csv', 'excel', 'tsv', 'parquet', 'json', 'ndjson').
-
-    Returns:
-        List of tuples of (LazyFrame, filename, tabname).
-    """
-    sources = []
-
-    if filename == "-":
-        from io import StringIO
-
-        # Read from stdin into memory first (stdin is not seekable)
-        stdin_data = sys.stdin.read()
-        lf = pl.scan_csv(StringIO(stdin_data), has_header=has_header, separator="," if file_format == "csv" else "\t")
-
-        # Reopen stdin to /dev/tty for proper terminal interaction
-        try:
-            tty = open("/dev/tty")
-            os.dup2(tty.fileno(), sys.stdin.fileno())
-        except (OSError, FileNotFoundError):
-            pass
-
-        sources.append((lf, f"stdin.{file_format}" if file_format else "stdin", "stdin"))
-        return sources
-
-    filepath = Path(filename)
-    ext = filepath.suffix.lower()
-
-    if file_format == "csv" or ext == ".csv":
-        lf = pl.scan_csv(filename, has_header=has_header)
-        sources.append((lf, filename, filepath.stem))
-    elif file_format == "excel" or ext in (".xlsx", ".xls"):
-        if first_sheet:
-            # Read only the first sheet for multiple files
-            lf = pl.read_excel(filename).lazy()
-            sources.append((lf, filename, filepath.stem))
-        else:
-            # For single file, expand all sheets
-            sheets = pl.read_excel(filename, sheet_id=0)
-            for sheet_name, df in sheets.items():
-                tabname = f"{filepath.stem}_{sheet_name}" if prefix_sheet else sheet_name
-                sources.append((df.lazy(), filename, tabname))
-    elif file_format == "tsv" or ext in (".tsv", ".tab"):
-        lf = pl.scan_csv(filename, has_header=has_header, separator="\t")
-        sources.append((lf, filename, filepath.stem))
-    elif file_format == "parquet" or ext == ".parquet":
-        lf = pl.scan_parquet(filename)
-        sources.append((lf, filename, filepath.stem))
-    elif file_format == "json" or ext == ".json":
-        df = pl.read_json(filename)
-        sources.append((df, filename, filepath.stem))
-    elif file_format == "ndjson" or ext == ".ndjson":
-        lf = pl.scan_ndjson(filename)
-        sources.append((lf, filename, filepath.stem))
-    else:
-        # Treat other formats as TSV
-        lf = pl.scan_csv(filename, has_header=has_header, separator="\t")
-        sources.append((lf, filename, filepath.stem))
-
-    return sources

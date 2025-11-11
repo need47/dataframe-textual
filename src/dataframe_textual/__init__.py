@@ -2,7 +2,7 @@
 
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable, History
-from .data_frame_viewer import DataFrameViewer, _load_dataframe
+from .data_frame_viewer import DataFrameViewer
 from .table_screen import FrequencyScreen, RowDetailScreen, TableScreen
 from .yes_no_screen import (
     ConfirmScreen,
@@ -31,5 +31,4 @@ __all__ = [
     "FilterScreen",
     "FreezeScreen",
     "OpenFileScreen",
-    "_load_dataframe",
 ]

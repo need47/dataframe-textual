@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .common import load_dataframe
 from .data_frame_viewer import DataFrameViewer
 
 SUPPORTED_FORMATS = ["csv", "excel", "tsv", "parquet", "json", "ndjson"]
@@ -57,7 +58,8 @@ def main() -> None:
         parser.print_help()
         sys.exit(1)
 
-    app = DataFrameViewer(*filenames, file_format=args.format, has_header=not args.no_header)
+    sources = load_dataframe(filenames, file_format=args.format, has_header=not args.no_header)
+    app = DataFrameViewer(*sources)
     app.run()
 
 
