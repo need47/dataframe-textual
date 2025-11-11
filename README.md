@@ -173,6 +173,8 @@ When multiple files are opened:
 | `a` | Add empty column after current |
 | `A` | Add column with name and value/expression |
 | `-` (minus) | Delete current column |
+| `_` (underscore) | Delete current column and all columns after |
+| `Ctrl+-` | Delete current column and all columns before |
 | `x` | Delete current row |
 | `X` | Delete current row and all rows below |
 | `Ctrl+X` | Delete current row and all rows above |
@@ -533,6 +535,14 @@ This is useful for:
 
 **Delete Column** (`-`):
 - Removes the entire column from view and dataframe
+
+**Delete Column and After** (`_`):
+- Deletes the current column and all columns to the right
+- Useful for removing trailing columns or the end of a dataset
+
+**Delete Column and Before** (`Ctrl+-`):
+- Deletes the current column and all columns to the left
+- Useful for removing leading columns or the beginning of a dataset
 
 ### 9. Hide & Show Columns
 

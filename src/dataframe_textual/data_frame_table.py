@@ -104,8 +104,12 @@ class DataFrameTable(DataTable):
         - **F** - 📊 Show frequency distribution
         - **s** - 📈 Show statistics for current column
         - **S** - 📊 Show statistics for entire dataframe
-        - **K** - 🔄 Cycle cursor (cell → row → column → cell)
+        - **h** - 👁️ Hide current column
+        - **H** - 👀 Show all hidden rows/columns
+        - **z** - 📌 Freeze rows and columns
         - **~** - 🏷️ Toggle row labels
+        - **,** - 🔢 Toggle thousand separator for numeric display
+        - **K** - 🔄 Cycle cursor (cell → row → column → cell)
 
         ## ↕️ Sorting
         - **[** - 🔼 Sort column ascending
@@ -136,7 +140,7 @@ class DataFrameTable(DataTable):
         - **{** - ⬆️ Go to previous selected row
         - **}** - ⬇️ Go to next selected row
         - **"** - 📍 Filter to show only selected rows
-        - **T** - 🧹 Clear all selections
+        - **T** - 🧹 Clear all selections and matches
 
         ## ✏️ Edit & Modify
         - **Double-click** - ✍️ Edit cell or rename column header
@@ -144,15 +148,16 @@ class DataFrameTable(DataTable):
         - **E** - 📊 Edit entire column with expression
         - **a** - ➕ Add empty column after current
         - **A** - ➕ Add column with name and optional expression
-        - **x** - 🗑️ Delete current row
-        - **X** - 🗑️ Delete row and those below
-        - **Ctrl+X** - 🗑️ Delete row and those above
-        - **delete** - ✨ Clear current cell (set to NULL)
-        - **D** - 📋 Duplicate current row
+        - **x** - ❌ Delete current row
+        - **X** - ❌ Delete row and those below
+        - **Ctrl+X** - ❌ Delete row and those above
+        - **delete** - ❌ Clear current cell (set to NULL)
         - **-** - ❌ Delete current column
+        - **_** - ❌ Delete column and those after
+        - **Ctrl+-** - ❌ Delete column and those before
         - **d** - 📋 Duplicate current column
-        - **h** - 👁️ Hide current column
-        - **H** - 👀 Show all hidden rows/columns
+        - **D** - 📋 Duplicate current row
+
 
         ## 🎯 Reorder
         - **Shift+↑↓** - ⬆️⬇️ Move row up/down
@@ -168,8 +173,6 @@ class DataFrameTable(DataTable):
         - **@** - 🔗 Make URLs in current column clickable with Ctrl/Cmd
 
         ## 💾 Data Management
-        - **z** - 📌 Freeze rows and columns
-        - **,** - 🔢 Toggle thousand separator for numeric display
         - **c** - 📋 Copy cell to clipboard
         - **Ctrl+c** - 📊 Copy column to clipboard
         - **Ctrl+r** - 📝 Copy row to clipboard (tab-separated)
@@ -180,20 +183,28 @@ class DataFrameTable(DataTable):
 
     # fmt: off
     BINDINGS = [
+        # Navigation
         ("g", "jump_top", "Jump to top"),
         ("G", "jump_bottom", "Jump to bottom"),
+        # Display
         ("h", "hide_column", "Hide column"),
         ("H", "show_hidden_rows_columns", "Show hidden rows/columns"),
+        ("tilde", "toggle_row_labels", "Toggle row labels"),  # `~`
+        ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
+        ("z", "freeze_row_column", "Freeze rows/columns"),
+        ("comma", "show_thousand_separator", "Toggle thousand separator"),  # `,`
+        # Copy
         ("c", "copy_cell", "Copy cell to clipboard"),
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
         ("ctrl+r", "copy_row", "Copy row to clipboard"),
+        # Save
         ("ctrl+s", "save_to_file", "Save to file"),
+        # Detail, Frequency, and Statistics
         ("enter", "view_row_detail", "View row details"),
-        # Frequency & Statistics
         ("F", "show_frequency", "Show frequency"),
         ("s", "show_statistics", "Show statistics for column"),
         ("S", "show_statistics('dataframe')", "Show statistics for dataframe"),
-        # Sorting
+        # Sort
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
         # View
@@ -217,18 +228,23 @@ class DataFrameTable(DataTable):
         # Selection
         ("apostrophe", "make_selections", "Toggle row selection"),  # `'`
         ("t", "toggle_selections", "Toggle all row selections"),
-        ("T", "clear_selections", "Clear selections"),
+        ("T", "clear_selections_and_matches", "Clear selections"),
         ("quotation_mark", "filter_selected_rows", "Filter selected"),  # `"`
-        # Edit
+        # Delete
+        ("delete", "clear_cell", "Clear cell"),
         ("minus", "delete_column", "Delete column"),  # `-`
+        ("underscore", "delete_column_and_after", "Delete column and those after"),  # `_`
+        ("ctrl+minus", "delete_column_and_before", "Delete column and those before"),  # `Ctrl+-`
         ("x", "delete_row", "Delete row"),
         ("X", "delete_row_and_below", "Delete row and those below"),
         ("ctrl+x", "delete_row_and_up", "Delete row and those up"),
-        ("delete", "clear_cell", "Clear cell"),
+        # Duplicate
         ("d", "duplicate_column", "Duplicate column"),
         ("D", "duplicate_row", "Duplicate row"),
+        # Edit
         ("e", "edit_cell", "Edit cell"),
         ("E", "edit_column", "Edit column"),
+        # Add
         ("a", "add_column", "Add column"),
         ("A", "add_column_expr", "Add column with expression"),
         # Reorder
@@ -242,11 +258,6 @@ class DataFrameTable(DataTable):
         ("exclamation_mark", "cast_column_dtype('bool')", "Cast column dtype to bool"),  # `!`
         ("dollar_sign", "cast_column_dtype('string')", "Cast column dtype to string"),  # `$`
         ("at", "make_cell_clickable", "Make cell clickable"),  # `@`
-        # Misc
-        ("tilde", "toggle_row_labels", "Toggle row labels"),  # `~`
-        ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
-        ("z", "freeze_row_column", "Freeze rows/columns"),
-        ("comma", "show_thousand_separator", "Toggle thousand separator"),  # `,`
         # Undo/Redo
         ("u", "undo", "Undo"),
         ("U", "reset", "Reset to original"),
@@ -582,6 +593,14 @@ class DataFrameTable(DataTable):
         """Delete the current column."""
         self._delete_column()
 
+    def action_delete_column_and_after(self) -> None:
+        """Delete the current column and those after."""
+        self._delete_column(more="after")
+
+    def action_delete_column_and_before(self) -> None:
+        """Delete the current column and those before."""
+        self._delete_column(more="before")
+
     def action_hide_column(self) -> None:
         """Hide the current column."""
         self._hide_column()
@@ -735,9 +754,9 @@ class DataFrameTable(DataTable):
         """Move the current row down."""
         self._move_row("down")
 
-    def action_clear_selections(self) -> None:
-        """Clear all row selections."""
-        self._clear_selections()
+    def action_clear_selections_and_matches(self) -> None:
+        """Clear all row selections and matches."""
+        self._clear_selections_and_matches()
 
     def action_cycle_cursor_type(self) -> None:
         """Cycle through cursor types."""
@@ -1098,38 +1117,68 @@ class DataFrameTable(DataTable):
         )
 
     # Delete & Move
-    def _delete_column(self) -> None:
+    def _delete_column(self, more: str = None) -> None:
         """Remove the currently selected column from the table."""
         # Get the column to remove
         col_idx = self.cursor_column
         col_name = self.cursor_col_name
-        col_key = self.cursor_col_key
+
+        col_names_to_remove = []
+        col_keys_to_remove = []
+
+        # Remove all columns before the current column
+        if more == "before":
+            for i in range(col_idx + 1):
+                col_key = self.get_column_key(i)
+                col_names_to_remove.append(col_key.value)
+                col_keys_to_remove.append(col_key)
+
+            descr = f"Removed column [$success]{col_name}[/] and all columns before"
+
+        # Remove all columns after the current column
+        elif more == "after":
+            for i in range(col_idx, len(self.columns)):
+                col_key = self.get_column_key(i)
+                col_names_to_remove.append(col_key.value)
+                col_keys_to_remove.append(col_key)
+
+            descr = f"Removed column [$success]{col_name}[/] and all columns after"
+
+        # Remove only the current column
+        else:
+            col_names_to_remove.append(col_name)
+            col_keys_to_remove.append(col_key)
+            descr = f"Removed column [$success]{col_name}[/]"
 
         # Add to history
-        self._add_history(f"Removed column [$success]{col_name}[/]")
+        self._add_history(descr)
 
-        # Remove the column from the table display using the column name as key
-        self.remove_column(col_key)
+        # Remove the columns from the table display using the column names as keys
+        for ck in col_keys_to_remove:
+            self.remove_column(ck)
 
-        # Move cursor left if we deleted the last column
-        if col_idx >= len(self.columns):
-            self.move_cursor(column=len(self.columns) - 1)
+        # Move cursor left if we deleted the last column(s)
+        last_col_idx = len(self.columns) - 1
+        if col_idx > last_col_idx:
+            self.move_cursor(column=last_col_idx)
 
         # Remove from sorted columns if present
-        if col_name in self.sorted_columns:
-            del self.sorted_columns[col_name]
+        for col_name in col_names_to_remove:
+            if col_name in self.sorted_columns:
+                del self.sorted_columns[col_name]
 
         # Remove from matches
+        col_indices_to_remove = set(self.df.columns.index(name) for name in col_names_to_remove)
         for row_idx in list(self.matches.keys()):
-            self.matches[row_idx].discard(col_idx)
+            self.matches[row_idx].difference_update(col_indices_to_remove)
             # Remove empty entries
             if not self.matches[row_idx]:
                 del self.matches[row_idx]
 
         # Remove from dataframe
-        self.df = self.df.drop(col_name)
+        self.df = self.df.drop(col_names_to_remove)
 
-        self.notify(f"Removed column [$success]{col_name}[/]", title="Delete")
+        # self.notify(descr, title="Delete")
 
     def _hide_column(self) -> None:
         """Hide the currently selected column from the table display."""
@@ -2507,8 +2556,8 @@ class DataFrameTable(DataTable):
         # Refresh the highlighting (also restores default styles for unselected rows)
         self._do_highlight()
 
-    def _clear_selections(self) -> None:
-        """Clear all selected rows without removing them from the dataframe."""
+    def _clear_selections_and_matches(self) -> None:
+        """Clear all selected rows and matches without removing them from the dataframe."""
         # Check if any selected rows or matches
         if not any(self.selected_rows) and not self.matches:
             self.notify("No selections to clear", title="Clear", severity="warning")
