@@ -383,7 +383,9 @@ def load_file(
         filename: Path to file to load.
         first_sheet: If True, only load first sheet for Excel files. Defaults to False.
         prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
-        file_format: Optional format specifier for input files (e.g., 'csv', 'excel', 'tsv', 'parquet', 'json', 'ndjson').
+        file_format: Optional format specifier (i.e., 'csv', 'excel', 'tsv', 'parquet', 'json', 'ndjson') for input files.
+                     By default, infers from file extension.
+        has_header: Whether the input files have a header row. Defaults to True.
 
     Returns:
         List of tuples of (LazyFrame, filename, tabname).
@@ -409,12 +411,11 @@ def load_file(
         return sources
 
     filepath = Path(filename)
-    ext = filepath.suffix.lower()
 
-    if file_format == "csv" or ext == ".csv":
+    if file_format == "csv":
         lf = pl.scan_csv(filename, has_header=has_header)
         sources.append((lf, filename, filepath.stem))
-    elif file_format == "excel" or ext in (".xlsx", ".xls"):
+    elif file_format == "excel":
         if first_sheet:
             # Read only the first sheet for multiple files
             lf = pl.read_excel(filename).lazy()
@@ -425,21 +426,36 @@ def load_file(
             for sheet_name, df in sheets.items():
                 tabname = f"{filepath.stem}_{sheet_name}" if prefix_sheet else sheet_name
                 sources.append((df.lazy(), filename, tabname))
-    elif file_format == "tsv" or ext in (".tsv", ".tab"):
+    elif file_format == "tsv":
         lf = pl.scan_csv(filename, has_header=has_header, separator="\t")
         sources.append((lf, filename, filepath.stem))
-    elif file_format == "parquet" or ext == ".parquet":
+    elif file_format == "parquet":
         lf = pl.scan_parquet(filename)
         sources.append((lf, filename, filepath.stem))
-    elif file_format == "json" or ext == ".json":
+    elif file_format == "json":
         df = pl.read_json(filename)
         sources.append((df, filename, filepath.stem))
-    elif file_format == "ndjson" or ext == ".ndjson":
+    elif file_format == "ndjson":
         lf = pl.scan_ndjson(filename)
         sources.append((lf, filename, filepath.stem))
     else:
-        # Treat other formats as TSV
-        lf = pl.scan_csv(filename, has_header=has_header, separator="\t")
-        sources.append((lf, filename, filepath.stem))
+        ext = filepath.suffix.lower()
+        if ext == ".csv":
+            file_format = "csv"
+        elif ext in (".xlsx", ".xls"):
+            file_format = "excel"
+        elif ext in (".tsv", ".tab"):
+            file_format = "tsv"
+        elif ext == ".parquet":
+            file_format = "parquet"
+        elif ext == ".json":
+            file_format = "json"
+        elif ext == ".ndjson":
+            file_format = "ndjson"
+        else:
+            # Default to TSV
+            file_format = "tsv"
+
+        sources.extend(load_file(filename, first_sheet, prefix_sheet, file_format, has_header))
 
     return sources

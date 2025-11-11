@@ -23,13 +23,14 @@ def main() -> None:
         SystemExit: If invalid arguments are provided or required files are missing.
     """
     parser = argparse.ArgumentParser(
+        prog="dv",
         description="Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Examples:\n"
-        "  dataframe-textual data.csv\n"
-        "  dataframe-textual file1.csv file2.csv file3.csv\n"
-        "  dataframe-textual data.xlsx  (opens all sheets in tabs)\n"
-        "  cat data.csv | dataframe-textual --format csv\n",
+        "  %(prog)s data.csv\n"
+        "  %(prog)s file1.csv file2.csv file3.csv\n"
+        "  %(prog)s data.xlsx  (opens each sheet in separate tab)\n"
+        "  cat data.csv | %(prog)s --format csv\n",
     )
     parser.add_argument("files", nargs="*", help="Files to view (or read from stdin)")
     parser.add_argument(
