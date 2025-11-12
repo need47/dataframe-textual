@@ -1921,7 +1921,7 @@ class DataFrameTable(DataTable):
             self._setup_table()
 
             self.notify(f"Cast column [$accent]{col_name}[/] to [$success]{target_dtype}[/]", title="Cast")
-        except Exception:
+        except Exception as e:
             self.notify(
                 f"Error casting column [$accent]{col_name}[/] to [$success]{target_dtype}[/]: {str(e)}",
                 title="Cast",
