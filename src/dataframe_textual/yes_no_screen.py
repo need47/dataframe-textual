@@ -33,9 +33,11 @@ class YesNoScreen(ModalScreen):
             min-width: 40;
             max-width: 60;
             height: auto;
-            border: heavy $primary;
-            border-title-color: $primary-lighten-3;
-            background: $surface;
+            border: heavy $accent;
+            border-title-color: $accent;
+            border-title-background: $panel;
+            border-title-style: bold;
+            background: $background;
             padding: 1 2;
         }
 

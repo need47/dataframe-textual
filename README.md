@@ -202,6 +202,13 @@ When multiple files are opened:
 | `v` | View only rows by selected rows and/or matches or cursor value |
 | `V` | View only rows by expression |
 
+#### SQL Interface
+
+| Key | Action |
+|-----|--------|
+| `l` | Simple SQL interface (select columns & WHERE clause) |
+| `L` | Advanced SQL interface (full SQL queries) |
+
 #### Find & Replace
 
 | Key | Action |
@@ -664,7 +671,40 @@ Press `@` to make URLs in the current column clickable:
 - **Scans** all cells in the current column for URLs starting with `http://` or `https://`
 - **Applies** link styling to make them clickable and dataframe remains unchanged
 
-### 19. Clipboard Operations
+### 19. SQL Interface
+
+The SQL interface provides two modes for querying your dataframe:
+
+#### Simple SQL Interface (`l`)
+Select specific columns and apply WHERE conditions without writing full SQL:
+- Choose which columns to include in results
+- Specify WHERE clause for filtering
+- Ideal for quick filtering and column selection
+
+#### Advanced SQL Interface (`L`)
+Execute complete SQL queries for advanced data manipulation:
+- Write full SQL queries with standard [SQL syntax](https://docs.pola.rs/api/python/stable/reference/sql/index.html)
+- Support for JOINs, GROUP BY, aggregations, and more
+- Access to all SQL capabilities for complex transformations
+- Always use `self` as the table name
+
+**Examples:**
+```sql
+-- Filter and select specific rows and/or columns
+SELECT name, age FROM self WHERE age > 30
+
+-- Aggregate with GROUP BY
+SELECT department, COUNT(*) as count, AVG(salary) as avg_salary
+FROM self
+GROUP BY department
+
+-- Complex filtering with multiple conditions
+SELECT *
+FROM self
+WHERE (age > 25 AND salary > 50000) OR department = 'Management'
+```
+
+### 20. Clipboard Operations
 
 Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux
 

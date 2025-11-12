@@ -33,6 +33,7 @@ from .common import (
     tentative_expr,
     validate_expr,
 )
+from .sql_screen import AdvancedSqlScreen, SimpleSqlScreen
 from .table_screen import FrequencyScreen, RowDetailScreen, StatisticsScreen
 from .yes_no_screen import (
     AddColumnScreen,
@@ -142,6 +143,10 @@ class DataFrameTable(DataTable):
         - **"** - 📍 Filter to show only selected rows
         - **T** - 🧹 Clear all selections and matches
 
+        ## 🔍 SQL Interface
+        - **l** - 💬 Open simple SQL interface (select columns & WHERE clause)
+        - **L** - 🔎 Open advanced SQL interface (full SQL queries)
+
         ## ✏️ Edit & Modify
         - **Double-click** - ✍️ Edit cell or rename column header
         - **e** - ✍️ Edit current cell
@@ -157,7 +162,6 @@ class DataFrameTable(DataTable):
         - **Ctrl+-** - ❌ Delete column and those before
         - **d** - 📋 Duplicate current column
         - **D** - 📋 Duplicate current row
-
 
         ## 🎯 Reorder
         - **Shift+↑↓** - ⬆️⬇️ Move row up/down
@@ -254,11 +258,14 @@ class DataFrameTable(DataTable):
         ("shift+up", "move_row_up", "Move row up"),
         ("shift+down", "move_row_down", "Move row down"),
         # Type Conversion
-        ("number_sign", "cast_column_dtype('int')", "Cast column dtype to int"),  # `#`
-        ("percent_sign", "cast_column_dtype('float')", "Cast column dtype to float"),  # `%`
-        ("exclamation_mark", "cast_column_dtype('bool')", "Cast column dtype to bool"),  # `!`
-        ("dollar_sign", "cast_column_dtype('string')", "Cast column dtype to string"),  # `$`
+        ("number_sign", "cast_column_dtype('pl.Int64')", "Cast column dtype to integer"),  # `#`
+        ("percent_sign", "cast_column_dtype('pl.Float64')", "Cast column dtype to float"),  # `%`
+        ("exclamation_mark", "cast_column_dtype('pl.Boolean')", "Cast column dtype to bool"),  # `!`
+        ("dollar_sign", "cast_column_dtype('pl.String')", "Cast column dtype to string"),  # `$`
         ("at", "make_cell_clickable", "Make cell clickable"),  # `@`
+        # Sql
+        ("l", "simple_sql", "Simple SQL interface"),
+        ("L", "advanced_sql", "Advanced SQL interface"),
         # Undo/Redo
         ("u", "undo", "Undo"),
         ("U", "redo", "Redo"),
@@ -854,6 +861,14 @@ class DataFrameTable(DataTable):
         """Go to the previous selected row."""
         self._previous_selected_row()
 
+    def action_simple_sql(self) -> None:
+        """Open the SQL interface screen."""
+        self._simple_sql()
+
+    def action_advanced_sql(self) -> None:
+        """Open the advanced SQL interface screen."""
+        self._advanced_sql()
+
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
         self._check_and_load_more()
@@ -1080,16 +1095,16 @@ class DataFrameTable(DataTable):
             self.notify("No actions to undo", title="Undo", severity="warning")
             return
 
-        # Save current state for redo
-        self.history = self._create_history("Redo state")
-
         # Pop the last history state for undo
         history = self.histories.pop()
+
+        # Save current state for redo
+        self.history = self._create_history(history.description)
 
         # Restore state
         self._apply_history(history)
 
-        # self.notify(f"Reverted: {history.description}", title="Undo")
+        self.notify(f"Reverted: {history.description}", title="Undo")
 
     def _redo(self) -> None:
         """Redo the last undone action."""
@@ -1097,8 +1112,10 @@ class DataFrameTable(DataTable):
             self.notify("No actions to redo", title="Redo", severity="warning")
             return
 
+        description = self.history.description
+
         # Save current state for undo
-        self._add_history("Undo state")
+        self._add_history(description)
 
         # Restore state
         self._apply_history(self.history)
@@ -1106,7 +1123,7 @@ class DataFrameTable(DataTable):
         # Clear redo state
         self.history = None
 
-        # self.notify(f"Reapplied: {history.description}", title="Redo")
+        self.notify(f"Reapplied: {description}", title="Redo")
 
     # View
     def _view_row_detail(self) -> None:
@@ -1161,10 +1178,7 @@ class DataFrameTable(DataTable):
         if fixed_columns >= 0:
             self.fixed_columns = fixed_columns
 
-        self.notify(
-            f"Pinned [$accent]{fixed_rows}[/] rows and [$success]{fixed_columns}[/] columns",
-            title="Pin",
-        )
+        # self.notify(f"Pinned [$accent]{fixed_rows}[/] rows and [$success]{fixed_columns}[/] columns", title="Pin")
 
     # Delete & Move
     def _delete_column(self, more: str = None) -> None:
@@ -1184,7 +1198,7 @@ class DataFrameTable(DataTable):
                 col_names_to_remove.append(col_key.value)
                 col_keys_to_remove.append(col_key)
 
-            descr = f"Removed column [$success]{col_name}[/] and all columns before"
+            message = f"Removed column [$success]{col_name}[/] and all columns before"
 
         # Remove all columns after the current column
         elif more == "after":
@@ -1193,16 +1207,16 @@ class DataFrameTable(DataTable):
                 col_names_to_remove.append(col_key.value)
                 col_keys_to_remove.append(col_key)
 
-            descr = f"Removed column [$success]{col_name}[/] and all columns after"
+            message = f"Removed column [$success]{col_name}[/] and all columns after"
 
         # Remove only the current column
         else:
             col_names_to_remove.append(col_name)
             col_keys_to_remove.append(col_key)
-            descr = f"Removed column [$success]{col_name}[/]"
+            message = f"Removed column [$success]{col_name}[/]"
 
         # Add to history
-        self._add_history(descr)
+        self._add_history(message)
 
         # Remove the columns from the table display using the column names as keys
         for ck in col_keys_to_remove:
@@ -1229,7 +1243,7 @@ class DataFrameTable(DataTable):
         # Remove from dataframe
         self.df = self.df.drop(col_names_to_remove)
 
-        # self.notify(descr, title="Delete")
+        # self.notify(message, title="Delete")
 
     def _hide_column(self) -> None:
         """Hide the currently selected column from the table display."""
@@ -1317,10 +1331,7 @@ class DataFrameTable(DataTable):
         # Move cursor to the new duplicated column
         self.move_cursor(column=col_idx + 1)
 
-        self.notify(
-            f"Duplicated column [$accent]{col_name}[/] as [$success]{new_col_name}[/]",
-            title="Duplicate",
-        )
+        # self.notify(f"Duplicated column [$accent]{col_name}[/] as [$success]{new_col_name}[/]", title="Duplicate")
 
     def _delete_row(self, more: str = None) -> None:
         """Delete rows from the table and dataframe.
@@ -1653,7 +1664,7 @@ class DataFrameTable(DataTable):
             col_key = col_name
             self.update_cell(row_key, col_key, formatted_value, update_width=True)
 
-            self.notify(f"Cell updated to [$success]{cell_value}[/]", title="Edit")
+            # self.notify(f"Cell updated to [$success]{cell_value}[/]", title="Edit")
         except Exception as e:
             self.notify(f"Failed to update cell: {str(e)}", title="Edit", severity="error")
 
@@ -1695,7 +1706,7 @@ class DataFrameTable(DataTable):
                 expr = pl.lit(value)
             except Exception:
                 self.notify(
-                    f"Unable to convert [$accent]{term}[/] to [$error]{dtype}[/]. Cast to string.",
+                    f"Error converting [$accent]{term}[/] to [$error]{dtype}[/]. Cast to string.",
                     title="Edit",
                     severity="error",
                 )
@@ -1714,10 +1725,7 @@ class DataFrameTable(DataTable):
         # Recreate the table for display
         self._setup_table()
 
-        self.notify(
-            f"Column [$accent]{col_name}[/] updated with [$success]{expr}[/]",
-            title="Edit",
-        )
+        # self.notify(f"Column [$accent]{col_name}[/] updated with [$success]{expr}[/]", title="Edit")
 
     def _rename_column(self) -> None:
         """Open modal to rename the selected column."""
@@ -1764,10 +1772,7 @@ class DataFrameTable(DataTable):
         # Move cursor to the renamed column
         self.move_cursor(column=col_idx)
 
-        self.notify(
-            f"Renamed column [$success]{col_name}[/] to [$success]{new_name}[/]",
-            title="Column",
-        )
+        # self.notify(f"Renamed column [$success]{col_name}[/] to [$success]{new_name}[/]", title="Column")
 
     def _clear_cell(self) -> None:
         """Clear the current cell by setting its value to None."""
@@ -1795,7 +1800,7 @@ class DataFrameTable(DataTable):
 
             self.update_cell(row_key, col_key, formatted_value)
 
-            self.notify(f"Cell cleared to [$success]{NULL_DISPLAY}[/]", title="Clear")
+            # self.notify(f"Cell cleared to [$success]{NULL_DISPLAY}[/]", title="Clear")
         except Exception as e:
             self.notify(f"Failed to clear cell: {str(e)}", title="Clear", severity="error")
             raise e
@@ -1840,7 +1845,7 @@ class DataFrameTable(DataTable):
             # Move cursor to the new column
             self.move_cursor(column=cidx + 1)
 
-            self.notify(f"Added column [$success]{new_name}[/]", title="Add Column")
+            # self.notify(f"Added column [$success]{new_name}[/]", title="Add Column")
         except Exception as e:
             self.notify(f"Failed to add column: {str(e)}", title="Add Column", severity="error")
             raise e
@@ -1887,50 +1892,21 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to add column: [$error]{str(e)}[/]", title="Add Column", severity="error")
             raise e
 
-    def _string_to_polars_dtype(self, dtype_str: str) -> pl.DataType:
-        """Convert string type name to Polars DataType.
-
-        Args:
-            dtype_str: String representation of the type ("string", "int", "float", "bool")
-
-        Returns:
-            Corresponding Polars DataType
-
-        Raises:
-            ValueError: If the type string is not recognized
-        """
-        dtype_map = {
-            "string": pl.String,
-            "int": pl.Int64,
-            "float": pl.Float64,
-            "bool": pl.Boolean,
-        }
-
-        dtype_lower = dtype_str.lower().strip()
-        return dtype_map.get(dtype_lower)
-
-    def _cast_column_dtype(self, dtype: str | pl.DataType = pl.String) -> None:
+    def _cast_column_dtype(self, dtype: str) -> None:
         """Cast the current column to a different data type.
 
         Args:
-            dtype: Target data type (string like "int", "float", "bool", "string" or Polars DataType)
+            dtype: Target data type (string representation, e.g., "pl.String", "pl.Int64")
         """
         cidx = self.cursor_col_idx
         col_name = self.cursor_col_name
         current_dtype = self.df.dtypes[cidx]
 
-        # Convert string dtype to Polars DataType if needed
-        if isinstance(dtype, str):
-            target_dtype = self._string_to_polars_dtype(dtype)
-            if target_dtype is None:
-                self.notify(
-                    f"Use string for unknown data type: {dtype}. Supported types: {', '.join(self._string_to_polars_dtype.keys())}",
-                    title="Cast",
-                    severity="warning",
-                )
-                target_dtype = pl.String
-        else:
-            target_dtype = dtype
+        try:
+            target_dtype = eval(dtype)
+        except Exception:
+            self.notify(f"Invalid target data type: [$error]{dtype}[/]", title="Cast", severity="error")
+            return
 
         # Add to history
         self._add_history(
@@ -2947,3 +2923,64 @@ class DataFrameTable(DataTable):
                 f"Made [$accent]{url_count}[/] cell(s) clickable in column [$success]{col_key.value}[/]",
                 title="Make Clickable",
             )
+
+    def _simple_sql(self) -> None:
+        """Open the SQL interface screen."""
+        self.app.push_screen(
+            SimpleSqlScreen(self),
+            callback=self._do_simple_sql,
+        )
+
+    def _do_simple_sql(self, result) -> None:
+        """Handle SQL result result from SimpleSqlScreen."""
+        if result is None:
+            return
+        columns, where = result
+
+        sql = f"SELECT {columns} FROM self"
+        if where:
+            sql += f" WHERE {where}"
+
+        self._do_sql(sql)
+
+    def _advanced_sql(self) -> None:
+        """Open the advanced SQL interface screen."""
+        self.app.push_screen(
+            AdvancedSqlScreen(self),
+            callback=self._do_advanced_sql,
+        )
+
+    def _do_advanced_sql(self, result) -> None:
+        """Handle SQL result result from AdvancedSqlScreen."""
+        if result is None:
+            return
+
+        self._do_sql(result)
+
+    def _do_sql(self, sql: str) -> None:
+        """Execute a SQL query directly.
+
+        Args:
+            sql: The SQL query string to execute.
+        """
+        # Add to history
+        self._add_history(f"SQL Query: [$accent]{sql}[/]")
+
+        # Execute the SQL query
+        try:
+            self.df = self.df.sql(sql)
+        except Exception as e:
+            self.notify(f"Error executing SQL query [$error]{sql}[/]: {str(e)}", title="SQL Query", severity="error")
+            return
+
+        if not len(self.df):
+            self.notify(f"SQL query returned no results for [$warning]{sql}[/]", title="SQL Query", severity="warning")
+            return
+
+        # Recreate the table display
+        self._setup_table()
+
+        self.notify(
+            f"SQL query executed. Now showing [$accent]{len(self.df)}[/] rows and [$accent]{len(self.df.columns)}[/] columns.",
+            title="SQL Query",
+        )
