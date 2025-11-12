@@ -1243,7 +1243,7 @@ class DataFrameTable(DataTable):
         # Remove from dataframe
         self.df = self.df.drop(col_names_to_remove)
 
-        # self.notify(message, title="Delete")
+        self.notify(message, title="Delete")
 
     def _hide_column(self) -> None:
         """Hide the currently selected column from the table display."""
@@ -1289,7 +1289,7 @@ class DataFrameTable(DataTable):
         self._setup_table()
 
         self.notify(
-            f"Showed [$accent]{hidden_row_count}[/] hidden row(s) and/or [$accent]{hidden_col_count}[/] hidden column(s)",
+            f"Showed [$accent]{hidden_row_count}[/] hidden row(s) and/or [$accent]{hidden_col_count}[/] column(s)",
             title="Show",
         )
 
@@ -1396,7 +1396,7 @@ class DataFrameTable(DataTable):
         self._setup_table()
 
         deleted_count = old_count - len(self.df)
-        if deleted_count > 1:
+        if deleted_count > 0:
             self.notify(f"Deleted [$accent]{deleted_count}[/] row(s)", title="Delete")
 
     def _duplicate_row(self) -> None:
@@ -1514,7 +1514,7 @@ class DataFrameTable(DataTable):
                 return
             swap_idx = row_idx + 1
         else:
-            self.notify(f"Invalid direction: {direction}", title="Move", severity="error")
+            # Invalid direction
             return
 
         row_key = self.coordinate_to_cell_key((row_idx, 0)).row_key
@@ -1719,7 +1719,7 @@ class DataFrameTable(DataTable):
             # Apply the expression to the column
             self.df = self.df.with_columns(expr.alias(col_name))
         except Exception as e:
-            self.notify(f"Failed to apply expression: [$error]{str(e)}[/]", title="Edit", severity="error")
+            self.notify(f"Error applying expression: [$error]{str(e)}[/]", title="Edit", severity="error")
             return
 
         # Recreate the table for display
@@ -1802,7 +1802,7 @@ class DataFrameTable(DataTable):
 
             # self.notify(f"Cell cleared to [$success]{NULL_DISPLAY}[/]", title="Clear")
         except Exception as e:
-            self.notify(f"Failed to clear cell: {str(e)}", title="Clear", severity="error")
+            self.notify(f"Error clearing cell: {str(e)}", title="Clear", severity="error")
             raise e
 
     def _add_column(self, col_name: str = None, col_value: pl.Expr = None) -> None:
@@ -1847,7 +1847,7 @@ class DataFrameTable(DataTable):
 
             # self.notify(f"Added column [$success]{new_name}[/]", title="Add Column")
         except Exception as e:
-            self.notify(f"Failed to add column: {str(e)}", title="Add Column", severity="error")
+            self.notify(f"Error adding column: {str(e)}", title="Add Column", severity="error")
             raise e
 
     def _add_column_expr(self) -> None:
@@ -1889,7 +1889,7 @@ class DataFrameTable(DataTable):
 
             # self.notify(f"Added column [$success]{col_name}[/]", title="Add Column")
         except Exception as e:
-            self.notify(f"Failed to add column: [$error]{str(e)}[/]", title="Add Column", severity="error")
+            self.notify(f"Error adding column: [$error]{str(e)}[/]", title="Add Column", severity="error")
             raise e
 
     def _cast_column_dtype(self, dtype: str) -> None:
@@ -1920,13 +1920,13 @@ class DataFrameTable(DataTable):
             # Recreate the table display
             self._setup_table()
 
+            self.notify(f"Cast column [$accent]{col_name}[/] to [$success]{target_dtype}[/]", title="Cast")
+        except Exception:
             self.notify(
-                f"Cast column [$accent]{col_name}[/] to [$success]{target_dtype}[/]",
+                f"Error casting column [$accent]{col_name}[/] to [$success]{target_dtype}[/]: {str(e)}",
                 title="Cast",
+                severity="error",
             )
-        except Exception as e:
-            self.notify(f"Failed to cast column: {str(e)}", title="Cast", severity="error")
-            raise e
 
     def _search_cursor_value(self) -> None:
         """Search with cursor value in current column."""
@@ -1966,9 +1966,7 @@ class DataFrameTable(DataTable):
                 expr = validate_expr(term, self.df, cidx)
             except Exception as e:
                 self.notify(
-                    f"Failed to validate Polars expression [$error]{term}[/]: {str(e)}",
-                    title="Search",
-                    severity="error",
+                    f"Error validating expression [$error]{term}[/]: {str(e)}", title="Search", severity="error"
                 )
                 return
 
@@ -1992,7 +1990,7 @@ class DataFrameTable(DataTable):
                         term = f"(?i){term}"
                     expr = pl.col(col_name).cast(pl.String).str.contains(term)
                     self.notify(
-                        f"Unable to convert [$accent]{term}[/] to [$error]{dtype}[/]. Cast to string.",
+                        f"Error converting [$accent]{term}[/] to [$error]{dtype}[/]. Cast to string.",
                         title="Search",
                         severity="warning",
                     )
@@ -2007,7 +2005,7 @@ class DataFrameTable(DataTable):
             matches = set(lf.filter(expr).select(RIDX).collect().to_series().to_list())
         except Exception as e:
             self.notify(
-                f"Error applying search filter: [$error]{str(e)}[/]",
+                f"Error applying search filter [$accent]{term}[/]: [$error]{str(e)}[/]",
                 title="Search",
                 severity="error",
             )
@@ -2016,7 +2014,7 @@ class DataFrameTable(DataTable):
         match_count = len(matches)
         if match_count == 0:
             self.notify(
-                f"No matches found for [$warning]{term}[/]. Try [$accent](?i)abc[/] for case-insensitive search.",
+                f"No matches found for [$accent]{term}[/]. Try [$warning](?i)abc[/] for case-insensitive search.",
                 title="Search",
                 severity="warning",
             )
@@ -2134,16 +2132,12 @@ class DataFrameTable(DataTable):
         try:
             matches = self._find_matches(term, cidx, match_nocase, match_whole)
         except Exception as e:
-            self.notify(
-                f"Error finding matches: [$error]{str(e)}[/]",
-                title="Find",
-                severity="error",
-            )
+            self.notify(f"Error finding matches for [$error]{term}[/]: {str(e)}", title="Find", severity="error")
             return
 
         if not matches:
             self.notify(
-                f"No matches found for [$warning]{term}[/] in current column. Try [$accent](?i)abc[/] for case-insensitive search.",
+                f"No matches found for [$accent]{term}[/] in current column. Try [$warning](?i)abc[/] for case-insensitive search.",
                 title="Find",
                 severity="warning",
             )
@@ -2171,16 +2165,12 @@ class DataFrameTable(DataTable):
         try:
             matches = self._find_matches(term, cidx=None, match_nocase=match_nocase, match_whole=match_whole)
         except Exception as e:
-            self.notify(
-                f"Error finding matches: [$error]{str(e)}[/]",
-                title="Find",
-                severity="error",
-            )
+            self.notify(f"Error finding matches for [$error]{term}[/]: {str(e)}", title="Find", severity="error")
             return
 
         if not matches:
             self.notify(
-                f"No matches found for [$warning]{term}[/] in any column. Try [$accent](?i)abc[/] for case-insensitive search.",
+                f"No matches found for [$accent]{term}[/] in any column. Try [$warning](?i)abc[/] for case-insensitive search.",
                 title="Global Find",
                 severity="warning",
             )
@@ -2198,8 +2188,7 @@ class DataFrameTable(DataTable):
         self._do_highlight()
 
         self.notify(
-            f"Found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns",
-            title="Global Find",
+            f"Found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns", title="Global Find"
         )
 
     def _next_match(self) -> None:
@@ -2340,16 +2329,12 @@ class DataFrameTable(DataTable):
         matches = self._find_matches(term_find, cidx, match_nocase, match_whole)
 
         if not matches:
-            self.notify(
-                f"No matches found for [$warning]{term_find}[/]",
-                title="Replace",
-                severity="warning",
-            )
+            self.notify(f"No matches found for [$warning]{term_find}[/]", title="Replace", severity="warning")
             return
 
         # Add to history
         self._add_history(
-            f"Replacing [$accent]{term_find}[/] with [$success]{term_replace}[/] in column [$accent]{col_name}[/]"
+            f"Replaced [$accent]{term_find}[/] with [$success]{term_replace}[/] in column [$accent]{col_name}[/]"
         )
 
         # Update matches
@@ -2572,10 +2557,7 @@ class DataFrameTable(DataTable):
 
         # Check if we're highlighting or un-highlighting
         if new_selected_count := self.selected_rows.count(True):
-            self.notify(
-                f"Toggled selection for [$accent]{new_selected_count}[/] rows",
-                title="Toggle",
-            )
+            self.notify(f"Toggled selection for [$accent]{new_selected_count}[/] rows", title="Toggle")
 
         # Refresh the highlighting
         self._do_highlight(force=True)
@@ -2641,10 +2623,7 @@ class DataFrameTable(DataTable):
         # Recreate the table for display
         self._setup_table()
 
-        self.notify(
-            f"Removed unselected rows. Now showing [$accent]{selected_count}[/] rows",
-            title="Filter",
-        )
+        self.notify(f"Removed unselected rows. Now showing [$accent]{selected_count}[/] rows", title="Filter")
 
     def _view_rows(self) -> None:
         """View rows.
@@ -2697,7 +2676,7 @@ class DataFrameTable(DataTable):
                 expr = validate_expr(term, self.df, cidx)
             except Exception as e:
                 self.notify(
-                    f"Error validating Polars expression [$error]{term}[/]: {str(e)}", title="Filter", severity="error"
+                    f"Error validating expression [$error]{term}[/]: {str(e)}", title="Filter", severity="error"
                 )
                 return
         else:
@@ -2719,9 +2698,7 @@ class DataFrameTable(DataTable):
                         term = f"(?i){term}"
                     expr = pl.col(col_name).cast(pl.String).str.contains(term)
                     self.notify(
-                        f"Unknown column type [$warning]{dtype}[/]. Cast to string.",
-                        title="Filter",
-                        severity="warning",
+                        f"Unknown column type [$warning]{dtype}[/]. Cast to string.", title="Filter", severity="warning"
                     )
 
         # Lazyframe with row indices
@@ -2735,17 +2712,13 @@ class DataFrameTable(DataTable):
         try:
             df_filtered = lf.filter(expr).collect()
         except Exception as e:
-            self.notify(f"Failed to apply filter [$error]{expr}[/]: {str(e)}", title="Filter", severity="error")
+            self.notify(f"Error applying filter [$error]{expr}[/]: {str(e)}", title="Filter", severity="error")
             self.histories.pop()  # Remove last history entry
             return
 
         matched_count = len(df_filtered)
         if not matched_count:
-            self.notify(
-                f"No rows match the expression: [$success]{expr}[/]",
-                title="Filter",
-                severity="warning",
-            )
+            self.notify(f"No rows match the expression: [$success]{expr}[/]", title="Filter", severity="warning")
             return
 
         # Add to history
@@ -2761,10 +2734,7 @@ class DataFrameTable(DataTable):
         # Recreate the table for display
         self._setup_table()
 
-        self.notify(
-            f"Filtered to [$accent]{matched_count}[/] matching rows",
-            title="Filter",
-        )
+        self.notify(f"Filtered to [$accent]{matched_count}[/] matching rows", title="Filter")
 
     def _cycle_cursor_type(self) -> None:
         """Cycle through cursor types: cell -> row -> column -> cell."""
@@ -2838,6 +2808,9 @@ class DataFrameTable(DataTable):
         filepath = Path(filename)
         ext = filepath.suffix.lower()
 
+        # Add to history
+        self._add_history(f"Saved dataframe to [$success]{filename}[/]")
+
         try:
             if ext in (".xlsx", ".xls"):
                 self._do_save_excel(filename)
@@ -2854,12 +2827,9 @@ class DataFrameTable(DataTable):
             self.filename = filename  # Update current filename
             if not self._all_tabs:
                 extra = "current tab with " if len(self.app.tabs) > 1 else ""
-                self.notify(
-                    f"Saved {extra}[$accent]{len(self.df)}[/] rows to [$success]{filename}[/]",
-                    title="Save",
-                )
+                self.notify(f"Saved {extra}[$accent]{len(self.df)}[/] rows to [$success]{filename}[/]", title="Save")
         except Exception as e:
-            self.notify(f"Failed to save: {str(e)}", title="Save", severity="error")
+            self.notify(f"Error saving [$error]{filename}[/]: {str(e)}", title="Save", severity="error")
             raise e
 
     def _do_save_excel(self, filename: str) -> None:
@@ -2879,14 +2849,10 @@ class DataFrameTable(DataTable):
 
         # From ConfirmScreen callback, so notify accordingly
         if self._all_tabs is True:
-            self.notify(
-                f"Saved all tabs to [$success]{filename}[/]",
-                title="Save",
-            )
+            self.notify(f"Saved all tabs to [$success]{filename}[/]", title="Save")
         else:
             self.notify(
-                f"Saved current tab with [$accent]{len(self.df)}[/] rows to [$success]{filename}[/]",
-                title="Save",
+                f"Saved current tab with [$accent]{len(self.df)}[/] rows to [$success]{filename}[/]", title="Save"
             )
 
     def _make_cell_clickable(self) -> None:
@@ -2920,8 +2886,7 @@ class DataFrameTable(DataTable):
 
         if url_count:
             self.notify(
-                f"Made [$accent]{url_count}[/] cell(s) clickable in column [$success]{col_key.value}[/]",
-                title="Make Clickable",
+                f"Use Ctrl/Cmd click to open the links in column [$success]{col_key.value}[/]", title="Hyperlink"
             )
 
     def _simple_sql(self) -> None:
@@ -2981,6 +2946,6 @@ class DataFrameTable(DataTable):
         self._setup_table()
 
         self.notify(
-            f"SQL query executed. Now showing [$accent]{len(self.df)}[/] rows and [$accent]{len(self.df.columns)}[/] columns.",
+            f"SQL query executed successfully. Now showing [$accent]{len(self.df)}[/] rows and [$accent]{len(self.df.columns)}[/] columns.",
             title="SQL Query",
         )

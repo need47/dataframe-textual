@@ -307,9 +307,9 @@ class DataFrameViewer(App):
                 for lf, filename, tabname in load_file(filename, prefix_sheet=True):
                     self._add_tab(lf.collect(), filename, tabname)
                     n_tab += 1
-                self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open")
+                # self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open")
             except Exception as e:
-                self.notify(f"Error: {e}", title="Open", severity="error")
+                self.notify(f"Error loading [$error]{filename}[/]: {str(e)}", title="Open", severity="error")
         else:
             self.notify(f"File does not exist: [$warning]{filename}[/]", title="Open", severity="warning")
 
@@ -369,6 +369,6 @@ class DataFrameViewer(App):
                 if active_pane := self.tabbed.active_pane:
                     self.tabbed.remove_pane(active_pane.id)
                     self.tabs.pop(active_pane)
-                    self.notify(f"Closed tab [$success]{active_pane.name}[/]", title="Close")
+                    # self.notify(f"Closed tab [$success]{active_pane.name}[/]", title="Close")
         except NoMatches:
             pass
