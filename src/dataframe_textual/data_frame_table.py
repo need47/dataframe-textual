@@ -178,7 +178,8 @@ class DataFrameTable(DataTable):
         - **Ctrl+r** - 📝 Copy row to clipboard (tab-separated)
         - **Ctrl+s** - 💾 Save current tab to file
         - **u** - ↩️ Undo last action
-        - **U** - 🔄 Reset to original data
+        - **U** - 🔄 Redo last undone action
+        - **Ctrl+U** - 🔁 Reset to initial state
     """).strip()
 
     # fmt: off
@@ -260,7 +261,8 @@ class DataFrameTable(DataTable):
         ("at", "make_cell_clickable", "Make cell clickable"),  # `@`
         # Undo/Redo
         ("u", "undo", "Undo"),
-        ("U", "reset", "Reset to original"),
+        ("U", "redo", "Redo"),
+        ("ctrl+u", "reset", "Reset to initial state"),
     ]
     # fmt: on
 
@@ -302,8 +304,10 @@ class DataFrameTable(DataTable):
         self.fixed_rows = 0  # Number of fixed rows
         self.fixed_columns = 0  # Number of fixed columns
 
-        # History stack for undo/redo
+        # History stack for undo
         self.histories: deque[History] = deque()
+        # Current history state for redo
+        self.history: History = None
 
         # Pending filename for save operations
         self._pending_filename = ""
@@ -733,10 +737,14 @@ class DataFrameTable(DataTable):
         """Undo the last action."""
         self._undo()
 
+    def action_redo(self) -> None:
+        """Redo the last undone action."""
+        self._redo()
+
     def action_reset(self) -> None:
-        """Reset to the original data."""
+        """Reset to the initial state."""
         self._setup_table(reset=True)
-        self.notify("Restored original display", title="Reset")
+        self.notify("Restored initial state", title="Reset")
 
     def action_move_column_left(self) -> None:
         """Move the current column to the left."""
@@ -1019,13 +1027,9 @@ class DataFrameTable(DataTable):
                     self.update_cell(row.key, col.key, cell_text)
 
     # History & Undo
-    def _add_history(self, description: str) -> None:
-        """Add the current state to the history stack.
-
-        Args:
-            description: Description of the action for this history entry.
-        """
-        history = History(
+    def _create_history(self, description: str) -> None:
+        """Create the initial history state."""
+        return History(
             description=description,
             df=self.df,
             filename=self.filename,
@@ -1039,15 +1043,11 @@ class DataFrameTable(DataTable):
             cursor_coordinate=self.cursor_coordinate,
             matches={k: v.copy() for k, v in self.matches.items()},
         )
-        self.histories.append(history)
 
-    def _undo(self) -> None:
-        """Undo the last action."""
-        if not self.histories:
-            self.notify("No actions to undo", title="Undo", severity="warning")
+    def _apply_history(self, history: History) -> None:
+        """Apply the current history state to the table."""
+        if history is None:
             return
-
-        history = self.histories.pop()
 
         # Restore state
         self.df = history.df
@@ -1065,7 +1065,48 @@ class DataFrameTable(DataTable):
         # Recreate the table for display
         self._setup_table()
 
+    def _add_history(self, description: str) -> None:
+        """Add the current state to the history stack.
+
+        Args:
+            description: Description of the action for this history entry.
+        """
+        history = self._create_history(description)
+        self.histories.append(history)
+
+    def _undo(self) -> None:
+        """Undo the last action."""
+        if not self.histories:
+            self.notify("No actions to undo", title="Undo", severity="warning")
+            return
+
+        # Save current state for redo
+        self.history = self._create_history("Redo state")
+
+        # Pop the last history state for undo
+        history = self.histories.pop()
+
+        # Restore state
+        self._apply_history(history)
+
         # self.notify(f"Reverted: {history.description}", title="Undo")
+
+    def _redo(self) -> None:
+        """Redo the last undone action."""
+        if self.history is None:
+            self.notify("No actions to redo", title="Redo", severity="warning")
+            return
+
+        # Save current state for undo
+        self._add_history("Undo state")
+
+        # Restore state
+        self._apply_history(self.history)
+
+        # Clear redo state
+        self.history = None
+
+        # self.notify(f"Reapplied: {history.description}", title="Redo")
 
     # View
     def _view_row_detail(self) -> None:

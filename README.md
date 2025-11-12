@@ -6,11 +6,11 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/J
 
 ## Features
 
-### Core Data Viewing
+### Data Viewing
 - 🚀 **Fast Loading** - Powered by Polars for efficient data handling
-- 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with automatic type detection
+- 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with various data types (e.g., integer, float, string)
 - ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls for browsing, editing, and manipulating data
-- 📊 **Flexible Input** - Read from files or stdin (pipes/redirects)
+- 📊 **Flexible Input** - Read from files and/or stdin (pipes/redirects)
 - 🔄 **Smart Pagination** - Lazy load rows on demand for handling large datasets
 
 ### Data Manipulation
@@ -21,7 +21,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/J
 - 💾 **Save & Undo** - Save edits back to file with full undo/redo support
 
 ### Advanced Features
-- 📂 **Multi-File Support** - Open multiple files in tabs for side-by-side comparison
+- 📂 **Multi-File Support** - Open multiple files in separate tabs
 - 🔄 **Tab Management** - Seamlessly switch between open files with keyboard shortcuts
 - 📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
 - 🎯 **Cursor Type Cycling** - Switch between cell, row, and column selection modes
@@ -248,7 +248,8 @@ When multiple files are opened:
 | `Ctrl+R` | Copy row to clipboard (tab-separated) |
 | `Ctrl+S` | Save current tab to file |
 | `u` | Undo last action |
-| `U` | Reset to original data |
+| `U` | Redo last undone action |
+| `Ctrl+U` | Reset to initial state |
 
 ## Features in Detail
 
@@ -477,7 +478,7 @@ Press `F` to see how many times each value appears in the current column. The mo
 **In the Frequency Table**:
 - Press `[` and `]` to sort by any column (value, count, or percentage)
 - Press `v` to **filter** the main table to show only rows with the selected value
-- Press `"` to **highlight** all rows containing the selected value
+- Press `"` to **exclude** all rows except those containing the selected value
 - Press `q` or `Escape` to close the frequency table
 
 This is useful for:
@@ -614,14 +615,23 @@ Press `Ctrl+S` to save:
 - Choose filename in modal dialog
 - Confirm if file already exists
 
-### 15. Undo/Redo
+### 15. Undo/Redo/Reset
 
-Press `u` to undo:
+**Undo** (`u`):
 - Reverts last action with full state restoration
 - Works for edits, deletions, sorts, searches, etc.
 - Shows description of reverted action
 
-Press `U` to revert to when data was initially loaded
+**Redo** (`U`):
+- Reapplies the last undone action
+- Restores the state before the undo was performed
+- Useful for redoing actions you've undone by mistake
+- Useful for alternating between two different states
+
+**Reset** (`Ctrl+U`):
+- Reverts all changes and returns to original data state when file was first loaded
+- Clears all edits, deletions, selections, filters, and sorts
+- Useful for starting fresh without reloading the file
 
 ### 16. Column Type Conversion
 
