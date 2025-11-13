@@ -79,10 +79,12 @@ class DataFrameHelpPanel(Widget):
             None
         """
 
-        def update_help(focused_widget: Widget | None):
-            self.update_help(focused_widget)
+        # def update_help(focused_widget: Widget | None):
+        #     self.update_help(focused_widget)
 
-        self.watch(self.screen, "focused", update_help)
+        # self.watch(self.screen, "focused", update_help)
+
+        self.update_help(self.screen.focused)
 
     def update_help(self, focused_widget: Widget | None) -> None:
         """Update the help for the focused widget.
@@ -96,7 +98,7 @@ class DataFrameHelpPanel(Widget):
             return
         self.set_class(focused_widget is not None, "-show-help")
         if focused_widget is not None:
-            help = self.app.HELP + "\n" + focused_widget.HELP or ""
+            help = (self.app.HELP or "") + "\n" + (focused_widget.HELP or "")
             if not help:
                 self.remove_class("-show-help")
             try:
