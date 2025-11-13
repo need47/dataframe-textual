@@ -46,7 +46,7 @@ class SqlScreen(ModalScreen):
 
     """
 
-    def __init__(self, dftable: DataFrameTable, on_yes_callback=None) -> None:
+    def __init__(self, dftable: "DataFrameTable", on_yes_callback=None) -> None:
         """Initialize the SQL screen."""
         super().__init__()
         self.dftable = dftable  # DataFrameTable
@@ -121,7 +121,7 @@ class SimpleSqlScreen(SqlScreen):
         }
     """
 
-    def __init__(self, dftable: DataFrameTable) -> None:
+    def __init__(self, dftable: "DataFrameTable") -> None:
         """Initialize the simple SQL screen.
 
         Sets up the modal screen with reference to the main DataFrameTable widget
@@ -172,7 +172,7 @@ class AdvancedSqlScreen(SqlScreen):
         }
     """
 
-    def __init__(self, dftable: DataFrameTable) -> None:
+    def __init__(self, dftable: "DataFrameTable") -> None:
         """Initialize the simple SQL screen.
 
         Sets up the modal screen with reference to the main DataFrameTable widget

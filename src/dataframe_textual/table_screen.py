@@ -37,7 +37,7 @@ class TableScreen(ModalScreen):
         }
     """
 
-    def __init__(self, dftable: DataFrameTable) -> None:
+    def __init__(self, dftable: "DataFrameTable") -> None:
         """Initialize the table screen.
 
         Sets up the base modal screen with reference to the main DataFrameTable widget
@@ -225,7 +225,7 @@ class StatisticsScreen(TableScreen):
 
     CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "StatisticsScreen")
 
-    def __init__(self, dftable: DataFrameTable, col_idx: int | None = None):
+    def __init__(self, dftable: "DataFrameTable", col_idx: int | None = None):
         super().__init__(dftable)
         self.col_idx = col_idx  # None for dataframe statistics, otherwise column index
 
@@ -344,7 +344,7 @@ class FrequencyScreen(TableScreen):
 
     CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "FrequencyScreen")
 
-    def __init__(self, col_idx: int, dftable: DataFrameTable):
+    def __init__(self, col_idx: int, dftable: "DataFrameTable") -> None:
         super().__init__(dftable)
         self.col_idx = col_idx
         self.sorted_columns = {
