@@ -10,7 +10,7 @@ from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
 from textual.theme import BUILTIN_THEMES
 from textual.widgets import TabbedContent, TabPane
-from textual.widgets.tabbed_content import ContentTab, ContentTabs
+from textual.widgets.tabbed_content import ContentTabs
 
 from .common import get_next_item, load_file
 from .data_frame_help_panel import DataFrameHelpPanel
@@ -70,15 +70,6 @@ class DataFrameViewer(App):
         TabbedContent > ContentSwitcher {
             overflow: auto;
             height: 1fr;  /* Takes the remaining space below tabs */
-        }
-
-        TabbedContent Tab:blur {
-            background: $primary-darken-3;
-            color: $text;
-        }
-
-        TabbedContent ContentTab.active {
-            background: $primary;
         }
     """
 
@@ -182,11 +173,11 @@ class DataFrameViewer(App):
         if table.loaded_rows == 0:
             table._setup_table()
 
-        # Apply background color to active tab
-        event.tab.add_class("active")
-        for tab in self.tabbed.query(ContentTab):
-            if tab != event.tab:
-                tab.remove_class("active")
+        # # Apply background color to active tab
+        # event.tab.add_class("active")
+        # for tab in self.tabbed.query(ContentTab):
+        #     if tab != event.tab:
+        #         tab.remove_class("active")
 
     def action_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.
