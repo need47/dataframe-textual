@@ -72,9 +72,13 @@ class DataFrameViewer(App):
             height: 1fr;  /* Takes the remaining space below tabs */
         }
 
+        TabbedContent Tab:blur {
+            background: $primary-darken-3;
+            color: $text;
+        }
+
         TabbedContent ContentTab.active {
             background: $primary;
-            color: $text;
         }
     """
 
