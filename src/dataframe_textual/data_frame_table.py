@@ -1693,7 +1693,7 @@ class DataFrameTable(DataTable):
         # Check if term is a valid expression
         elif tentative_expr(term):
             try:
-                expr = validate_expr(term, self.df, cidx)
+                expr = validate_expr(term, self.df.columns, cidx)
             except Exception as e:
                 self.notify(f"Error validating expression [$error]{term}[/]: {str(e)}", title="Edit", severity="error")
                 return
@@ -1963,7 +1963,7 @@ class DataFrameTable(DataTable):
         # Support for polars expressions
         elif tentative_expr(term):
             try:
-                expr = validate_expr(term, self.df, cidx)
+                expr = validate_expr(term, self.df.columns, cidx)
             except Exception as e:
                 self.notify(
                     f"Error validating expression [$error]{term}[/]: {str(e)}", title="Search", severity="error"
@@ -2069,7 +2069,7 @@ class DataFrameTable(DataTable):
                 expr = pl.col(col_name).is_null()
             elif tentative_expr(term):
                 try:
-                    expr = validate_expr(term, self.df, col_idx)
+                    expr = validate_expr(term, self.df.columns, col_idx)
                 except Exception as e:
                     raise Exception(f"Error validating Polars expression: {str(e)}")
             else:
@@ -2673,7 +2673,7 @@ class DataFrameTable(DataTable):
         elif tentative_expr(term):
             # Support for polars expressions
             try:
-                expr = validate_expr(term, self.df, cidx)
+                expr = validate_expr(term, self.df.columns, cidx)
             except Exception as e:
                 self.notify(
                     f"Error validating expression [$error]{term}[/]: {str(e)}", title="Filter", severity="error"

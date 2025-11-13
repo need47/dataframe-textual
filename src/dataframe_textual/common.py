@@ -216,7 +216,7 @@ def get_next_item(lst: list[Any], current, offset=1) -> Any:
     return lst[next_index]
 
 
-def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: int) -> str:
+def parse_polars_expression(expression: str, columns: list[str], current_col_idx: int) -> str:
     """Parse and convert an expression to Polars syntax.
 
     Replaces column references with Polars col() expressions:
@@ -234,7 +234,7 @@ def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: 
 
     Args:
         expression: The input expression as a string.
-        df: The DataFrame to validate column references.
+        columns: The list of column names in the DataFrame.
         current_col_idx: The index of the currently selected column (0-based). Used for $_ reference.
 
     Returns:
@@ -264,19 +264,19 @@ def parse_polars_expression(expression: str, df: pl.DataFrame, current_col_idx: 
 
         if col_ref == "_":
             # Current selected column
-            col_name = df.columns[current_col_idx]
+            col_name = columns[current_col_idx]
         elif col_ref == "#":
             # RIDX is used to store 0-based row index; add 1 for 1-based index
             return f"(pl.col('{RIDX}') + 1)"
         elif col_ref.isdigit():
             # Column by 1-based index
             col_idx = int(col_ref) - 1
-            if col_idx < 0 or col_idx >= len(df.columns):
+            if col_idx < 0 or col_idx >= len(columns):
                 raise ValueError(f"Column index out of range: ${col_ref}")
-            col_name = df.columns[col_idx]
+            col_name = columns[col_idx]
         else:
             # Column by name
-            if col_ref not in df.columns:
+            if col_ref not in columns:
                 raise ValueError(f"Column not found: ${col_ref}")
             col_name = col_ref
 
@@ -305,7 +305,7 @@ def tentative_expr(term: str) -> bool:
     return False
 
 
-def validate_expr(term: str, df: pl.DataFrame, current_col_idx: int) -> pl.Expr | None:
+def validate_expr(term: str, columns: list[str], current_col_idx: int) -> pl.Expr | None:
     """Validate and return the expression.
 
     Parses a user-provided expression string and validates it as a valid Polars expression.
@@ -313,7 +313,7 @@ def validate_expr(term: str, df: pl.DataFrame, current_col_idx: int) -> pl.Expr 
 
     Args:
         term: The input expression as a string.
-        df: The DataFrame to validate column references against.
+        columns: The list of column names in the DataFrame.
         current_col_idx: The index of the currently selected column (0-based). Used for $_ reference.
 
     Returns:
@@ -326,7 +326,7 @@ def validate_expr(term: str, df: pl.DataFrame, current_col_idx: int) -> pl.Expr 
 
     try:
         # Parse the expression
-        expr_str = parse_polars_expression(term, df, current_col_idx)
+        expr_str = parse_polars_expression(term, columns, current_col_idx)
 
         # Validate by evaluating it
         try:
