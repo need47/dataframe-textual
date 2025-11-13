@@ -50,8 +50,8 @@ class TableScreen(ModalScreen):
             None
         """
         super().__init__()
-        self.df: pl.DataFrame = dftable.df  # Polars DataFrame
         self.dftable = dftable  # DataFrameTable
+        self.df: pl.DataFrame = dftable.df  # Polars DataFrame
         self.thousand_separator = False  # Whether to use thousand separators in numbers
 
     def compose(self) -> ComposeResult:

@@ -14,11 +14,7 @@ from textual.widgets.selection_list import Selection
 
 
 class SqlScreen(ModalScreen):
-    """Base class for modal screens displaying data in a DataTable.
-
-    Provides common functionality for screens that show tabular data with
-    keyboard shortcuts and styling.
-    """
+    """Base class for modal screens handling SQL query."""
 
     DEFAULT_CSS = """
         SqlScreen {
@@ -51,40 +47,21 @@ class SqlScreen(ModalScreen):
     """
 
     def __init__(self, dftable: DataFrameTable, on_yes_callback=None) -> None:
-        """Initialize the table screen.
-
-        Sets up the base modal screen with reference to the main DataFrameTable widget
-        and stores the DataFrame for display.
-
-        Args:
-            dftable: Reference to the parent DataFrameTable widget.
-
-        Returns:
-            None
-        """
+        """Initialize the SQL screen."""
         super().__init__()
-        self.df: pl.DataFrame = dftable.df  # Polars DataFrame
         self.dftable = dftable  # DataFrameTable
+        self.df: pl.DataFrame = dftable.df  # Polars DataFrame
         self.on_yes_callback = on_yes_callback
 
     def compose(self) -> ComposeResult:
         """Compose the SQL screen widget structure."""
+        # Shared by subclasses
         with Horizontal(id="button-container"):
             yield Button("Apply", id="yes", variant="success")
             yield Button("Cancel", id="no", variant="error")
 
     def on_key(self, event) -> None:
-        """Handle key press events in the table screen.
-
-        Provides keyboard shortcuts for navigation and interaction, including q/Escape to close.
-        Prevents propagation of non-navigation keys to parent screens.
-
-        Args:
-            event: The key event object.
-
-        Returns:
-            None
-        """
+        """Handle key press events in the SQL screen"""
         if event.key in ("q", "escape"):
             self.app.pop_screen()
             event.stop()
@@ -96,6 +73,7 @@ class SqlScreen(ModalScreen):
             event.stop()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press events in the SQL screen."""
         if event.button.id == "yes":
             self._handle_yes()
         elif event.button.id == "no":
@@ -111,11 +89,7 @@ class SqlScreen(ModalScreen):
 
 
 class SimpleSqlScreen(SqlScreen):
-    """Base class for modal screens displaying data in a DataTable.
-
-    Provides common functionality for screens that show tabular data with
-    keyboard shortcuts and styling.
-    """
+    """Simple SQL query screen."""
 
     DEFAULT_CSS = SqlScreen.DEFAULT_CSS.replace("SqlScreen", "SimpleSqlScreen")
 
@@ -150,7 +124,7 @@ class SimpleSqlScreen(SqlScreen):
     def __init__(self, dftable: DataFrameTable) -> None:
         """Initialize the simple SQL screen.
 
-        Sets up the base modal screen with reference to the main DataFrameTable widget
+        Sets up the modal screen with reference to the main DataFrameTable widget
         and stores the DataFrame for display.
 
         Args:
@@ -201,7 +175,7 @@ class AdvancedSqlScreen(SqlScreen):
     def __init__(self, dftable: DataFrameTable) -> None:
         """Initialize the simple SQL screen.
 
-        Sets up the base modal screen with reference to the main DataFrameTable widget
+        Sets up the modal screen with reference to the main DataFrameTable widget
         and stores the DataFrame for display.
 
         Args:

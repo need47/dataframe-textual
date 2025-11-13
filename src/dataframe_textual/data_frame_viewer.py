@@ -305,7 +305,7 @@ class DataFrameViewer(App):
             try:
                 n_tab = 0
                 for lf, filename, tabname in load_file(filename, prefix_sheet=True):
-                    self._add_tab(lf.collect(), filename, tabname)
+                    self._add_tab(lf, filename, tabname)
                     n_tab += 1
                 # self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open")
             except Exception as e:
@@ -313,7 +313,7 @@ class DataFrameViewer(App):
         else:
             self.notify(f"File does not exist: [$warning]{filename}[/]", title="Open", severity="warning")
 
-    def _add_tab(self, df: pl.DataFrame, filename: str, tabname: str) -> None:
+    def _add_tab(self, df: pl.DataFrame | pl.LazyFrame, filename: str, tabname: str) -> None:
         """Add new tab for the given DataFrame.
 
         Creates and adds a new tab with the provided DataFrame and configuration.
@@ -321,15 +321,18 @@ class DataFrameViewer(App):
         if this is no longer the only tab.
 
         Args:
-            df: The Polars DataFrame to display in the new tab.
+            lf: The Polars DataFrame to display in the new tab.
             filename: The source filename for this data (used in table metadata).
             tabname: The display name for the tab.
 
         Returns:
             None
         """
-        if any(tab.name == tabname for tab in self.tabs):
-            tabname = f"{tabname}_{len(self.tabs) + 1}"
+        # Ensure unique tab names
+        counter = 1
+        while any(tab.name == tabname for tab in self.tabs):
+            tabname = f"{tabname}_{counter}"
+            counter += 1
 
         # Find an available tab index
         tab_idx = f"tab_{len(self.tabs) + 1}"

@@ -2929,7 +2929,7 @@ class DataFrameTable(DataTable):
             sql: The SQL query string to execute.
         """
         # Add to history
-        self._add_history(f"SQL Query: [$accent]{sql}[/]")
+        self._add_history(f"SQL Query:\n[$accent]{sql}[/]")
 
         # Execute the SQL query
         try:

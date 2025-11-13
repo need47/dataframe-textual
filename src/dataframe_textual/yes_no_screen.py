@@ -243,6 +243,7 @@ class YesNoScreen(ModalScreen):
                         yield self.no
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press events in the Yes/No screen."""
         if event.button.id == "yes":
             self._handle_yes()
         elif event.button.id == "maybe":
@@ -251,6 +252,7 @@ class YesNoScreen(ModalScreen):
             self.dismiss(None)
 
     def on_key(self, event) -> None:
+        """Handle key press events in the table screen."""
         if event.key == "enter":
             self._handle_yes()
             event.stop()
