@@ -122,7 +122,7 @@ When multiple files are opened:
 |-----|--------|
 | `Ctrl+O` | Open file in a new tab |
 | `Ctrl+W` | Close current tab |
-| `Ctrl+Shift+S` | Save all open tabs to Excel file |
+| `Ctrl+A` | Save all open tabs to Excel file |
 | `>` or `b` | Move to next tab |
 | `<` | Move to previous tab |
 | `B` | Toggle tab bar visibility |
@@ -132,7 +132,7 @@ When multiple files are opened:
 
 | Key | Action |
 |-----|--------|
-| `Ctrl+H` | Toggle help panel |
+| `F1` | Toggle help panel |
 | `k` | Cycle through themes |
 
 ---

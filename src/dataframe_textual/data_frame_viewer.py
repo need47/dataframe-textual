@@ -26,7 +26,7 @@ class DataFrameViewer(App):
 
         ## 🎯 File & Tab Management
         - **Ctrl+O** - 📁 Add a new tab
-        - **Ctrl+Shift+S** - 💾 Save all tabs
+        - **Ctrl+A** - 💾 Save all tabs
         - **Ctrl+W** - ❌ Close current tab
         - **>** or **b** - ▶️ Next tab
         - **<** - ◀️ Previous tab
@@ -34,7 +34,7 @@ class DataFrameViewer(App):
         - **q** - 🚪 Quit application
 
         ## 🎨 View & Settings
-        - **Ctrl+H** - ❓ Toggle this help panel
+        - **F1** - ❓ Toggle this help panel
         - **k** - 🌙 Cycle through themes
 
         ## ⭐ Features
@@ -51,10 +51,10 @@ class DataFrameViewer(App):
 
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("ctrl+h", "toggle_help_panel", "Help"),
+        ("f1", "toggle_help_panel", "Help"),
         ("B", "toggle_tab_bar", "Toggle Tab Bar"),
         ("ctrl+o", "add_tab", "Add Tab"),
-        ("ctrl+shift+s", "save_all_tabs", "Save All Tabs"),
+        ("ctrl+a", "save_all_tabs", "Save All Tabs"),
         ("ctrl+w", "close_tab", "Close Tab"),
         ("greater_than_sign,b", "next_tab(1)", "Next Tab"),
         ("less_than_sign", "next_tab(-1)", "Prev Tab"),
