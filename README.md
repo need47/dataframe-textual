@@ -174,7 +174,7 @@ When multiple files are opened:
 | `A` | Add column with name and value/expression |
 | `-` (minus) | Delete current column |
 | `_` (underscore) | Delete current column and all columns after |
-| `Ctrl+-` | Delete current column and all columns before |
+| `Ctrl+_` | Delete current column and all columns before |
 | `x` | Delete current row |
 | `X` | Delete current row and all rows below |
 | `Ctrl+X` | Delete current row and all rows above |

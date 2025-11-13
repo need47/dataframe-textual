@@ -159,7 +159,7 @@ class DataFrameTable(DataTable):
         - **delete** - ❌ Clear current cell (set to NULL)
         - **-** - ❌ Delete current column
         - **_** - ❌ Delete column and those after
-        - **Ctrl+-** - ❌ Delete column and those before
+        - **Ctrl+_** - ❌ Delete column and those before
         - **d** - 📋 Duplicate current column
         - **D** - 📋 Duplicate current row
 
@@ -239,7 +239,7 @@ class DataFrameTable(DataTable):
         ("delete", "clear_cell", "Clear cell"),
         ("minus", "delete_column", "Delete column"),  # `-`
         ("underscore", "delete_column_and_after", "Delete column and those after"),  # `_`
-        ("ctrl+minus", "delete_column_and_before", "Delete column and those before"),  # `Ctrl+-`
+        ("ctrl+underscore", "delete_column_and_before", "Delete column and those before"),  # `Ctrl+_`
         ("x", "delete_row", "Delete row"),
         ("X", "delete_row_and_below", "Delete row and those below"),
         ("ctrl+x", "delete_row_and_up", "Delete row and those up"),
