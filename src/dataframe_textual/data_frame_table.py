@@ -1908,6 +1908,14 @@ class DataFrameTable(DataTable):
             self.notify(f"Invalid target data type: [$error]{dtype}[/]", title="Cast", severity="error")
             return
 
+        if current_dtype == target_dtype:
+            self.notify(
+                f"Column [$accent]{col_name}[/] is already of type [$success]{target_dtype}[/]",
+                title="Cast",
+                severity="warning",
+            )
+            return  # No change needed
+
         # Add to history
         self._add_history(
             f"Cast column [$accent]{col_name}[/] from [$success]{current_dtype}[/] to [$success]{target_dtype}[/]"
