@@ -458,12 +458,10 @@ class FrequencyScreen(TableScreen):
         row_idx, col_idx = self.table.cursor_coordinate
         col_sort = col_idx if col_idx == 0 else 1
 
-        sort_dir = self.sorted_columns.get(col_sort)
-        if sort_dir is not None:
+        if self.sorted_columns.get(col_sort) == descending:
             # If already sorted in the same direction, do nothing
-            if sort_dir == descending:
-                self.notify("Already sorted in that order", title="Sort", severity="warning")
-                return
+            # self.notify("Already sorted in that order", title="Sort", severity="warning")
+            return
 
         self.sorted_columns.clear()
         self.sorted_columns[col_sort] = descending

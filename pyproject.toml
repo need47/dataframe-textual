@@ -69,4 +69,5 @@ dev = [
 ]
 
 [project.scripts]
+dataframe-textual = "dataframe_textual.__main__:main"
 dv = "dataframe_textual.__main__:main"
