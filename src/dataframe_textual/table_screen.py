@@ -350,9 +350,10 @@ class FrequencyScreen(TableScreen):
         self.sorted_columns = {
             1: True,  # Count
         }
-        self.df: pl.DataFrame = (
-            dftable.df[dftable.df.columns[self.col_idx]].value_counts(sort=True).sort("count", descending=True)
-        )
+
+        df = dftable.df.filter(dftable.visible_rows) if False in dftable.visible_rows else dftable.df
+        self.total_count = len(df)
+        self.df: pl.DataFrame = df[df.columns[self.col_idx]].value_counts(sort=True).sort("count", descending=True)
 
     def on_mount(self) -> None:
         """Create the frequency table."""
@@ -385,9 +386,6 @@ class FrequencyScreen(TableScreen):
         dtype = self.dftable.df.dtypes[self.col_idx]
         dc = DtypeConfig(dtype)
 
-        # Calculate frequencies using Polars
-        total_count = len(self.dftable.df)
-
         # Add column headers with sort indicators
         columns = [
             (column, "Value", 0),
@@ -415,7 +413,7 @@ class FrequencyScreen(TableScreen):
         # Add rows to the frequency table
         for row_idx, row in enumerate(self.df.rows()):
             column, count = row
-            percentage = (count / total_count) * 100
+            percentage = (count / self.total_count) * 100
 
             if column is None:
                 value = NULL_DISPLAY
@@ -446,7 +444,7 @@ class FrequencyScreen(TableScreen):
         # Add a total row
         self.table.add_row(
             Text("Total", style="bold", justify=dc.justify),
-            Text(f"{total_count:,}", style="bold", justify="right"),
+            Text(f"{self.total_count:,}", style="bold", justify="right"),
             Text("100.00", style="bold", justify="right"),
             Bar(
                 highlight_range=(0.0, 10),
