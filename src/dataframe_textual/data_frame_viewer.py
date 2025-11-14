@@ -71,6 +71,10 @@ class DataFrameViewer(App):
             overflow: auto;
             height: 1fr;  /* Takes the remaining space below tabs */
         }
+
+        ContentTab.-active {
+            background: $block-cursor-background; /* Same as underline */
+        }
     """
 
     def __init__(self, *sources: str) -> None:
@@ -172,12 +176,6 @@ class DataFrameViewer(App):
 
         if table.loaded_rows == 0:
             table._setup_table()
-
-        # # Apply background color to active tab
-        # event.tab.add_class("active")
-        # for tab in self.tabbed.query(ContentTab):
-        #     if tab != event.tab:
-        #         tab.remove_class("active")
 
     def action_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.
