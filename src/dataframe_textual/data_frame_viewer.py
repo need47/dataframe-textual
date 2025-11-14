@@ -61,17 +61,13 @@ class DataFrameViewer(App):
     ]
 
     CSS = """
-        TabbedContent {
-            height: 100%;  /* Or a specific value, e.g., 20; */
-        }
         TabbedContent > ContentTabs {
             dock: bottom;
         }
         TabbedContent > ContentSwitcher {
             overflow: auto;
-            height: 1fr;  /* Takes the remaining space below tabs */
+            height: 1fr;
         }
-
         ContentTab.-active {
             background: $block-cursor-background; /* Same as underline */
         }
