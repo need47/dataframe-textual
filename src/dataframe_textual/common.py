@@ -133,7 +133,7 @@ def format_float(value: float, thousand_separator: bool = False, precision: int 
             return f"{value:,f}" if thousand_separator else str(value)
 
 
-def format_row(vals, dtypes, apply_justify=True, thousand_separator=False) -> list[Text]:
+def format_row(vals, dtypes, styles=None, apply_justify=True, thousand_separator=False) -> list[Text]:
     """Format a single row with proper styling and justification.
 
     Converts raw row values to formatted Rich Text objects with appropriate
@@ -149,7 +149,7 @@ def format_row(vals, dtypes, apply_justify=True, thousand_separator=False) -> li
     """
     formatted_row = []
 
-    for val, dtype in zip(vals, dtypes, strict=True):
+    for idx, (val, dtype) in enumerate(zip(vals, dtypes, strict=True)):
         dc = DtypeConfig(dtype)
 
         # Format the value
@@ -165,7 +165,7 @@ def format_row(vals, dtypes, apply_justify=True, thousand_separator=False) -> li
         formatted_row.append(
             Text(
                 text_val,
-                style=dc.style,
+                style=styles[idx] if styles and styles[idx] else dc.style,
                 justify=dc.justify if apply_justify else "",
             )
         )
@@ -440,6 +440,9 @@ def load_file(
         sources.append((lf, filename, filepath.stem))
     else:
         ext = filepath.suffix.lower()
+        if ext == ".gz" or ext == ".bz2" or ext == ".xz":
+            ext = filepath.with_suffix("").suffix.lower()
+
         if ext == ".csv":
             file_format = "csv"
         elif ext in (".xlsx", ".xls"):
@@ -459,3 +462,10 @@ def load_file(
         sources.extend(load_file(filename, first_sheet, prefix_sheet, file_format, has_header))
 
     return sources
+
+
+def now() -> str:
+    """Get the current local time as a formatted string."""
+    import time
+
+    return time.strftime("%m/%d/%Y %H:%M:%S", time.localtime())
