@@ -469,3 +469,14 @@ def now() -> str:
     import time
 
     return time.strftime("%m/%d/%Y %H:%M:%S", time.localtime())
+
+
+async def sleep_async(seconds: float) -> None:
+    """Async sleep to yield control back to the event loop.
+
+    Args:
+        seconds: The number of seconds to sleep.
+    """
+    import asyncio
+
+    await asyncio.sleep(seconds)

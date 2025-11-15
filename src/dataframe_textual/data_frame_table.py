@@ -30,8 +30,8 @@ from .common import (
     DtypeConfig,
     format_row,
     get_next_item,
-    now,
     rindex,
+    sleep_async,
     tentative_expr,
     validate_expr,
 )
@@ -882,6 +882,9 @@ class DataFrameTable(DataTable):
         Row keys are 0-based indices, which map directly to dataframe row indices.
         Column keys are header names from the dataframe.
         """
+        self.loaded_rows = 0
+        self.show_row_labels = True
+
         # Reset to original dataframe
         if reset:
             self.df = self.lazyframe.collect()
@@ -913,7 +916,6 @@ class DataFrameTable(DataTable):
 
         self._setup_columns()
         self._load_rows(stop)
-        # self._do_highlight()
 
         # Restore cursor position
         if row_idx < len(self.rows) and col_idx < len(self.columns):
@@ -925,9 +927,7 @@ class DataFrameTable(DataTable):
         Column keys are header names from the dataframe.
         Column labels contain column names from the dataframe, with sort indicators if applicable.
         """
-        self.loaded_rows = 0
         self.clear(columns=True)
-        self.show_row_labels = True
 
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
@@ -956,11 +956,11 @@ class DataFrameTable(DataTable):
         Args:
             stop: Stop loading rows when this index is reached. If None, load until the end of the dataframe.
         """
-        if stop <= self.loaded_rows:
-            return
-
         if stop is None or stop > len(self.df):
             stop = len(self.df)
+
+        if stop <= self.loaded_rows:
+            return
 
         start = self.loaded_rows
         df_slice = self.df.slice(start, stop - start)
@@ -991,28 +991,7 @@ class DataFrameTable(DataTable):
         self.loaded_rows = stop
 
         # self.notify(f"Loaded [$accent]{stop}/{len(self.df)}[/] rows from [$success]{self.name}[/]", title="Load")
-
-    @work(exclusive=False, description="Loading rows asynchronously...")
-    async def _load_rows_async(self, stop: int | None = None) -> None:
-        """Asynchronously load a batch of rows into the table.
-
-        Args:
-            stop: Stop loading rows when this index is reached. If None, load until the end of the dataframe.
-        """
-        if stop >= (total := len(self.df)):
-            stop = total
-
-        if stop > self.loaded_rows:
-            # Load incrementally to avoid one big block
-            chunk_size = min(10000, stop - self.loaded_rows)  # Load max 10k rows at a time
-            next_stop = min(self.loaded_rows + chunk_size, stop)
-            self._load_rows(next_stop)
-
-            # If there's more to load, schedule the next chunk using set_timer
-            if next_stop < stop:
-                self.set_timer(0.01, lambda: self._load_rows_async(stop))  # 10ms delay
-
-            self.log(f"Async loaded rows: {self.loaded_rows}/{stop}")
+        # self.log(f"Loaded {stop}/{len(self.df)} rows from {self.name}")
 
     def _check_and_load_more(self) -> None:
         """Check if we need to load more rows and load them."""
@@ -1075,6 +1054,63 @@ class DataFrameTable(DataTable):
                 # Update the cell in the table
                 if need_update:
                     self.update_cell(row.key, col.key, cell_text)
+
+    @work(exclusive=True, description="Loading rows asynchronously...")
+    async def _load_rows_async(self, stop: int | None = None) -> None:
+        """Asynchronously load a batch of rows into the table.
+
+        Args:
+            stop: Stop loading rows when this index is reached. If None, load until the end of the dataframe.
+        """
+        if stop >= (total := len(self.df)):
+            stop = total
+
+        if stop > self.loaded_rows:
+            # Load incrementally with smaller chunks to prevent UI freezing
+            chunk_size = min(100, stop - self.loaded_rows)  # Load max 100 rows at a time
+            next_stop = min(self.loaded_rows + chunk_size, stop)
+            self._load_rows(next_stop)
+
+            # If there's more to load, schedule the next chunk with longer delay
+            if next_stop < stop:
+                # Use longer delay and call work method instead of set_timer
+                await sleep_async(0.1)  # 100ms delay to yield to UI
+                self._load_rows_async(stop)  # Recursive call within work context
+
+            # self.log(f"Async loaded {stop}/{len(self.df)} rows from {self.name}")
+
+    @work(exclusive=True, description="Doing highlight...")
+    async def _do_highlight_async(self) -> None:
+        """Perform the highlighting preparation in a worker."""
+        try:
+            # Calculate what needs to be loaded without actually loading
+            stop = rindex(self.selected_rows, True) + 1
+            stop = max(stop, max(self.matches.keys(), default=0) + 1)
+
+            # Call the highlighting method (runs in background worker)
+            self._highlight_async(stop)
+
+        except Exception as e:
+            self.notify(f"Error preparing highlight: {str(e)}", title="Search", severity="error")
+
+    @work(exclusive=True, description="Highlighting matches...")
+    async def _highlight_async(self, stop: int) -> None:
+        """Perform highlighting with async loading to avoid blocking."""
+        # Load rows in smaller chunks to avoid blocking
+        if stop > self.loaded_rows:
+            # Load incrementally to avoid one big block
+            chunk_size = min(100, stop - self.loaded_rows)  # Load max 100 rows at a time
+            next_stop = min(self.loaded_rows + chunk_size, stop)
+            self._load_rows(next_stop)
+
+            # If there's more to load, yield to event loop with delay
+            if next_stop < stop:
+                await sleep_async(0.05)  # 50ms delay to allow UI updates
+                self._highlight_async(stop)
+                return
+
+        # Now do the actual highlighting
+        self._highlight_table(force=False)
 
     # History & Undo
     def _create_history(self, description: str) -> None:
@@ -1978,7 +2014,7 @@ class DataFrameTable(DataTable):
         # Get the value of the currently selected cell
         term = NULL if self.cursor_value is None else str(self.cursor_value)
 
-        self._do_search((term, cidx, False, False))
+        self._do_search((term, cidx, False, True))
 
     def _search_expr(self) -> None:
         """Search by expression."""
@@ -2075,40 +2111,7 @@ class DataFrameTable(DataTable):
         self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Search")
 
         # Start highlighting in a worker to avoid blocking the UI
-        self._start_highlight_worker()
-
-    @work(exclusive=False, description="Highlighting matches...")  # Non-exclusive to allow other operations
-    async def _start_highlight_worker(self) -> None:
-        """Perform the highlighting preparation in a worker."""
-        try:
-            # Calculate what needs to be loaded without actually loading
-            stop = rindex(self.selected_rows, True) + 1
-            stop = max(stop, max(self.matches.keys(), default=0) + 1)
-
-            # Call the highlighting method on the main thread
-            self.call_after_refresh(self._do_highlight_async, stop)
-
-        except Exception as e:
-            self.call_after_refresh(
-                self.notify, f"Error preparing highlight: {str(e)}", title="Search", severity="error"
-            )
-
-    def _do_highlight_async(self, stop: int) -> None:
-        """Perform highlighting with async loading to avoid blocking."""
-        # Load rows in smaller chunks to avoid blocking
-        if stop > self.loaded_rows:
-            # Load incrementally to avoid one big block
-            chunk_size = min(10000, stop - self.loaded_rows)  # Load max 10k rows at a time
-            next_stop = min(self.loaded_rows + chunk_size, stop)
-            self._load_rows(next_stop)
-
-            # If there's more to load, schedule the next chunk using set_timer
-            if next_stop < stop:
-                self.set_timer(0.01, lambda: self._do_highlight_async(stop))  # 10ms delay
-                return
-
-        # Now do the actual highlighting
-        self._highlight_table(force=False)
+        self._do_highlight_async()
 
     def _find_matches(
         self, term: str, cidx: int | None = None, match_nocase: bool = False, match_whole: bool = False
@@ -2179,9 +2182,9 @@ class DataFrameTable(DataTable):
 
         if scope == "column":
             cidx = self.cursor_col_idx
-            self._do_find((term, cidx, False, False))
+            self._do_find((term, cidx, False, True))
         else:
-            self._do_find_global((term, None, False, False))
+            self._do_find_global((term, None, False, True))
 
     def _find_expr(self, scope="column") -> None:
         """Open screen to find by expression.
@@ -2232,7 +2235,7 @@ class DataFrameTable(DataTable):
         self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Find")
 
         # Start highlighting in a worker to avoid blocking the UI
-        self._start_highlight_worker()
+        self._do_highlight_async()
 
     def _do_find_global(self, result) -> None:
         """Global find a term across all columns."""
@@ -2262,12 +2265,12 @@ class DataFrameTable(DataTable):
         for ridx, col_idxs in matches.items():
             self.matches[ridx].update(col_idxs)
 
-        # Highlight matches
-        self._do_highlight()
-
         self.notify(
             f"Found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns", title="Global Find"
         )
+
+        # Start highlighting in a worker to avoid blocking the UI
+        self._do_highlight_async()
 
     def _next_match(self) -> None:
         """Move cursor to the next match."""
@@ -2706,7 +2709,7 @@ class DataFrameTable(DataTable):
     def _view_rows(self) -> None:
         """View rows.
 
-        If there are selected rows, view those rows.
+        If there are selected rows or matches, view those rows.
         Otherwise, view based on the value of the currently selected cell.
         """
 
@@ -2722,7 +2725,7 @@ class DataFrameTable(DataTable):
             ridx = self.cursor_row_idx
             term = str(self.df.item(ridx, cidx))
 
-        self._do_view_rows((term, cidx, False, False))
+        self._do_view_rows((term, cidx, False, True))
 
     def _view_rows_expr(self) -> None:
         """Open the filter screen to enter an expression."""
@@ -2786,8 +2789,6 @@ class DataFrameTable(DataTable):
         if False in self.visible_rows:
             lf = lf.filter(self.visible_rows)
 
-        self.log("go 1", now())
-
         # Apply the filter expression
         try:
             df_filtered = lf.filter(expr).collect()
@@ -2795,7 +2796,6 @@ class DataFrameTable(DataTable):
             self.notify(f"Error applying filter [$error]{expr}[/]: {str(e)}", title="Filter", severity="error")
             self.histories.pop()  # Remove last history entry
             return
-        self.log("go 2", now())
 
         matched_count = len(df_filtered)
         if not matched_count:
@@ -2814,6 +2814,7 @@ class DataFrameTable(DataTable):
 
         # Recreate the table for display
         self._setup_table()
+        self._do_highlight()
 
         self.notify(f"Filtered to [$accent]{matched_count}[/] matching rows", title="Filter")
 
