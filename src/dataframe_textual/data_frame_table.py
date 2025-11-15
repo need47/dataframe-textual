@@ -23,6 +23,7 @@ from textual.widgets._data_table import (
 
 from .common import (
     CURSOR_TYPES,
+    HIGHLIGHT_COLOR,
     NULL,
     NULL_DISPLAY,
     RIDX,
@@ -214,9 +215,10 @@ class DataFrameTable(DataTable):
         # Sort
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
-        # View
+        # View & Filter
         ("v", "view_rows", "View rows"),
         ("V", "view_rows_expr", "View rows by expression"),
+        ("quotation_mark", "filter_rows", "Filter selected"),  # `"`
         # Search
         ("backslash", "search_cursor_value", "Search column with cursor value"),  # `\`
         ("vertical_line", "search_expr", "Search column with expression"),  # `|`
@@ -233,10 +235,9 @@ class DataFrameTable(DataTable):
         ("r", "replace", "Replace in column"),  # `r`
         ("R", "replace_global", "Replace global"),  # `Shift+R`
         # Selection
-        ("apostrophe", "make_selections", "Toggle row selection"),  # `'`
+        ("apostrophe", "toggle_row_selection", "Toggle row selection"),  # `'`
         ("t", "toggle_selections", "Toggle all row selections"),
         ("T", "clear_selections_and_matches", "Clear selections"),
-        ("quotation_mark", "filter_selected_rows", "Filter selected"),  # `"`
         # Delete
         ("delete", "clear_cell", "Clear cell"),
         ("minus", "delete_column", "Delete column"),  # `-`
@@ -710,17 +711,17 @@ class DataFrameTable(DataTable):
         """Replace values across all columns."""
         self._replace_global()
 
-    def action_make_selections(self) -> None:
+    def action_toggle_row_selection(self) -> None:
         """Toggle selection for the current row."""
-        self._make_selections()
+        self._toggle_row_selection()
 
     def action_toggle_selections(self) -> None:
         """Toggle all row selections."""
         self._toggle_selections()
 
-    def action_filter_selected_rows(self) -> None:
+    def action_filter_rows(self) -> None:
         """Filter to show only selected rows."""
-        self._filter_selected_rows()
+        self._filter_rows()
 
     def action_delete_row(self) -> None:
         """Delete the current row."""
@@ -898,7 +899,7 @@ class DataFrameTable(DataTable):
             self.matches = defaultdict(set)
 
         # Lazy load up to INITIAL_BATCH_SIZE visible rows
-        stop, visible_count = len(self.df), 0
+        stop, visible_count = self.INITIAL_BATCH_SIZE, 0
         for row_idx, visible in enumerate(self.visible_rows):
             if not visible:
                 continue
@@ -907,9 +908,9 @@ class DataFrameTable(DataTable):
                 stop = row_idx + 1
                 break
 
-        # Ensure all selected rows or matches are loaded
-        stop = max(stop, rindex(self.selected_rows, True) + 1)
-        stop = max(stop, max(self.matches.keys(), default=0) + 1)
+        # # Ensure all selected rows or matches are loaded
+        # stop = max(stop, rindex(self.selected_rows, True) + 1)
+        # stop = max(stop, max(self.matches.keys(), default=0) + 1)
 
         # Save current cursor position before clearing
         row_idx, col_idx = self.cursor_coordinate
@@ -973,14 +974,15 @@ class DataFrameTable(DataTable):
             match_cols = self.matches.get(ridx, set())
 
             vals, dtypes, styles = [], [], []
-            for val, col, dtype in zip(row, self.df.columns, self.df.dtypes):
+            for cidx, (val, col, dtype) in enumerate(zip(row, self.df.columns, self.df.dtypes)):
                 if col in self.hidden_columns:
                     continue  # Skip hidden columns
 
                 vals.append(val)
                 dtypes.append(dtype)
-                # Highlight entire row if selected or has matches
-                styles.append("red" if is_selected or col in match_cols else None)
+
+                # Highlight entire row with selection or cells with matches
+                styles.append(HIGHLIGHT_COLOR if is_selected or cidx in match_cols else None)
 
             formatted_row = format_row(vals, dtypes, styles=styles, thousand_separator=self.thousand_separator)
 
@@ -1006,6 +1008,7 @@ class DataFrameTable(DataTable):
         if bottom_visible_row >= self.loaded_rows - 10:
             self._load_rows(self.loaded_rows + self.BATCH_SIZE)
 
+    # Highlighting
     def _do_highlight(self, force: bool = False) -> None:
         """Update all rows, highlighting selected ones and restoring others to default.
 
@@ -1018,6 +1021,42 @@ class DataFrameTable(DataTable):
 
         self._load_rows(stop)
         self._highlight_table(force)
+
+    @work(exclusive=True, description="Doing highlight...")
+    async def _do_highlight_async(self, force: bool = False) -> None:
+        """Perform the highlighting preparation in a worker."""
+        try:
+            # Calculate what needs to be loaded without actually loading
+            stop = rindex(self.selected_rows, True) + 1
+            stop = max(stop, max(self.matches.keys(), default=0) + 1)
+            if stop > (total := len(self.df)):
+                stop = total
+
+            # Call the highlighting method (runs in background worker)
+            self._highlight_async(stop, force=force)
+
+        except Exception as e:
+            self.notify(f"Error preparing highlight: {str(e)}", title="Search", severity="error")
+
+    @work(exclusive=True, description="Highlighting matches...")
+    async def _highlight_async(self, stop: int, force: bool = False) -> None:
+        """Perform highlighting with async loading to avoid blocking."""
+        # Load rows in smaller chunks to avoid blocking
+        if stop > self.loaded_rows:
+            self.log(f"Async highlight loading up to row {self.loaded_rows = }, {stop = }")
+            # Load incrementally to avoid one big block
+            chunk_size = min(100, stop - self.loaded_rows)  # Load max 100 rows at a time
+            next_stop = min(self.loaded_rows + chunk_size, stop)
+            self._load_rows(next_stop)
+
+            # If there's more to load, yield to event loop with delay
+            if next_stop < stop:
+                await sleep_async(0.05)  # 50ms delay to allow UI updates
+                self._highlight_async(stop)
+                return
+
+        # Now do the actual highlighting
+        self._highlight_table(force=force)
 
     def _highlight_table(self, force: bool = False) -> None:
         """Highlight selected rows/cells in red."""
@@ -1042,7 +1081,7 @@ class DataFrameTable(DataTable):
                 need_update = False
 
                 if is_selected or col_idx in match_cols:
-                    cell_text.style = "red"
+                    cell_text.style = HIGHLIGHT_COLOR
                     need_update = True
                 elif force:
                     # Restore original style based on dtype
@@ -1054,42 +1093,6 @@ class DataFrameTable(DataTable):
                 # Update the cell in the table
                 if need_update:
                     self.update_cell(row.key, col.key, cell_text)
-
-    @work(exclusive=True, description="Doing highlight...")
-    async def _do_highlight_async(self, force: bool = False) -> None:
-        """Perform the highlighting preparation in a worker."""
-        try:
-            # Calculate what needs to be loaded without actually loading
-            stop = rindex(self.selected_rows, True) + 1
-            stop = max(stop, max(self.matches.keys(), default=0) + 1)
-            if stop > (total := len(self.df)):
-                stop = total
-
-            # Call the highlighting method (runs in background worker)
-            self._highlight_async(stop, force=force)
-
-        except Exception as e:
-            self.notify(f"Error preparing highlight: {str(e)}", title="Search", severity="error")
-
-    @work(exclusive=True, description="Highlighting matches...")
-    async def _highlight_async(self, stop: int, force: bool = False) -> None:
-        """Perform highlighting with async loading to avoid blocking."""
-        # Load rows in smaller chunks to avoid blocking
-        if stop > self.loaded_rows:
-            self.log(f"Async highlight loading up to row {stop}...{self.loaded_rows}")
-            # Load incrementally to avoid one big block
-            chunk_size = min(100, stop - self.loaded_rows)  # Load max 100 rows at a time
-            next_stop = min(self.loaded_rows + chunk_size, stop)
-            self._load_rows(next_stop)
-
-            # If there's more to load, yield to event loop with delay
-            if next_stop < stop:
-                await sleep_async(0.05)  # 50ms delay to allow UI updates
-                self._highlight_async(stop)
-                return
-
-        # Now do the actual highlighting
-        self._highlight_table(force=force)
 
     # History & Undo
     def _create_history(self, description: str) -> None:
@@ -1127,7 +1130,7 @@ class DataFrameTable(DataTable):
         self.cursor_coordinate = history.cursor_coordinate
         self.matches = {k: v.copy() for k, v in history.matches.items()} if history.matches else defaultdict(set)
 
-        # Recreate the table for display
+        # Recreate table for display
         self._setup_table()
 
     def _add_history(self, description: str) -> None:
@@ -1175,7 +1178,14 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Reapplied: {description}", title="Redo")
 
-    # View
+    # Display
+    def _cycle_cursor_type(self) -> None:
+        """Cycle through cursor types: cell -> row -> column -> cell."""
+        next_type = get_next_item(CURSOR_TYPES, self.cursor_type)
+        self.cursor_type = next_type
+
+        # self.notify(f"Changed cursor type to [$success]{next_type}[/]", title="Cursor")
+
     def _view_row_detail(self) -> None:
         """Open a modal screen to view the selected row's details."""
         ridx = self.cursor_row_idx
@@ -1229,6 +1239,88 @@ class DataFrameTable(DataTable):
             self.fixed_columns = fixed_columns
 
         # self.notify(f"Pinned [$accent]{fixed_rows}[/] rows and [$success]{fixed_columns}[/] columns", title="Pin")
+
+    def _hide_column(self) -> None:
+        """Hide the currently selected column from the table display."""
+        col_key = self.cursor_col_key
+        col_name = col_key.value
+        col_idx = self.cursor_column
+
+        # Add to history
+        self._add_history(f"Hid column [$success]{col_name}[/]")
+
+        # Remove the column from the table display (but keep in dataframe)
+        self.remove_column(col_key)
+
+        # Track hidden columns
+        self.hidden_columns.add(col_name)
+
+        # Move cursor left if we hid the last column
+        if col_idx >= len(self.columns):
+            self.move_cursor(column=len(self.columns) - 1)
+
+        # self.notify(f"Hid column [$accent]{col_name}[/]. Press [$success]H[/] to show hidden columns", title="Hide")
+
+    def _show_hidden_rows_columns(self) -> None:
+        """Show all hidden rows/columns by recreating the table."""
+        # Get currently visible columns
+        visible_cols = set(col.key for col in self.ordered_columns)
+
+        hidden_row_count = sum(0 if visible else 1 for visible in self.visible_rows)
+        hidden_col_count = sum(0 if col in visible_cols else 1 for col in self.df.columns)
+
+        if not hidden_row_count and not hidden_col_count:
+            self.notify("No hidden columns or rows to show", title="Show", severity="warning")
+            return
+
+        # Add to history
+        self._add_history("Showed hidden rows/columns")
+
+        # Clear hidden rows/columns tracking
+        self.visible_rows = [True] * len(self.df)
+        self.hidden_columns.clear()
+
+        # Recreate table for display
+        self._setup_table()
+
+        self.notify(
+            f"Showed [$accent]{hidden_row_count}[/] hidden row(s) and/or [$accent]{hidden_col_count}[/] column(s)",
+            title="Show",
+        )
+
+    def _make_cell_clickable(self) -> None:
+        """Make cells with URLs in the current column clickable.
+
+        Scans all loaded rows in the current column for cells containing URLs
+        (starting with 'http://' or 'https://') and applies Textual link styling
+        to make them clickable. Does not modify the dataframe.
+
+        Returns:
+            None
+        """
+        cidx = self.cursor_col_idx
+        col_key = self.cursor_col_key
+        dtype = self.df.dtypes[cidx]
+
+        # Only process string columns
+        if dtype != pl.String:
+            return
+
+        # Count how many URLs were made clickable
+        url_count = 0
+
+        # Iterate through all loaded rows and make URLs clickable
+        for row in self.ordered_rows:
+            cell_text: Text = self.get_cell(row.key, col_key)
+            if cell_text.plain.startswith(("http://", "https://")):
+                cell_text.style = f"#00afff link {cell_text.plain}"  # sky blue
+                self.update_cell(row.key, col_key, cell_text)
+                url_count += 1
+
+        if url_count:
+            self.notify(
+                f"Use Ctrl/Cmd click to open the links in column [$success]{col_key.value}[/]", title="Hyperlink"
+            )
 
     # Delete & Move
     def _delete_column(self, more: str = None) -> None:
@@ -1295,54 +1387,6 @@ class DataFrameTable(DataTable):
 
         self.notify(message, title="Delete")
 
-    def _hide_column(self) -> None:
-        """Hide the currently selected column from the table display."""
-        col_key = self.cursor_col_key
-        col_name = col_key.value
-        col_idx = self.cursor_column
-
-        # Add to history
-        self._add_history(f"Hid column [$success]{col_name}[/]")
-
-        # Remove the column from the table display (but keep in dataframe)
-        self.remove_column(col_key)
-
-        # Track hidden columns
-        self.hidden_columns.add(col_name)
-
-        # Move cursor left if we hid the last column
-        if col_idx >= len(self.columns):
-            self.move_cursor(column=len(self.columns) - 1)
-
-        # self.notify(f"Hid column [$accent]{col_name}[/]. Press [$success]H[/] to show hidden columns", title="Hide")
-
-    def _show_hidden_rows_columns(self) -> None:
-        """Show all hidden rows/columns by recreating the table."""
-        # Get currently visible columns
-        visible_cols = set(col.key for col in self.ordered_columns)
-
-        hidden_row_count = sum(0 if visible else 1 for visible in self.visible_rows)
-        hidden_col_count = sum(0 if col in visible_cols else 1 for col in self.df.columns)
-
-        if not hidden_row_count and not hidden_col_count:
-            self.notify("No hidden columns or rows to show", title="Show", severity="warning")
-            return
-
-        # Add to history
-        self._add_history("Showed hidden rows/columns")
-
-        # Clear hidden rows/columns tracking
-        self.visible_rows = [True] * len(self.df)
-        self.hidden_columns.clear()
-
-        # Recreate table for display
-        self._setup_table()
-
-        self.notify(
-            f"Showed [$accent]{hidden_row_count}[/] hidden row(s) and/or [$accent]{hidden_col_count}[/] column(s)",
-            title="Show",
-        )
-
     def _duplicate_column(self) -> None:
         """Duplicate the currently selected column, inserting it right after the current column."""
         cidx = self.cursor_col_idx
@@ -1375,7 +1419,7 @@ class DataFrameTable(DataTable):
             new_matches[row_idx] = new_cols
         self.matches = new_matches
 
-        # Recreate the table for display
+        # Recreate table for display
         self._setup_table()
 
         # Move cursor to the new duplicated column
@@ -1442,7 +1486,7 @@ class DataFrameTable(DataTable):
         # Clear all matches since row indices have changed
         self.matches = defaultdict(set)
 
-        # Recreate the table display
+        # Recreate table for display
         self._setup_table()
 
         deleted_count = old_count - len(self.df)
@@ -1481,7 +1525,7 @@ class DataFrameTable(DataTable):
                 new_matches[row_idx + 1] = cols
         self.matches = new_matches
 
-        # Recreate the table display
+        # Recreate table for display
         self._setup_table()
 
         # Move cursor to the new duplicated row
@@ -1655,7 +1699,7 @@ class DataFrameTable(DataTable):
         # Update the dataframe
         self.df = df_sorted.drop(RIDX)
 
-        # Recreate the table for display
+        # Recreate table for display
         self._setup_table()
 
         # Restore cursor position on the sorted column
@@ -1668,7 +1712,7 @@ class DataFrameTable(DataTable):
         cidx = self.cursor_col_idx if cidx is None else cidx
         col_name = self.df.columns[cidx]
 
-        # Save current state to history
+        # Add to history
         self._add_history(f"Edited cell [$success]({ridx + 1}, {col_name})[/]")
 
         # Push the edit modal screen
@@ -1772,7 +1816,7 @@ class DataFrameTable(DataTable):
             self.notify(f"Error applying expression: [$error]{str(e)}[/]", title="Edit", severity="error")
             return
 
-        # Recreate the table for display
+        # Recreate table for display
         self._setup_table()
 
         # self.notify(f"Column [$accent]{col_name}[/] updated with [$success]{expr}[/]", title="Edit")
@@ -1816,7 +1860,7 @@ class DataFrameTable(DataTable):
             self.hidden_columns.remove(col_name)
             self.hidden_columns.add(new_name)
 
-        # Recreate the table for display
+        # Recreate table for display
         self._setup_table()
 
         # Move cursor to the renamed column
@@ -1889,7 +1933,7 @@ class DataFrameTable(DataTable):
             select_cols = cols_before + [new_name] + cols_after
             self.df = self.df.with_columns(new_col).select(select_cols)
 
-            # Recreate the table display
+            # Recreate table for display
             self._setup_table()
 
             # Move cursor to the new column
@@ -1931,7 +1975,7 @@ class DataFrameTable(DataTable):
             select_cols = cols_before + [col_name] + cols_after
             self.df = self.df.with_row_index(RIDX).with_columns(new_col).select(select_cols)
 
-            # Recreate the table display
+            # Recreate table for display
             self._setup_table()
 
             # Move cursor to the new column
@@ -1942,6 +1986,7 @@ class DataFrameTable(DataTable):
             self.notify(f"Error adding column: [$error]{str(e)}[/]", title="Add Column", severity="error")
             raise e
 
+    # Type Casting
     def _cast_column_dtype(self, dtype: str) -> None:
         """Cast the current column to a different data type.
 
@@ -1975,7 +2020,7 @@ class DataFrameTable(DataTable):
             # Cast the column using Polars
             self.df = self.df.with_columns(pl.col(col_name).cast(target_dtype))
 
-            # Recreate the table display
+            # Recreate table for display
             self._setup_table()
 
             self.notify(f"Cast column [$accent]{col_name}[/] to [$success]{target_dtype}[/]", title="Cast")
@@ -1986,6 +2031,7 @@ class DataFrameTable(DataTable):
                 severity="error",
             )
 
+    # Search
     def _search_cursor_value(self) -> None:
         """Search with cursor value in current column."""
         cidx = self.cursor_col_idx
@@ -2089,9 +2135,13 @@ class DataFrameTable(DataTable):
         # Show notification immediately, then start highlighting
         self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Search")
 
-        # Start highlighting in a worker to avoid blocking the UI
-        self._do_highlight_async()
+        # # Start highlighting in a worker to avoid blocking the UI
+        # self._do_highlight_async()
 
+        # Recreate table for display
+        self._setup_table()
+
+    # Find
     def _find_matches(
         self, term: str, cidx: int | None = None, match_nocase: bool = False, match_whole: bool = False
     ) -> dict[int, set[int]]:
@@ -2213,8 +2263,11 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Find")
 
-        # Start highlighting in a worker to avoid blocking the UI
-        self._do_highlight_async()
+        # # Start highlighting in a worker to avoid blocking the UI
+        # self._do_highlight_async()
+
+        # Recreate table for display
+        self._setup_table()
 
     def _do_find_global(self, result) -> None:
         """Global find a term across all columns."""
@@ -2248,8 +2301,11 @@ class DataFrameTable(DataTable):
             f"Found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns", title="Global Find"
         )
 
-        # Start highlighting in a worker to avoid blocking the UI
-        self._do_highlight_async()
+        # # Start highlighting in a worker to avoid blocking the UI
+        # self._do_highlight_async()
+
+        # Recreate table for display
+        self._setup_table()
 
     def _next_match(self) -> None:
         """Move cursor to the next match."""
@@ -2345,6 +2401,7 @@ class DataFrameTable(DataTable):
         last_ridx = selected_row_indices[-1]
         self.move_cursor_to(last_ridx, self.cursor_col_idx)
 
+    # Replace
     def _replace(self) -> None:
         """Open replace screen for current column."""
         # Push the replace modal screen
@@ -2487,7 +2544,7 @@ class DataFrameTable(DataTable):
 
                 state.replaced_occurrence += 1
 
-        # Recreate the table display
+        # Recreate table for display
         self._setup_table()
 
         col_name = "all columns" if state.cidx is None else self.df.columns[state.cidx]
@@ -2593,15 +2650,16 @@ class DataFrameTable(DataTable):
         if state.current_rpos >= len(state.rows):
             state.done = True
 
-        # Recreate the table display
+        # Recreate table for display
         self._setup_table()
 
         # Show next confirmation
         self._show_next_replace_confirmation()
 
+    # Selection & Match
     def _toggle_selections(self) -> None:
         """Toggle selected rows highlighting on/off."""
-        # Save current state to history
+        # Add to history
         self._add_history("Toggled row selection")
 
         if False in self.visible_rows:
@@ -2619,29 +2677,35 @@ class DataFrameTable(DataTable):
         if new_selected_count := self.selected_rows.count(True):
             self.notify(f"Toggled selection for [$accent]{new_selected_count}[/] rows", title="Toggle")
 
-        # Refresh the highlighting
-        self._do_highlight_async(force=True)
+        # # Refresh the highlighting
+        # self._do_highlight_async(force=True)
 
-    def _make_selections(self) -> None:
-        """Make selections based on current matches or toggle current row selection."""
-        # Save current state to history
+        # Recreate table for display
+        self._setup_table()
+
+    def _toggle_row_selection(self) -> None:
+        """Select/deselect current row."""
+        # Add to history
         self._add_history("Toggled row selection")
 
-        if self.matches:
-            # There are matched cells - select rows with matches
-            for ridx in self.matches.keys():
-                self.selected_rows[ridx] = True
-        else:
-            # No matched cells - select/deselect the current row
-            ridx = self.cursor_row_idx
-            self.selected_rows[ridx] = not self.selected_rows[ridx]
+        ridx = self.cursor_row_idx
+        self.selected_rows[ridx] = not self.selected_rows[ridx]
 
-        # Check if we're highlighting or un-highlighting
-        if new_selected_count := self.selected_rows.count(True):
-            self.notify(f"Selected [$accent]{new_selected_count}[/] rows", title="Toggle")
+        row_key = str(ridx)
+        match_cols = self.matches.get(ridx, set())
+        for col_idx, col in enumerate(self.ordered_columns):
+            col_key = col.key
+            cell_text: Text = self.get_cell(row_key, col_key)
 
-        # Refresh the highlighting (also restores default styles for unselected rows)
-        self._do_highlight_async(force=True)
+            if self.selected_rows[ridx] or (col_idx in match_cols):
+                cell_text.style = HIGHLIGHT_COLOR
+            else:
+                # Reset to default style based on dtype
+                dtype = self.df.dtypes[col_idx]
+                dc = DtypeConfig(dtype)
+                cell_text.style = dc.style
+
+            self.update_cell(row_key, col_key, cell_text)
 
     def _clear_selections_and_matches(self) -> None:
         """Clear all selected rows and matches without removing them from the dataframe."""
@@ -2654,7 +2718,7 @@ class DataFrameTable(DataTable):
             1 if (selected or idx in self.matches) else 0 for idx, selected in enumerate(self.selected_rows)
         )
 
-        # Save current state to history
+        # Add to history
         self._add_history("Cleared all selected rows")
 
         # Clear all selections
@@ -2666,24 +2730,38 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Cleared selections for [$accent]{row_count}[/] rows", title="Clear")
 
-    def _filter_selected_rows(self) -> None:
-        """Keep only the selected rows and remove unselected ones."""
-        selected_count = self.selected_rows.count(True)
-        if selected_count == 0:
-            self.notify("No rows selected to filter", title="Filter", severity="warning")
+    # Filter & View
+    def _filter_rows(self) -> None:
+        """Keep only the rows with selections and matches, and remove others."""
+        if not any(self.selected_rows) and not self.matches:
+            self.notify("No rows to filter", title="Filter", severity="warning")
             return
 
-        # Save current state to history
-        self._add_history("Filtered to selected rows")
+        filter_expr = [
+            True if (selected or ridx in self.matches) else False for ridx, selected in enumerate(self.selected_rows)
+        ]
 
-        # Update dataframe to only include selected rows
-        self.df = self.df.filter(self.selected_rows)
-        self.selected_rows = [True] * len(self.df)
+        # Add to history
+        self._add_history("Filtered to selections and matches")
 
-        # Recreate the table for display
+        # Apply filter to dataframe with row indices
+        df_filtered = self.df.with_row_index(RIDX).filter(filter_expr)
+
+        # Update selections and matches
+        self.selected_rows = [self.selected_rows[ridx] for ridx in df_filtered[RIDX]]
+        self.matches = {
+            idx: self.matches[ridx].copy() for idx, ridx in enumerate(df_filtered[RIDX]) if ridx in self.matches
+        }
+
+        # Update dataframe
+        self.df = df_filtered.drop(RIDX)
+
+        # Recreate table for display
         self._setup_table()
 
-        self.notify(f"Removed unselected rows. Now showing [$accent]{selected_count}[/] rows", title="Filter")
+        self.notify(
+            f"Removed rows without selections or matches. Now showing [$accent]{len(self.df)}[/] rows", title="Filter"
+        )
 
     def _view_rows(self) -> None:
         """View rows.
@@ -2694,7 +2772,7 @@ class DataFrameTable(DataTable):
 
         cidx = self.cursor_col_idx
 
-        # If there are selected rows or matches, use those
+        # If there are rows with selections or matches, use those
         if any(self.selected_rows) or self.matches:
             term = [
                 True if (selected or idx in self.matches) else False for idx, selected in enumerate(self.selected_rows)
@@ -2718,7 +2796,7 @@ class DataFrameTable(DataTable):
         )
 
     def _do_view_rows(self, result) -> None:
-        """Show only those matching rows and hide others. Do not modify the dataframe."""
+        """Show only rows with selections or matches, and do hide others. Do not modify the dataframe."""
         if result is None:
             return
         term, cidx, match_nocase, match_whole = result
@@ -2791,18 +2869,12 @@ class DataFrameTable(DataTable):
                 if ridx not in filtered_row_indices:
                     self.visible_rows[ridx] = False
 
-        # Recreate the table for display
+        # Recreate table for display
         self._setup_table()
 
         self.notify(f"Filtered to [$accent]{matched_count}[/] matching rows", title="Filter")
 
-    def _cycle_cursor_type(self) -> None:
-        """Cycle through cursor types: cell -> row -> column -> cell."""
-        next_type = get_next_item(CURSOR_TYPES, self.cursor_type)
-        self.cursor_type = next_type
-
-        # self.notify(f"Changed cursor type to [$success]{next_type}[/]", title="Cursor")
-
+    # Copy & Save
     def _copy_to_clipboard(self, content: str, message: str) -> None:
         """Copy content to clipboard using pbcopy (macOS) or xclip (Linux).
 
@@ -2915,40 +2987,7 @@ class DataFrameTable(DataTable):
                 f"Saved current tab with [$accent]{len(self.df)}[/] rows to [$success]{filename}[/]", title="Save"
             )
 
-    def _make_cell_clickable(self) -> None:
-        """Make cells with URLs in the current column clickable.
-
-        Scans all loaded rows in the current column for cells containing URLs
-        (starting with 'http://' or 'https://') and applies Textual link styling
-        to make them clickable. Does not modify the dataframe.
-
-        Returns:
-            None
-        """
-        cidx = self.cursor_col_idx
-        col_key = self.cursor_col_key
-        dtype = self.df.dtypes[cidx]
-
-        # Only process string columns
-        if dtype != pl.String:
-            return
-
-        # Count how many URLs were made clickable
-        url_count = 0
-
-        # Iterate through all loaded rows and make URLs clickable
-        for row in self.ordered_rows:
-            cell_text: Text = self.get_cell(row.key, col_key)
-            if cell_text.plain.startswith(("http://", "https://")):
-                cell_text.style = f"#00afff link {cell_text.plain}"  # sky blue
-                self.update_cell(row.key, col_key, cell_text)
-                url_count += 1
-
-        if url_count:
-            self.notify(
-                f"Use Ctrl/Cmd click to open the links in column [$success]{col_key.value}[/]", title="Hyperlink"
-            )
-
+    # SQL Interface
     def _simple_sql(self) -> None:
         """Open the SQL interface screen."""
         self.app.push_screen(
@@ -3002,7 +3041,7 @@ class DataFrameTable(DataTable):
             self.notify(f"SQL query returned no results for [$warning]{sql}[/]", title="SQL Query", severity="warning")
             return
 
-        # Recreate the table display
+        # Recreate table for display
         self._setup_table()
 
         self.notify(

@@ -37,6 +37,10 @@ class DtypeClass:
     convert: Any
 
 
+# Color for highlighting selections and matches
+HIGHLIGHT_COLOR = "red"
+
+
 # itype is used by Input widget for input validation
 # fmt: off
 STYLES = {
@@ -53,15 +57,15 @@ STYLES = {
     pl.UInt32: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
     pl.UInt64: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
     # float
-    pl.Float32: DtypeClass(gtype="float", style="magenta", justify="right", itype="number", convert=float),
-    pl.Float64: DtypeClass(gtype="float", style="magenta", justify="right", itype="number", convert=float),
-    pl.Decimal: DtypeClass(gtype="float", style="magenta", justify="right", itype="number", convert=float),
+    pl.Float32: DtypeClass(gtype="float", style="yellow", justify="right", itype="number", convert=float),
+    pl.Float64: DtypeClass(gtype="float", style="yellow", justify="right", itype="number", convert=float),
+    pl.Decimal: DtypeClass(gtype="float", style="yellow", justify="right", itype="number", convert=float),
     # bool
     pl.Boolean: DtypeClass(gtype="boolean", style="blue", justify="center", itype="text", convert=lambda x: BOOLS[x.lower()]),
     # temporal
-    pl.Date: DtypeClass(gtype="temporal", style="yellow", justify="center", itype="text", convert=str),
-    pl.Datetime: DtypeClass(gtype="temporal", style="yellow", justify="center", itype="text", convert=str),
-    pl.Time: DtypeClass(gtype="temporal", style="yellow", justify="center", itype="text", convert=str),
+    pl.Date: DtypeClass(gtype="temporal", style="magenta", justify="center", itype="text", convert=str),
+    pl.Datetime: DtypeClass(gtype="temporal", style="magenta", justify="center", itype="text", convert=str),
+    pl.Time: DtypeClass(gtype="temporal", style="magenta", justify="center", itype="text", convert=str),
     # unknown
     pl.Unknown: DtypeClass(gtype="unknown", style="", justify="", itype="text", convert=str),
 }
