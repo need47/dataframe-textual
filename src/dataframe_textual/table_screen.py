@@ -240,9 +240,11 @@ class StatisticsScreen(TableScreen):
         if self.col_idx is None:
             # Dataframe statistics
             self._build_dataframe_stats()
+            self.table.cursor_type = "column"
         else:
             # Column statistics
             self._build_column_stats()
+            self.table.cursor_type = "row"
 
     def _build_column_stats(self) -> None:
         """Build statistics for a single column."""

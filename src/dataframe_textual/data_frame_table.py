@@ -1055,30 +1055,6 @@ class DataFrameTable(DataTable):
                 if need_update:
                     self.update_cell(row.key, col.key, cell_text)
 
-    @work(exclusive=True, description="Loading rows asynchronously...")
-    async def _load_rows_async(self, stop: int | None = None) -> None:
-        """Asynchronously load a batch of rows into the table.
-
-        Args:
-            stop: Stop loading rows when this index is reached. If None, load until the end of the dataframe.
-        """
-        if stop >= (total := len(self.df)):
-            stop = total
-
-        if stop > self.loaded_rows:
-            # Load incrementally with smaller chunks to prevent UI freezing
-            chunk_size = min(100, stop - self.loaded_rows)  # Load max 100 rows at a time
-            next_stop = min(self.loaded_rows + chunk_size, stop)
-            self._load_rows(next_stop)
-
-            # If there's more to load, schedule the next chunk with longer delay
-            if next_stop < stop:
-                # Use longer delay and call work method instead of set_timer
-                await sleep_async(0.1)  # 100ms delay to yield to UI
-                self._load_rows_async(stop)  # Recursive call within work context
-
-            # self.log(f"Async loaded {stop}/{len(self.df)} rows from {self.name}")
-
     @work(exclusive=True, description="Doing highlight...")
     async def _do_highlight_async(self) -> None:
         """Perform the highlighting preparation in a worker."""
