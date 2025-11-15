@@ -991,7 +991,7 @@ class DataFrameTable(DataTable):
         self.loaded_rows = stop
 
         # self.notify(f"Loaded [$accent]{stop}/{len(self.df)}[/] rows from [$success]{self.name}[/]", title="Load")
-        # self.log(f"Loaded {stop}/{len(self.df)} rows from {self.name}")
+        self.log(f"Loaded {stop}/{len(self.df)} rows from {self.name}")
 
     def _check_and_load_more(self) -> None:
         """Check if we need to load more rows and load them."""
@@ -1056,24 +1056,27 @@ class DataFrameTable(DataTable):
                     self.update_cell(row.key, col.key, cell_text)
 
     @work(exclusive=True, description="Doing highlight...")
-    async def _do_highlight_async(self) -> None:
+    async def _do_highlight_async(self, force: bool = False) -> None:
         """Perform the highlighting preparation in a worker."""
         try:
             # Calculate what needs to be loaded without actually loading
             stop = rindex(self.selected_rows, True) + 1
             stop = max(stop, max(self.matches.keys(), default=0) + 1)
+            if stop > (total := len(self.df)):
+                stop = total
 
             # Call the highlighting method (runs in background worker)
-            self._highlight_async(stop)
+            self._highlight_async(stop, force=force)
 
         except Exception as e:
             self.notify(f"Error preparing highlight: {str(e)}", title="Search", severity="error")
 
     @work(exclusive=True, description="Highlighting matches...")
-    async def _highlight_async(self, stop: int) -> None:
+    async def _highlight_async(self, stop: int, force: bool = False) -> None:
         """Perform highlighting with async loading to avoid blocking."""
         # Load rows in smaller chunks to avoid blocking
         if stop > self.loaded_rows:
+            self.log(f"Async highlight loading up to row {stop}...{self.loaded_rows}")
             # Load incrementally to avoid one big block
             chunk_size = min(100, stop - self.loaded_rows)  # Load max 100 rows at a time
             next_stop = min(self.loaded_rows + chunk_size, stop)
@@ -1086,7 +1089,7 @@ class DataFrameTable(DataTable):
                 return
 
         # Now do the actual highlighting
-        self._highlight_table(force=False)
+        self._highlight_table(force=force)
 
     # History & Undo
     def _create_history(self, description: str) -> None:
@@ -2398,7 +2401,7 @@ class DataFrameTable(DataTable):
         self.matches = {ridx: set(col_idxs) for ridx, col_idxs in matches.items()}
 
         # Highlight matches
-        self._do_highlight()
+        self._do_highlight_async()
 
         # Store state for interactive replacement using dataclass
         self._replace_state = ReplaceState(
@@ -2617,7 +2620,7 @@ class DataFrameTable(DataTable):
             self.notify(f"Toggled selection for [$accent]{new_selected_count}[/] rows", title="Toggle")
 
         # Refresh the highlighting
-        self._do_highlight(force=True)
+        self._do_highlight_async(force=True)
 
     def _make_selections(self) -> None:
         """Make selections based on current matches or toggle current row selection."""
@@ -2638,7 +2641,7 @@ class DataFrameTable(DataTable):
             self.notify(f"Selected [$accent]{new_selected_count}[/] rows", title="Toggle")
 
         # Refresh the highlighting (also restores default styles for unselected rows)
-        self._do_highlight(force=True)
+        self._do_highlight_async(force=True)
 
     def _clear_selections_and_matches(self) -> None:
         """Clear all selected rows and matches without removing them from the dataframe."""
@@ -2659,7 +2662,7 @@ class DataFrameTable(DataTable):
         self.matches = defaultdict(set)
 
         # Refresh the highlighting to remove all highlights
-        self._do_highlight(force=True)
+        self._do_highlight_async(force=True)
 
         self.notify(f"Cleared selections for [$accent]{row_count}[/] rows", title="Clear")
 
@@ -2790,7 +2793,6 @@ class DataFrameTable(DataTable):
 
         # Recreate the table for display
         self._setup_table()
-        self._do_highlight()
 
         self.notify(f"Filtered to [$accent]{matched_count}[/] matching rows", title="Filter")
 
