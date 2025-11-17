@@ -532,6 +532,10 @@ class DataFrameTable(DataTable):
             ridx: Row index (0-based) in the dataframe.
             cidx: Column index (0-based) in the dataframe.
         """
+        # Ensure the target row is loaded
+        if ridx >= self.loaded_rows:
+            self._load_rows(stop=ridx + self.BATCH_SIZE)
+
         row_key = str(ridx)
         col_key = self.df.columns[cidx]
         row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
@@ -905,8 +909,10 @@ class DataFrameTable(DataTable):
                 continue
             visible_count += 1
             if visible_count >= self.INITIAL_BATCH_SIZE:
-                stop = row_idx + 1
+                stop = row_idx + self.BATCH_SIZE
                 break
+        else:
+            stop = row_idx + self.BATCH_SIZE
 
         # # Ensure all selected rows or matches are loaded
         # stop = max(stop, rindex(self.selected_rows, True) + 1)
@@ -2406,7 +2412,7 @@ class DataFrameTable(DataTable):
         """Open replace screen for current column."""
         # Push the replace modal screen
         self.app.push_screen(
-            FindReplaceScreen(self),
+            FindReplaceScreen(self, title="Find and Replace in Current Column"),
             callback=self._do_replace,
         )
 
@@ -2418,7 +2424,7 @@ class DataFrameTable(DataTable):
         """Open replace screen for all columns."""
         # Push the replace modal screen
         self.app.push_screen(
-            FindReplaceScreen(self),
+            FindReplaceScreen(self, title="Global Find and Replace"),
             callback=self._do_replace_global,
         )
 
@@ -2455,10 +2461,13 @@ class DataFrameTable(DataTable):
         )
 
         # Update matches
-        self.matches = {ridx: set(col_idxs) for ridx, col_idxs in matches.items()}
+        self.matches = {ridx: col_idxs.copy() for ridx, col_idxs in matches.items()}
 
-        # Highlight matches
-        self._do_highlight_async()
+        # # Highlight matches
+        # self._do_highlight_async()
+
+        # Recreate table for display
+        self._setup_table()
 
         # Store state for interactive replacement using dataclass
         self._replace_state = ReplaceState(
@@ -2580,12 +2589,12 @@ class DataFrameTable(DataTable):
         # Move cursor to next match
         ridx = state.rows[state.current_rpos]
         cidx = state.cols_per_row[state.current_rpos][state.current_cpos]
-        self.move_cursor(row=ridx, column=cidx)
+        self.move_cursor_to(ridx, cidx)
 
         state.current_occurrence += 1
 
         # Show confirmation
-        label = f"Replace [$warning]{state.term_find}[/] with [$success]{state.term_replace}[/] (Occurrence {state.current_occurrence} of {state.total_occurrence})?"
+        label = f"Replace [$warning]{state.term_find}[/] with [$success]{state.term_replace}[/] ({state.current_occurrence} of {state.total_occurrence})?"
 
         self.app.push_screen(
             ConfirmScreen("Replace", label=label, maybe="Skip"),
