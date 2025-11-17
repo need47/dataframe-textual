@@ -350,7 +350,12 @@ def validate_expr(term: str, columns: list[str], current_col_idx: int) -> pl.Exp
 
 
 def load_dataframe(
-    filenames: list[str], file_format: str | None = None, has_header: bool = True, infer_schema: bool = True
+    filenames: list[str],
+    file_format: str | None = None,
+    has_header: bool = True,
+    infer_schema: bool = True,
+    skip_lines: int = 0,
+    skip_rows_after_header: int = 0,
 ) -> list[tuple[pl.LazyFrame, str, str]]:
     """Load DataFrames from file specifications.
 
@@ -377,6 +382,8 @@ def load_dataframe(
                 file_format=file_format,
                 has_header=has_header,
                 infer_schema=infer_schema,
+                skip_lines=skip_lines,
+                skip_rows_after_header=skip_rows_after_header,
             )
         )
     return sources
@@ -389,6 +396,8 @@ def load_file(
     file_format: str | None = None,
     has_header: bool = True,
     infer_schema: bool = True,
+    skip_lines: int = 0,
+    skip_rows_after_header: int = 0,
 ) -> list[tuple[pl.LazyFrame, str, str]]:
     """Load a single file and return list of sources.
 
@@ -402,6 +411,9 @@ def load_file(
         file_format: Optional format specifier (i.e., 'csv', 'excel', 'tsv', 'parquet', 'json', 'ndjson') for input files.
                      By default, infers from file extension.
         has_header: Whether the input files have a header row. Defaults to True.
+        infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
+        skip_lines: Number of lines to skip when reading CSV/TSV files. The header will be parsed at this offset. Defaults to 0.
+        skip_rows_after_header: Number of rows to skip after header when reading CSV/TSV files. Defaults to 0.
 
     Returns:
         List of tuples of (LazyFrame, filename, tabname).
@@ -416,9 +428,11 @@ def load_file(
         stdin_data = sys.stdin.read()
         lf = pl.scan_csv(
             StringIO(stdin_data),
+            separator="," if file_format == "csv" else "\t",
             has_header=has_header,
             infer_schema=infer_schema,
-            separator="," if file_format == "csv" else "\t",
+            skip_lines=skip_lines,
+            skip_rows_after_header=skip_rows_after_header,
         )
 
         # Reopen stdin to /dev/tty for proper terminal interaction
@@ -434,7 +448,13 @@ def load_file(
     filepath = Path(filename)
 
     if file_format == "csv":
-        lf = pl.scan_csv(filename, has_header=has_header, infer_schema=infer_schema)
+        lf = pl.scan_csv(
+            filename,
+            has_header=has_header,
+            infer_schema=infer_schema,
+            skip_lines=skip_lines,
+            skip_rows_after_header=skip_rows_after_header,
+        )
         sources.append((lf, filename, filepath.stem))
     elif file_format == "excel":
         if first_sheet:
@@ -448,7 +468,14 @@ def load_file(
                 tabname = f"{filepath.stem}_{sheet_name}" if prefix_sheet else sheet_name
                 sources.append((df.lazy(), filename, tabname))
     elif file_format == "tsv":
-        lf = pl.scan_csv(filename, has_header=has_header, infer_schema=infer_schema, separator="\t")
+        lf = pl.scan_csv(
+            filename,
+            separator="\t",
+            has_header=has_header,
+            infer_schema=infer_schema,
+            skip_lines=skip_lines,
+            skip_rows_after_header=skip_rows_after_header,
+        )
         sources.append((lf, filename, filepath.stem))
     elif file_format == "parquet":
         lf = pl.scan_parquet(filename)
@@ -480,7 +507,18 @@ def load_file(
             # Default to TSV
             file_format = "tsv"
 
-        sources.extend(load_file(filename, first_sheet, prefix_sheet, file_format, has_header, infer_schema))
+        sources.extend(
+            load_file(
+                filename,
+                first_sheet=first_sheet,
+                prefix_sheet=prefix_sheet,
+                file_format=file_format,
+                has_header=has_header,
+                infer_schema=infer_schema,
+                skip_lines=skip_lines,
+                skip_rows_after_header=skip_rows_after_header,
+            )
+        )
 
     return sources
 

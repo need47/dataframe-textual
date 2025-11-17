@@ -41,6 +41,10 @@ def main() -> None:
     )
     parser.add_argument("-H", "--no-header", action="store_true", help="Specify that input files have no header row")
     parser.add_argument("-I", "--no-inferrence", action="store_true", help="Do not infer data types for CSV/TSV")
+    parser.add_argument("-L", "--skip-lines", type=int, default=0, help="Skip lines when reading CSV/TSV")
+    parser.add_argument(
+        "-K", "--skip-rows-after-header", type=int, default=0, help="Skip rows after header when reading CSV/TSV"
+    )
 
     args = parser.parse_args()
     filenames = []
@@ -61,7 +65,12 @@ def main() -> None:
         sys.exit(1)
 
     sources = load_dataframe(
-        filenames, file_format=args.format, has_header=not args.no_header, infer_schema=not args.no_inferrence
+        filenames,
+        file_format=args.format,
+        has_header=not args.no_header,
+        infer_schema=not args.no_inferrence,
+        skip_lines=args.skip_lines,
+        skip_rows_after_header=args.skip_rows_after_header,
     )
     app = DataFrameViewer(*sources)
     app.run()
