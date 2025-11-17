@@ -40,10 +40,6 @@ class DtypeClass:
     convert: Any
 
 
-# Color for highlighting selections and matches
-HIGHLIGHT_COLOR = "red"
-
-
 # itype is used by Input widget for input validation
 # fmt: off
 STYLES = {

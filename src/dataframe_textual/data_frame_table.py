@@ -23,7 +23,6 @@ from textual.widgets._data_table import (
 
 from .common import (
     CURSOR_TYPES,
-    HIGHLIGHT_COLOR,
     NULL,
     NULL_DISPLAY,
     RIDX,
@@ -50,6 +49,12 @@ from .yes_no_screen import (
     SaveFileScreen,
     SearchScreen,
 )
+
+# Color for highlighting selections and matches
+HIGHLIGHT_COLOR = "red"
+
+# Warning threshold for loading rows
+WARN_ROWS_THRESHOLD = 50_000
 
 
 @dataclass
@@ -299,7 +304,7 @@ class DataFrameTable(DataTable):
         self.filename = filename  # Current filename
 
         # Pagination & Loading
-        self.INITIAL_BATCH_SIZE = (self.app.size.height // 100 + 1) * 100
+        self.INITIAL_BATCH_SIZE = (self.app.size.height // 100 + 1) * 100 * 2
         self.BATCH_SIZE = self.INITIAL_BATCH_SIZE // 2
         self.loaded_rows = 0  # Track how many rows are currently loaded
 
@@ -600,8 +605,7 @@ class DataFrameTable(DataTable):
 
     def action_jump_bottom(self) -> None:
         """Jump to the bottom of the table."""
-        self._load_rows()
-        self.move_cursor(row=self.row_count - 1)
+        self._load_rows(move_to_end=True)
 
     def action_view_row_detail(self) -> None:
         """View details of the current row."""
@@ -908,7 +912,7 @@ class DataFrameTable(DataTable):
             if not visible:
                 continue
             visible_count += 1
-            if visible_count >= self.INITIAL_BATCH_SIZE:
+            if visible_count > self.INITIAL_BATCH_SIZE:
                 stop = row_idx + self.BATCH_SIZE
                 break
         else:
@@ -954,11 +958,8 @@ class DataFrameTable(DataTable):
 
             self.add_column(Text(cell_value, justify=DtypeConfig(dtype).justify), key=col)
 
-    def _load_rows(self, stop: int | None = None) -> None:
-        """Load a batch of rows into the table.
-
-        Row keys are 0-based indices as strings, which map directly to dataframe row indices.
-        Row labels are 1-based indices as strings.
+    def _load_rows(self, stop: int | None = None, move_to_end: bool = False) -> None:
+        """Load a batch of rows into the table (synchronous wrapper).
 
         Args:
             stop: Stop loading rows when this index is reached. If None, load until the end of the dataframe.
@@ -966,40 +967,104 @@ class DataFrameTable(DataTable):
         if stop is None or stop > len(self.df):
             stop = len(self.df)
 
+        # If already loaded enough rows, just move cursor if needed
         if stop <= self.loaded_rows:
+            if move_to_end:
+                self.move_cursor(row=self.row_count - 1)
+
             return
 
-        start = self.loaded_rows
-        df_slice = self.df.slice(start, stop - start)
+        # Warn user if loading a large number of rows
+        elif (nrows := stop - self.loaded_rows) >= WARN_ROWS_THRESHOLD:
 
-        for ridx, row in enumerate(df_slice.rows(), start):
-            if not self.visible_rows[ridx]:
-                continue  # Skip hidden rows
+            def _continue(result: bool) -> None:
+                if result:
+                    self._load_rows_async(stop, move_to_end=move_to_end)
 
-            is_selected = self.selected_rows[ridx]
-            match_cols = self.matches.get(ridx, set())
+            self.app.push_screen(
+                ConfirmScreen(
+                    f"Load {nrows} Rows",
+                    label="Loading a large number of rows may cause the application to become unresponsive. Do you want to continue?",
+                ),
+                callback=_continue,
+            )
 
-            vals, dtypes, styles = [], [], []
-            for cidx, (val, col, dtype) in enumerate(zip(row, self.df.columns, self.df.dtypes)):
-                if col in self.hidden_columns:
-                    continue  # Skip hidden columns
+            return
 
-                vals.append(val)
-                dtypes.append(dtype)
+        # Load rows asynchronously
+        self._load_rows_async(stop, move_to_end=move_to_end)
 
-                # Highlight entire row with selection or cells with matches
-                styles.append(HIGHLIGHT_COLOR if is_selected or cidx in match_cols else None)
+    @work(exclusive=True, description="Loading rows...")
+    async def _load_rows_async(self, stop: int, move_to_end: bool = False) -> None:
+        """Perform loading with async to avoid blocking.
 
-            formatted_row = format_row(vals, dtypes, styles=styles, thousand_separator=self.thousand_separator)
+        Args:
+            stop: Stop loading rows when this index is reached.
+            move_to_end: If True, move cursor to the last loaded row after loading completes.
+        """
+        # Load rows in smaller chunks to avoid blocking
+        if stop > self.loaded_rows:
+            self.log(f"Async loading up to row {self.loaded_rows = }, {stop = }")
+            # Load incrementally to avoid one big block
+            # Load max BATCH_SIZE rows at a time
+            chunk_size = min(self.BATCH_SIZE, stop - self.loaded_rows)
+            next_stop = min(self.loaded_rows + chunk_size, stop)
+            self._load_rows_batch(next_stop)
 
-            # Always add labels so they can be shown/hidden via CSS
-            self.add_row(*formatted_row, key=str(ridx), label=str(ridx + 1))
+            # If there's more to load, yield to event loop with delay
+            if next_stop < stop:
+                await sleep_async(0.05)  # 50ms delay to allow UI updates
+                self._load_rows_async(stop, move_to_end=move_to_end)
+                return
 
-        # Update loaded rows count
-        self.loaded_rows = stop
+        # After loading completes, move cursor to end if requested
+        if move_to_end:
+            self.call_after_refresh(lambda: self.move_cursor(row=self.row_count - 1))
 
-        # self.notify(f"Loaded [$accent]{stop}/{len(self.df)}[/] rows from [$success]{self.name}[/]", title="Load")
-        self.log(f"Loaded {stop}/{len(self.df)} rows from {self.name}")
+    def _load_rows_batch(self, stop: int) -> None:
+        """Load a batch of rows into the table.
+
+        Row keys are 0-based indices as strings, which map directly to dataframe row indices.
+        Row labels are 1-based indices as strings.
+
+        Args:
+            stop: Stop loading rows when this index is reached.
+        """
+        try:
+            start = self.loaded_rows
+            df_slice = self.df.slice(start, stop - start)
+
+            for ridx, row in enumerate(df_slice.rows(), start):
+                if not self.visible_rows[ridx]:
+                    continue  # Skip hidden rows
+
+                is_selected = self.selected_rows[ridx]
+                match_cols = self.matches.get(ridx, set())
+
+                vals, dtypes, styles = [], [], []
+                for cidx, (val, col, dtype) in enumerate(zip(row, self.df.columns, self.df.dtypes)):
+                    if col in self.hidden_columns:
+                        continue  # Skip hidden columns
+
+                    vals.append(val)
+                    dtypes.append(dtype)
+
+                    # Highlight entire row with selection or cells with matches
+                    styles.append(HIGHLIGHT_COLOR if is_selected or cidx in match_cols else None)
+
+                formatted_row = format_row(vals, dtypes, styles=styles, thousand_separator=self.thousand_separator)
+
+                # Always add labels so they can be shown/hidden via CSS
+                self.add_row(*formatted_row, key=str(ridx), label=str(ridx + 1))
+
+            # Update loaded rows count
+            self.loaded_rows = stop
+
+            # self.notify(f"Loaded [$accent]{stop}/{len(self.df)}[/] rows from [$success]{self.name}[/]", title="Load")
+            self.log(f"Loaded {stop}/{len(self.df)} rows from {self.name}")
+
+        except Exception as e:
+            self.notify(f"Error loading rows: {str(e)}", title="Load", severity="error")
 
     def _check_and_load_more(self) -> None:
         """Check if we need to load more rows and load them."""
@@ -2734,8 +2799,11 @@ class DataFrameTable(DataTable):
         self.selected_rows = [False] * len(self.df)
         self.matches = defaultdict(set)
 
-        # Refresh the highlighting to remove all highlights
-        self._do_highlight_async(force=True)
+        # # Refresh the highlighting to remove all highlights
+        # self._do_highlight_async(force=True)
+
+        # Recreate table for display
+        self._setup_table()
 
         self.notify(f"Cleared selections for [$accent]{row_count}[/] rows", title="Clear")
 

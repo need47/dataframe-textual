@@ -302,7 +302,7 @@ class SaveFileScreen(YesNoScreen):
 
 
 class ConfirmScreen(YesNoScreen):
-    """Modal screen to confirm file overwrite."""
+    """Modal screen to ask for confirmation."""
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ConfirmScreen")
 
