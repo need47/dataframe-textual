@@ -27,6 +27,9 @@ BOOLS = {
     "0": False,
 }
 
+# Common null value representations
+NULL_VALUES = ["null", "NULL", "Null", "NaN", "nan", "NA", "na", "N/A", "n/a", ""]
+
 
 @dataclass
 class DtypeClass:
@@ -347,7 +350,7 @@ def validate_expr(term: str, columns: list[str], current_col_idx: int) -> pl.Exp
 
 
 def load_dataframe(
-    filenames: list[str], file_format: str | None = None, has_header: bool = True
+    filenames: list[str], file_format: str | None = None, has_header: bool = True, infer_schema: bool = True
 ) -> list[tuple[pl.LazyFrame, str, str]]:
     """Load DataFrames from file specifications.
 
@@ -367,7 +370,15 @@ def load_dataframe(
     prefix_sheet = len(filenames) > 1
 
     for filename in filenames:
-        sources.extend(load_file(filename, prefix_sheet=prefix_sheet, file_format=file_format, has_header=has_header))
+        sources.extend(
+            load_file(
+                filename,
+                prefix_sheet=prefix_sheet,
+                file_format=file_format,
+                has_header=has_header,
+                infer_schema=infer_schema,
+            )
+        )
     return sources
 
 
@@ -377,6 +388,7 @@ def load_file(
     prefix_sheet: bool = False,
     file_format: str | None = None,
     has_header: bool = True,
+    infer_schema: bool = True,
 ) -> list[tuple[pl.LazyFrame, str, str]]:
     """Load a single file and return list of sources.
 
@@ -402,7 +414,12 @@ def load_file(
 
         # Read from stdin into memory first (stdin is not seekable)
         stdin_data = sys.stdin.read()
-        lf = pl.scan_csv(StringIO(stdin_data), has_header=has_header, separator="," if file_format == "csv" else "\t")
+        lf = pl.scan_csv(
+            StringIO(stdin_data),
+            has_header=has_header,
+            infer_schema=infer_schema,
+            separator="," if file_format == "csv" else "\t",
+        )
 
         # Reopen stdin to /dev/tty for proper terminal interaction
         try:
@@ -417,7 +434,7 @@ def load_file(
     filepath = Path(filename)
 
     if file_format == "csv":
-        lf = pl.scan_csv(filename, has_header=has_header)
+        lf = pl.scan_csv(filename, has_header=has_header, infer_schema=infer_schema)
         sources.append((lf, filename, filepath.stem))
     elif file_format == "excel":
         if first_sheet:
@@ -431,7 +448,7 @@ def load_file(
                 tabname = f"{filepath.stem}_{sheet_name}" if prefix_sheet else sheet_name
                 sources.append((df.lazy(), filename, tabname))
     elif file_format == "tsv":
-        lf = pl.scan_csv(filename, has_header=has_header, separator="\t")
+        lf = pl.scan_csv(filename, has_header=has_header, infer_schema=infer_schema, separator="\t")
         sources.append((lf, filename, filepath.stem))
     elif file_format == "parquet":
         lf = pl.scan_parquet(filename)
@@ -463,7 +480,7 @@ def load_file(
             # Default to TSV
             file_format = "tsv"
 
-        sources.extend(load_file(filename, first_sheet, prefix_sheet, file_format, has_header))
+        sources.extend(load_file(filename, first_sheet, prefix_sheet, file_format, has_header, infer_schema))
 
     return sources
 

@@ -40,6 +40,7 @@ def main() -> None:
         help="Specify the format of the input files (csv, excel, tsv etc.)",
     )
     parser.add_argument("-H", "--no-header", action="store_true", help="Specify that input files have no header row")
+    parser.add_argument("-I", "--no-inferrence", action="store_true", help="Do not infer data types for CSV/TSV")
 
     args = parser.parse_args()
     filenames = []
@@ -59,7 +60,9 @@ def main() -> None:
         parser.print_help()
         sys.exit(1)
 
-    sources = load_dataframe(filenames, file_format=args.format, has_header=not args.no_header)
+    sources = load_dataframe(
+        filenames, file_format=args.format, has_header=not args.no_header, infer_schema=not args.no_inferrence
+    )
     app = DataFrameViewer(*sources)
     app.run()
 

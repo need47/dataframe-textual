@@ -90,6 +90,13 @@ uv run python main.py pokemon.csv
 # Read from stdin (auto-detects format; defaults to TSV if not recognized)
 cat data.tsv | dv
 dv < data.tsv
+
+# Gzipped files are supported
+dv data.csv.gz
+dv large_dataset.tsv.gz
+
+# Specify format for gzipped stdin
+zcat data.csv.gz | dv -f csv
 ```
 
 ### Multi-File Usage - Multiple Tabs
@@ -103,6 +110,9 @@ dv file.xlsx
 
 # Mix files and stdin (read from stdin, then open file)
 dv data1.tsv < data2.tsv
+
+# Mix regular and gzipped files
+dv data1.csv data2.csv.gz data3.tsv.gz
 ```
 
 When multiple files are opened:
@@ -111,6 +121,43 @@ When multiple files are opened:
 - Open additional files with `Ctrl+O`
 - Close the current tab with `Ctrl+W`
 - Each file maintains its own state (edits, sort order, selections, history, etc.)
+
+## Command Line Options
+
+```
+usage: dv [-h] [-f {csv,excel,tsv,parquet,json,ndjson}] [-H] [-I] [files ...]
+
+Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).
+
+positional arguments:
+  files                 Files to view (or read from stdin)
+
+options:
+  -h, --help            show this help message and exit
+  -f, --format {csv,excel,tsv,parquet,json,ndjson}
+                        Specify the format of the input files
+  -H, --no-header       Specify that input files have no header row
+  -I, --no-inferrence   Do not infer data types for CSV/TSV
+```
+
+### CLI Examples
+
+```bash
+# View CSV file without header row
+dv -H data_no_header.csv
+
+# Disable type inference for faster loading of large CSV files
+dv -I large_data.csv
+
+# Specify format when reading from stdin
+cat data.tsv | dv -f tsv
+
+# Combine options: no header, no inference, with gzipped file
+dv -H -I data.csv.gz
+
+# Force CSV format for ambiguous file extension
+dv -f csv mystery_file.txt
+```
 
 ## Keyboard Shortcuts
 
@@ -723,6 +770,21 @@ dv pokemon.csv
 
 # Chain with other command and specify input file format
 cut -d',' -f1,2,3 pokemon.csv | dv -f csv
+
+# Work with gzipped files
+dv large_dataset.csv.gz
+
+# CSV file without header row
+dv -H raw_data.csv
+
+# Skip type inference for faster loading
+dv -I huge_file.csv
+
+# Combine options: no header, no inference, gzipped
+dv -H -I data_dump.csv.gz
+
+# Process compressed data from stdin
+zcat compressed_data.csv.gz | dv -f csv
 ```
 
 ### Multi-File/Tab Examples
@@ -731,8 +793,8 @@ cut -d',' -f1,2,3 pokemon.csv | dv -f csv
 # Open multiple sheets as tabs in a single Excel
 dv sales.xlsx
 
-# Open multiple files as tabs
-dv pokemon.csv titanic.csv
+# Open multiple files as tabs (including gzipped)
+dv pokemon.csv titanic.csv large_data.csv.gz
 
 # Start with one file, then open others using Ctrl+O
 dv initial_data.csv
