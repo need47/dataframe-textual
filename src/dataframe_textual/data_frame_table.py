@@ -962,7 +962,8 @@ class DataFrameTable(DataTable):
         """Load a batch of rows into the table (synchronous wrapper).
 
         Args:
-            stop: Stop loading rows when this index is reached. If None, load until the end of the dataframe.
+            stop: Stop loading rows when this index is reached.
+                  If None, load until the end of the dataframe.
         """
         if stop is None or stop > len(self.df):
             stop = len(self.df)
@@ -1092,42 +1093,6 @@ class DataFrameTable(DataTable):
 
         self._load_rows(stop)
         self._highlight_table(force)
-
-    @work(exclusive=True, description="Doing highlight...")
-    async def _do_highlight_async(self, force: bool = False) -> None:
-        """Perform the highlighting preparation in a worker."""
-        try:
-            # Calculate what needs to be loaded without actually loading
-            stop = rindex(self.selected_rows, True) + 1
-            stop = max(stop, max(self.matches.keys(), default=0) + 1)
-            if stop > (total := len(self.df)):
-                stop = total
-
-            # Call the highlighting method (runs in background worker)
-            self._highlight_async(stop, force=force)
-
-        except Exception as e:
-            self.notify(f"Error preparing highlight: {str(e)}", title="Search", severity="error")
-
-    @work(exclusive=True, description="Highlighting matches...")
-    async def _highlight_async(self, stop: int, force: bool = False) -> None:
-        """Perform highlighting with async loading to avoid blocking."""
-        # Load rows in smaller chunks to avoid blocking
-        if stop > self.loaded_rows:
-            self.log(f"Async highlight loading up to row {self.loaded_rows = }, {stop = }")
-            # Load incrementally to avoid one big block
-            chunk_size = min(100, stop - self.loaded_rows)  # Load max 100 rows at a time
-            next_stop = min(self.loaded_rows + chunk_size, stop)
-            self._load_rows(next_stop)
-
-            # If there's more to load, yield to event loop with delay
-            if next_stop < stop:
-                await sleep_async(0.05)  # 50ms delay to allow UI updates
-                self._highlight_async(stop)
-                return
-
-        # Now do the actual highlighting
-        self._highlight_table(force=force)
 
     def _highlight_table(self, force: bool = False) -> None:
         """Highlight selected rows/cells in red."""
@@ -2206,9 +2171,6 @@ class DataFrameTable(DataTable):
         # Show notification immediately, then start highlighting
         self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Search")
 
-        # # Start highlighting in a worker to avoid blocking the UI
-        # self._do_highlight_async()
-
         # Recreate table for display
         self._setup_table()
 
@@ -2334,9 +2296,6 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Find")
 
-        # # Start highlighting in a worker to avoid blocking the UI
-        # self._do_highlight_async()
-
         # Recreate table for display
         self._setup_table()
 
@@ -2371,9 +2330,6 @@ class DataFrameTable(DataTable):
         self.notify(
             f"Found [$accent]{match_count}[/] matches for [$success]{term}[/] across all columns", title="Global Find"
         )
-
-        # # Start highlighting in a worker to avoid blocking the UI
-        # self._do_highlight_async()
 
         # Recreate table for display
         self._setup_table()
@@ -2527,9 +2483,6 @@ class DataFrameTable(DataTable):
 
         # Update matches
         self.matches = {ridx: col_idxs.copy() for ridx, col_idxs in matches.items()}
-
-        # # Highlight matches
-        # self._do_highlight_async()
 
         # Recreate table for display
         self._setup_table()
@@ -2751,9 +2704,6 @@ class DataFrameTable(DataTable):
         if new_selected_count := self.selected_rows.count(True):
             self.notify(f"Toggled selection for [$accent]{new_selected_count}[/] rows", title="Toggle")
 
-        # # Refresh the highlighting
-        # self._do_highlight_async(force=True)
-
         # Recreate table for display
         self._setup_table()
 
@@ -2798,9 +2748,6 @@ class DataFrameTable(DataTable):
         # Clear all selections
         self.selected_rows = [False] * len(self.df)
         self.matches = defaultdict(set)
-
-        # # Refresh the highlighting to remove all highlights
-        # self._do_highlight_async(force=True)
 
         # Recreate table for display
         self._setup_table()
