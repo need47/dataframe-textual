@@ -210,6 +210,8 @@ dv -f csv mystery_file.txt
 | `Home` / `End` | Jump to first/last column in current row |
 | `Ctrl + Home` / `Ctrl + End` | Jump to top/bottom in current page |
 | `PageDown` / `PageUp` | Scroll down/up one page |
+| `Ctrl+F` | Page down |
+| `Ctrl+B` | Page up |
 
 #### Viewing & Display
 
@@ -273,8 +275,8 @@ dv -f csv mystery_file.txt
 
 | Key | Action |
 |-----|--------|
-| `f` | Find across all columns with cursor value |
-| `Ctrl+F` | Find across all columns with expression |
+| `;` | Find across all columns with cursor value |
+| `:` | Find across all columns with expression |
 | `r` | Find and replace in current column (interactive or replace all) |
 | `R` | Find and replace across all columns (interactive or replace all) |
 
@@ -350,8 +352,8 @@ The application provides multiple search modes for different use cases:
 **Find Operations** - Find by value/expression:
 - **`/` - Column Find**: Find cursor value within current column
 - **`?` - Column Expression Find**: Open dialog to search current column with expression
-- **`f` - Global Find**: Find cursor value across all columns
-- **`Ctrl+f` - Global Expression Find**: Open dialog to search all columns with expression
+- **`;` - Global Find**: Find cursor value across all columns
+- **`:` - Global Expression Find**: Open dialog to search all columns with expression
 
 **Selection & Filtering**:
 - **`'` - Toggle Row Selection**: Select/deselect current row (marks it for filtering)

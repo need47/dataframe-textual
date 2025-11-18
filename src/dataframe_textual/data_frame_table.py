@@ -110,6 +110,8 @@ class DataFrameTable(DataTable):
         - **↑↓←→** - 🎯 Move cursor (cell/row/column)
         - **g** - ⬆️ Jump to first row
         - **G** - ⬇️ Jump to last row
+        - **Ctrl+F** - 📜 Page down
+        - **Ctrl+B** - 📜 Page up
         - **PgUp/PgDn** - 📜 Page up/down
 
         ## 👁️ View & Display
@@ -134,8 +136,8 @@ class DataFrameTable(DataTable):
         - **\\\\** - 🔎 Search in current column using cursor value
         - **/** - 🔎 Find in current column with cursor value
         - **?** - 🔎 Find in current column with expression
-        - **f** - 🌐 Global find using cursor value
-        - **Ctrl+f** - 🌐 Global find with expression
+        - **;** - 🌐 Global find using cursor value
+        - **:** - 🌐 Global find with expression
         - **n** - ⬇️ Go to next match
         - **N** - ⬆️ Go to previous match
         - **v** - 👁️ View/filter rows by cell or selected rows
@@ -203,6 +205,8 @@ class DataFrameTable(DataTable):
         # Navigation
         ("g", "jump_top", "Jump to top"),
         ("G", "jump_bottom", "Jump to bottom"),
+        ("ctrl+f", "forward_page", "Page down"),
+        ("ctrl+b", "backward_page", "Page up"),
         # Display
         ("h", "hide_column", "Hide column"),
         ("H", "show_hidden_rows_columns", "Show hidden rows/columns"),
@@ -236,8 +240,8 @@ class DataFrameTable(DataTable):
         # Find
         ("slash", "find_cursor_value", "Find in column with cursor value"),  # `/`
         ("question_mark", "find_expr", "Find in column with expression"),  # `?`
-        ("f", "find_cursor_value('global')", "Global find with cursor value"),  # `f`
-        ("ctrl+f", "find_expr('global')", "Global find with expression"),  # `Ctrl+F`
+        ("semicolon", "find_cursor_value('global')", "Global find with cursor value"),  # `;`
+        ("colon", "find_expr('global')", "Global find with expression"),  # `:`
         ("n", "next_match", "Go to next match"),  # `n`
         ("N", "previous_match", "Go to previous match"),  # `Shift+n`
         # Replace
@@ -610,6 +614,15 @@ class DataFrameTable(DataTable):
     def action_jump_bottom(self) -> None:
         """Jump to the bottom of the table."""
         self._load_rows(move_to_end=True)
+
+    def action_forward_page(self) -> None:
+        """Scroll down one page."""
+        super().action_page_down()
+        self._check_and_load_more()
+
+    def action_backward_page(self) -> None:
+        """Scroll up one page."""
+        super().action_page_up()
 
     def action_view_row_detail(self) -> None:
         """View details of the current row."""
