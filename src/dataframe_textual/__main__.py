@@ -4,10 +4,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from .common import load_dataframe
+from .common import SUPPORTED_FORMATS, load_dataframe
 from .data_frame_viewer import DataFrameViewer
-
-SUPPORTED_FORMATS = ["csv", "excel", "tsv", "parquet", "json", "ndjson"]
 
 
 def cli() -> argparse.Namespace:

@@ -9,9 +9,9 @@ from typing import Any
 import polars as pl
 from rich.text import Text
 
-# Special string to represent null value
-NULL = "NULL"
-NULL_DISPLAY = "-"
+# Supported file formats
+SUPPORTED_FORMATS = ["csv", "excel", "tsv", "parquet", "json", "ndjson"]
+
 
 # Boolean string mappings
 BOOLS = {
@@ -26,6 +26,10 @@ BOOLS = {
     "n": False,
     "0": False,
 }
+
+# Special string to represent null value
+NULL = "NULL"
+NULL_DISPLAY = "-"
 
 # Common null value representations
 NULL_VALUES = ["null", "NULL", "Null", "NaN", "nan", "NA", "na", "N/A", "n/a", ""]
@@ -493,7 +497,38 @@ def load_file(
 
     filepath = Path(filename)
 
-    if file_format == "csv":
+    if not file_format:
+        ext = filepath.suffix.lower()
+        if ext == ".gz" or ext == ".bz2" or ext == ".xz":
+            ext = filepath.with_suffix("").suffix.lower()
+
+        if ext in (".tsv", ".tab", ".txt"):
+            file_format = "tsv"
+        elif ext == ".csv":
+            file_format = "csv"
+        elif ext in (".xlsx", ".xls"):
+            file_format = "excel"
+        elif ext == ".parquet":
+            file_format = "parquet"
+        elif ext == ".json":
+            file_format = "json"
+        elif ext == ".ndjson":
+            file_format = "ndjson"
+        else:  # Default to TSV
+            file_format = "tsv"
+
+    if file_format == "tsv":
+        lf = pl.scan_csv(
+            filename,
+            separator="\t",
+            has_header=has_header,
+            infer_schema=infer_schema,
+            skip_lines=skip_lines,
+            skip_rows_after_header=skip_rows_after_header,
+            schema_overrides=schema_overrides,
+        )
+        sources.append((lf, filename, filepath.stem))
+    elif file_format == "csv":
         lf = pl.scan_csv(
             filename,
             has_header=has_header,
@@ -514,17 +549,6 @@ def load_file(
             for sheet_name, df in sheets.items():
                 tabname = f"{filepath.stem}_{sheet_name}" if prefix_sheet else sheet_name
                 sources.append((df.lazy(), filename, tabname))
-    elif file_format == "tsv":
-        lf = pl.scan_csv(
-            filename,
-            separator="\t",
-            has_header=has_header,
-            infer_schema=infer_schema,
-            skip_lines=skip_lines,
-            skip_rows_after_header=skip_rows_after_header,
-            schema_overrides=schema_overrides,
-        )
-        sources.append((lf, filename, filepath.stem))
     elif file_format == "parquet":
         lf = pl.scan_parquet(filename)
         sources.append((lf, filename, filepath.stem))
@@ -535,39 +559,7 @@ def load_file(
         lf = pl.scan_ndjson(filename)
         sources.append((lf, filename, filepath.stem))
     else:
-        ext = filepath.suffix.lower()
-        if ext == ".gz" or ext == ".bz2" or ext == ".xz":
-            ext = filepath.with_suffix("").suffix.lower()
-
-        if ext == ".csv":
-            file_format = "csv"
-        elif ext in (".xlsx", ".xls"):
-            file_format = "excel"
-        elif ext in (".tsv", ".tab"):
-            file_format = "tsv"
-        elif ext == ".parquet":
-            file_format = "parquet"
-        elif ext == ".json":
-            file_format = "json"
-        elif ext == ".ndjson":
-            file_format = "ndjson"
-        else:
-            # Default to TSV
-            file_format = "tsv"
-
-        sources.extend(
-            load_file(
-                filename,
-                first_sheet=first_sheet,
-                prefix_sheet=prefix_sheet,
-                file_format=file_format,
-                has_header=has_header,
-                infer_schema=infer_schema,
-                skip_lines=skip_lines,
-                skip_rows_after_header=skip_rows_after_header,
-                schema_overrides=schema_overrides,
-            )
-        )
+        raise ValueError(f"Unsupported file format: {file_format}. Supported formats are: {SUPPORTED_FORMATS}")
 
     return sources
 
