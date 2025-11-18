@@ -58,7 +58,7 @@ HIGHLIGHT_COLOR = "red"
 WARN_ROWS_THRESHOLD = 50_000
 
 # Maximum width for string columns before truncation
-STRING_WIDTH_CAP = 40
+STRING_WIDTH_CAP = 35
 
 
 @dataclass

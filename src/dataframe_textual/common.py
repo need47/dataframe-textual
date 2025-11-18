@@ -170,6 +170,8 @@ def format_row(vals, dtypes, styles=None, apply_justify=True, thousand_separator
                 text_val,
                 style=styles[idx] if styles and styles[idx] else dc.style,
                 justify=dc.justify if apply_justify else "",
+                overflow="ellipsis",
+                no_wrap=True,
             )
         )
 

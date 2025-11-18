@@ -181,7 +181,12 @@ class RowDetailScreen(TableScreen):
         # Get all columns and values from the dataframe row
         for col, val, dtype in zip(self.df.columns, self.df.row(self.ridx), self.df.dtypes):
             self.table.add_row(
-                *format_row([col, val], [None, dtype], apply_justify=False, thousand_separator=self.thousand_separator)
+                *format_row(
+                    [col, val],
+                    [None, dtype],
+                    apply_justify=False,
+                    thousand_separator=self.thousand_separator,
+                )
             )
 
         self.table.cursor_type = "row"
