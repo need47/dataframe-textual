@@ -10,7 +10,7 @@ import polars as pl
 from rich.text import Text
 
 # Supported file formats
-SUPPORTED_FORMATS = {"tsv", "csv", "excel", "parquet", "json", "ndjson"}
+SUPPORTED_FORMATS = {"tsv", "csv", "excel", "xlsx", "xls", "parquet", "json", "ndjson"}
 
 
 # Boolean string mappings
@@ -484,7 +484,7 @@ def load_file(
             schema_overrides=schema_overrides,
         )
         sources.append((lf, filename, filepath.stem))
-    elif file_format == "excel":
+    elif file_format in ("xlsx", "xls", "excel"):
         if first_sheet:
             # Read only the first sheet for multiple files
             lf = pl.read_excel(filename).lazy()
