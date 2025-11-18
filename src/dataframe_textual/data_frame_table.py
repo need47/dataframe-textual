@@ -289,14 +289,14 @@ class DataFrameTable(DataTable):
     ]
     # fmt: on
 
-    def __init__(self, df: pl.DataFrame | pl.LazyFrame, filename: str = "", name: str = "", **kwargs) -> None:
+    def __init__(self, df: pl.DataFrame, filename: str = "", name: str = "", **kwargs) -> None:
         """Initialize the DataFrameTable with a dataframe and manage all state.
 
         Sets up the table widget with display configuration, loads the dataframe, and
         initializes all state tracking variables for row/column operations.
 
         Args:
-            df: The Polars DataFrame or LazyFrame to display and edit.
+            df: The Polars DataFrame to display and edit.
             filename: Optional source filename for the data (used in save operations). Defaults to "".
             name: Optional display name for the table tab. Defaults to "" (uses filename stem).
             **kwargs: Additional keyword arguments passed to the parent DataTable widget.
@@ -307,8 +307,8 @@ class DataFrameTable(DataTable):
         super().__init__(name=(name or Path(filename).stem), **kwargs)
 
         # DataFrame state
-        self.lazyframe = df.lazy()  # Original dataframe
-        self.df = self.lazyframe.collect()  # Internal/working dataframe
+        self.dataframe = df  # Original dataframe
+        self.df = df  # Internal/working dataframe
         self.filename = filename  # Current filename
 
         # Pagination & Loading
@@ -913,7 +913,7 @@ class DataFrameTable(DataTable):
 
         # Reset to original dataframe
         if reset:
-            self.df = self.lazyframe.collect()
+            self.df = self.dataframe
             self.loaded_rows = 0
             self.sorted_columns = {}
             self.hidden_columns = set()
@@ -3070,7 +3070,7 @@ class DataFrameTable(DataTable):
             else:
                 self.df.write_csv(filename)
 
-            self.lazyframe = self.df.lazy()  # Update original dataframe
+            self.dataframe = self.df  # Update original dataframe
             self.filename = filename  # Update current filename
             if not self._all_tabs:
                 extra = "current tab with " if len(self.app.tabs) > 1 else ""

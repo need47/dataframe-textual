@@ -10,7 +10,7 @@ import polars as pl
 from rich.text import Text
 
 # Supported file formats
-SUPPORTED_FORMATS = ["csv", "excel", "tsv", "parquet", "json", "ndjson"]
+SUPPORTED_FORMATS = {"tsv", "csv", "excel", "parquet", "json", "ndjson"}
 
 
 # Boolean string mappings
@@ -351,9 +351,6 @@ def validate_expr(term: str, columns: list[str], current_col_idx: int) -> pl.Exp
         raise ValueError(f"Failed to validate expression `{term}`: {ve}") from ve
 
 
-RE_COMPUTE_ERROR = re.compile(r"at column '(.*?)' \(column number \d+\)")
-
-
 def load_dataframe(
     filenames: list[str],
     file_format: str | None = None,
@@ -361,15 +358,11 @@ def load_dataframe(
     infer_schema: bool = True,
     skip_lines: int = 0,
     skip_rows_after_header: int = 0,
-    schema_overrides: dict[str, pl.DataType] | None = None,
-) -> list[tuple[pl.LazyFrame, str, str]]:
+) -> list[tuple[pl.DataFrame, str, str]]:
     """Load DataFrames from file specifications.
 
     Handles loading from multiple files, single files, or stdin. For Excel files,
     loads all sheets as separate entries. For other formats, loads as single file.
-
-    If a ComputeError occurs during schema inference for a column, attempts to recover
-    by treating that column as a string and retrying the load.
 
     Args:
         filenames: List of filenames to load. If single filename is "-", read from stdin.
@@ -378,15 +371,25 @@ def load_dataframe(
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
         skip_lines: Number of lines to skip when reading CSV/TSV files. Defaults to 0.
         skip_rows_after_header: Number of rows to skip after header. Defaults to 0.
-        schema_overrides: Optional dictionary mapping column names to Polars data types.
 
     Returns:
-        List of tuples of (LazyFrame, filename, tabname) ready for display.
+        List of tuples of (DataFrame, filename, tabname) ready for display.
     """
     sources = []
     prefix_sheet = len(filenames) > 1
 
     for filename in filenames:
+        # Determine file format if not specified
+        if not file_format:
+            ext = Path(filename).suffix.lower()
+            if ext == ".gz" or ext == ".bz2" or ext == ".xz":
+                ext = Path(filename).with_suffix("").suffix.lower()
+            fmt = ext.removeprefix(".")
+
+            # Default to TSV
+            file_format = fmt if fmt in SUPPORTED_FORMATS else "tsv"
+
+        # Load each file
         sources.extend(
             load_file(
                 filename,
@@ -396,45 +399,13 @@ def load_dataframe(
                 infer_schema=infer_schema,
                 skip_lines=skip_lines,
                 skip_rows_after_header=skip_rows_after_header,
-                schema_overrides=schema_overrides,
             )
         )
 
-    try:
-        sources = [(lf.collect(), fn, tn) for lf, fn, tn in sources]
-    except pl.exceptions.ComputeError as ce:
-        # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
-        msg = str(ce)
-        if m := RE_COMPUTE_ERROR.search(msg):
-            col_name = m.group(1)
-
-            if schema_overrides is None:
-                schema_overrides = {}
-            schema_overrides.update({col_name: pl.String})
-
-            return load_dataframe(
-                filenames,
-                file_format=file_format,
-                has_header=has_header,
-                infer_schema=infer_schema,
-                skip_lines=skip_lines,
-                skip_rows_after_header=skip_rows_after_header,
-                schema_overrides=schema_overrides,
-            )
-
-        # Disable schema inference (treat all as strings)
-        else:
-            return load_dataframe(
-                filenames,
-                file_format=file_format,
-                has_header=has_header,
-                infer_schema=False,
-                skip_lines=skip_lines,
-                skip_rows_after_header=skip_rows_after_header,
-                schema_overrides=schema_overrides,
-            )
-
     return sources
+
+
+RE_COMPUTE_ERROR = re.compile(r"at column '(.*?)' \(column number \d+\)")
 
 
 def load_file(
@@ -446,18 +417,22 @@ def load_file(
     infer_schema: bool = True,
     skip_lines: int = 0,
     skip_rows_after_header: int = 0,
-    schema_overrides: dict[str, pl.DataType] = {},
-) -> list[tuple[pl.LazyFrame, str, str]]:
+    schema_overrides: dict[str, pl.DataType] | None = None,
+) -> list[tuple[pl.DataFrame, str, str]]:
     """Load a single file and return list of sources.
 
     For Excel files, when `first_sheet` is True, returns only the first sheet. Otherwise, returns one entry per sheet.
     For other files or multiple files, returns one entry per file.
 
+    If a ComputeError occurs during schema inference for a column, attempts to recover
+    by treating that column as a string and retrying the load. This process repeats until
+    all columns are successfully loaded or no further recovery is possible.
+
     Args:
         filename: Path to file to load.
         first_sheet: If True, only load first sheet for Excel files. Defaults to False.
         prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
-        file_format: Optional format specifier (i.e., 'csv', 'excel', 'tsv', 'parquet', 'json', 'ndjson') for input files.
+        file_format: Optional format specifier (i.e., 'tsv', 'csv', 'excel', 'parquet', 'json', 'ndjson') for input files.
                      By default, infers from file extension.
         has_header: Whether the input files have a header row. Defaults to True.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
@@ -465,7 +440,7 @@ def load_file(
         skip_rows_after_header: Number of rows to skip after header when reading CSV/TSV files. Defaults to 0.
 
     Returns:
-        List of tuples of (LazyFrame, filename, tabname).
+        List of tuples of (DataFrame, filename, tabname).
     """
     sources = []
 
@@ -497,40 +472,11 @@ def load_file(
 
     filepath = Path(filename)
 
-    if not file_format:
-        ext = filepath.suffix.lower()
-        if ext == ".gz" or ext == ".bz2" or ext == ".xz":
-            ext = filepath.with_suffix("").suffix.lower()
-
-        if ext in (".tsv", ".tab", ".txt"):
-            file_format = "tsv"
-        elif ext == ".csv":
-            file_format = "csv"
-        elif ext in (".xlsx", ".xls"):
-            file_format = "excel"
-        elif ext == ".parquet":
-            file_format = "parquet"
-        elif ext == ".json":
-            file_format = "json"
-        elif ext == ".ndjson":
-            file_format = "ndjson"
-        else:  # Default to TSV
-            file_format = "tsv"
-
-    if file_format == "tsv":
+    # Load based on file format
+    if file_format in ("tsv", "csv"):
         lf = pl.scan_csv(
             filename,
-            separator="\t",
-            has_header=has_header,
-            infer_schema=infer_schema,
-            skip_lines=skip_lines,
-            skip_rows_after_header=skip_rows_after_header,
-            schema_overrides=schema_overrides,
-        )
-        sources.append((lf, filename, filepath.stem))
-    elif file_format == "csv":
-        lf = pl.scan_csv(
-            filename,
+            separator="\t" if file_format == "tsv" else ",",
             has_header=has_header,
             infer_schema=infer_schema,
             skip_lines=skip_lines,
@@ -553,13 +499,42 @@ def load_file(
         lf = pl.scan_parquet(filename)
         sources.append((lf, filename, filepath.stem))
     elif file_format == "json":
-        df = pl.read_json(filename)
-        sources.append((df, filename, filepath.stem))
+        lf = pl.read_json(filename).lazy()
+        sources.append((lf, filename, filepath.stem))
     elif file_format == "ndjson":
         lf = pl.scan_ndjson(filename)
         sources.append((lf, filename, filepath.stem))
     else:
         raise ValueError(f"Unsupported file format: {file_format}. Supported formats are: {SUPPORTED_FORMATS}")
+
+    # Attempt to collect, handling ComputeError for schema inference issues
+    try:
+        sources = [(lf.collect(), fn, tn) for lf, fn, tn in sources]
+    except pl.exceptions.ComputeError as ce:
+        # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
+        if m := RE_COMPUTE_ERROR.search(str(ce)):
+            col_name = m.group(1)
+
+            if schema_overrides is None:
+                schema_overrides = {}
+            schema_overrides.update({col_name: pl.String})
+
+            # print(f"{schema_overrides = }", file=sys.stderr)
+        # Disable schema inference (treat all as strings)
+        else:
+            # print("Disabling schema inference", file=sys.stderr)
+            infer_schema = False
+
+        # Retry loading with updated schema overrides
+        return load_file(
+            filename,
+            file_format=file_format,
+            has_header=has_header,
+            infer_schema=infer_schema,
+            skip_lines=skip_lines,
+            skip_rows_after_header=skip_rows_after_header,
+            schema_overrides=schema_overrides,
+        )
 
     return sources
 
