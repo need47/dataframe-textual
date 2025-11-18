@@ -308,7 +308,7 @@ class DataFrameTable(DataTable):
         self.filename = filename  # Current filename
 
         # Pagination & Loading
-        self.INITIAL_BATCH_SIZE = (self.app.size.height // 100 + 1) * 100 * 2
+        self.INITIAL_BATCH_SIZE = (self.app.size.height // 100 + 1) * 100
         self.BATCH_SIZE = self.INITIAL_BATCH_SIZE // 2
         self.loaded_rows = 0  # Track how many rows are currently loaded
 

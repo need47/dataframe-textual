@@ -347,6 +347,9 @@ def validate_expr(term: str, columns: list[str], current_col_idx: int) -> pl.Exp
         raise ValueError(f"Failed to validate expression `{term}`: {ve}") from ve
 
 
+RE_COMPUTE_ERROR = re.compile(r"at column '(.*?)' \(column number \d+\)")
+
+
 def load_dataframe(
     filenames: list[str],
     file_format: str | None = None,
@@ -354,22 +357,29 @@ def load_dataframe(
     infer_schema: bool = True,
     skip_lines: int = 0,
     skip_rows_after_header: int = 0,
+    schema_overrides: dict[str, pl.DataType] | None = None,
 ) -> list[tuple[pl.LazyFrame, str, str]]:
     """Load DataFrames from file specifications.
 
     Handles loading from multiple files, single files, or stdin. For Excel files,
     loads all sheets as separate entries. For other formats, loads as single file.
 
+    If a ComputeError occurs during schema inference for a column, attempts to recover
+    by treating that column as a string and retrying the load.
+
     Args:
         filenames: List of filenames to load. If single filename is "-", read from stdin.
         file_format: Optional format specifier for input files (e.g., 'csv', 'excel').
         has_header: Whether the input files have a header row. Defaults to True.
+        infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
+        skip_lines: Number of lines to skip when reading CSV/TSV files. Defaults to 0.
+        skip_rows_after_header: Number of rows to skip after header. Defaults to 0.
+        schema_overrides: Optional dictionary mapping column names to Polars data types.
 
     Returns:
         List of tuples of (LazyFrame, filename, tabname) ready for display.
     """
     sources = []
-
     prefix_sheet = len(filenames) > 1
 
     for filename in filenames:
@@ -382,8 +392,44 @@ def load_dataframe(
                 infer_schema=infer_schema,
                 skip_lines=skip_lines,
                 skip_rows_after_header=skip_rows_after_header,
+                schema_overrides=schema_overrides,
             )
         )
+
+    try:
+        sources = [(lf.collect(), fn, tn) for lf, fn, tn in sources]
+    except pl.exceptions.ComputeError as ce:
+        # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
+        msg = str(ce)
+        if m := RE_COMPUTE_ERROR.search(msg):
+            col_name = m.group(1)
+
+            if schema_overrides is None:
+                schema_overrides = {}
+            schema_overrides.update({col_name: pl.String})
+
+            return load_dataframe(
+                filenames,
+                file_format=file_format,
+                has_header=has_header,
+                infer_schema=infer_schema,
+                skip_lines=skip_lines,
+                skip_rows_after_header=skip_rows_after_header,
+                schema_overrides=schema_overrides,
+            )
+
+        # Disable schema inference (treat all as strings)
+        else:
+            return load_dataframe(
+                filenames,
+                file_format=file_format,
+                has_header=has_header,
+                infer_schema=False,
+                skip_lines=skip_lines,
+                skip_rows_after_header=skip_rows_after_header,
+                schema_overrides=schema_overrides,
+            )
+
     return sources
 
 
@@ -396,6 +442,7 @@ def load_file(
     infer_schema: bool = True,
     skip_lines: int = 0,
     skip_rows_after_header: int = 0,
+    schema_overrides: dict[str, pl.DataType] = {},
 ) -> list[tuple[pl.LazyFrame, str, str]]:
     """Load a single file and return list of sources.
 
@@ -431,6 +478,7 @@ def load_file(
             infer_schema=infer_schema,
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
+            schema_overrides=schema_overrides,
         )
 
         # Reopen stdin to /dev/tty for proper terminal interaction
@@ -452,6 +500,7 @@ def load_file(
             infer_schema=infer_schema,
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
+            schema_overrides=schema_overrides,
         )
         sources.append((lf, filename, filepath.stem))
     elif file_format == "excel":
@@ -473,6 +522,7 @@ def load_file(
             infer_schema=infer_schema,
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
+            schema_overrides=schema_overrides,
         )
         sources.append((lf, filename, filepath.stem))
     elif file_format == "parquet":
@@ -515,6 +565,7 @@ def load_file(
                 infer_schema=infer_schema,
                 skip_lines=skip_lines,
                 skip_rows_after_header=skip_rows_after_header,
+                schema_overrides=schema_overrides,
             )
         )
 

@@ -122,7 +122,11 @@ class DataFrameViewer(App):
                     self.tabs[tab] = table
                     yield tab
                 except Exception as e:
-                    self.notify(f"Error loading {tabname}: {e}", severity="error")
+                    self.notify(
+                        f"Error loading [$error]{filename}[/]: Try [$accent]-I[/] to disable schema inference",
+                        severity="error",
+                    )
+                    self.log(f"Error loading `{filename}`: {str(e)}")
 
     def on_mount(self) -> None:
         """Set up the application when it starts.
