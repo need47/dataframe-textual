@@ -12,6 +12,7 @@ from rich.text import Text
 from textual import work
 from textual.coordinate import Coordinate
 from textual.events import Click
+from textual.render import measure
 from textual.widgets import DataTable, TabPane
 from textual.widgets._data_table import (
     CellDoesNotExist,
@@ -55,6 +56,9 @@ HIGHLIGHT_COLOR = "red"
 
 # Warning threshold for loading rows
 WARN_ROWS_THRESHOLD = 50_000
+
+# Maximum width for string columns before truncation
+STRING_WIDTH_CAP = 40
 
 
 @dataclass
@@ -932,6 +936,74 @@ class DataFrameTable(DataTable):
         if row_idx < len(self.rows) and col_idx < len(self.columns):
             self.move_cursor(row=row_idx, column=col_idx)
 
+    def _determine_column_widths(self) -> dict[str, int]:
+        """Determine optimal width for each column based on data type and content.
+
+        For String columns:
+        - Minimum width: length of column label
+        - Ideal width: maximum width of all cells in the column
+        - If space constrained: find appropriate width smaller than maximum
+
+        For non-String columns:
+        - Return None to let Textual auto-determine width
+
+        Returns:
+            dict[str, int]: Mapping of column name to width (None for auto-sizing columns).
+        """
+        column_widths = {}
+
+        # Get available width for the table (with some padding for borders/scrollbar)
+        available_width = self.size.width - 4  # Account for borders and scrollbar
+
+        # Calculate how much width we need for string columns first
+        string_cols = [col for col, dtype in zip(self.df.columns, self.df.dtypes) if dtype == pl.String]
+
+        # No string columns, let TextualDataTable auto-size all columns
+        if not string_cols:
+            return column_widths
+
+        # Sample a reasonable number of rows to calculate widths (don't scan entire dataframe)
+        sample_size = min(self.INITIAL_BATCH_SIZE, len(self.df))
+        sample_lf = self.df.lazy().slice(0, sample_size)
+
+        # Determine widths for each column
+        for col, dtype in zip(self.df.columns, self.df.dtypes):
+            if col in self.hidden_columns:
+                continue
+
+            # Get column label width
+            # Add padding for sort indicators if any
+            label_width = measure(self.app.console, col, 1) + 2
+
+            try:
+                # Get sample values from the column
+                sample_values = sample_lf.select(col).collect().get_column(col).to_list()
+
+                # Find maximum width in sample
+                max_cell_width = max(
+                    (measure(self.app.console, str(val), 1) for val in sample_values if val),
+                    default=label_width,
+                )
+
+                # Set column width to max of label and sampled data (capped at reasonable max)
+                max_width = max(label_width, max_cell_width)
+            except Exception:
+                # If any error, let Textual auto-size
+                max_width = label_width
+
+            if dtype == pl.String:
+                column_widths[col] = max_width
+
+            available_width -= max_width
+
+        # If there's no more available width, auto-size remaining columns
+        if available_width < 0:
+            for col in column_widths:
+                if column_widths[col] > STRING_WIDTH_CAP:
+                    column_widths[col] = STRING_WIDTH_CAP  # Cap string columns
+
+        return column_widths
+
     def _setup_columns(self) -> None:
         """Clear table and setup columns.
 
@@ -939,6 +1011,9 @@ class DataFrameTable(DataTable):
         Column labels contain column names from the dataframe, with sort indicators if applicable.
         """
         self.clear(columns=True)
+
+        # Get optimal column widths
+        column_widths = self._determine_column_widths()
 
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
@@ -956,7 +1031,10 @@ class DataFrameTable(DataTable):
             else:  # No break occurred, so column is not sorted
                 cell_value = col
 
-            self.add_column(Text(cell_value, justify=DtypeConfig(dtype).justify), key=col)
+            # Get the width for this column (None means auto-size)
+            width = column_widths.get(col)
+
+            self.add_column(Text(cell_value, justify=DtypeConfig(dtype).justify), key=col, width=width)
 
     def _load_rows(self, stop: int | None = None, move_to_end: bool = False) -> None:
         """Load a batch of rows into the table (synchronous wrapper).
@@ -1061,8 +1139,8 @@ class DataFrameTable(DataTable):
             # Update loaded rows count
             self.loaded_rows = stop
 
-            # self.notify(f"Loaded [$accent]{stop}/{len(self.df)}[/] rows from [$success]{self.name}[/]", title="Load")
-            self.log(f"Loaded {stop}/{len(self.df)} rows from `{self.filename or self.name}`")
+            # self.notify(f"Loaded [$accent]{self.loaded_rows}/{len(self.df)}[/] rows from [$success]{self.name}[/]", title="Load")
+            self.log(f"Loaded {self.loaded_rows}/{len(self.df)} rows from `{self.filename or self.name}`")
 
         except Exception as e:
             self.notify(f"Error loading rows: {str(e)}", title="Load", severity="error")
