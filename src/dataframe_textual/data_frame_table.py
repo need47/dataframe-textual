@@ -1062,7 +1062,7 @@ class DataFrameTable(DataTable):
             self.loaded_rows = stop
 
             # self.notify(f"Loaded [$accent]{stop}/{len(self.df)}[/] rows from [$success]{self.name}[/]", title="Load")
-            self.log(f"Loaded {stop}/{len(self.df)} rows from {self.name}")
+            self.log(f"Loaded {stop}/{len(self.df)} rows from `{self.filename or self.name}`")
 
         except Exception as e:
             self.notify(f"Error loading rows: {str(e)}", title="Load", severity="error")

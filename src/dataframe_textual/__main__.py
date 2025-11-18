@@ -10,17 +10,10 @@ from .data_frame_viewer import DataFrameViewer
 SUPPORTED_FORMATS = ["csv", "excel", "tsv", "parquet", "json", "ndjson"]
 
 
-def main() -> None:
-    """Run the DataFrame Viewer application.
+def cli() -> argparse.Namespace:
+    """Parse command-line arguments.
 
-    Parses command-line arguments to determine input files or stdin, validates
-    file existence, and launches the interactive DataFrame Viewer application.
-
-    Returns:
-        None
-
-    Raises:
-        SystemExit: If invalid arguments are provided or required files are missing.
+    Determines input files or stdin and validates file existence
     """
     parser = argparse.ArgumentParser(
         prog="dv",
@@ -47,25 +40,31 @@ def main() -> None:
     )
 
     args = parser.parse_args()
-    filenames = []
+    if args.files is None:
+        args.files = []
 
     # Check if reading from stdin (pipe or redirect)
     if not sys.stdin.isatty():
-        filenames.append("-")
-    if args.files:
+        args.files.append("-")
+    else:
         # Validate all files exist
         for filename in args.files:
             if not Path(filename).exists():
                 print(f"File not found: {filename}")
                 sys.exit(1)
-        filenames.extend(args.files)
 
-    if not filenames:
+    if not args.files:
         parser.print_help()
         sys.exit(1)
 
+    return args
+
+
+def main() -> None:
+    """Run the DataFrame Viewer application."""
+    args = cli()
     sources = load_dataframe(
-        filenames,
+        args.files,
         file_format=args.format,
         has_header=not args.no_header,
         infer_schema=not args.no_inferrence,
