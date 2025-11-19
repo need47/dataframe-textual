@@ -513,8 +513,13 @@ def load_file(
     try:
         sources = [(lf.collect(), fn, tn) for lf, fn, tn in sources]
     except pl.exceptions.ComputeError as ce:
+        err_msg = str(ce)
+        if "found more fields than defined in 'Schema'" in err_msg:
+            print(f"File `{filename}` might be malformed:\n{err_msg}", file=sys.stderr)
+            sys.exit(1)
+
         # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
-        if m := RE_COMPUTE_ERROR.search(str(ce)):
+        elif m := RE_COMPUTE_ERROR.search(err_msg):
             col_name = m.group(1)
 
             if schema_overrides is None:
@@ -522,6 +527,7 @@ def load_file(
             schema_overrides.update({col_name: pl.String})
 
             # print(f"{schema_overrides = }", file=sys.stderr)
+
         # Disable schema inference (treat all as strings)
         else:
             # print("Disabling schema inference", file=sys.stderr)
