@@ -407,6 +407,115 @@ def load_dataframe(
 RE_COMPUTE_ERROR = re.compile(r"at column '(.*?)' \(column number \d+\)")
 
 
+def handle_compute_error(
+    err_msg: str,
+    file_format: str | None,
+    infer_schema: bool,
+    schema_overrides: dict[str, pl.DataType] | None = None,
+) -> tuple[bool, dict[str, pl.DataType] | None]:
+    """Handle ComputeError during schema inference and determine retry strategy.
+
+    Analyzes the error message and determines whether to retry with schema overrides,
+    disable schema inference, or exit with an error.
+
+    Args:
+        err_msg: The error message from the ComputeError exception.
+        file_format: The file format being loaded (tsv, csv, etc.).
+        infer_schema: Whether schema inference is currently enabled.
+        schema_overrides: Current schema overrides, if any.
+
+    Returns:
+        A tuple of (should_retry, updated_schema_overrides):
+        - should_retry: True if the load should be retried, False to exit or disable inference
+        - updated_schema_overrides: Updated schema overrides dict if retrying with overrides, None otherwise
+
+    Raises:
+        SystemExit: If the error is unrecoverable.
+    """
+    # Already disabled schema inference, cannot recover
+    if not infer_schema:
+        print(f"Error loading with schema inference disabled:\n{err_msg}", file=sys.stderr)
+        sys.exit(1)
+
+    # Schema mismatch error
+    if "found more fields than defined in 'Schema'" in err_msg:
+        print(f"Input might be malformed:\n{err_msg}", file=sys.stderr)
+        sys.exit(1)
+
+    # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
+    if file_format in ("tsv", "csv") and (m := RE_COMPUTE_ERROR.search(err_msg)):
+        col_name = m.group(1)
+
+        if schema_overrides is None:
+            schema_overrides = {}
+        schema_overrides.update({col_name: pl.String})
+    else:
+        infer_schema = False
+
+    return infer_schema, schema_overrides
+
+
+def load_stdin(
+    stdin_data=None,
+    file_format: str | None = None,
+    has_header: bool = True,
+    infer_schema: bool = True,
+    skip_lines: int = 0,
+    skip_rows_after_header: int = 0,
+    schema_overrides: dict[str, pl.DataType] | None = None,
+    null_values: list[str] | None = None,
+):
+    import os
+    from io import StringIO
+
+    sources = []
+
+    # Read from stdin into memory first (stdin is not seekable)
+    if stdin_data is None:
+        stdin_data = sys.stdin.read()
+
+        # Reopen stdin to /dev/tty for proper terminal interaction
+        try:
+            tty = open("/dev/tty")
+            os.dup2(tty.fileno(), sys.stdin.fileno())
+        except (OSError, FileNotFoundError):
+            pass
+
+    lf = pl.scan_csv(
+        StringIO(stdin_data),
+        separator="," if file_format == "csv" else "\t",
+        has_header=has_header,
+        infer_schema=infer_schema,
+        skip_lines=skip_lines,
+        skip_rows_after_header=skip_rows_after_header,
+        schema_overrides=schema_overrides,
+        null_values=null_values,
+    )
+
+    sources = [(lf, f"stdin.{file_format}" if file_format else "stdin", "stdin")]
+
+    # Attempt to collect, handling ComputeError for schema inference issues
+    try:
+        sources = [(lf.collect(), fn, tn) for lf, fn, tn in sources]
+    except pl.exceptions.ComputeError as ce:
+        # Handle the error and determine retry strategy
+        infer_schema, schema_overrides = handle_compute_error(str(ce), file_format, infer_schema, schema_overrides)
+
+        # Retry loading with updated schema overrides
+        return load_stdin(
+            stdin_data,
+            file_format=file_format,
+            has_header=has_header,
+            infer_schema=infer_schema,
+            skip_lines=skip_lines,
+            skip_rows_after_header=skip_rows_after_header,
+            schema_overrides=schema_overrides,
+            null_values=null_values,
+        )
+
+    return sources
+
+
 def load_file(
     filename: str,
     first_sheet: bool = False,
@@ -445,14 +554,8 @@ def load_file(
     sources = []
 
     if filename == "-":
-        import os
-        from io import StringIO
-
-        # Read from stdin into memory first (stdin is not seekable)
-        stdin_data = sys.stdin.read()
-        lf = pl.scan_csv(
-            StringIO(stdin_data),
-            separator="," if file_format == "csv" else "\t",
+        return load_stdin(
+            file_format=file_format,
             has_header=has_header,
             infer_schema=infer_schema,
             skip_lines=skip_lines,
@@ -460,16 +563,6 @@ def load_file(
             schema_overrides=schema_overrides,
             null_values=null_values,
         )
-
-        # Reopen stdin to /dev/tty for proper terminal interaction
-        try:
-            tty = open("/dev/tty")
-            os.dup2(tty.fileno(), sys.stdin.fileno())
-        except (OSError, FileNotFoundError):
-            pass
-
-        sources.append((lf, f"stdin.{file_format}" if file_format else "stdin", "stdin"))
-        return sources
 
     filepath = Path(filename)
 
@@ -513,31 +606,8 @@ def load_file(
     try:
         sources = [(lf.collect(), fn, tn) for lf, fn, tn in sources]
     except pl.exceptions.ComputeError as ce:
-        err_msg = str(ce)
-        # Already disabled schema inference, cannot recover
-        if not infer_schema:
-            print(f"Error loading file `{filename}` with schema inference disabled:\n{err_msg}", file=sys.stderr)
-            sys.exit(1)
-
-        # Schema mismatch error
-        elif "found more fields than defined in 'Schema'" in err_msg:
-            print(f"File `{filename}` might be malformed:\n{err_msg}", file=sys.stderr)
-            sys.exit(1)
-
-        # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
-        elif file_format in ("tsv", "csv") and (m := RE_COMPUTE_ERROR.search(err_msg)):
-            col_name = m.group(1)
-
-            if schema_overrides is None:
-                schema_overrides = {}
-            schema_overrides.update({col_name: pl.String})
-
-            # print(f"{schema_overrides = }", file=sys.stderr)
-
-        # Disable schema inference (treat all as strings)
-        else:
-            # print("Disabling schema inference", file=sys.stderr)
-            infer_schema = False
+        # Handle the error and determine retry strategy
+        infer_schema, schema_overrides = handle_compute_error(str(ce), file_format, infer_schema, schema_overrides)
 
         # Retry loading with updated schema overrides
         return load_file(
