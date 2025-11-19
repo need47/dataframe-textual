@@ -452,7 +452,7 @@ class FrequencyScreen(TableScreen):
         self.table.add_row(
             Text("Total", style="bold", justify=dc.justify),
             Text(f"{self.total_count:,}", style="bold", justify="right"),
-            Text("100.00", style="bold", justify="right"),
+            Text("100.000", style="bold", justify="right"),
             Bar(
                 highlight_range=(0.0, 10),
                 width=10,
