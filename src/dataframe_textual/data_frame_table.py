@@ -1150,7 +1150,8 @@ class DataFrameTable(DataTable):
             self.log(f"Loaded {self.loaded_rows}/{len(self.df)} rows from `{self.filename or self.name}`")
 
         except Exception as e:
-            self.notify(f"Error loading rows: {str(e)}", title="Load", severity="error")
+            self.notify("Error loading rows", title="Load", severity="error")
+            self.log(f"Error loading rows: {str(e)}")
 
     def _check_and_load_more(self) -> None:
         """Check if we need to load more rows and load them."""
@@ -1416,6 +1417,7 @@ class DataFrameTable(DataTable):
 
             # self.notify(f"Expanded column [$success]{col_name}[/] to width [$accent]{max_width}[/]", title="Expand")
         except Exception as e:
+            self.notify("Error expanding column", title="Expand", severity="error")
             self.log(f"Error expanding column `{col_name}`: {str(e)}")
 
     def _show_hidden_rows_columns(self) -> None:
@@ -1917,7 +1919,8 @@ class DataFrameTable(DataTable):
 
             # self.notify(f"Cell updated to [$success]{cell_value}[/]", title="Edit")
         except Exception as e:
-            self.notify(f"Failed to update cell: {str(e)}", title="Edit", severity="error")
+            self.notify("Error updating cell", title="Edit", severity="error")
+            self.log(f"Error updating cell: {str(e)}")
 
     def _edit_column(self) -> None:
         """Open modal to edit the entire column with an expression."""
@@ -1946,7 +1949,8 @@ class DataFrameTable(DataTable):
             try:
                 expr = validate_expr(term, self.df.columns, cidx)
             except Exception as e:
-                self.notify(f"Error validating expression [$error]{term}[/]: {str(e)}", title="Edit", severity="error")
+                self.notify(f"Error validating expression [$error]{term}[/]", title="Edit", severity="error")
+                self.log(f"Error validating expression `{term}`: {str(e)}")
                 return
 
         # Otherwise, treat term as a literal value
@@ -1970,7 +1974,12 @@ class DataFrameTable(DataTable):
             # Apply the expression to the column
             self.df = self.df.with_columns(expr.alias(col_name))
         except Exception as e:
-            self.notify(f"Error applying expression: [$error]{str(e)}[/]", title="Edit", severity="error")
+            self.notify(
+                f"Error applying expression: [$error]{term}[/] to column [$accent]{col_name}[/]",
+                title="Edit",
+                severity="error",
+            )
+            self.log(f"Error applying expression `{term}` to column `{col_name}`: {str(e)}")
             return
 
         # Recreate table for display
@@ -2053,7 +2062,8 @@ class DataFrameTable(DataTable):
 
             # self.notify(f"Cell cleared to [$success]{NULL_DISPLAY}[/]", title="Clear")
         except Exception as e:
-            self.notify(f"Error clearing cell: {str(e)}", title="Clear", severity="error")
+            self.notify("Error clearing cell", title="Clear", severity="error")
+            self.log(f"Error clearing cell: {str(e)}")
             raise e
 
     def _add_column(self, col_name: str = None, col_value: pl.Expr = None) -> None:
@@ -2098,7 +2108,8 @@ class DataFrameTable(DataTable):
 
             # self.notify(f"Added column [$success]{new_name}[/]", title="Add Column")
         except Exception as e:
-            self.notify(f"Error adding column: {str(e)}", title="Add Column", severity="error")
+            self.notify("Error adding column", title="Add Column", severity="error")
+            self.log(f"Error adding column: {str(e)}")
             raise e
 
     def _add_column_expr(self) -> None:
@@ -2140,8 +2151,8 @@ class DataFrameTable(DataTable):
 
             # self.notify(f"Added column [$success]{col_name}[/]", title="Add Column")
         except Exception as e:
-            self.notify(f"Error adding column: [$error]{str(e)}[/]", title="Add Column", severity="error")
-            raise e
+            self.notify("Error adding column", title="Add Column", severity="error")
+            self.log(f"Error adding column `{col_name}`: {str(e)}")
 
     # Type Casting
     def _cast_column_dtype(self, dtype: str) -> None:
@@ -2183,10 +2194,11 @@ class DataFrameTable(DataTable):
             self.notify(f"Cast column [$accent]{col_name}[/] to [$success]{target_dtype}[/]", title="Cast")
         except Exception as e:
             self.notify(
-                f"Error casting column [$accent]{col_name}[/] to [$error]{target_dtype}[/]: {str(e)}",
+                f"Error casting column [$accent]{col_name}[/] to [$error]{target_dtype}[/]",
                 title="Cast",
                 severity="error",
             )
+            self.log(f"Error casting column `{col_name}`: {str(e)}")
 
     # Search
     def _search_cursor_value(self) -> None:
@@ -2227,9 +2239,8 @@ class DataFrameTable(DataTable):
             try:
                 expr = validate_expr(term, self.df.columns, cidx)
             except Exception as e:
-                self.notify(
-                    f"Error validating expression [$error]{term}[/]: {str(e)}", title="Search", severity="error"
-                )
+                self.notify(f"Error validating expression [$error]{term}[/]", title="Search", severity="error")
+                self.log(f"Error validating expression `{term}`: {str(e)}")
                 return
 
         # Perform type-aware search based on column dtype
@@ -2266,11 +2277,8 @@ class DataFrameTable(DataTable):
         try:
             matches = set(lf.filter(expr).select(RIDX).collect().to_series().to_list())
         except Exception as e:
-            self.notify(
-                f"Error applying search filter [$accent]{term}[/]: [$error]{str(e)}[/]",
-                title="Search",
-                severity="error",
-            )
+            self.notify(f"Error applying search filter [$error]{term}[/]", title="Search", severity="error")
+            self.log(f"Error applying search filter `{term}`: {str(e)}")
             return
 
         match_count = len(matches)
@@ -2335,7 +2343,9 @@ class DataFrameTable(DataTable):
                 try:
                     expr = validate_expr(term, self.df.columns, col_idx)
                 except Exception as e:
-                    raise Exception(f"Error validating Polars expression: {str(e)}")
+                    self.notify(f"Error validating expression [$error]{term}[/]", title="Find", severity="error")
+                    self.log(f"Error validating expression `{term}`: {str(e)}")
+                    return matches
             else:
                 if match_whole:
                     term = f"^{term}$"
@@ -2347,7 +2357,9 @@ class DataFrameTable(DataTable):
             try:
                 matched_ridxs = lf.filter(expr).select(RIDX).collect().to_series().to_list()
             except Exception as e:
-                raise Exception(f"Error applying filter: {str(e)}")
+                self.notify(f"Error applying filter: {expr}", title="Find", severity="error")
+                self.log(f"Error applying filter: {str(e)}")
+                return matches
 
             for ridx in matched_ridxs:
                 matches[ridx].add(col_idx)
@@ -2396,7 +2408,8 @@ class DataFrameTable(DataTable):
         try:
             matches = self._find_matches(term, cidx, match_nocase, match_whole)
         except Exception as e:
-            self.notify(f"Error finding matches for [$error]{term}[/]: {str(e)}", title="Find", severity="error")
+            self.notify(f"Error finding matches for [$error]{term}[/]", title="Find", severity="error")
+            self.log(f"Error finding matches for `{term}`: {str(e)}")
             return
 
         if not matches:
@@ -2429,7 +2442,8 @@ class DataFrameTable(DataTable):
         try:
             matches = self._find_matches(term, cidx=None, match_nocase=match_nocase, match_whole=match_whole)
         except Exception as e:
-            self.notify(f"Error finding matches for [$error]{term}[/]: {str(e)}", title="Find", severity="error")
+            self.notify(f"Error finding matches for [$error]{term}[/]", title="Find", severity="error")
+            self.log(f"Error finding matches for `{term}`: {str(e)}")
             return
 
         if not matches:
@@ -2636,10 +2650,11 @@ class DataFrameTable(DataTable):
 
         except Exception as e:
             self.notify(
-                f"Error replacing [$accent]{term_find}[/] with [$error]{term_replace}[/]: {str(e)}",
+                f"Error replacing [$accent]{term_find}[/] with [$error]{term_replace}[/]",
                 title="Replace",
                 severity="error",
             )
+            self.log(f"Error replacing `{term_find}` with `{term_replace}`: {str(e)}")
 
     def _do_replace_all(self, term_find: str, term_replace: str) -> None:
         """Replace all occurrences."""
@@ -2708,10 +2723,11 @@ class DataFrameTable(DataTable):
             self._show_next_replace_confirmation()
         except Exception as e:
             self.notify(
-                f"Error replacing [$accent]{term_find}[/] with [$error]{term_replace}[/]: {str(e)}",
+                f"Error replacing [$accent]{term_find}[/] with [$error]{term_replace}[/]",
                 title="Replace",
                 severity="error",
             )
+            self.log(f"Error in interactive replace: {str(e)}")
 
     def _show_next_replace_confirmation(self) -> None:
         """Show confirmation for next replacement."""
@@ -2958,9 +2974,8 @@ class DataFrameTable(DataTable):
             try:
                 expr = validate_expr(term, self.df.columns, cidx)
             except Exception as e:
-                self.notify(
-                    f"Error validating expression [$error]{term}[/]: {str(e)}", title="Filter", severity="error"
-                )
+                self.notify(f"Error validating expression [$error]{term}[/]", title="Filter", severity="error")
+                self.log(f"Error validating expression `{term}`: {str(e)}")
                 return
         else:
             dtype = self.df.dtypes[cidx]
@@ -2995,8 +3010,9 @@ class DataFrameTable(DataTable):
         try:
             df_filtered = lf.filter(expr).collect()
         except Exception as e:
-            self.notify(f"Error applying filter [$error]{expr}[/]: {str(e)}", title="Filter", severity="error")
             self.histories.pop()  # Remove last history entry
+            self.notify(f"Error applying filter [$error]{expr}[/]", title="Filter", severity="error")
+            self.log(f"Error applying filter `{expr}`: {str(e)}")
             return
 
         matched_count = len(df_filtered)
@@ -3106,8 +3122,8 @@ class DataFrameTable(DataTable):
                 extra = "current tab with " if len(self.app.tabs) > 1 else ""
                 self.notify(f"Saved {extra}[$accent]{len(self.df)}[/] rows to [$success]{filename}[/]", title="Save")
         except Exception as e:
-            self.notify(f"Error saving [$error]{filename}[/]: {str(e)}", title="Save", severity="error")
-            raise e
+            self.notify(f"Error saving [$error]{filename}[/]", title="Save", severity="error")
+            self.log(f"Error saving file `{filename}`: {str(e)}")
 
     def _do_save_excel(self, filename: str) -> None:
         """Save to an Excel file."""
@@ -3179,7 +3195,8 @@ class DataFrameTable(DataTable):
         try:
             self.df = self.df.sql(sql)
         except Exception as e:
-            self.notify(f"Error executing SQL query [$error]{sql}[/]: {str(e)}", title="SQL Query", severity="error")
+            self.notify(f"Error executing SQL query [$error]{sql}[/]", title="SQL Query", severity="error")
+            self.log(f"Error executing SQL query `{sql}`: {str(e)}")
             return
 
         if not len(self.df):
