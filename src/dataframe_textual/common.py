@@ -504,7 +504,7 @@ def load_file(
         lf = pl.read_json(filename).lazy()
         sources.append((lf, filename, filepath.stem))
     elif file_format == "ndjson":
-        lf = pl.scan_ndjson(filename)
+        lf = pl.scan_ndjson(filename, schema_overrides=schema_overrides)
         sources.append((lf, filename, filepath.stem))
     else:
         raise ValueError(f"Unsupported file format: {file_format}. Supported formats are: {SUPPORTED_FORMATS}")
@@ -514,12 +514,18 @@ def load_file(
         sources = [(lf.collect(), fn, tn) for lf, fn, tn in sources]
     except pl.exceptions.ComputeError as ce:
         err_msg = str(ce)
-        if "found more fields than defined in 'Schema'" in err_msg:
+        # Already disabled schema inference, cannot recover
+        if not infer_schema:
+            print(f"Error loading file `{filename}` with schema inference disabled:\n{err_msg}", file=sys.stderr)
+            sys.exit(1)
+
+        # Schema mismatch error
+        elif "found more fields than defined in 'Schema'" in err_msg:
             print(f"File `{filename}` might be malformed:\n{err_msg}", file=sys.stderr)
             sys.exit(1)
 
         # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
-        elif m := RE_COMPUTE_ERROR.search(err_msg):
+        elif file_format in ("tsv", "csv") and (m := RE_COMPUTE_ERROR.search(err_msg)):
             col_name = m.group(1)
 
             if schema_overrides is None:
