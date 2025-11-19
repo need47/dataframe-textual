@@ -125,7 +125,7 @@ When multiple files are opened:
 ## Command Line Options
 
 ```
-usage: dv [-h] [-f {csv,excel,tsv,parquet,json,ndjson}] [-H] [-I] [-L SKIP_LINES] [-K SKIP_ROWS_AFTER_HEADER] [files ...]
+usage: dv [-h] [-f {csv,excel,tsv,parquet,json,ndjson}] [-H] [-I] [-L SKIP_LINES] [-K SKIP_ROWS_AFTER_HEADER] [-U NULL [NULL ...]] [files ...]
 
 Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).
 
@@ -137,11 +137,13 @@ options:
   -f, --format {csv,excel,tsv,parquet,json,ndjson}
                         Specify the format of the input files
   -H, --no-header       Specify that input files have no header row
-  -I, --no-inferrence   Do not infer data types for CSV/TSV
+  -I, --no-inferrence   Do not infer data types when reading CSV/TSV
   -L, --skip-lines SKIP_LINES
                         Skip lines when reading CSV/TSV (default: 0)
   -K, --skip-rows-after-header SKIP_ROWS_AFTER_HEADER
                         Skip rows after header when reading CSV/TSV (default: 0)
+  -U, --null NULL [NULL ...]
+                        Values to interpret as null values when reading CSV/TSV
 ```
 
 ### CLI Examples
@@ -150,26 +152,35 @@ options:
 # View CSV file without header row
 dv -H data_no_header.csv
 
-# Disable type inference for faster loading of large CSV files
+# Disable type inference for faster loading
 dv -I large_data.csv
 
 # Skip first 3 lines of file (e.g., comments, metadata)
 dv -L 3 data_with_comments.csv
 
-# Skip 2 rows after the header (e.g., units row, empty row)
-dv -K 2 data_with_units.csv
+# Skip 1 row after header (e.g., units row)
+dv -K 1 data_with_units.csv
 
-# Combine options: skip lines, no inference, with gzipped file
-dv -L 5 -I data.csv.gz
+# Treat specific values as null/missing (e.g., 'NA', 'N/A', '-')
+dv -U NA N/A - data.csv
 
-# Complex example: skip 2 lines, then 1 row after header, no type inference
-dv -L 2 -K 1 -I messy_data.csv
+# Multiple null values with different formats
+dv -U NULL NA "" "Not Available" messy_data.csv
 
-# Specify format when reading from stdin
-cat data.tsv | dv -f tsv
+# Complex CSV with comments and units row
+dv -L 3 -K 1 -I messy_scientific_data.csv
 
-# Force CSV format for ambiguous file extension
-dv -f csv mystery_file.txt
+# Combine all options: skip lines, skip after header, no header, no inference, gzipped
+dv -L 2 -K 1 -H -I complex_data.csv.gz
+
+# Process compressed data from stdin with line skipping
+zcat compressed_data.csv.gz | dv -f csv -L 2
+
+# CSV with custom null values and no header
+dv -H -U NA "N/A" "-" raw_data.csv
+
+# Skip lines, specify null values, and disable type inference
+dv -L 5 -U NA "" data_with_metadata.csv
 ```
 
 ## Keyboard Shortcuts

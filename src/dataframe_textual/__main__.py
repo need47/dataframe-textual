@@ -31,14 +31,19 @@ def cli() -> argparse.Namespace:
         help="Specify the format of the input files (csv, excel, tsv etc.)",
     )
     parser.add_argument(
-        "-H", "--no-header", action="store_true", help="Specify that input files have no header row for CSV/TSV"
+        "-H",
+        "--no-header",
+        action="store_true",
+        help="Specify that input files have no header row when reading CSV/TSV",
     )
-    parser.add_argument("-I", "--no-inferrence", action="store_true", help="Do not infer data types for CSV/TSV")
+    parser.add_argument(
+        "-I", "--no-inferrence", action="store_true", help="Do not infer data types when reading CSV/TSV"
+    )
     parser.add_argument("-L", "--skip-lines", type=int, default=0, help="Skip lines when reading CSV/TSV")
     parser.add_argument(
         "-K", "--skip-rows-after-header", type=int, default=0, help="Skip rows after header when reading CSV/TSV"
     )
-    parser.add_argument("-U", "--null", nargs="+", help="Values to interpret as null values for CSV/TSV")
+    parser.add_argument("-U", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
 
     args = parser.parse_args()
     if args.files is None:
