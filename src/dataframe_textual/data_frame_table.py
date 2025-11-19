@@ -1411,6 +1411,7 @@ class DataFrameTable(DataTable):
 
             # Force a refresh
             self._update_count += 1
+            self._require_update_dimensions = True
             self.refresh(layout=True)
 
             # self.notify(f"Expanded column [$success]{col_name}[/] to width [$accent]{max_width}[/]", title="Expand")
