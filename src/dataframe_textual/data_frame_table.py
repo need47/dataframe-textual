@@ -172,8 +172,6 @@ class DataFrameTable(DataTable):
         - **Ctrl+X** - ❌ Delete row and those above
         - **delete** - ❌ Clear current cell (set to NULL)
         - **-** - ❌ Delete current column
-        - **_** - ❌ Delete column and those after
-        - **Ctrl+_** - ❌ Delete column and those before
         - **d** - 📋 Duplicate current column
         - **D** - 📋 Duplicate current row
 
@@ -254,8 +252,6 @@ class DataFrameTable(DataTable):
         # Delete
         ("delete", "clear_cell", "Clear cell"),
         ("minus", "delete_column", "Delete column"),  # `-`
-        ("underscore", "delete_column_and_after", "Delete column and those after"),  # `_`
-        ("ctrl+underscore", "delete_column_and_before", "Delete column and those before"),  # `Ctrl+_`
         ("x", "delete_row", "Delete row"),
         ("X", "delete_row_and_below", "Delete row and those below"),
         ("ctrl+x", "delete_row_and_up", "Delete row and those up"),
@@ -631,14 +627,6 @@ class DataFrameTable(DataTable):
     def action_delete_column(self) -> None:
         """Delete the current column."""
         self._delete_column()
-
-    def action_delete_column_and_after(self) -> None:
-        """Delete the current column and those after."""
-        self._delete_column(more="after")
-
-    def action_delete_column_and_before(self) -> None:
-        """Delete the current column and those before."""
-        self._delete_column(more="before")
 
     def action_hide_column(self) -> None:
         """Hide the current column."""
