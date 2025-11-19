@@ -586,7 +586,7 @@ class AddColumnScreen(YesNoScreen):
             title="Add Column",
             label="Enter column name",
             input="column name",
-            label2="Enter value or Polars expression, e.g., 123, NULL, $_ * 2",
+            label2="Enter value or Polars expression, e.g., abc, pl.lit(123), NULL, $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.concat_str($_, pl.lit('-suffix'))",
             input2="column value or expression",
             on_yes_callback=self._get_input,
         )
