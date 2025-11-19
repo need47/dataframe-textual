@@ -234,6 +234,7 @@ dv -L 5 -U NA "" data_with_metadata.csv
 | `S` | Show statistics for entire dataframe |
 | `K` | Cycle cursor type: cell → row → column → cell |
 | `~` | Toggle row labels |
+| `_` (underscore) | Expand column to full width |
 
 #### Data Editing
 

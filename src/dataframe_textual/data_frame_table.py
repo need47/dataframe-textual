@@ -121,6 +121,7 @@ class DataFrameTable(DataTable):
         - **S** - 📊 Show statistics for entire dataframe
         - **h** - 👁️ Hide current column
         - **H** - 👀 Show all hidden rows/columns
+        - **_** - 📏 Expand column to full width
         - **z** - 📌 Freeze rows and columns
         - **~** - 🏷️ Toggle row labels
         - **,** - 🔢 Toggle thousand separator for numeric display
@@ -212,6 +213,7 @@ class DataFrameTable(DataTable):
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
         ("z", "freeze_row_column", "Freeze rows/columns"),
         ("comma", "show_thousand_separator", "Toggle thousand separator"),  # `,`
+        ("underscore", "expand_column", "Expand column to full width"),  # `_`
         # Copy
         ("c", "copy_cell", "Copy cell to clipboard"),
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
@@ -631,6 +633,10 @@ class DataFrameTable(DataTable):
     def action_hide_column(self) -> None:
         """Hide the current column."""
         self._hide_column()
+
+    def action_expand_column(self) -> None:
+        """Expand the current column to its full width."""
+        self._expand_column()
 
     def action_show_hidden_rows_columns(self) -> None:
         """Show all hidden rows/columns."""
@@ -1375,6 +1381,41 @@ class DataFrameTable(DataTable):
             self.move_cursor(column=len(self.columns) - 1)
 
         # self.notify(f"Hid column [$accent]{col_name}[/]. Press [$success]H[/] to show hidden columns", title="Hide")
+
+    def _expand_column(self) -> None:
+        """Expand the current column to show the widest cell in the loaded data."""
+        col_idx = self.cursor_col_idx
+        col_key = self.cursor_col_key
+        col_name = col_key.value
+        dtype = self.df.dtypes[col_idx]
+
+        # Only expand string columns
+        if dtype != pl.String:
+            return
+
+        # Calculate the maximum width across all loaded rows
+        max_width = len(col_name) + 2  # Start with column name width + padding
+
+        try:
+            # Scan through all loaded rows that are visible to find max width
+            for row_idx in range(self.loaded_rows):
+                if not self.visible_rows[row_idx]:
+                    continue  # Skip hidden rows
+                cell_value = str(self.df.item(row_idx, col_idx))
+                cell_width = measure(self.app.console, cell_value, 1)
+                max_width = max(max_width, cell_width)
+
+            # Update the column width
+            col = self.columns[col_key]
+            col.width = max_width
+
+            # Force a refresh
+            self._update_count += 1
+            self.refresh(layout=True)
+
+            # self.notify(f"Expanded column [$success]{col_name}[/] to width [$accent]{max_width}[/]", title="Expand")
+        except Exception as e:
+            self.log(f"Error expanding column `{col_name}`: {str(e)}")
 
     def _show_hidden_rows_columns(self) -> None:
         """Show all hidden rows/columns by recreating the table."""
