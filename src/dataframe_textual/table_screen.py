@@ -437,7 +437,7 @@ class FrequencyScreen(TableScreen):
                     f"{count:,}" if self.thousand_separator else str(count), style=ds_int.style, justify=ds_int.justify
                 ),
                 Text(
-                    f"{percentage:,.3f}" if self.thousand_separator else f"{percentage:.3f}",
+                    format_float(percentage, self.thousand_separator),
                     style=ds_float.style,
                     justify=ds_float.justify,
                 ),
@@ -451,8 +451,16 @@ class FrequencyScreen(TableScreen):
         # Add a total row
         self.table.add_row(
             Text("Total", style="bold", justify=dc.justify),
-            Text(f"{self.total_count:,}", style="bold", justify="right"),
-            Text("100.000", style="bold", justify="right"),
+            Text(
+                f"{self.total_count:,}" if self.thousand_separator else str(self.total_count),
+                style="bold",
+                justify="right",
+            ),
+            Text(
+                format_float(100.0, self.thousand_separator),
+                style="bold",
+                justify="right",
+            ),
             Bar(
                 highlight_range=(0.0, 10),
                 width=10,
