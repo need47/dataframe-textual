@@ -31,9 +31,6 @@ BOOLS = {
 NULL = "NULL"
 NULL_DISPLAY = "-"
 
-# Common null value representations
-NULL_VALUES = ["null", "NULL", "Null", "NaN", "nan", "NA", "na", "N/A", "n/a", ""]
-
 
 @dataclass
 class DtypeClass:
@@ -358,6 +355,7 @@ def load_dataframe(
     infer_schema: bool = True,
     skip_lines: int = 0,
     skip_rows_after_header: int = 0,
+    null_values: list[str] | None = None,
 ) -> list[tuple[pl.DataFrame, str, str]]:
     """Load DataFrames from file specifications.
 
@@ -399,6 +397,7 @@ def load_dataframe(
                 infer_schema=infer_schema,
                 skip_lines=skip_lines,
                 skip_rows_after_header=skip_rows_after_header,
+                null_values=null_values,
             )
         )
 
@@ -418,6 +417,7 @@ def load_file(
     skip_lines: int = 0,
     skip_rows_after_header: int = 0,
     schema_overrides: dict[str, pl.DataType] | None = None,
+    null_values: list[str] | None = None,
 ) -> list[tuple[pl.DataFrame, str, str]]:
     """Load a single file and return list of sources.
 
@@ -458,6 +458,7 @@ def load_file(
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
             schema_overrides=schema_overrides,
+            null_values=null_values,
         )
 
         # Reopen stdin to /dev/tty for proper terminal interaction
@@ -482,6 +483,7 @@ def load_file(
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
             schema_overrides=schema_overrides,
+            null_values=null_values,
         )
         sources.append((lf, filename, filepath.stem))
     elif file_format in ("xlsx", "xls", "excel"):
@@ -534,6 +536,7 @@ def load_file(
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
             schema_overrides=schema_overrides,
+            null_values=null_values,
         )
 
     return sources

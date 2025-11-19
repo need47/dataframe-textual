@@ -80,7 +80,7 @@ class DataFrameViewer(App):
 
         Args:
             sources: sources to load dataframes from, each as a tuple of
-                     (DataFrame | LazyFrame, filename, tabname).
+                     (DataFrame, filename, tabname).
 
         Returns:
             None
@@ -306,7 +306,7 @@ class DataFrameViewer(App):
         else:
             self.notify(f"File does not exist: [$warning]{filename}[/]", title="Open", severity="warning")
 
-    def _add_tab(self, df: pl.DataFrame | pl.LazyFrame, filename: str, tabname: str) -> None:
+    def _add_tab(self, df: pl.DataFrame, filename: str, tabname: str) -> None:
         """Add new tab for the given DataFrame.
 
         Creates and adds a new tab with the provided DataFrame and configuration.
