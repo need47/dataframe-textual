@@ -125,7 +125,7 @@ When multiple files are opened:
 ## Command Line Options
 
 ```
-usage: dv [-h] [-f {csv,excel,tsv,parquet,json,ndjson}] [-H] [-I] [-c COMMENT_PREFIX] [-q QUOTE_CHAR] [-l SKIP_LINES] [-a SKIP_ROWS_AFTER_HEADER] [-u NULL [NULL ...]] [files ...]
+usage: dv [-h] [-f {csv,excel,tsv,parquet,json,ndjson}] [-H] [-I] [-E] [-c COMMENT_PREFIX] [-q QUOTE_CHAR] [-l SKIP_LINES] [-a SKIP_ROWS_AFTER_HEADER] [-u NULL [NULL ...]] [files ...]
 
 Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).
 
@@ -138,6 +138,7 @@ options:
                         Specify the format of the input files
   -H, --no-header       Specify that input files have no header row
   -I, --no-inferrence   Do not infer data types when reading CSV/TSV
+  -E, --ignore-errors   Ignore errors when reading CSV/TSV
   -c, --comment-prefix COMMENT_PREFIX
                         Comment lines are skipped when reading CSV/TSV (default: skip none)
   -q, --quote-char QUOTE_CHAR
@@ -158,6 +159,9 @@ dv -H data_no_header.csv
 
 # Disable type inference for faster loading
 dv -I large_data.csv
+
+# Ignore parsing errors in malformed CSV
+dv -E data_with_errors.csv
 
 # Skip first 3 lines of file (e.g., comments, metadata)
 dv -l 3 data_with_comments.csv
