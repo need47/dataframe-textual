@@ -248,34 +248,41 @@ def get_next_item(lst: list[Any], current, offset=1) -> Any:
     return lst[next_index]
 
 
-def parse_placeholders(template: str, columns: list[str], current_col_idx: int) -> list[pl.Expr]:
-    """Parse template string and build a list of Polars expressions for concatenation.
+def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> list[str | pl.Expr]:
+    """Parse template string into a list of strings or Polars expressions
 
-    Supports multiple placeholder types for flexible URL/template generation:
-    - `$_` - Current column (based on current_col_idx parameter)
+    Supports multiple placeholder types:
+    - `$_` - Current column (based on current_cidx parameter)
     - `$#` - Row index (1-based, requires '^__ridx__^' column to be present)
-    - `$1`, `$2`, etc. - Column by 1-based position index
-    - `$name` - Column by name (e.g., `$product_id`)
+    - `$1`, `$2`, etc. - Column index (1-based)
+    - `$name` - Column name (e.g., `$product_id`)
 
     Args:
         template: The template string containing placeholders and literal text
         columns: List of column names in the dataframe
-        current_col_idx: 0-based index of the current column for `$_` references
+        current_cidx: 0-based index of the current column for `$_` references in the columns list
 
     Returns:
-        List of Polars expressions (mix of `pl.lit()` for literals and `pl.col()` for columns)
-        ready to be passed to `pl.concat_str()`
+        A list of strings (literal text) and Polars expressions (for column references)
 
     Raises:
         ValueError: If invalid column index or non-existent column name is referenced
     """
+    if "$" not in template or template.endswith("$"):
+        return [template]
+
     # Regex matches: $_ or $\d+ or $\w+ (column names)
-    placeholder_pattern = r"\$(_|#|\d+|\w+)"
+    placeholder_pattern = r"\$(_|#|\d+|[a-zA-Z_]\w*)"
     placeholders = re.finditer(placeholder_pattern, template)
 
     parts = []
     last_end = 0
-    col_name = columns[current_col_idx]  # Get current column name for $_ references
+
+    # Get current column name for $_ references
+    try:
+        col_name = columns[current_cidx]
+    except IndexError:
+        raise ValueError(f"Current column index {current_cidx} is out of range for columns list")
 
     for match in placeholders:
         # Add literal text before this placeholder
@@ -293,10 +300,10 @@ def parse_placeholders(template: str, columns: list[str], current_col_idx: int) 
         elif placeholder.isdigit():
             # $1, $2, etc. refer to columns by 1-based position index
             col_idx = int(placeholder) - 1  # Convert to 0-based
-            if 0 <= col_idx < len(columns):
+            try:
                 col_ref = columns[col_idx]
                 parts.append(pl.col(col_ref))
-            else:
+            except IndexError:
                 raise ValueError(f"Invalid column index: ${placeholder} (valid range: $1 to ${len(columns)})")
         else:
             # $name refers to column by name
@@ -318,14 +325,14 @@ def parse_placeholders(template: str, columns: list[str], current_col_idx: int) 
     return parts
 
 
-def parse_polars_expression(expression: str, columns: list[str], current_col_idx: int) -> str:
+def parse_polars_expression(expression: str, columns: list[str], current_cidx: int) -> str:
     """Parse and convert an expression to Polars syntax.
 
     Replaces column references with Polars col() expressions:
     - $_ - Current selected column
     - $# - Row index (1-based, requires '^__ridx__^' column to be present)
-    - $1, $2, etc. - Column by 1-based index
-    - $col_name - Column by name (valid identifier starting with _ or letter)
+    - $1, $2, etc. - Column index (1-based)
+    - $col_name - Column name (valid identifier starting with _ or letter)
 
     Examples:
     - "$_ > 50" -> "pl.col('current_col') > 50"
@@ -337,7 +344,7 @@ def parse_polars_expression(expression: str, columns: list[str], current_col_idx
     Args:
         expression: The input expression as a string.
         columns: The list of column names in the DataFrame.
-        current_col_idx: The index of the currently selected column (0-based). Used for $_ reference.
+        current_cidx: The index of the currently selected column (0-based). Used for $_ reference.
 
     Returns:
         A Python expression string with $references replaced by pl.col() calls.
@@ -354,38 +361,18 @@ def parse_polars_expression(expression: str, columns: list[str], current_col_idx
             # Return as a literal string
             return f"pl.lit({expression})"
 
-    # Pattern to match $ followed by either:
-    # - _ (single underscore)
-    # - # (hash for row index)
-    # - digits (integer)
-    # - identifier (starts with letter or _, followed by letter/digit/_)
-    pattern = r"\$(_|#|\d+|[a-zA-Z_]\w*)"
+    parts = parse_placeholders(expression, columns, current_cidx)
 
-    def replace_column_ref(match):
-        col_ref = match.group(1)
+    result = []
+    for part in parts:
+        if isinstance(part, pl.Expr):
+            col = part.meta.output_name()
 
-        if col_ref == "_":
-            # Current selected column
-            col_name = columns[current_col_idx]
-        elif col_ref == "#":
-            # RIDX is used to store 0-based row index; add 1 for 1-based index
-            return f"(pl.col('{RIDX}') + 1)"
-        elif col_ref.isdigit():
-            # Column by 1-based index
-            col_idx = int(col_ref) - 1
-            if col_idx < 0 or col_idx >= len(columns):
-                raise ValueError(f"Column index out of range: ${col_ref}")
-            col_name = columns[col_idx]
+            result.append(f"pl.col('{col}')")
         else:
-            # Column by name
-            if col_ref not in columns:
-                raise ValueError(f"Column not found: ${col_ref}")
-            col_name = col_ref
+            result.append(part)
 
-        return f"pl.col('{col_name}')"
-
-    result = re.sub(pattern, replace_column_ref, expression)
-    return result
+    return "".join(result)
 
 
 def tentative_expr(term: str) -> bool:
@@ -710,69 +697,3 @@ async def sleep_async(seconds: float) -> None:
     import asyncio
 
     await asyncio.sleep(seconds)
-
-
-def parse_placeholders(template: str, columns: list[str], current_col_idx: int) -> list[pl.Expr]:
-    """Parse template string and build a list of Polars expressions for concatenation.
-
-    Supports multiple placeholder types for flexible URL/template generation:
-    - `$_` - Current column (based on current_col_idx parameter)
-    - `$1`, `$2`, etc. - Column by 1-based position index
-    - `$name` - Column by name (e.g., `$product_id`)
-
-    Args:
-        template: The template string containing placeholders and literal text
-        columns: List of column names in the dataframe
-        current_col_idx: 0-based index of the current column for `$_` references
-
-    Returns:
-        List of Polars expressions (mix of `pl.lit()` for literals and `pl.col()` for columns)
-        ready to be passed to `pl.concat_str()`
-
-    Raises:
-        ValueError: If invalid column index or non-existent column name is referenced
-    """
-    # Regex matches: $_ or $\d+ or $\w+ (column names)
-    placeholder_pattern = r"\$(_|\d+|\w+)"
-    placeholders = re.finditer(placeholder_pattern, template)
-
-    parts = []
-    last_end = 0
-    col_name = columns[current_col_idx]  # Get current column name for $_ references
-
-    for match in placeholders:
-        # Add literal text before this placeholder
-        if match.start() > last_end:
-            parts.append(pl.lit(template[last_end : match.start()]))
-
-        placeholder = match.group(1)  # Extract content after '$'
-
-        if placeholder == "_":
-            # $_ refers to current column (where cursor was)
-            parts.append(pl.col(col_name).cast(pl.String))
-        elif placeholder.isdigit():
-            # $1, $2, etc. refer to columns by 1-based position index
-            col_idx = int(placeholder) - 1  # Convert to 0-based
-            if 0 <= col_idx < len(columns):
-                col_ref = columns[col_idx]
-                parts.append(pl.col(col_ref).cast(pl.String))
-            else:
-                raise ValueError(f"Invalid column index: ${placeholder} (valid range: $1 to ${len(columns)})")
-        else:
-            # $name refers to column by name
-            if placeholder in columns:
-                parts.append(pl.col(placeholder).cast(pl.String))
-            else:
-                raise ValueError(f"Column not found: ${placeholder} (available columns: {', '.join(columns)})")
-
-        last_end = match.end()
-
-    # Add remaining literal text after last placeholder
-    if last_end < len(template):
-        parts.append(pl.lit(template[last_end:]))
-
-    # If no placeholders found, treat entire template as literal
-    if not parts:
-        parts = [pl.lit(template)]
-
-    return parts

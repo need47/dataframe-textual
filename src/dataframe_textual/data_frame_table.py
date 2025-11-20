@@ -2166,7 +2166,8 @@ class DataFrameTable(DataTable):
             parts = parse_placeholders(link_template, self.df.columns, cidx)
 
             # Build the concatenation expression
-            new_col = pl.concat_str(parts).alias(new_col_name)
+            exprs = [part if isinstance(part, pl.Expr) else pl.lit(part) for part in parts]
+            new_col = pl.concat_str(exprs).alias(new_col_name)
 
             # Get columns up to current, the new column, then remaining columns
             cols = self.df.columns
