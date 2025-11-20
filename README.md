@@ -9,7 +9,21 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/J
 ### Data Viewing
 - 🚀 **Fast Loading** - Powered by Polars for efficient data handling
 - 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with various data types (e.g., integer, float, string)
-- ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls for browsing, editing, and manipulating data
+- ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls
+# Skip first 5 lines (comments, metadata)
+dv -l 5 data_with_metadata.csv
+
+# Skip 1 row after header (e.g., units row)
+dv -a 1 data_with_units.csv
+
+# Complex CSV with comments and units row
+dv -l 3 -a 1 -I messy_scientific_data.csv
+
+# Combine all options: skip lines, skip after header, no header, no inference, gzipped
+dv -l 2 -a 1 -H -I complex_data.csv.gz
+
+# Process compressed data from stdin with line skipping
+zcat compressed_data.csv.gz | dv -f csv -l 2editing, and manipulating data
 - 📊 **Flexible Input** - Read from files and/or stdin (pipes/redirects)
 - 🔄 **Smart Pagination** - Lazy load rows on demand for handling large datasets
 
@@ -267,6 +281,7 @@ dv -c "#" -u NA "N/A" commented_data.csv
 | `E` | Edit entire column with expression |
 | `a` | Add empty column after current |
 | `A` | Add column with name and value/expression |
+| `@` | Add a link column from template expression |
 | `-` (minus) | Delete current column |
 | `x` | Delete current row |
 | `X` | Delete current row and all rows below |
@@ -327,7 +342,7 @@ dv -c "#" -u NA "N/A" commented_data.csv
 | `Shift+←` | Move current column left |
 | `Shift+→` | Move current column right |
 
-#### Type Conversion & Links
+#### Type Conversion
 
 | Key | Action |
 |-----|--------|
@@ -335,8 +350,6 @@ dv -c "#" -u NA "N/A" commented_data.csv
 | `%` | Cast current column to float (Float64) |
 | `!` | Cast current column to boolean |
 | `$` | Cast current column to string |
-| `@` | Make URLs in current column clickable with Ctrl/Cmd + click |
-| `Ctrl+@` | Add a new link column from template expression |
 
 #### Data Management
 
@@ -758,14 +771,7 @@ Press `K` to cycle through selection modes:
 2. **Row mode**: Highlight entire row
 3. **Column mode**: Highlight entire column
 
-### 18. URL Handling
-
-Press `@` to make URLs in the current column clickable:
-- **Ctrl/Cmd + click** on URLs to open them in your default browser
-- **Scans** all cells in the current column for URLs starting with `http://` or `https://`
-- **Applies** link styling to make them clickable and dataframe remains unchanged
-
-### 19. SQL Interface
+### 18. SQL Interface
 
 The SQL interface provides two modes for querying your dataframe:
 
@@ -798,7 +804,7 @@ FROM self
 WHERE (age > 25 AND salary > 50000) OR department = 'Management'
 ```
 
-### 20. Clipboard Operations
+### 19. Clipboard Operations
 
 Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux
 

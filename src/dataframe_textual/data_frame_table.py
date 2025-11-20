@@ -188,8 +188,7 @@ class DataFrameTable(DataTable):
         - **$** - 📝 Cast column to string
 
         ## 🔗 URL Handling
-        - **@** - 🔗 Make URLs in current column clickable with Ctrl/Cmd
-        - **Ctrl+@** - 🔗 Add a new link column from template expression (e.g., `https://example.com/$_`)
+        - **@** - 🔗 Add a new link column from template expression (e.g., `https://example.com/$_`)
 
         ## 💾 Data Management
         - **c** - 📋 Copy cell to clipboard
@@ -268,6 +267,7 @@ class DataFrameTable(DataTable):
         # Add
         ("a", "add_column", "Add column"),
         ("A", "add_column_expr", "Add column with expression"),
+        ("at", "add_link_column", "Add a link column"),  # `@`
         # Reorder
         ("shift+left", "move_column_left", "Move column left"),
         ("shift+right", "move_column_right", "Move column right"),
@@ -278,8 +278,6 @@ class DataFrameTable(DataTable):
         ("percent_sign", "cast_column_dtype('pl.Float64')", "Cast column dtype to float"),  # `%`
         ("exclamation_mark", "cast_column_dtype('pl.Boolean')", "Cast column dtype to bool"),  # `!`
         ("dollar_sign", "cast_column_dtype('pl.String')", "Cast column dtype to string"),  # `$`
-        ("at", "make_cell_clickable", "Make cell clickable"),  # `@`
-        ("ctrl+@", "add_link_column", "Add a link column"),  # `ctrl+@`
         # Sql
         ("l", "simple_sql", "Simple SQL interface"),
         ("L", "advanced_sql", "Advanced SQL interface"),
@@ -693,6 +691,10 @@ class DataFrameTable(DataTable):
         """Add a new column with optional expression after the current column."""
         self._add_column_expr()
 
+    def action_add_link_column(self) -> None:
+        """Open AddLinkScreen to create a new link column from a Polars expression."""
+        self._add_link_column()
+
     def action_rename_column(self) -> None:
         """Rename the current column."""
         self._rename_column()
@@ -858,14 +860,6 @@ class DataFrameTable(DataTable):
             )
         except (FileNotFoundError, IndexError):
             self.notify("Error copying row", title="Clipboard", severity="error")
-
-    def action_make_cell_clickable(self) -> None:
-        """Make cells with URLs in current column clickable."""
-        self._make_cell_clickable()
-
-    def action_add_link_column(self) -> None:
-        """Open AddLinkScreen to create a new link column from a Polars expression."""
-        self._add_link_column()
 
     def action_show_thousand_separator(self) -> None:
         """Toggle thousand separator for numeric display."""
@@ -1455,40 +1449,6 @@ class DataFrameTable(DataTable):
             f"Showed [$accent]{hidden_row_count}[/] hidden row(s) and/or [$accent]{hidden_col_count}[/] column(s)",
             title="Show",
         )
-
-    def _make_cell_clickable(self) -> None:
-        """Make cells with URLs in the current column clickable.
-
-        Scans all loaded rows in the current column for cells containing URLs
-        (starting with 'http://' or 'https://') and applies Textual link styling
-        to make them clickable. Does not modify the dataframe.
-
-        Returns:
-            None
-        """
-        cidx = self.cursor_col_idx
-        col_key = self.cursor_col_key
-        dtype = self.df.dtypes[cidx]
-
-        # Only process string columns
-        if dtype != pl.String:
-            return
-
-        # Count how many URLs were made clickable
-        url_count = 0
-
-        # Iterate through all loaded rows and make URLs clickable
-        for row in self.ordered_rows:
-            cell_text: Text = self.get_cell(row.key, col_key)
-            if cell_text.plain.startswith(("http://", "https://")):
-                cell_text.style = f"#00afff link {cell_text.plain}"  # sky blue
-                self.update_cell(row.key, col_key, cell_text)
-                url_count += 1
-
-        if url_count:
-            self.notify(
-                f"Use Ctrl/Cmd click to open the links in column [$success]{col_key.value}[/]", title="Hyperlink"
-            )
 
     # Delete & Move
     def _delete_column(self, more: str = None) -> None:
