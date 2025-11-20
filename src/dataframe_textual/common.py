@@ -248,6 +248,76 @@ def get_next_item(lst: list[Any], current, offset=1) -> Any:
     return lst[next_index]
 
 
+def parse_placeholders(template: str, columns: list[str], current_col_idx: int) -> list[pl.Expr]:
+    """Parse template string and build a list of Polars expressions for concatenation.
+
+    Supports multiple placeholder types for flexible URL/template generation:
+    - `$_` - Current column (based on current_col_idx parameter)
+    - `$#` - Row index (1-based, requires '^__ridx__^' column to be present)
+    - `$1`, `$2`, etc. - Column by 1-based position index
+    - `$name` - Column by name (e.g., `$product_id`)
+
+    Args:
+        template: The template string containing placeholders and literal text
+        columns: List of column names in the dataframe
+        current_col_idx: 0-based index of the current column for `$_` references
+
+    Returns:
+        List of Polars expressions (mix of `pl.lit()` for literals and `pl.col()` for columns)
+        ready to be passed to `pl.concat_str()`
+
+    Raises:
+        ValueError: If invalid column index or non-existent column name is referenced
+    """
+    # Regex matches: $_ or $\d+ or $\w+ (column names)
+    placeholder_pattern = r"\$(_|#|\d+|\w+)"
+    placeholders = re.finditer(placeholder_pattern, template)
+
+    parts = []
+    last_end = 0
+    col_name = columns[current_col_idx]  # Get current column name for $_ references
+
+    for match in placeholders:
+        # Add literal text before this placeholder
+        if match.start() > last_end:
+            parts.append(template[last_end : match.start()])
+
+        placeholder = match.group(1)  # Extract content after '$'
+
+        if placeholder == "_":
+            # $_ refers to current column (where cursor was)
+            parts.append(pl.col(col_name))
+        elif placeholder == "#":
+            # $# refers to row index (1-based)
+            parts.append((pl.col(RIDX)))
+        elif placeholder.isdigit():
+            # $1, $2, etc. refer to columns by 1-based position index
+            col_idx = int(placeholder) - 1  # Convert to 0-based
+            if 0 <= col_idx < len(columns):
+                col_ref = columns[col_idx]
+                parts.append(pl.col(col_ref))
+            else:
+                raise ValueError(f"Invalid column index: ${placeholder} (valid range: $1 to ${len(columns)})")
+        else:
+            # $name refers to column by name
+            if placeholder in columns:
+                parts.append(pl.col(placeholder))
+            else:
+                raise ValueError(f"Column not found: ${placeholder} (available columns: {', '.join(columns)})")
+
+        last_end = match.end()
+
+    # Add remaining literal text after last placeholder
+    if last_end < len(template):
+        parts.append(template[last_end:])
+
+    # If no placeholders found, treat entire template as literal
+    if not parts:
+        parts = [template]
+
+    return parts
+
+
 def parse_polars_expression(expression: str, columns: list[str], current_col_idx: int) -> str:
     """Parse and convert an expression to Polars syntax.
 
@@ -640,3 +710,69 @@ async def sleep_async(seconds: float) -> None:
     import asyncio
 
     await asyncio.sleep(seconds)
+
+
+def parse_placeholders(template: str, columns: list[str], current_col_idx: int) -> list[pl.Expr]:
+    """Parse template string and build a list of Polars expressions for concatenation.
+
+    Supports multiple placeholder types for flexible URL/template generation:
+    - `$_` - Current column (based on current_col_idx parameter)
+    - `$1`, `$2`, etc. - Column by 1-based position index
+    - `$name` - Column by name (e.g., `$product_id`)
+
+    Args:
+        template: The template string containing placeholders and literal text
+        columns: List of column names in the dataframe
+        current_col_idx: 0-based index of the current column for `$_` references
+
+    Returns:
+        List of Polars expressions (mix of `pl.lit()` for literals and `pl.col()` for columns)
+        ready to be passed to `pl.concat_str()`
+
+    Raises:
+        ValueError: If invalid column index or non-existent column name is referenced
+    """
+    # Regex matches: $_ or $\d+ or $\w+ (column names)
+    placeholder_pattern = r"\$(_|\d+|\w+)"
+    placeholders = re.finditer(placeholder_pattern, template)
+
+    parts = []
+    last_end = 0
+    col_name = columns[current_col_idx]  # Get current column name for $_ references
+
+    for match in placeholders:
+        # Add literal text before this placeholder
+        if match.start() > last_end:
+            parts.append(pl.lit(template[last_end : match.start()]))
+
+        placeholder = match.group(1)  # Extract content after '$'
+
+        if placeholder == "_":
+            # $_ refers to current column (where cursor was)
+            parts.append(pl.col(col_name).cast(pl.String))
+        elif placeholder.isdigit():
+            # $1, $2, etc. refer to columns by 1-based position index
+            col_idx = int(placeholder) - 1  # Convert to 0-based
+            if 0 <= col_idx < len(columns):
+                col_ref = columns[col_idx]
+                parts.append(pl.col(col_ref).cast(pl.String))
+            else:
+                raise ValueError(f"Invalid column index: ${placeholder} (valid range: $1 to ${len(columns)})")
+        else:
+            # $name refers to column by name
+            if placeholder in columns:
+                parts.append(pl.col(placeholder).cast(pl.String))
+            else:
+                raise ValueError(f"Column not found: ${placeholder} (available columns: {', '.join(columns)})")
+
+        last_end = match.end()
+
+    # Add remaining literal text after last placeholder
+    if last_end < len(template):
+        parts.append(pl.lit(template[last_end:]))
+
+    # If no placeholders found, treat entire template as literal
+    if not parts:
+        parts = [pl.lit(template)]
+
+    return parts

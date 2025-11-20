@@ -31,6 +31,7 @@ from .common import (
     DtypeConfig,
     format_row,
     get_next_item,
+    parse_placeholders,
     rindex,
     sleep_async,
     tentative_expr,
@@ -2133,12 +2134,16 @@ class DataFrameTable(DataTable):
         """Handle result from AddLinkScreen.
 
         Creates a new link column in the dataframe with clickable links based on a
-        user-provided value or Polars expression. The expression is evaluated for each
-        row and the results are styled as clickable hyperlinks in the display. The new
-        column is inserted after the current column.
+        user-provided template. Supports multiple placeholder types:
+        - `$_` - Current column (based on cursor position)
+        - `$1`, `$2`, etc. - Column by 1-based position index
+        - `$name` - Column by name (e.g., `$id`, `$product_name`)
+
+        The template is evaluated for each row using Polars expressions with vectorized
+        string concatenation. The new column is inserted after the current column.
 
         Args:
-            result: Tuple of (column_name, expression) or None if cancelled.
+            result: Tuple of (cidx, new_col_name, link_template) or None if cancelled.
 
         Returns:
             None
@@ -2146,7 +2151,6 @@ class DataFrameTable(DataTable):
         if result is None:
             return
         cidx, new_col_name, link_template = result
-        col_name = self.df.columns[cidx]
 
         self._add_history(f"Added link column [$success]{new_col_name}[/] with template {link_template}.")
 
@@ -2158,11 +2162,10 @@ class DataFrameTable(DataTable):
             if not link_template.startswith(("https://", "http://")):
                 link_template = "https://" + link_template
 
-            # Create link column by splitting template on '$_' and rebuilding with column values
-            tokens = link_template.split("$_")
-            parts = [pl.lit(tokens[0])]
-            for token in tokens[1:]:
-                parts.extend([pl.col(col_name).cast(pl.String), pl.lit(token)])
+            # Parse template placeholders into Polars expressions
+            parts = parse_placeholders(link_template, self.df.columns, cidx)
+
+            # Build the concatenation expression
             new_col = pl.concat_str(parts).alias(new_col_name)
 
             # Get columns up to current, the new column, then remaining columns
@@ -2184,9 +2187,8 @@ class DataFrameTable(DataTable):
 
         except Exception as e:
             self.notify(f"Error adding link column: {str(e)}", title="Add Link", severity="error")
-            self.log(f"Error adding link column: {str(e)}")
+            self.log(f"Error adding link column: {str(e)}")  # Type Casting
 
-    # Type Casting
     def _cast_column_dtype(self, dtype: str) -> None:
         """Cast the current column to a different data type.
 

@@ -813,6 +813,73 @@ Press `Ctrl+C` to copy:
 - Press `Ctrl+C` to copy column values
 - Press `Ctrl+R` to copy row values (delimited by tab)
 
+### 20. Link Column Creation
+
+Press `@` to create a new column containing dynamically generated URLs using template expressions.
+
+**Template Placeholders:**
+
+The link template supports multiple placeholder types for maximum flexibility:
+
+- **`$_`** - Current column (the column where cursor was when `@` was pressed)
+  - Example: `https://example.com/search/$_` - Uses values from the current column
+  - Useful for quick links based on the focused column
+
+- **`$1`, `$2`, `$3`, etc.** - Column by 1-based position index
+  - Example: `https://example.com/product/$1/details/$2` - Uses 1st and 2nd columns
+  - Useful for structured templates spanning multiple columns
+  - Index corresponds to column display order (left-to-right)
+
+- **`$name`** - Column by name (use actual column names)
+  - Example: `https://pubchem.ncbi.nlm.nih.gov/search?q=$product_id` - Uses `product_id` column
+  - Example: `https://example.com/$region/$city/data` - Uses `region` and `city` columns
+  - Useful for readable, self-documenting templates
+
+**Features:**
+
+- **Vectorized Expression**: All rows processed efficiently using Polars' vectorized operations
+- **Type Casting**: Column values automatically converted to strings for URL construction
+- **Multiple Placeholders**: Mix and match placeholders in a single template
+- **URL Prefix**: Automatically prepends `https://` if URL doesn't start with `http://` or `https://`
+- **PubChem Support**: Special shorthand - replace `PC` with full PubChem URL
+
+**Examples:**
+
+```
+Template: https://example.com/$_
+Current column: product_id
+Result: https://example.com/ABC123 (for each row's product_id value)
+
+Template: https://database.org/view?id=$1&lang=$2
+Column 1: item_code, Column 2: language
+Result: https://database.org/view?id=X001&lang=en
+
+Template: https://example.com/$username/profile
+Column: username (must exist in dataframe)
+Result: https://example.com/john_doe/profile
+
+Template: https://example.com/$region/$city
+Columns: region, city
+Result: https://example.com/north/seattle
+
+Template: PC/compound/$1
+Column 1: pubchem_cid
+Result: https://pubchem.ncbi.nlm.nih.gov/compound/12345
+```
+
+**Error Handling:**
+
+- **Invalid column index**: `$5` when only 3 columns exist → Error message showing valid range
+- **Non-existent column name**: `$invalid_column` → Error message with available columns
+- **No placeholders**: Template treated as constant → All rows get identical URL
+
+**Tips:**
+
+- Use descriptive column names for `$name` placeholders to make templates self-documenting
+- Test with a small dataset first to verify template correctness
+- Use full undo (`u`) if template produces unexpected URLs
+- For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
+
 ## Examples
 
 ### Single File Examples
