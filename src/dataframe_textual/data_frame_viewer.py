@@ -12,7 +12,7 @@ from textual.theme import BUILTIN_THEMES
 from textual.widgets import TabbedContent, TabPane
 from textual.widgets.tabbed_content import ContentTabs
 
-from .common import get_next_item, load_file
+from .common import Source, get_next_item, load_file
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
 from .yes_no_screen import OpenFileScreen, SaveFileScreen
@@ -73,7 +73,7 @@ class DataFrameViewer(App):
         }
     """
 
-    def __init__(self, *sources: str) -> None:
+    def __init__(self, *sources: Source) -> None:
         """Initialize the DataFrame Viewer application.
 
         Loads data from provided sources and prepares the tabbed interface.
@@ -103,7 +103,8 @@ class DataFrameViewer(App):
         self.tabbed = TabbedContent(id="main_tabs")
         with self.tabbed:
             seen_names = set()
-            for idx, (df, filename, tabname) in enumerate(self.sources, start=1):
+            for idx, source in enumerate(self.sources, start=1):
+                df, filename, tabname = source.frame, source.filename, source.tabname
                 tab_id = f"tab_{idx}"
 
                 if not tabname:
