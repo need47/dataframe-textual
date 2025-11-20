@@ -40,6 +40,7 @@ from .sql_screen import AdvancedSqlScreen, SimpleSqlScreen
 from .table_screen import FrequencyScreen, RowDetailScreen, StatisticsScreen
 from .yes_no_screen import (
     AddColumnScreen,
+    AddLinkScreen,
     ConfirmScreen,
     EditCellScreen,
     EditColumnScreen,
@@ -277,6 +278,7 @@ class DataFrameTable(DataTable):
         ("exclamation_mark", "cast_column_dtype('pl.Boolean')", "Cast column dtype to bool"),  # `!`
         ("dollar_sign", "cast_column_dtype('pl.String')", "Cast column dtype to string"),  # `$`
         ("at", "make_cell_clickable", "Make cell clickable"),  # `@`
+        ("ctrl+@", "add_link", "Add a link column"),  # `ctrl+@`
         # Sql
         ("l", "simple_sql", "Simple SQL interface"),
         ("L", "advanced_sql", "Advanced SQL interface"),
@@ -859,6 +861,10 @@ class DataFrameTable(DataTable):
     def action_make_cell_clickable(self) -> None:
         """Make cells with URLs in current column clickable."""
         self._make_cell_clickable()
+
+    def action_add_link(self) -> None:
+        """Open AddLinkScreen to create a new link column from a Polars expression."""
+        self._add_link()
 
     def action_show_thousand_separator(self) -> None:
         """Toggle thousand separator for numeric display."""
@@ -2125,14 +2131,14 @@ class DataFrameTable(DataTable):
         if result is None:
             return
 
-        cidx, col_name, expr = result
+        cidx, new_col_name, expr = result
 
         # Add to history
-        self._add_history(f"Added column [$success]{col_name}[/] with expression {expr}.")
+        self._add_history(f"Added column [$success]{new_col_name}[/] with expression {expr}.")
 
         try:
             # Create the column
-            new_col = expr.alias(col_name)
+            new_col = expr.alias(new_col_name)
 
             # Get columns up to current, the new column, then remaining columns
             cols = self.df.columns
@@ -2140,7 +2146,7 @@ class DataFrameTable(DataTable):
             cols_after = cols[cidx + 1 :]
 
             # Build the new dataframe with columns reordered
-            select_cols = cols_before + [col_name] + cols_after
+            select_cols = cols_before + [new_col_name] + cols_after
             self.df = self.df.with_row_index(RIDX).with_columns(new_col).select(select_cols)
 
             # Recreate table for display
@@ -2152,7 +2158,63 @@ class DataFrameTable(DataTable):
             # self.notify(f"Added column [$success]{col_name}[/]", title="Add Column")
         except Exception as e:
             self.notify("Error adding column", title="Add Column", severity="error")
-            self.log(f"Error adding column `{col_name}`: {str(e)}")
+            self.log(f"Error adding column `{new_col_name}`: {str(e)}")
+
+    def _add_link(self) -> None:
+        self.app.push_screen(
+            AddLinkScreen(self.cursor_col_idx, self.df),
+            callback=self._do_add_link,
+        )
+
+    def _do_add_link(self, result: tuple[str, str] | None) -> None:
+        """Handle result from AddLinkScreen.
+
+        Creates a new link column in the dataframe with clickable links based on a
+        user-provided value or Polars expression. The expression is evaluated for each
+        row and the results are styled as clickable hyperlinks in the display. The new
+        column is inserted after the current column.
+
+        Args:
+            result: Tuple of (column_name, expression) or None if cancelled.
+
+        Returns:
+            None
+        """
+        if result is None:
+            return
+        cidx, new_col_name, link_template = result
+        col_name = self.df.columns[cidx]
+
+        self._add_history(f"Added link column [$success]{new_col_name}[/] with template {link_template}.")
+
+        try:
+            # Create link column by splitting template on '$_' and rebuilding with column values
+            tokens = link_template.split("$_")
+            parts = [pl.lit(tokens[0])]
+            for token in tokens[1:]:
+                parts.extend([pl.col(col_name).cast(pl.String), pl.lit(token)])
+            new_col = pl.concat_str(parts).alias(new_col_name)
+
+            # Get columns up to current, the new column, then remaining columns
+            cols = self.df.columns
+            cols_before = cols[: cidx + 1]
+            cols_after = cols[cidx + 1 :]
+
+            # Build the new dataframe with columns reordered
+            select_cols = cols_before + [new_col_name] + cols_after
+            self.df = self.df.with_columns(new_col).select(select_cols)
+
+            # Recreate table for display
+            self._setup_table()
+
+            # Move cursor to the new column
+            self.move_cursor(column=cidx + 1)
+
+            self.notify(f"Added link column [$success]{new_col_name}[/]. Use Ctrl/Cmd click to open.", title="Add Link")
+
+        except Exception as e:
+            self.notify(f"Error adding link column: {str(e)}", title="Add Link", severity="error")
+            self.log(f"Error adding link column: {str(e)}")
 
     # Type Casting
     def _cast_column_dtype(self, dtype: str) -> None:

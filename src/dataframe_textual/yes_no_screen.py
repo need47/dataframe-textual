@@ -578,16 +578,19 @@ class AddColumnScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "AddColumnScreen")
 
-    def __init__(self, cidx: int, df: pl.DataFrame):
+    def __init__(self, cidx: int, df: pl.DataFrame, link: bool = False):
         self.cidx = cidx
         self.df = df
+        self.link = link
         self.existing_columns = set(df.columns)
         super().__init__(
             title="Add Column",
             label="Enter column name",
-            input="column name",
-            label2="Enter value or Polars expression, e.g., abc, pl.lit(123), NULL, $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.concat_str($_, pl.lit('-suffix'))",
-            input2="column value or expression",
+            input="Link" if link else "Column name",
+            label2="Enter link template, e.g., example.com/$_, https://example.com/$_"
+            if link
+            else "Enter value or Polars expression, e.g., abc, pl.lit(123), NULL, $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.concat_str($_, pl.lit('-suffix'))",
+            input2="Link template" if link else "Column value or expression",
             on_yes_callback=self._get_input,
         )
 
@@ -611,6 +614,9 @@ class AddColumnScreen(YesNoScreen):
 
         if term == NULL:
             return self.cidx, col_name, pl.lit(None)
+        elif self.link:
+            # Treat as link template
+            return self.cidx, col_name, term
         elif tentative_expr(term):
             try:
                 expr = validate_expr(term, self.df.columns, self.cidx)
@@ -631,6 +637,20 @@ class AddColumnScreen(YesNoScreen):
                     severity="warning",
                 )
                 return self.cidx, col_name, pl.lit(term)
+
+
+class AddLinkScreen(AddColumnScreen):
+    """Modal screen to add a new link column with user-provided expressions.
+
+    Allows user to specify a column name and a value or Polars expression that will be
+    evaluated to create links. A new column is created with the resulting link values.
+    Inherits column name and expression validation from AddColumnScreen.
+    """
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "AddLinkScreen")
+
+    def __init__(self, cidx: int, df: pl.DataFrame):
+        super().__init__(cidx, df, link=True)
 
 
 class FindReplaceScreen(YesNoScreen):
