@@ -39,6 +39,9 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "-I", "--no-inferrence", action="store_true", help="Do not infer data types when reading CSV/TSV"
     )
+    parser.add_argument(
+        "-C", "--comment-prefix", nargs="?", const="#", help="Comment lines are skipped when reading CSV/TSV"
+    )
     parser.add_argument("-L", "--skip-lines", type=int, default=0, help="Skip lines when reading CSV/TSV")
     parser.add_argument(
         "-K", "--skip-rows-after-header", type=int, default=0, help="Skip rows after header when reading CSV/TSV"
@@ -74,6 +77,7 @@ def main() -> None:
         file_format=args.format,
         has_header=not args.no_header,
         infer_schema=not args.no_inferrence,
+        comment_prefix=args.comment_prefix,
         skip_lines=args.skip_lines,
         skip_rows_after_header=args.skip_rows_after_header,
         null_values=args.null,

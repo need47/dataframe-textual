@@ -353,6 +353,7 @@ def load_dataframe(
     file_format: str | None = None,
     has_header: bool = True,
     infer_schema: bool = True,
+    comment_prefix: str | None = None,
     skip_lines: int = 0,
     skip_rows_after_header: int = 0,
     null_values: list[str] | None = None,
@@ -367,6 +368,7 @@ def load_dataframe(
         file_format: Optional format specifier for input files (e.g., 'csv', 'excel').
         has_header: Whether the input files have a header row. Defaults to True.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
+        comment_prefix: Character(s) indicating comment lines in CSV/TSV files. Defaults to None.
         skip_lines: Number of lines to skip when reading CSV/TSV files. Defaults to 0.
         skip_rows_after_header: Number of rows to skip after header. Defaults to 0.
 
@@ -395,6 +397,7 @@ def load_dataframe(
                 file_format=file_format,
                 has_header=has_header,
                 infer_schema=infer_schema,
+                comment_prefix=comment_prefix,
                 skip_lines=skip_lines,
                 skip_rows_after_header=skip_rows_after_header,
                 null_values=null_values,
@@ -425,9 +428,7 @@ def handle_compute_error(
         schema_overrides: Current schema overrides, if any.
 
     Returns:
-        A tuple of (should_retry, updated_schema_overrides):
-        - should_retry: True if the load should be retried, False to exit or disable inference
-        - updated_schema_overrides: Updated schema overrides dict if retrying with overrides, None otherwise
+        A tuple of (infer_schema, schema_overrides):
 
     Raises:
         SystemExit: If the error is unrecoverable.
@@ -460,11 +461,30 @@ def load_stdin(
     file_format: str | None = None,
     has_header: bool = True,
     infer_schema: bool = True,
+    comment_prefix: str | None = None,
     skip_lines: int = 0,
     skip_rows_after_header: int = 0,
     schema_overrides: dict[str, pl.DataType] | None = None,
     null_values: list[str] | None = None,
-):
+) -> list[tuple[pl.DataFrame, str, str]]:
+    """Load DataFrame from stdin.
+
+    If a ComputeError occurs during schema inference for a column, attempts to recover
+    by treating that column as a string and retrying the load. This process repeats until
+    all columns are successfully loaded or no further recovery is possible.
+
+    Args:
+        stdin_data: Optional stdin data as string. If None, read from sys.stdin.
+        file_format: Optional format specifier for input files (e.g., 'csv', 'excel').
+        has_header: Whether the input files have a header row. Defaults to True.
+        infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
+        comment_prefix: Character(s) indicating comment lines in CSV/TSV files. Defaults to None.
+        skip_lines: Number of lines to skip when reading CSV/TSV files. Defaults to 0.
+        skip_rows_after_header: Number of rows to skip after header. Defaults to 0.
+
+    Returns:
+        List of tuples of (DataFrame, filename, tabname) ready for display.
+    """
     import os
     from io import StringIO
 
@@ -486,6 +506,7 @@ def load_stdin(
         separator="," if file_format == "csv" else "\t",
         has_header=has_header,
         infer_schema=infer_schema,
+        comment_prefix=comment_prefix,
         skip_lines=skip_lines,
         skip_rows_after_header=skip_rows_after_header,
         schema_overrides=schema_overrides,
@@ -507,6 +528,7 @@ def load_stdin(
             file_format=file_format,
             has_header=has_header,
             infer_schema=infer_schema,
+            comment_prefix=comment_prefix,
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
             schema_overrides=schema_overrides,
@@ -523,12 +545,13 @@ def load_file(
     file_format: str | None = None,
     has_header: bool = True,
     infer_schema: bool = True,
+    comment_prefix: str | None = None,
     skip_lines: int = 0,
     skip_rows_after_header: int = 0,
     schema_overrides: dict[str, pl.DataType] | None = None,
     null_values: list[str] | None = None,
 ) -> list[tuple[pl.DataFrame, str, str]]:
-    """Load a single file and return list of sources.
+    """Load a single file.
 
     For Excel files, when `first_sheet` is True, returns only the first sheet. Otherwise, returns one entry per sheet.
     For other files or multiple files, returns one entry per file.
@@ -545,6 +568,7 @@ def load_file(
                      By default, infers from file extension.
         has_header: Whether the input files have a header row. Defaults to True.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
+        comment_prefix: Character(s) indicating comment lines in CSV/TSV files. Defaults to None.
         skip_lines: Number of lines to skip when reading CSV/TSV files. The header will be parsed at this offset. Defaults to 0.
         skip_rows_after_header: Number of rows to skip after header when reading CSV/TSV files. Defaults to 0.
 
@@ -558,6 +582,7 @@ def load_file(
             file_format=file_format,
             has_header=has_header,
             infer_schema=infer_schema,
+            comment_prefix=comment_prefix,
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
             schema_overrides=schema_overrides,
@@ -573,6 +598,7 @@ def load_file(
             separator="\t" if file_format == "tsv" else ",",
             has_header=has_header,
             infer_schema=infer_schema,
+            comment_prefix=comment_prefix,
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
             schema_overrides=schema_overrides,
@@ -615,6 +641,7 @@ def load_file(
             file_format=file_format,
             has_header=has_header,
             infer_schema=infer_schema,
+            comment_prefix=comment_prefix,
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
             schema_overrides=schema_overrides,
