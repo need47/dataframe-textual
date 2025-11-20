@@ -2623,18 +2623,19 @@ class DataFrameTable(DataTable):
         self._setup_table()
 
         # Store state for interactive replacement using dataclass
+        sorted_rows = sorted(self.matches.keys())
         self._replace_state = ReplaceState(
             term_find=term_find,
             term_replace=term_replace,
             match_nocase=match_nocase,
             match_whole=match_whole,
             cidx=cidx,
-            rows=sorted(list(self.matches.keys())),
-            cols_per_row=[sorted(list(self.matches[ridx])) for ridx in sorted(self.matches.keys())],
+            rows=sorted_rows,
+            cols_per_row=[sorted(self.matches[ridx]) for ridx in sorted_rows],
             current_rpos=0,
             current_cpos=0,
             current_occurrence=0,
-            total_occurrence=len(self.matches),
+            total_occurrence=sum(len(col_idxs) for col_idxs in self.matches.values()),
             replaced_occurrence=0,
             skipped_occurrence=0,
             done=False,
@@ -2826,8 +2827,16 @@ class DataFrameTable(DataTable):
         if state.current_rpos >= len(state.rows):
             state.done = True
 
-        # Recreate table for display
-        self._setup_table()
+        # Get the new value of the current cell after replacement
+        new_cell_value = self.df.item(ridx, cidx)
+        row_key = str(ridx)
+        col_key = col_name
+        self.update_cell(
+            row_key, col_key, Text(str(new_cell_value), style=HIGHLIGHT_COLOR, justify=DtypeConfig(dtype).justify)
+        )
+
+        # # Recreate table for display
+        # self._setup_table()
 
         # Show next confirmation
         self._show_next_replace_confirmation()
