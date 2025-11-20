@@ -473,7 +473,6 @@ def handle_compute_error(
     Raises:
         SystemExit: If the error is unrecoverable.
     """
-    print("go here ..............")
     # Already disabled schema inference, cannot recover
     if not infer_schema:
         print(f"Error loading with schema inference disabled:\n{err_msg}", file=sys.stderr)
