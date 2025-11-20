@@ -2662,7 +2662,7 @@ class DataFrameTable(DataTable):
         self.app.push_screen(
             ConfirmScreen(
                 "Replace All",
-                label=f"Replace [$accent]{term_find}[/] with [$success]{term_replace}[/] for all [$accent]{state.total_occurrence}[/] occurrences?",
+                label=f"Replace [$success]{term_find}[/] with [$success]{term_replace or repr('')}[/] for all [$accent]{state.total_occurrence}[/] occurrences?",
             ),
             callback=self._handle_replace_all_confirmation,
         )
@@ -2676,36 +2676,48 @@ class DataFrameTable(DataTable):
         rows = state.rows
         cols_per_row = state.cols_per_row
 
-        # Replace in each matched row/column
-        for ridx, col_idxs in zip(rows, cols_per_row):
-            for cidx in col_idxs:
-                col_name = self.df.columns[cidx]
-                dtype = self.df.dtypes[cidx]
+        # Batch replacements by column for efficiency
+        # Group row indices by column to minimize dataframe operations
+        cidxs_to_replace: dict[int, set[int]] = defaultdict(set)
 
-                # Only applicable to string columns for substring matches
-                if dtype == pl.String and not state.match_whole:
-                    term_find = f"(?i){state.term_find}" if state.match_nocase else state.term_find
-                    self.df = self.df.with_columns(
-                        pl.when(pl.arange(0, len(self.df)) == ridx)
-                        .then(pl.col(col_name).str.replace_all(term_find, state.term_replace))
-                        .otherwise(pl.col(col_name))
-                        .alias(col_name)
-                    )
-                else:
-                    # try to convert replacement value to column dtype
-                    try:
-                        value = DtypeConfig(dtype).convert(state.term_replace)
-                    except Exception:
-                        value = state.term_replace
+        # Single column replacement
+        if state.cidx is not None:
+            cidxs_to_replace[state.cidx].update(rows)
+        # Multiple columns replacement
+        else:
+            for ridx, cidxs in zip(rows, cols_per_row):
+                for cidx in cidxs:
+                    cidxs_to_replace[cidx].add(ridx)
 
-                    self.df = self.df.with_columns(
-                        pl.when(pl.arange(0, len(self.df)) == ridx)
-                        .then(pl.lit(value))
-                        .otherwise(pl.col(col_name))
-                        .alias(col_name)
-                    )
+        # Apply replacements column by column (single operation per column)
+        for cidx, ridxs in cidxs_to_replace.items():
+            col_name = self.df.columns[cidx]
+            dtype = self.df.dtypes[cidx]
 
-                state.replaced_occurrence += 1
+            # Create a mask for rows to replace
+            mask = pl.arange(0, len(self.df)).is_in(ridxs)
+
+            # Only applicable to string columns for substring matches
+            if dtype == pl.String and not state.match_whole:
+                term_find = f"(?i){state.term_find}" if state.match_nocase else state.term_find
+                self.df = self.df.with_columns(
+                    pl.when(mask)
+                    .then(pl.col(col_name).str.replace_all(term_find, state.term_replace))
+                    .otherwise(pl.col(col_name))
+                    .alias(col_name)
+                )
+            else:
+                # Try to convert replacement value to column dtype
+                try:
+                    value = DtypeConfig(dtype).convert(state.term_replace)
+                except Exception:
+                    value = state.term_replace
+
+                self.df = self.df.with_columns(
+                    pl.when(mask).then(pl.lit(value)).otherwise(pl.col(col_name)).alias(col_name)
+                )
+
+            state.replaced_occurrence += len(ridxs)
 
         # Recreate table for display
         self._setup_table()
