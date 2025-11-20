@@ -380,9 +380,11 @@ def load_dataframe(
     has_header: bool = True,
     infer_schema: bool = True,
     comment_prefix: str | None = None,
+    quote_char: str | None = '"',
     skip_lines: int = 0,
     skip_rows_after_header: int = 0,
     null_values: list[str] | None = None,
+    ignore_errors: bool = False,
 ) -> list[Source]:
     """Load DataFrames from file specifications.
 
@@ -395,8 +397,11 @@ def load_dataframe(
         has_header: Whether the input files have a header row. Defaults to True.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
         comment_prefix: Character(s) indicating comment lines in CSV/TSV files. Defaults to None.
+        quote_char: Quote character for reading CSV/TSV files. Defaults to '"'.
         skip_lines: Number of lines to skip when reading CSV/TSV files. Defaults to 0.
         skip_rows_after_header: Number of rows to skip after header. Defaults to 0.
+        null_values: List of values to interpret as null when reading CSV/TSV files. Defaults to None.
+        ignore_errors: Whether to ignore errors when reading CSV/TSV files. Defaults to False.
 
     Returns:
         List of `Source` objects.
@@ -438,9 +443,11 @@ def load_dataframe(
                 has_header=has_header,
                 infer_schema=infer_schema,
                 comment_prefix=comment_prefix,
+                quote_char=quote_char,
                 skip_lines=skip_lines,
                 skip_rows_after_header=skip_rows_after_header,
                 null_values=null_values,
+                ignore_errors=ignore_errors,
             )
         )
 
@@ -475,12 +482,19 @@ def handle_compute_error(
     """
     # Already disabled schema inference, cannot recover
     if not infer_schema:
-        print(f"Error loading with schema inference disabled:\n{err_msg}", file=sys.stderr)
+        print(f"Error loading even with schema inference disabled:\n{err_msg}", file=sys.stderr)
+
+        if "CSV malformed" in err_msg:
+            print(
+                "\nSometimes quote characters might be mismatched. Try again with `-Q` or `-E` to ignore errors",
+                file=sys.stderr,
+            )
+
         sys.exit(1)
 
     # Schema mismatch error
     if "found more fields than defined in 'Schema'" in err_msg:
-        print(f"Input might be malformed:\n{err_msg}", file=sys.stderr)
+        print(f"Input might be malformed:\n{err_msg}.\nTry again with `-E` to ignore errors", file=sys.stderr)
         sys.exit(1)
 
     # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
@@ -504,10 +518,12 @@ def load_file(
     has_header: bool = True,
     infer_schema: bool = True,
     comment_prefix: str | None = None,
+    quote_char: str | None = '"',
     skip_lines: int = 0,
     skip_rows_after_header: int = 0,
     schema_overrides: dict[str, pl.DataType] | None = None,
     null_values: list[str] | None = None,
+    ignore_errors: bool = False,
 ) -> list[Source]:
     """Load a single file.
 
@@ -527,8 +543,12 @@ def load_file(
         has_header: Whether the input files have a header row. Defaults to True.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
         comment_prefix: Character(s) indicating comment lines in CSV/TSV files. Defaults to None.
+        quote_char: Quote character for reading CSV/TSV files. Defaults to '"'.
         skip_lines: Number of lines to skip when reading CSV/TSV files. The header will be parsed at this offset. Defaults to 0.
         skip_rows_after_header: Number of rows to skip after header when reading CSV/TSV files. Defaults to 0.
+        schema_overrides: Optional dictionary of column name to Polars data type to override inferred schema.
+        null_values: List of values to interpret as null when reading CSV/TSV files. Defaults to None.
+        ignore_errors: Whether to ignore errors when reading CSV/TSV files.
 
     Returns:
         List of `Source` objects.
@@ -545,10 +565,12 @@ def load_file(
             has_header=has_header,
             infer_schema=infer_schema,
             comment_prefix=comment_prefix,
+            quote_char=quote_char,
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
             schema_overrides=schema_overrides,
             null_values=null_values,
+            ignore_errors=ignore_errors,
         )
         data.append(Source(lf, filename, filepath.stem))
     elif file_format in ("xlsx", "xls", "excel"):
@@ -591,10 +613,12 @@ def load_file(
             has_header=has_header,
             infer_schema=infer_schema,
             comment_prefix=comment_prefix,
+            quote_char=quote_char,
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
             schema_overrides=schema_overrides,
             null_values=null_values,
+            ignore_errors=ignore_errors,
         )
 
     return data

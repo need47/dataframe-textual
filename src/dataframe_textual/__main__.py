@@ -39,14 +39,18 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "-I", "--no-inferrence", action="store_true", help="Do not infer data types when reading CSV/TSV"
     )
+    parser.add_argument("-E", "--ignore-errors", action="store_true", help="Ignore errors when reading CSV/TSV")
     parser.add_argument(
-        "-C", "--comment-prefix", nargs="?", const="#", help="Comment lines are skipped when reading CSV/TSV"
+        "-c", "--comment-prefix", nargs="?", const="#", help="Comment lines are skipped when reading CSV/TSV"
     )
-    parser.add_argument("-L", "--skip-lines", type=int, default=0, help="Skip lines when reading CSV/TSV")
     parser.add_argument(
-        "-K", "--skip-rows-after-header", type=int, default=0, help="Skip rows after header when reading CSV/TSV"
+        "-q", "--quote-char", nargs="?", const=None, default='"', help="Quote character for reading CSV/TSV"
     )
-    parser.add_argument("-U", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
+    parser.add_argument("-l", "--skip-lines", type=int, default=0, help="Skip lines when reading CSV/TSV")
+    parser.add_argument(
+        "-a", "--skip-rows-after-header", type=int, default=0, help="Skip rows after header when reading CSV/TSV"
+    )
+    parser.add_argument("-u", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
 
     args = parser.parse_args()
     if args.files is None:
@@ -78,9 +82,11 @@ def main() -> None:
         has_header=not args.no_header,
         infer_schema=not args.no_inferrence,
         comment_prefix=args.comment_prefix,
+        quote_char=args.quote_char,
         skip_lines=args.skip_lines,
         skip_rows_after_header=args.skip_rows_after_header,
         null_values=args.null,
+        ignore_errors=args.ignore_errors,
     )
     app = DataFrameViewer(*sources)
     app.run()

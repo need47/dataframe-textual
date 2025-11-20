@@ -125,7 +125,7 @@ When multiple files are opened:
 ## Command Line Options
 
 ```
-usage: dv [-h] [-f {csv,excel,tsv,parquet,json,ndjson}] [-H] [-I] [-L SKIP_LINES] [-K SKIP_ROWS_AFTER_HEADER] [-U NULL [NULL ...]] [files ...]
+usage: dv [-h] [-f {csv,excel,tsv,parquet,json,ndjson}] [-H] [-I] [-c COMMENT_PREFIX] [-q QUOTE_CHAR] [-l SKIP_LINES] [-a SKIP_ROWS_AFTER_HEADER] [-u NULL [NULL ...]] [files ...]
 
 Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).
 
@@ -138,11 +138,15 @@ options:
                         Specify the format of the input files
   -H, --no-header       Specify that input files have no header row
   -I, --no-inferrence   Do not infer data types when reading CSV/TSV
-  -L, --skip-lines SKIP_LINES
+  -c, --comment-prefix COMMENT_PREFIX
+                        Comment lines are skipped when reading CSV/TSV (default: skip none)
+  -q, --quote-char QUOTE_CHAR
+                        Quote character for reading CSV/TSV (default: "; use None to disable)
+  -l, --skip-lines SKIP_LINES
                         Skip lines when reading CSV/TSV (default: 0)
-  -K, --skip-rows-after-header SKIP_ROWS_AFTER_HEADER
+  -a, --skip-rows-after-header SKIP_ROWS_AFTER_HEADER
                         Skip rows after header when reading CSV/TSV (default: 0)
-  -U, --null NULL [NULL ...]
+  -u, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
 ```
 
@@ -156,31 +160,43 @@ dv -H data_no_header.csv
 dv -I large_data.csv
 
 # Skip first 3 lines of file (e.g., comments, metadata)
-dv -L 3 data_with_comments.csv
+dv -l 3 data_with_comments.csv
 
 # Skip 1 row after header (e.g., units row)
-dv -K 1 data_with_units.csv
+dv -a 1 data_with_units.csv
 
 # Treat specific values as null/missing (e.g., 'NA', 'N/A', '-')
-dv -U NA N/A - data.csv
+dv -u NA N/A - data.csv
 
 # Multiple null values with different formats
-dv -U NULL NA "" "Not Available" messy_data.csv
+dv -u NULL NA "" "Not Available" messy_data.csv
+
+# Disable quote character processing for TSV with embedded quotes
+dv -q "" data.tsv
+
+# Use different quote character (e.g., single quote for CSV)
+dv -q "'" data.csv
 
 # Complex CSV with comments and units row
-dv -L 3 -K 1 -I messy_scientific_data.csv
+dv -l 3 -a 1 -I messy_scientific_data.csv
 
 # Combine all options: skip lines, skip after header, no header, no inference, gzipped
-dv -L 2 -K 1 -H -I complex_data.csv.gz
+dv -l 2 -a 1 -H -I complex_data.csv.gz
 
 # Process compressed data from stdin with line skipping
-zcat compressed_data.csv.gz | dv -f csv -L 2
+zcat compressed_data.csv.gz | dv -f csv -l 2
 
 # CSV with custom null values and no header
-dv -H -U NA "N/A" "-" raw_data.csv
+dv -H -u NA "N/A" "-" raw_data.csv
 
 # Skip lines, specify null values, and disable type inference
-dv -L 5 -U NA "" data_with_metadata.csv
+dv -l 5 -u NA "" data_with_metadata.csv
+
+# TSV file with problematic quotes in data fields
+dv -q None data.tsv
+
+# CSV with comment lines and custom null values
+dv -c "#" -u NA "N/A" commented_data.csv
 ```
 
 ## Keyboard Shortcuts
