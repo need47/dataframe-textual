@@ -25,6 +25,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/J
 - 🔄 **Tab Management** - Seamlessly switch between open files with keyboard shortcuts
 - 📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
 - 🎯 **Cursor Type Cycling** - Switch between cell, row, and column selection modes
+- 🔗 **Link Column Creation** - Generate clickable URLs using template expressions with placeholder support
 
 ## Installation
 
@@ -326,7 +327,7 @@ dv -c "#" -u NA "N/A" commented_data.csv
 | `Shift+←` | Move current column left |
 | `Shift+→` | Move current column right |
 
-#### Type Conversion
+#### Type Conversion & Links
 
 | Key | Action |
 |-----|--------|
@@ -334,7 +335,8 @@ dv -c "#" -u NA "N/A" commented_data.csv
 | `%` | Cast current column to float (Float64) |
 | `!` | Cast current column to boolean |
 | `$` | Cast current column to string |
-| `@` | Make URLs in current column clickable with Ctrl/Cmd + click|
+| `@` | Make URLs in current column clickable with Ctrl/Cmd + click |
+| `Ctrl+@` | Add a new link column from template expression |
 
 #### Data Management
 

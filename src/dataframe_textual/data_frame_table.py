@@ -189,6 +189,7 @@ class DataFrameTable(DataTable):
 
         ## 🔗 URL Handling
         - **@** - 🔗 Make URLs in current column clickable with Ctrl/Cmd
+        - **Ctrl+@** - 🔗 Add a new link column from template expression (e.g., `https://example.com/$_`)
 
         ## 💾 Data Management
         - **c** - 📋 Copy cell to clipboard
@@ -278,7 +279,7 @@ class DataFrameTable(DataTable):
         ("exclamation_mark", "cast_column_dtype('pl.Boolean')", "Cast column dtype to bool"),  # `!`
         ("dollar_sign", "cast_column_dtype('pl.String')", "Cast column dtype to string"),  # `$`
         ("at", "make_cell_clickable", "Make cell clickable"),  # `@`
-        ("ctrl+@", "add_link", "Add a link column"),  # `ctrl+@`
+        ("ctrl+@", "add_link_column", "Add a link column"),  # `ctrl+@`
         # Sql
         ("l", "simple_sql", "Simple SQL interface"),
         ("L", "advanced_sql", "Advanced SQL interface"),
@@ -862,9 +863,9 @@ class DataFrameTable(DataTable):
         """Make cells with URLs in current column clickable."""
         self._make_cell_clickable()
 
-    def action_add_link(self) -> None:
+    def action_add_link_column(self) -> None:
         """Open AddLinkScreen to create a new link column from a Polars expression."""
-        self._add_link()
+        self._add_link_column()
 
     def action_show_thousand_separator(self) -> None:
         """Toggle thousand separator for numeric display."""
@@ -991,6 +992,8 @@ class DataFrameTable(DataTable):
             try:
                 # Get sample values from the column
                 sample_values = sample_lf.select(col).collect().get_column(col).to_list()
+                if any(val.startswith(("https://", "http://")) for val in sample_values):
+                    continue  # Skip link columns so they can auto-size and be clickable
 
                 # Find maximum width in sample
                 max_cell_width = max(
@@ -2160,13 +2163,13 @@ class DataFrameTable(DataTable):
             self.notify("Error adding column", title="Add Column", severity="error")
             self.log(f"Error adding column `{new_col_name}`: {str(e)}")
 
-    def _add_link(self) -> None:
+    def _add_link_column(self) -> None:
         self.app.push_screen(
             AddLinkScreen(self.cursor_col_idx, self.df),
-            callback=self._do_add_link,
+            callback=self._do_add_link_column,
         )
 
-    def _do_add_link(self, result: tuple[str, str] | None) -> None:
+    def _do_add_link_column(self, result: tuple[str, str] | None) -> None:
         """Handle result from AddLinkScreen.
 
         Creates a new link column in the dataframe with clickable links based on a
@@ -2188,6 +2191,13 @@ class DataFrameTable(DataTable):
         self._add_history(f"Added link column [$success]{new_col_name}[/] with template {link_template}.")
 
         try:
+            # Hack to support PubChem link
+            link_template = link_template.replace("PC", "https://pubchem.ncbi.nlm.nih.gov")
+
+            # Ensure link starts with http:// or https://
+            if not link_template.startswith(("https://", "http://")):
+                link_template = "https://" + link_template
+
             # Create link column by splitting template on '$_' and rebuilding with column values
             tokens = link_template.split("$_")
             parts = [pl.lit(tokens[0])]
