@@ -486,7 +486,7 @@ def handle_compute_error(
 
         if "CSV malformed" in err_msg:
             print(
-                "\nSometimes quote characters might be mismatched. Try again with `-Q` or `-E` to ignore errors",
+                "\nSometimes quote characters might be mismatched. Try again with `-q` or `-E` to ignore errors",
                 file=sys.stderr,
             )
 
