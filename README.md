@@ -10,20 +10,9 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/J
 - 🚀 **Fast Loading** - Powered by Polars for efficient data handling
 - 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with various data types (e.g., integer, float, string)
 - ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls
-# Skip first 5 lines (comments, metadata)
-dv -l 5 data_with_metadata.csv
 
-# Skip 1 row after header (e.g., units row)
-dv -a 1 data_with_units.csv
-
-# Complex CSV with comments and units row
-dv -l 3 -a 1 -I messy_scientific_data.csv
-
-# Combine all options: skip lines, skip after header, no header, no inference, gzipped
-dv -l 2 -a 1 -H -I complex_data.csv.gz
-
-# Process compressed data from stdin with line skipping
-zcat compressed_data.csv.gz | dv -f csv -l 2editing, and manipulating data
+# Process compressed data from stdin
+zcat compressed_data.csv.gz | dv -f csv editing, and manipulating data
 - 📊 **Flexible Input** - Read from files and/or stdin (pipes/redirects)
 - 🔄 **Smart Pagination** - Lazy load rows on demand for handling large datasets
 
@@ -102,16 +91,15 @@ python main.py pokemon.csv
 # Or with uv
 uv run python main.py pokemon.csv
 
-# Read from stdin (auto-detects format; defaults to TSV if not recognized)
+# Read from stdin (defaults to TSV)
 cat data.tsv | dv
 dv < data.tsv
 
-# Gzipped files are supported
-dv data.csv.gz
-dv large_dataset.tsv.gz
-
 # Specify format for gzipped stdin
 zcat data.csv.gz | dv -f csv
+
+# Gzipped files are supported
+dv data.csv.gz
 ```
 
 ### Multi-File Usage - Multiple Tabs
@@ -123,16 +111,13 @@ dv file1.csv file2.csv file3.csv
 # Open multiple sheets in tabs in an Excel file
 dv file.xlsx
 
-# Mix files and stdin (read from stdin, then open file)
+# Mix files and stdin
 dv data1.tsv < data2.tsv
-
-# Mix regular and gzipped files
-dv data1.csv data2.csv.gz data3.tsv.gz
 ```
 
 When multiple files are opened:
-- Each file appears as a separate tab at the top
-- Switch between tabs using `>` (next) or `<` (previous)
+- Each file appears as a separate tab
+- Switch between tabs using `>` (next) or `<` (previous), or use `b` for cycling tabs
 - Open additional files with `Ctrl+O`
 - Close the current tab with `Ctrl+W`
 - Each file maintains its own state (edits, sort order, selections, history, etc.)
@@ -140,7 +125,7 @@ When multiple files are opened:
 ## Command Line Options
 
 ```
-usage: dv [-h] [-f {csv,excel,tsv,parquet,json,ndjson}] [-H] [-I] [-E] [-c COMMENT_PREFIX] [-q QUOTE_CHAR] [-l SKIP_LINES] [-a SKIP_ROWS_AFTER_HEADER] [-u NULL [NULL ...]] [files ...]
+usage: dv [-h] [-f {csv,excel,tsv,parquet,json,ndjson}] [-H] [-I] [-E] [-c COMMENT_PREFIX] [-q QUOTE_CHAR] [-l SKIP_LINES] [-a SKIP_ROWS_AFTER_HEADER] [-n NULL [NULL ...]] [files ...]
 
 Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).
 
@@ -162,14 +147,14 @@ options:
                         Skip lines when reading CSV/TSV (default: 0)
   -a, --skip-rows-after-header SKIP_ROWS_AFTER_HEADER
                         Skip rows after header when reading CSV/TSV (default: 0)
-  -u, --null NULL [NULL ...]
+  -n, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
 ```
 
 ### CLI Examples
 
 ```bash
-# View CSV file without header row
+# View headless CSV file
 dv -H data_no_header.csv
 
 # Disable type inference for faster loading
@@ -178,44 +163,30 @@ dv -I large_data.csv
 # Ignore parsing errors in malformed CSV
 dv -E data_with_errors.csv
 
-# Skip first 3 lines of file (e.g., comments, metadata)
-dv -l 3 data_with_comments.csv
+# Skip first 3 lines of file (e.g., metadata)
+dv -l 3 data_with_meta.csv
 
 # Skip 1 row after header (e.g., units row)
 dv -a 1 data_with_units.csv
 
+# CSV with comment lines
+dv -c "#" commented_data.csv
+
 # Treat specific values as null/missing (e.g., 'NA', 'N/A', '-')
-dv -u NA N/A - data.csv
-
-# Multiple null values with different formats
-dv -u NULL NA "" "Not Available" messy_data.csv
-
-# Disable quote character processing for TSV with embedded quotes
-dv -q "" data.tsv
+dv -n NA N/A - data.csv
 
 # Use different quote character (e.g., single quote for CSV)
 dv -q "'" data.csv
 
+# Disable quote character processing for TSV with embedded quotes
+dv -q data.tsv
+
 # Complex CSV with comments and units row
 dv -l 3 -a 1 -I messy_scientific_data.csv
 
-# Combine all options: skip lines, skip after header, no header, no inference, gzipped
-dv -l 2 -a 1 -H -I complex_data.csv.gz
-
-# Process compressed data from stdin with line skipping
-zcat compressed_data.csv.gz | dv -f csv -l 2
-
-# CSV with custom null values and no header
-dv -H -u NA "N/A" "-" raw_data.csv
-
-# Skip lines, specify null values, and disable type inference
-dv -l 5 -u NA "" data_with_metadata.csv
-
-# TSV file with problematic quotes in data fields
-dv -q None data.tsv
-
-# CSV with comment lines and custom null values
-dv -c "#" -u NA "N/A" commented_data.csv
+# Process compressed data
+dv data.csv.gz
+zcat compressed_data.csv.gz | dv -f csv
 ```
 
 ## Keyboard Shortcuts
@@ -229,7 +200,8 @@ dv -c "#" -u NA "N/A" commented_data.csv
 | `Ctrl+O` | Open file in a new tab |
 | `Ctrl+W` | Close current tab |
 | `Ctrl+A` | Save all open tabs to Excel file |
-| `>` or `b` | Move to next tab |
+| `b` | Cycle through tabs |
+| `>` | Move to next tab |
 | `<` | Move to previous tab |
 | `B` | Toggle tab bar visibility |
 | `q` | Quit the application |
@@ -253,23 +225,30 @@ dv -c "#" -u NA "N/A" commented_data.csv
 | `G` | Jump to last row (loads all remaining rows) |
 | `↑` / `↓` | Move up/down one row |
 | `←` / `→` | Move left/right one column |
-| `Home` / `End` | Jump to first/last column in current row |
-| `Ctrl + Home` / `Ctrl + End` | Jump to top/bottom in current page |
+| `Home` / `End` | Jump to first/last column |
+| `Ctrl + Home` / `Ctrl + End` | Jump to page top/bottom |
 | `PageDown` / `PageUp` | Scroll down/up one page |
 | `Ctrl+F` | Page down |
 | `Ctrl+B` | Page up |
+
+#### Undo/Redo/Reset
+| `u` | Undo last action |
+| `U` | Redo last undone action |
+| `Ctrl+U` | Reset to initial state |
 
 #### Viewing & Display
 
 | Key | Action |
 |-----|--------|
-| `Enter` | View full details of current row in modal |
-| `F` | Show frequency distribution for column |
+| `Enter` | Record view of current row |
+| `F` | Show frequency distribution for current column |
 | `s` | Show statistics for current column |
 | `S` | Show statistics for entire dataframe |
-| `K` | Cycle cursor type: cell → row → column → cell |
+| `K` | Cycle cursor types: cell → row → column → cell |
 | `~` | Toggle row labels |
 | `_` (underscore) | Expand column to full width |
+| `z` | Freeze rows and columns |
+| `,` | Toggle thousand separator for numeric display |
 
 #### Data Editing
 
@@ -281,11 +260,11 @@ dv -c "#" -u NA "N/A" commented_data.csv
 | `E` | Edit entire column with expression |
 | `a` | Add empty column after current |
 | `A` | Add column with name and value/expression |
-| `@` | Add a link column from template expression |
+| `@` | Add a link column from template |
 | `-` (minus) | Delete current column |
 | `x` | Delete current row |
-| `X` | Delete current row and all rows below |
-| `Ctrl+X` | Delete current row and all rows above |
+| `X` | Delete current row and all those below |
+| `Ctrl+X` | Delete current row and all those above |
 | `d` | Duplicate current column (appends '_copy' suffix) |
 | `D` | Duplicate current row |
 | `h` | Hide current column |
@@ -297,25 +276,25 @@ dv -c "#" -u NA "N/A" commented_data.csv
 |-----|--------|
 | `\` | Search in current column using cursor value and select rows |
 | `\|` (pipe) | Search in current column with expression and select rows |
+| `{` | Go to previous selected row |
+| `}` | Go to next selected row |
 | `/` | Find in current column with cursor value and highlight matches |
 | `?` | Find in current column with expression and highlight matches |
 | `n` | Go to next match |
 | `N` | Go to previous match |
-| `{` | Go to previous selected row |
-| `}` | Go to next selected row |
 | `'` | Select/deselect current row |
-| `t` | Toggle selected rows (invert) |
+| `t` | Toggle selected rows (invßert) |
 | `T` | Clear all selected rows and/or matches |
-| `"` (quote) | Filter to selected rows only |
-| `v` | View only rows by selected rows and/or matches or cursor value |
-| `V` | View only rows by expression |
+| `"` (quote) | Filter to selected rows and remove others |
+| `v` | View only rows (and hide others) by selected rows and/or matches or cursor value |
+| `V` | View only rows (and hide others) by expression |
 
 #### SQL Interface
 
 | Key | Action |
 |-----|--------|
-| `l` | Simple SQL interface (select columns & WHERE clause) |
-| `L` | Advanced SQL interface (full SQL queries) |
+| `l` | Simple SQL interface (select columns & where clause) |
+| `L` | Advanced SQL interface (full SQL query with syntax highlight) |
 
 #### Find & Replace
 
@@ -342,7 +321,7 @@ dv -c "#" -u NA "N/A" commented_data.csv
 | `Shift+←` | Move current column left |
 | `Shift+→` | Move current column right |
 
-#### Type Conversion
+#### Type Casting
 
 | Key | Action |
 |-----|--------|
@@ -351,19 +330,14 @@ dv -c "#" -u NA "N/A" commented_data.csv
 | `!` | Cast current column to boolean |
 | `$` | Cast current column to string |
 
-#### Data Management
+#### Copy & Save
 
 | Key | Action |
 |-----|--------|
-| `z` | Freeze rows and columns |
-| `,` | Toggle thousand separator for numeric display |
 | `c` | Copy current cell to clipboard |
 | `Ctrl+C` | Copy column to clipboard |
 | `Ctrl+R` | Copy row to clipboard (tab-separated) |
 | `Ctrl+S` | Save current tab to file |
-| `u` | Undo last action |
-| `U` | Redo last undone action |
-| `Ctrl+U` | Reset to initial state |
 
 ## Features in Detail
 
@@ -379,34 +353,34 @@ Columns are automatically styled based on their data type:
 ### 2. Row Detail View
 
 Press `Enter` on any row to open a modal showing all column values for that row.
-Useful for examining wide datasets where columns don't fit on screen.
+Useful for examining wide datasets where columns don't fit well on screen.
 
 **In the Row Detail Modal**:
-- Press `v` to **view** the main table to show only rows with the selected column value
-- Press `"` to **filter** all rows containing the selected column value
+- Press `v` to **view** all rows containing the selected column value (and hide others)
+- Press `"` to **filter** all rows containing the selected column value (and remove others)
 - Press `q` or `Escape` to close the modal
 
 ### 3. Search & Filtering
 
 The application provides multiple search modes for different use cases:
 
-**Search Operations** - Direct value/expression matching in current column:
-- **`|` - Column Expression Search**: Opens dialog to search current column with custom expression
-- **`\` - Column Cursor Search**: Instantly search current column using the cursor value
+**Search Operations** - Search by value/expression in current column and select rows:
+- **`\` - Column Cursor Search**: Search cursor value
+- **`|` - Column Expression Search**: Opens dialog to search with custom expression
 
-**Find Operations** - Find by value/expression:
+**Find Operations** - Find by value/expression and highlight matches:
 - **`/` - Column Find**: Find cursor value within current column
 - **`?` - Column Expression Find**: Open dialog to search current column with expression
 - **`;` - Global Find**: Find cursor value across all columns
 - **`:` - Global Expression Find**: Open dialog to search all columns with expression
 
 **Selection & Filtering**:
-- **`'` - Toggle Row Selection**: Select/deselect current row (marks it for filtering)
-- **`t` - Invert Selections**: Flip selection state of all rows at once
+- **`'` - Toggle Row Selection**: Select/deselect current row (marks it for filtering or viewing)
+- **`t` - Invert Selections**: Flip selections of all rows
 - **`T` - Clear Selections**: Remove all row selections and matches
-- **`"` - Filter Selected**: Display only the selected rows and remove others
-- **`v` - View by Value**: Filter/view rows by selected rows or cursor value (others hidden but preserved)
-- **`V` - View by Expression**: Filter/view rows using custom Polars expression (others hidden but preserved)
+- **`"` - Filter Selected**: View only the selected rows (others removed)
+- **`v` - View by Value**: View rows by selected rows or cursor value (others hidden but preserved)
+- **`V` - View by Expression**: View rows using custom expression (others hidden but preserved)
 
 **Advanced Matching Options**:
 
@@ -420,7 +394,7 @@ These options work with plain text searches. Use Polars regex patterns in expres
 
 **Quick Tips:**
 - Search results highlight matching rows/cells in **red**
-- Multiple searches **accumulate selections** - each new search adds to the selections
+- Multiple searches **accumulate** - each new search adds to the selections or matches
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 - Use `u` to undo any search or filter
 
@@ -456,45 +430,8 @@ When you press `r` or `R`, a dialog opens where you can enter:
   - `Enter` or press the `Yes` button - **Replace this occurrence** and move to next
   - Press the `Skip` button - **Skip this occurrence** and move to next
   - `Escape` or press the `No` button - **Cancel** remaining replacements (but keep already-made replacements)
-- Displays progress: `Occurrence X of Y` (Y = total matches, X = current)
-- Shows the value that will be replaced and what it will become
+- Displays progress: `Occurrence X of Y` (Y = total occurrences, X = current)
 - Useful for careful replacements where you want to review each change
-
-**Search Term Types:**
-- **Plain text**: Exact string match (e.g., "John" finds "John")
-  - Use **Match Nocase** checkbox to match regardless of case (e.g., find "john", "John", "JOHN")
-  - Use **Match Whole** checkbox to match complete words only (e.g., find "cat" but not in "catfish")
-- **NULL**: Replace null/missing values (type `NULL`)
-- **Expression**: Polars expressions for complex matching (e.g., `$_ > 50` for column replace)
-- **Regex patterns**: Use Polars regex syntax for advanced matching
-  - Case-insensitive: Use `(?i)` prefix (e.g., `(?i)john`)
-  - Whole word: Use `\b` boundary markers (e.g., `\bjohn\b`)
-
-**Examples:**
-
-```
-Find: "John"
-Replace: "Jane"
-→ All occurrences of "John" become "Jane"
-
-Find: "john"
-Replace: "jane"
-Match Nocase: ✓ (checked)
-→ "John", "JOHN", "john" all become "jane"
-
-Find: "cat"
-Replace: "dog"
-Match Whole: ✓ (checked)
-→ "cat" becomes "dog", but "catfish" is not matched
-
-Find: "NULL"
-Replace: "Unknown"
-→ All null/missing values become "Unknown"
-
-Find: "(?i)active"        # Case-insensitive
-Replace: "inactive"
-→ "Active", "ACTIVE", "active" all become "inactive"
-```
 
 **For Global Replace (`R`)**:
 - Searches and replaces across all columns simultaneously
@@ -511,6 +448,7 @@ Replace: "inactive"
 - **Flexible matching**: Support for case-insensitive and whole-word matching
 
 **Tips:**
+- **NULL**: Replace null/missing values (type `NULL`)
 - Use interactive mode for one-time replacements to be absolutely sure
 - Use "Replace All" for routine replacements (e.g., fixing typos, standardizing formats)
 - Use **Match Nocase** for matching variations of names or titles
@@ -552,7 +490,7 @@ Complex values or filters can be specified via Polars expressions, with the foll
 - `~($status == 'inactive')` - Status is not inactive
 - `$revenue > $expenses` - Revenue exceeds expenses
 
-**String Matching:**
+**String Matching:** ([Polars string API reference](https://docs.pola.rs/api/python/stable/reference/series/string.html))
 - `$name.str.contains("John")` - Name contains "John" (case-sensitive)
 - `$name.str.contains("(?i)john")` - Name contains "john" (case-insensitive)
 - `$email.str.ends_with("@company.com")` - Email ends with domain
@@ -582,17 +520,14 @@ Complex values or filters can be specified via Polars expressions, with the foll
 
 ### 6. Frequency Distribution
 
-Press `F` to see how many times each value appears in the current column. The modal shows:
-- Value
-- Count
-- Percentage
-- Histogram
+Press `F` to see value distributions of the current column. The modal shows:
+- Value, Count, Percentage, Histogram
 - **Total row** at the bottom
 
 **In the Frequency Table**:
 - Press `[` and `]` to sort by any column (value, count, or percentage)
-- Press `v` to **filter** the main table to show only rows with the selected value
-- Press `"` to **exclude** all rows except those containing the selected value
+- Press `v` to **filter** all rows with the selected value (others hidden but preserved)
+- Press `"` to **exclude** all rows containing the selected value (others removed)
 - Press `q` or `Escape` to close the frequency table
 
 This is useful for:
@@ -608,12 +543,10 @@ Press `s` to see summary statistics for the current column, or press `S` for sta
 **Column Statistics** (`s`):
 - Shows calculated statistics using Polars' `describe()` method
 - Displays: count, null count, mean, median, std, min, max, etc.
-- Values are color-coded according to their data type
-- Statistics label column has no styling for clarity
 
 **Dataframe Statistics** (`S`):
 - Shows statistics for all numeric and applicable columns simultaneously
-- Data columns are color-coded by their data type (integer, float, string, etc.)
+- Displays: count, null count, mean, median, std, min, max, etc.
 
 **In the Statistics Modal**:
 - Press `q` or `Escape` to close the statistics table
@@ -649,15 +582,7 @@ This is useful for:
 - Useful for removing leading rows or the beginning of a dataset
 
 **Delete Column** (`-`):
-- Removes the entire column from view and dataframe
-
-**Delete Column and After** (`_`):
-- Deletes the current column and all columns to the right
-- Useful for removing trailing columns or the end of a dataset
-
-**Delete Column and Before** (`Ctrl+-`):
-- Deletes the current column and all columns to the left
-- Useful for removing leading columns or the beginning of a dataset
+- Removes the entire column from display and dataframe
 
 ### 9. Hide & Show Columns
 
@@ -668,10 +593,6 @@ This is useful for:
 
 **Show Hidden Rows/Columns** (`H`):
 - Restores all previously hidden rows/columns to the display
-
-This is useful for:
-- Focusing on specific columns without deleting data
-- Temporarily removing cluttered or unnecessary columns
 
 ### 10. Duplicate Column
 
@@ -787,6 +708,7 @@ Execute complete SQL queries for advanced data manipulation:
 - Support for JOINs, GROUP BY, aggregations, and more
 - Access to all SQL capabilities for complex transformations
 - Always use `self` as the table name
+- Syntax highlighted
 
 **Examples:**
 ```sql
@@ -807,15 +729,16 @@ WHERE (age > 25 AND salary > 50000) OR department = 'Management'
 ### 19. Clipboard Operations
 
 Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux
+**Note** May require a X server to work
 
-Press `Ctrl+C` to copy:
 - Press `c` to copy cursor value
 - Press `Ctrl+C` to copy column values
 - Press `Ctrl+R` to copy row values (delimited by tab)
+- Hold `Shift` to select with mouse
 
 ### 20. Link Column Creation
 
-Press `@` to create a new column containing dynamically generated URLs using template expressions.
+Press `@` to create a new column containing dynamically generated URLs using template.
 
 **Template Placeholders:**
 
@@ -823,111 +746,22 @@ The link template supports multiple placeholder types for maximum flexibility:
 
 - **`$_`** - Current column (the column where cursor was when `@` was pressed)
   - Example: `https://example.com/search/$_` - Uses values from the current column
-  - Useful for quick links based on the focused column
 
 - **`$1`, `$2`, `$3`, etc.** - Column by 1-based position index
   - Example: `https://example.com/product/$1/details/$2` - Uses 1st and 2nd columns
-  - Useful for structured templates spanning multiple columns
   - Index corresponds to column display order (left-to-right)
 
 - **`$name`** - Column by name (use actual column names)
   - Example: `https://pubchem.ncbi.nlm.nih.gov/search?q=$product_id` - Uses `product_id` column
   - Example: `https://example.com/$region/$city/data` - Uses `region` and `city` columns
-  - Useful for readable, self-documenting templates
 
 **Features:**
-
-- **Vectorized Expression**: All rows processed efficiently using Polars' vectorized operations
-- **Type Casting**: Column values automatically converted to strings for URL construction
 - **Multiple Placeholders**: Mix and match placeholders in a single template
 - **URL Prefix**: Automatically prepends `https://` if URL doesn't start with `http://` or `https://`
-- **PubChem Support**: Special shorthand - replace `PC` with full PubChem URL
-
-**Examples:**
-
-```
-Template: https://example.com/$_
-Current column: product_id
-Result: https://example.com/ABC123 (for each row's product_id value)
-
-Template: https://database.org/view?id=$1&lang=$2
-Column 1: item_code, Column 2: language
-Result: https://database.org/view?id=X001&lang=en
-
-Template: https://example.com/$username/profile
-Column: username (must exist in dataframe)
-Result: https://example.com/john_doe/profile
-
-Template: https://example.com/$region/$city
-Columns: region, city
-Result: https://example.com/north/seattle
-
-Template: PC/compound/$1
-Column 1: pubchem_cid
-Result: https://pubchem.ncbi.nlm.nih.gov/compound/12345
-```
-
-**Error Handling:**
-
-- **Invalid column index**: `$5` when only 3 columns exist → Error message showing valid range
-- **Non-existent column name**: `$invalid_column` → Error message with available columns
-- **No placeholders**: Template treated as constant → All rows get identical URL
 
 **Tips:**
-
-- Use descriptive column names for `$name` placeholders to make templates self-documenting
-- Test with a small dataset first to verify template correctness
 - Use full undo (`u`) if template produces unexpected URLs
 - For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
-
-## Examples
-
-### Single File Examples
-
-```bash
-# View Pokemon dataset
-dv pokemon.csv
-
-# Chain with other command and specify input file format
-cut -d',' -f1,2,3 pokemon.csv | dv -f csv
-
-# Work with gzipped files
-dv large_dataset.csv.gz
-
-# CSV file without header row
-dv -H raw_data.csv
-
-# Skip type inference for faster loading
-dv -I huge_file.csv
-
-# Skip first 5 lines (comments, metadata)
-dv -L 5 data_with_metadata.csv
-
-# Skip 1 row after header (units row)
-dv -K 1 data_with_units.csv
-
-# Complex CSV with comments and units row
-dv -L 3 -K 1 -I messy_scientific_data.csv
-
-# Combine all options: skip lines, skip after header, no header, no inference, gzipped
-dv -L 2 -K 1 -H -I complex_data.csv.gz
-
-# Process compressed data from stdin with line skipping
-zcat compressed_data.csv.gz | dv -f csv -L 2
-```
-
-### Multi-File/Tab Examples
-
-```bash
-# Open multiple sheets as tabs in a single Excel
-dv sales.xlsx
-
-# Open multiple files as tabs (including gzipped)
-dv pokemon.csv titanic.csv large_data.csv.gz
-
-# Start with one file, then open others using Ctrl+O
-dv initial_data.csv
-```
 
 ## Dependencies
 

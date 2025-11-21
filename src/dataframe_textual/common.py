@@ -615,7 +615,7 @@ def load_file(
     filepath = Path(filename)
 
     # Load based on file format
-    if file_format in ("tsv", "csv"):
+    if file_format in ("csv", "tsv"):
         lf = pl.scan_csv(
             source,
             separator="\t" if file_format == "tsv" else ",",

@@ -587,7 +587,7 @@ class AddColumnScreen(YesNoScreen):
             title="Add Column",
             label="Enter column name",
             input="Link" if link else "Column name",
-            label2="Enter link template, e.g., https://example.com/$1/id/$id, PC/compound/$_"
+            label2="Enter link template, e.g., https://example.com/$_/id/$1, PC/compound/$cid"
             if link
             else "Enter value or Polars expression, e.g., abc, pl.lit(123), NULL, $_ * 2, $1 + $total, $_.str.to_uppercase(), pl.concat_str($_, pl.lit('-suffix'))",
             input2="Link template" if link else "Column value or expression",

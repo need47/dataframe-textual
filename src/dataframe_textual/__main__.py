@@ -50,7 +50,7 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "-a", "--skip-rows-after-header", type=int, default=0, help="Skip rows after header when reading CSV/TSV"
     )
-    parser.add_argument("-u", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
+    parser.add_argument("-n", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
 
     args = parser.parse_args()
     if args.files is None:

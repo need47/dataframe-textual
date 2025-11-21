@@ -112,11 +112,18 @@ class DataFrameTable(DataTable):
         - **↑↓←→** - 🎯 Move cursor (cell/row/column)
         - **g** - ⬆️ Jump to first row
         - **G** - ⬇️ Jump to last row
+        - **HOME/END** - 🎯 Jump to first/last column
+        - **Ctrl+HOME/END** - 🎯 Jump to page top/bottom
         - **Ctrl+F** - 📜 Page down
         - **Ctrl+B** - 📜 Page up
         - **PgUp/PgDn** - 📜 Page up/down
 
-        ## 👁️ View & Display
+        ## ♻️ Undo/Redo/Reset
+        - **u** - ↩️ Undo last action
+        - **U** - 🔄 Redo last undone action
+        - **Ctrl+U** - 🔁 Reset to initial state
+
+        ## 👁️ Viewing & Display
         - **Enter** - 📋 Show row details in modal
         - **F** - 📊 Show frequency distribution
         - **s** - 📈 Show statistics for current column
@@ -134,7 +141,7 @@ class DataFrameTable(DataTable):
         - **]** - 🔽 Sort column descending
         - *(Multi-column sort supported)*
 
-        ## 🔍 Search & Filter
+        ## 🔍 Searching & Filtering
         - **|** - 🔎 Search in current column with expression
         - **\\\\** - 🔎 Search in current column using cursor value
         - **/** - 🔎 Find in current column with cursor value
@@ -143,8 +150,8 @@ class DataFrameTable(DataTable):
         - **:** - 🌐 Global find with expression
         - **n** - ⬇️ Go to next match
         - **N** - ⬆️ Go to previous match
-        - **v** - 👁️ View/filter rows by cell or selected rows
-        - **V** - 🔧 View/filter rows by expression
+        - **v** - 👁️ View/filter rows by cell or selected rows and hide others
+        - **V** - 🔧 View/filter rows by expression and hide others
         - *(All search/find support case-insensitive & whole-word matching)*
 
         ## ✏️ Replace
@@ -152,24 +159,25 @@ class DataFrameTable(DataTable):
         - **R** - 🔄 Replace across all columns (interactive or all)
         - *(Supports case-insensitive & whole-word matching)*
 
-        ## ✅ Selection & Filtering
+        ## ✅ Selection & Filter
         - **'** - ✓️ Select/deselect current row
         - **t** - 💡 Toggle row selection (invert all)
+        - **T** - 🧹 Clear all selections and matches
         - **{** - ⬆️ Go to previous selected row
         - **}** - ⬇️ Go to next selected row
-        - **"** - 📍 Filter to show only selected rows
-        - **T** - 🧹 Clear all selections and matches
+        - **"** - 📍 Filter selected rows and remove others
 
         ## 🔍 SQL Interface
-        - **l** - 💬 Open simple SQL interface (select columns & WHERE clause)
+        - **l** - 💬 Open simple SQL interface (select columns & where clause)
         - **L** - 🔎 Open advanced SQL interface (full SQL queries)
 
-        ## ✏️ Edit & Modify
+        ## ✏️ Editing
         - **Double-click** - ✍️ Edit cell or rename column header
         - **e** - ✍️ Edit current cell
         - **E** - 📊 Edit entire column with expression
         - **a** - ➕ Add empty column after current
         - **A** - ➕ Add column with name and optional expression
+        - **@** - 🔗 Add a new link column from template
         - **x** - ❌ Delete current row
         - **X** - ❌ Delete row and those below
         - **Ctrl+X** - ❌ Delete row and those above
@@ -182,23 +190,17 @@ class DataFrameTable(DataTable):
         - **Shift+↑↓** - ⬆️⬇️ Move row up/down
         - **Shift+←→** - ⬅️➡️ Move column left/right
 
-        ## 🎨 Type Conversion
+        ## 🎨 Type Casting
         - **#** - 🔢 Cast column to integer
         - **%** - 🔢 Cast column to float
         - **!** - ✅ Cast column to boolean
         - **$** - 📝 Cast column to string
 
-        ## 🔗 URL Handling
-        - **@** - 🔗 Add a new link column from template expression (e.g., `https://example.com/$_`)
-
-        ## 💾 Data Management
+        ## 💾 Copy & Save
         - **c** - 📋 Copy cell to clipboard
         - **Ctrl+c** - 📊 Copy column to clipboard
         - **Ctrl+r** - 📝 Copy row to clipboard (tab-separated)
         - **Ctrl+s** - 💾 Save current tab to file
-        - **u** - ↩️ Undo last action
-        - **U** - 🔄 Redo last undone action
-        - **Ctrl+U** - 🔁 Reset to initial state
     """).strip()
 
     # fmt: off
@@ -274,7 +276,7 @@ class DataFrameTable(DataTable):
         ("shift+right", "move_column_right", "Move column right"),
         ("shift+up", "move_row_up", "Move row up"),
         ("shift+down", "move_row_down", "Move row down"),
-        # Type Conversion
+        # Type Casting
         ("number_sign", "cast_column_dtype('pl.Int64')", "Cast column dtype to integer"),  # `#`
         ("percent_sign", "cast_column_dtype('pl.Float64')", "Cast column dtype to float"),  # `%`
         ("exclamation_mark", "cast_column_dtype('pl.Boolean')", "Cast column dtype to bool"),  # `!`
@@ -1451,337 +1453,6 @@ class DataFrameTable(DataTable):
             title="Show",
         )
 
-    # Delete & Move
-    def _delete_column(self, more: str = None) -> None:
-        """Remove the currently selected column from the table."""
-        # Get the column to remove
-        col_idx = self.cursor_column
-        col_name = self.cursor_col_name
-        col_key = self.cursor_col_key
-
-        col_names_to_remove = []
-        col_keys_to_remove = []
-
-        # Remove all columns before the current column
-        if more == "before":
-            for i in range(col_idx + 1):
-                col_key = self.get_column_key(i)
-                col_names_to_remove.append(col_key.value)
-                col_keys_to_remove.append(col_key)
-
-            message = f"Removed column [$success]{col_name}[/] and all columns before"
-
-        # Remove all columns after the current column
-        elif more == "after":
-            for i in range(col_idx, len(self.columns)):
-                col_key = self.get_column_key(i)
-                col_names_to_remove.append(col_key.value)
-                col_keys_to_remove.append(col_key)
-
-            message = f"Removed column [$success]{col_name}[/] and all columns after"
-
-        # Remove only the current column
-        else:
-            col_names_to_remove.append(col_name)
-            col_keys_to_remove.append(col_key)
-            message = f"Removed column [$success]{col_name}[/]"
-
-        # Add to history
-        self._add_history(message)
-
-        # Remove the columns from the table display using the column names as keys
-        for ck in col_keys_to_remove:
-            self.remove_column(ck)
-
-        # Move cursor left if we deleted the last column(s)
-        last_col_idx = len(self.columns) - 1
-        if col_idx > last_col_idx:
-            self.move_cursor(column=last_col_idx)
-
-        # Remove from sorted columns if present
-        for col_name in col_names_to_remove:
-            if col_name in self.sorted_columns:
-                del self.sorted_columns[col_name]
-
-        # Remove from matches
-        col_indices_to_remove = set(self.df.columns.index(name) for name in col_names_to_remove)
-        for row_idx in list(self.matches.keys()):
-            self.matches[row_idx].difference_update(col_indices_to_remove)
-            # Remove empty entries
-            if not self.matches[row_idx]:
-                del self.matches[row_idx]
-
-        # Remove from dataframe
-        self.df = self.df.drop(col_names_to_remove)
-
-        self.notify(message, title="Delete")
-
-    def _duplicate_column(self) -> None:
-        """Duplicate the currently selected column, inserting it right after the current column."""
-        cidx = self.cursor_col_idx
-        col_name = self.cursor_col_name
-
-        col_idx = self.cursor_column
-        new_col_name = f"{col_name}_copy"
-
-        # Add to history
-        self._add_history(f"Duplicated column [$success]{col_name}[/]")
-
-        # Create new column and reorder columns to insert after current column
-        cols_before = self.df.columns[: cidx + 1]
-        cols_after = self.df.columns[cidx + 1 :]
-
-        # Add the new column and reorder columns for insertion after current column
-        self.df = self.df.with_columns(pl.col(col_name).alias(new_col_name)).select(
-            list(cols_before) + [new_col_name] + list(cols_after)
-        )
-
-        # Update matches to account for new column
-        new_matches = defaultdict(set)
-        for row_idx, cols in self.matches.items():
-            new_cols = set()
-            for col_idx_in_set in cols:
-                if col_idx_in_set <= cidx:
-                    new_cols.add(col_idx_in_set)
-                else:
-                    new_cols.add(col_idx_in_set + 1)
-            new_matches[row_idx] = new_cols
-        self.matches = new_matches
-
-        # Recreate table for display
-        self._setup_table()
-
-        # Move cursor to the new duplicated column
-        self.move_cursor(column=col_idx + 1)
-
-        # self.notify(f"Duplicated column [$accent]{col_name}[/] as [$success]{new_col_name}[/]", title="Duplicate")
-
-    def _delete_row(self, more: str = None) -> None:
-        """Delete rows from the table and dataframe.
-
-        Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.
-        """
-        old_count = len(self.df)
-        predicates = [True] * len(self.df)
-
-        # Delete all selected rows
-        if selected_count := self.selected_rows.count(True):
-            history_desc = f"Deleted {selected_count} selected row(s)"
-
-            for ridx, selected in enumerate(self.selected_rows):
-                if selected:
-                    predicates[ridx] = False
-
-        # Delete current row and those above
-        elif more == "above":
-            ridx = self.cursor_row_idx
-            history_desc = f"Deleted current row [$success]{ridx + 1}[/] and those above"
-            for i in range(ridx + 1):
-                predicates[i] = False
-
-        # Delete current row and those below
-        elif more == "below":
-            ridx = self.cursor_row_idx
-            history_desc = f"Deleted current row [$success]{ridx + 1}[/] and those below"
-            for i in range(ridx, len(self.df)):
-                if self.visible_rows[i]:
-                    predicates[i] = False
-
-        # Delete the row at the cursor
-        else:
-            ridx = self.cursor_row_idx
-            history_desc = f"Deleted row [$success]{ridx + 1}[/]"
-            if self.visible_rows[ridx]:
-                predicates[ridx] = False
-
-        # Add to history
-        self._add_history(history_desc)
-
-        # Apply the filter to remove rows
-        try:
-            df = self.df.with_row_index(RIDX).filter(predicates)
-        except Exception as e:
-            self.notify(f"Error deleting row(s): {e}", title="Delete", severity="error")
-            self.histories.pop()  # Remove last history entry
-            return
-
-        self.df = df.drop(RIDX)
-
-        # Update selected and visible rows tracking
-        old_row_indices = set(df[RIDX].to_list())
-        self.selected_rows = [selected for i, selected in enumerate(self.selected_rows) if i in old_row_indices]
-        self.visible_rows = [visible for i, visible in enumerate(self.visible_rows) if i in old_row_indices]
-
-        # Clear all matches since row indices have changed
-        self.matches = defaultdict(set)
-
-        # Recreate table for display
-        self._setup_table()
-
-        deleted_count = old_count - len(self.df)
-        if deleted_count > 0:
-            self.notify(f"Deleted [$accent]{deleted_count}[/] row(s)", title="Delete")
-
-    def _duplicate_row(self) -> None:
-        """Duplicate the currently selected row, inserting it right after the current row."""
-        ridx = self.cursor_row_idx
-
-        # Get the row to duplicate
-        row_to_duplicate = self.df.slice(ridx, 1)
-
-        # Add to history
-        self._add_history(f"Duplicated row [$success]{ridx + 1}[/]")
-
-        # Concatenate: rows before + duplicated row + rows after
-        df_before = self.df.slice(0, ridx + 1)
-        df_after = self.df.slice(ridx + 1)
-
-        # Combine the parts
-        self.df = pl.concat([df_before, row_to_duplicate, df_after])
-
-        # Update selected and visible rows tracking to account for new row
-        new_selected_rows = self.selected_rows[: ridx + 1] + [self.selected_rows[ridx]] + self.selected_rows[ridx + 1 :]
-        new_visible_rows = self.visible_rows[: ridx + 1] + [self.visible_rows[ridx]] + self.visible_rows[ridx + 1 :]
-        self.selected_rows = new_selected_rows
-        self.visible_rows = new_visible_rows
-
-        # Update matches to account for new row
-        new_matches = defaultdict(set)
-        for row_idx, cols in self.matches.items():
-            if row_idx <= ridx:
-                new_matches[row_idx] = cols
-            else:
-                new_matches[row_idx + 1] = cols
-        self.matches = new_matches
-
-        # Recreate table for display
-        self._setup_table()
-
-        # Move cursor to the new duplicated row
-        self.move_cursor(row=ridx + 1)
-
-        # self.notify(f"Duplicated row [$success]{ridx + 1}[/]", title="Row")
-
-    def _move_column(self, direction: str) -> None:
-        """Move the current column left or right.
-
-        Args:
-            direction: "left" to move left, "right" to move right.
-        """
-        row_idx, col_idx = self.cursor_coordinate
-        col_key = self.cursor_col_key
-        col_name = col_key.value
-        cidx = self.cursor_col_idx
-
-        # Validate move is possible
-        if direction == "left":
-            if col_idx <= 0:
-                self.notify("Cannot move column left", title="Move", severity="warning")
-                return
-            swap_idx = col_idx - 1
-        elif direction == "right":
-            if col_idx >= len(self.columns) - 1:
-                self.notify("Cannot move column right", title="Move", severity="warning")
-                return
-            swap_idx = col_idx + 1
-
-        # Get column to swap
-        _, swap_key = self.coordinate_to_cell_key(Coordinate(row_idx, swap_idx))
-        swap_name = swap_key.value
-        swap_cidx = self.df.columns.index(swap_name)
-
-        # Add to history
-        self._add_history(f"Moved column [$success]{col_name}[/] {direction} (swapped with [$success]{swap_name}[/])")
-
-        # Swap columns in the table's internal column locations
-        self.check_idle()
-
-        (
-            self._column_locations[col_key],
-            self._column_locations[swap_key],
-        ) = (
-            self._column_locations.get(swap_key),
-            self._column_locations.get(col_key),
-        )
-
-        self._update_count += 1
-        self.refresh()
-
-        # Restore cursor position on the moved column
-        self.move_cursor(row=row_idx, column=swap_idx)
-
-        # Update the dataframe column order
-        cols = list(self.df.columns)
-        cols[cidx], cols[swap_cidx] = cols[swap_cidx], cols[cidx]
-        self.df = self.df.select(cols)
-
-        # self.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move")
-
-    def _move_row(self, direction: str) -> None:
-        """Move the current row up or down.
-
-        Args:
-            direction: "up" to move up, "down" to move down.
-        """
-        row_idx, col_idx = self.cursor_coordinate
-
-        # Validate move is possible
-        if direction == "up":
-            if row_idx <= 0:
-                self.notify("Cannot move row up", title="Move", severity="warning")
-                return
-            swap_idx = row_idx - 1
-        elif direction == "down":
-            if row_idx >= len(self.rows) - 1:
-                self.notify("Cannot move row down", title="Move", severity="warning")
-                return
-            swap_idx = row_idx + 1
-        else:
-            # Invalid direction
-            return
-
-        row_key = self.coordinate_to_cell_key((row_idx, 0)).row_key
-        swap_key = self.coordinate_to_cell_key((swap_idx, 0)).row_key
-
-        # Add to history
-        self._add_history(
-            f"Moved row [$success]{row_key.value}[/] {direction} (swapped with row [$success]{swap_key.value}[/])"
-        )
-
-        # Swap rows in the table's internal row locations
-        self.check_idle()
-
-        (
-            self._row_locations[row_key],
-            self._row_locations[swap_key],
-        ) = (
-            self._row_locations.get(swap_key),
-            self._row_locations.get(row_key),
-        )
-
-        self._update_count += 1
-        self.refresh()
-
-        # Restore cursor position on the moved row
-        self.move_cursor(row=swap_idx, column=col_idx)
-
-        # Swap rows in the dataframe
-        ridx = int(row_key.value)  # 0-based
-        swap_ridx = int(swap_key.value)  # 0-based
-        first, second = sorted([ridx, swap_ridx])
-
-        self.df = pl.concat(
-            [
-                self.df.slice(0, first),
-                self.df.slice(second, 1),
-                self.df.slice(first + 1, second - first - 1),
-                self.df.slice(first, 1),
-                self.df.slice(second + 1),
-            ]
-        )
-
-        # self.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move")
-
     # Sort
     def _sort_by_column(self, descending: bool = False) -> None:
         """Sort by the currently selected column.
@@ -2152,11 +1823,11 @@ class DataFrameTable(DataTable):
             return
         cidx, new_col_name, link_template = result
 
-        self._add_history(f"Added link column [$success]{new_col_name}[/] with template {link_template}.")
+        self._add_history(f"Added link column [$accent]{new_col_name}[/] with template [$success]{link_template}[/].")
 
         try:
             # Hack to support PubChem link
-            link_template = link_template.replace("PC", "https://pubchem.ncbi.nlm.nih.gov")
+            link_template = link_template.replace("PC", "pubchem.ncbi.nlm.nih.gov")
 
             # Ensure link starts with http:// or https://
             if not link_template.startswith(("https://", "http://")):
@@ -2187,9 +1858,340 @@ class DataFrameTable(DataTable):
             self.notify(f"Added link column [$success]{new_col_name}[/]. Use Ctrl/Cmd click to open.", title="Add Link")
 
         except Exception as e:
-            self.notify(f"Error adding link column: {str(e)}", title="Add Link", severity="error")
-            self.log(f"Error adding link column: {str(e)}")  # Type Casting
+            self.notify(f"Error adding link column [$error]{new_col_name}[/]", title="Add Link", severity="error")
+            self.log(f"Error adding link column: {str(e)}")
 
+    def _delete_column(self, more: str = None) -> None:
+        """Remove the currently selected column from the table."""
+        # Get the column to remove
+        col_idx = self.cursor_column
+        col_name = self.cursor_col_name
+        col_key = self.cursor_col_key
+
+        col_names_to_remove = []
+        col_keys_to_remove = []
+
+        # Remove all columns before the current column
+        if more == "before":
+            for i in range(col_idx + 1):
+                col_key = self.get_column_key(i)
+                col_names_to_remove.append(col_key.value)
+                col_keys_to_remove.append(col_key)
+
+            message = f"Removed column [$success]{col_name}[/] and all columns before"
+
+        # Remove all columns after the current column
+        elif more == "after":
+            for i in range(col_idx, len(self.columns)):
+                col_key = self.get_column_key(i)
+                col_names_to_remove.append(col_key.value)
+                col_keys_to_remove.append(col_key)
+
+            message = f"Removed column [$success]{col_name}[/] and all columns after"
+
+        # Remove only the current column
+        else:
+            col_names_to_remove.append(col_name)
+            col_keys_to_remove.append(col_key)
+            message = f"Removed column [$success]{col_name}[/]"
+
+        # Add to history
+        self._add_history(message)
+
+        # Remove the columns from the table display using the column names as keys
+        for ck in col_keys_to_remove:
+            self.remove_column(ck)
+
+        # Move cursor left if we deleted the last column(s)
+        last_col_idx = len(self.columns) - 1
+        if col_idx > last_col_idx:
+            self.move_cursor(column=last_col_idx)
+
+        # Remove from sorted columns if present
+        for col_name in col_names_to_remove:
+            if col_name in self.sorted_columns:
+                del self.sorted_columns[col_name]
+
+        # Remove from matches
+        col_indices_to_remove = set(self.df.columns.index(name) for name in col_names_to_remove)
+        for row_idx in list(self.matches.keys()):
+            self.matches[row_idx].difference_update(col_indices_to_remove)
+            # Remove empty entries
+            if not self.matches[row_idx]:
+                del self.matches[row_idx]
+
+        # Remove from dataframe
+        self.df = self.df.drop(col_names_to_remove)
+
+        self.notify(message, title="Delete")
+
+    def _duplicate_column(self) -> None:
+        """Duplicate the currently selected column, inserting it right after the current column."""
+        cidx = self.cursor_col_idx
+        col_name = self.cursor_col_name
+
+        col_idx = self.cursor_column
+        new_col_name = f"{col_name}_copy"
+
+        # Add to history
+        self._add_history(f"Duplicated column [$success]{col_name}[/]")
+
+        # Create new column and reorder columns to insert after current column
+        cols_before = self.df.columns[: cidx + 1]
+        cols_after = self.df.columns[cidx + 1 :]
+
+        # Add the new column and reorder columns for insertion after current column
+        self.df = self.df.with_columns(pl.col(col_name).alias(new_col_name)).select(
+            list(cols_before) + [new_col_name] + list(cols_after)
+        )
+
+        # Update matches to account for new column
+        new_matches = defaultdict(set)
+        for row_idx, cols in self.matches.items():
+            new_cols = set()
+            for col_idx_in_set in cols:
+                if col_idx_in_set <= cidx:
+                    new_cols.add(col_idx_in_set)
+                else:
+                    new_cols.add(col_idx_in_set + 1)
+            new_matches[row_idx] = new_cols
+        self.matches = new_matches
+
+        # Recreate table for display
+        self._setup_table()
+
+        # Move cursor to the new duplicated column
+        self.move_cursor(column=col_idx + 1)
+
+        # self.notify(f"Duplicated column [$accent]{col_name}[/] as [$success]{new_col_name}[/]", title="Duplicate")
+
+    def _delete_row(self, more: str = None) -> None:
+        """Delete rows from the table and dataframe.
+
+        Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.
+        """
+        old_count = len(self.df)
+        predicates = [True] * len(self.df)
+
+        # Delete all selected rows
+        if selected_count := self.selected_rows.count(True):
+            history_desc = f"Deleted {selected_count} selected row(s)"
+
+            for ridx, selected in enumerate(self.selected_rows):
+                if selected:
+                    predicates[ridx] = False
+
+        # Delete current row and those above
+        elif more == "above":
+            ridx = self.cursor_row_idx
+            history_desc = f"Deleted current row [$success]{ridx + 1}[/] and those above"
+            for i in range(ridx + 1):
+                predicates[i] = False
+
+        # Delete current row and those below
+        elif more == "below":
+            ridx = self.cursor_row_idx
+            history_desc = f"Deleted current row [$success]{ridx + 1}[/] and those below"
+            for i in range(ridx, len(self.df)):
+                if self.visible_rows[i]:
+                    predicates[i] = False
+
+        # Delete the row at the cursor
+        else:
+            ridx = self.cursor_row_idx
+            history_desc = f"Deleted row [$success]{ridx + 1}[/]"
+            if self.visible_rows[ridx]:
+                predicates[ridx] = False
+
+        # Add to history
+        self._add_history(history_desc)
+
+        # Apply the filter to remove rows
+        try:
+            df = self.df.with_row_index(RIDX).filter(predicates)
+        except Exception as e:
+            self.notify(f"Error deleting row(s): {e}", title="Delete", severity="error")
+            self.histories.pop()  # Remove last history entry
+            return
+
+        self.df = df.drop(RIDX)
+
+        # Update selected and visible rows tracking
+        old_row_indices = set(df[RIDX].to_list())
+        self.selected_rows = [selected for i, selected in enumerate(self.selected_rows) if i in old_row_indices]
+        self.visible_rows = [visible for i, visible in enumerate(self.visible_rows) if i in old_row_indices]
+
+        # Clear all matches since row indices have changed
+        self.matches = defaultdict(set)
+
+        # Recreate table for display
+        self._setup_table()
+
+        deleted_count = old_count - len(self.df)
+        if deleted_count > 0:
+            self.notify(f"Deleted [$accent]{deleted_count}[/] row(s)", title="Delete")
+
+    def _duplicate_row(self) -> None:
+        """Duplicate the currently selected row, inserting it right after the current row."""
+        ridx = self.cursor_row_idx
+
+        # Get the row to duplicate
+        row_to_duplicate = self.df.slice(ridx, 1)
+
+        # Add to history
+        self._add_history(f"Duplicated row [$success]{ridx + 1}[/]")
+
+        # Concatenate: rows before + duplicated row + rows after
+        df_before = self.df.slice(0, ridx + 1)
+        df_after = self.df.slice(ridx + 1)
+
+        # Combine the parts
+        self.df = pl.concat([df_before, row_to_duplicate, df_after])
+
+        # Update selected and visible rows tracking to account for new row
+        new_selected_rows = self.selected_rows[: ridx + 1] + [self.selected_rows[ridx]] + self.selected_rows[ridx + 1 :]
+        new_visible_rows = self.visible_rows[: ridx + 1] + [self.visible_rows[ridx]] + self.visible_rows[ridx + 1 :]
+        self.selected_rows = new_selected_rows
+        self.visible_rows = new_visible_rows
+
+        # Update matches to account for new row
+        new_matches = defaultdict(set)
+        for row_idx, cols in self.matches.items():
+            if row_idx <= ridx:
+                new_matches[row_idx] = cols
+            else:
+                new_matches[row_idx + 1] = cols
+        self.matches = new_matches
+
+        # Recreate table for display
+        self._setup_table()
+
+        # Move cursor to the new duplicated row
+        self.move_cursor(row=ridx + 1)
+
+        # self.notify(f"Duplicated row [$success]{ridx + 1}[/]", title="Row")
+
+    def _move_column(self, direction: str) -> None:
+        """Move the current column left or right.
+
+        Args:
+            direction: "left" to move left, "right" to move right.
+        """
+        row_idx, col_idx = self.cursor_coordinate
+        col_key = self.cursor_col_key
+        col_name = col_key.value
+        cidx = self.cursor_col_idx
+
+        # Validate move is possible
+        if direction == "left":
+            if col_idx <= 0:
+                self.notify("Cannot move column left", title="Move", severity="warning")
+                return
+            swap_idx = col_idx - 1
+        elif direction == "right":
+            if col_idx >= len(self.columns) - 1:
+                self.notify("Cannot move column right", title="Move", severity="warning")
+                return
+            swap_idx = col_idx + 1
+
+        # Get column to swap
+        _, swap_key = self.coordinate_to_cell_key(Coordinate(row_idx, swap_idx))
+        swap_name = swap_key.value
+        swap_cidx = self.df.columns.index(swap_name)
+
+        # Add to history
+        self._add_history(f"Moved column [$success]{col_name}[/] {direction} (swapped with [$success]{swap_name}[/])")
+
+        # Swap columns in the table's internal column locations
+        self.check_idle()
+
+        (
+            self._column_locations[col_key],
+            self._column_locations[swap_key],
+        ) = (
+            self._column_locations.get(swap_key),
+            self._column_locations.get(col_key),
+        )
+
+        self._update_count += 1
+        self.refresh()
+
+        # Restore cursor position on the moved column
+        self.move_cursor(row=row_idx, column=swap_idx)
+
+        # Update the dataframe column order
+        cols = list(self.df.columns)
+        cols[cidx], cols[swap_cidx] = cols[swap_cidx], cols[cidx]
+        self.df = self.df.select(cols)
+
+        # self.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move")
+
+    def _move_row(self, direction: str) -> None:
+        """Move the current row up or down.
+
+        Args:
+            direction: "up" to move up, "down" to move down.
+        """
+        row_idx, col_idx = self.cursor_coordinate
+
+        # Validate move is possible
+        if direction == "up":
+            if row_idx <= 0:
+                self.notify("Cannot move row up", title="Move", severity="warning")
+                return
+            swap_idx = row_idx - 1
+        elif direction == "down":
+            if row_idx >= len(self.rows) - 1:
+                self.notify("Cannot move row down", title="Move", severity="warning")
+                return
+            swap_idx = row_idx + 1
+        else:
+            # Invalid direction
+            return
+
+        row_key = self.coordinate_to_cell_key((row_idx, 0)).row_key
+        swap_key = self.coordinate_to_cell_key((swap_idx, 0)).row_key
+
+        # Add to history
+        self._add_history(
+            f"Moved row [$success]{row_key.value}[/] {direction} (swapped with row [$success]{swap_key.value}[/])"
+        )
+
+        # Swap rows in the table's internal row locations
+        self.check_idle()
+
+        (
+            self._row_locations[row_key],
+            self._row_locations[swap_key],
+        ) = (
+            self._row_locations.get(swap_key),
+            self._row_locations.get(row_key),
+        )
+
+        self._update_count += 1
+        self.refresh()
+
+        # Restore cursor position on the moved row
+        self.move_cursor(row=swap_idx, column=col_idx)
+
+        # Swap rows in the dataframe
+        ridx = int(row_key.value)  # 0-based
+        swap_ridx = int(swap_key.value)  # 0-based
+        first, second = sorted([ridx, swap_ridx])
+
+        self.df = pl.concat(
+            [
+                self.df.slice(0, first),
+                self.df.slice(second, 1),
+                self.df.slice(first + 1, second - first - 1),
+                self.df.slice(first, 1),
+                self.df.slice(second + 1),
+            ]
+        )
+
+        # self.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move")
+
+    # Type casting
     def _cast_column_dtype(self, dtype: str) -> None:
         """Cast the current column to a different data type.
 
