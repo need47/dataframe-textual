@@ -144,7 +144,7 @@ class TableScreen(ModalScreen):
             message = f"Highlighted [$accent]{col_name}[/] == [$success]{value_display}[/]"
 
         # Recreate the table display with updated data in the main app
-        self.dftable._setup_table()
+        self.dftable.setup_table()
 
         # Dismiss the frequency screen
         self.app.pop_screen()

@@ -338,9 +338,6 @@ class DataFrameTable(DataTable):
         # Current history state for redo
         self.history: History = None
 
-        # Pending filename for save operations
-        self._pending_filename = ""
-
         # Whether to use thousand separator for numeric display
         self.thousand_separator = False
 
@@ -470,7 +467,7 @@ class DataFrameTable(DataTable):
         """
         return self._column_locations.get_key(col_idx)
 
-    def _should_highlight(self, cursor: Coordinate, target_cell: Coordinate, type_of_cursor: CursorType) -> bool:
+    def should_highlight(self, cursor: Coordinate, target_cell: Coordinate, type_of_cursor: CursorType) -> bool:
         """Determine if the given cell should be highlighted because of the cursor.
 
         In "cell" mode, also highlights the row and column headers. In "row" and "column"
@@ -583,7 +580,7 @@ class DataFrameTable(DataTable):
         """
         # Ensure the target row is loaded
         if ridx >= self.loaded_rows:
-            self._load_rows(stop=ridx + self.BATCH_SIZE)
+            self.load_rows(stop=ridx + self.BATCH_SIZE)
 
         row_key = str(ridx)
         col_key = self.df.columns[cidx]
@@ -599,7 +596,7 @@ class DataFrameTable(DataTable):
         Returns:
             None
         """
-        # self._setup_table()
+        # self.setup_table()
         pass
 
     def on_key(self, event) -> None:
@@ -616,7 +613,7 @@ class DataFrameTable(DataTable):
         """
         if event.key in ("pagedown", "down"):
             # Let the table handle the navigation first
-            self._check_and_load_more()
+            self.check_and_load_more()
 
     def on_click(self, event: Click) -> None:
         """Handle mouse click events on the table.
@@ -638,9 +635,9 @@ class DataFrameTable(DataTable):
 
             # header row
             if row_idx == -1:
-                self._rename_column()
+                self.do_rename_column()
             else:
-                self._edit_cell()
+                self.do_edit_cell()
 
     # Action handlers for BINDINGS
     def action_jump_top(self) -> None:
@@ -649,12 +646,12 @@ class DataFrameTable(DataTable):
 
     def action_jump_bottom(self) -> None:
         """Jump to the bottom of the table."""
-        self._load_rows(move_to_end=True)
+        self.load_rows(move_to_end=True)
 
     def action_forward_page(self) -> None:
         """Scroll down one page."""
         super().action_page_down()
-        self._check_and_load_more()
+        self.check_and_load_more()
 
     def action_backward_page(self) -> None:
         """Scroll up one page."""
@@ -662,39 +659,39 @@ class DataFrameTable(DataTable):
 
     def action_view_row_detail(self) -> None:
         """View details of the current row."""
-        self._view_row_detail()
+        self.do_view_row_detail()
 
     def action_delete_column(self) -> None:
         """Delete the current column."""
-        self._delete_column()
+        self.do_delete_column()
 
     def action_hide_column(self) -> None:
         """Hide the current column."""
-        self._hide_column()
+        self.do_hide_column()
 
     def action_expand_column(self) -> None:
         """Expand the current column to its full width."""
-        self._expand_column()
+        self.do_expand_column()
 
     def action_show_hidden_rows_columns(self) -> None:
         """Show all hidden rows/columns."""
-        self._show_hidden_rows_columns()
+        self.do_show_hidden_rows_columns()
 
     def action_sort_ascending(self) -> None:
         """Sort by current column in ascending order."""
-        self._sort_by_column(descending=False)
+        self.do_sort_by_column(descending=False)
 
     def action_sort_descending(self) -> None:
         """Sort by current column in descending order."""
-        self._sort_by_column(descending=True)
+        self.do_sort_by_column(descending=True)
 
     def action_save_to_file(self) -> None:
         """Save the current dataframe to a file."""
-        self._save_to_file()
+        self.do_save_to_file()
 
     def action_show_frequency(self) -> None:
         """Show frequency distribution for the current column."""
-        self._show_frequency()
+        self.do_show_frequency()
 
     def action_show_statistics(self, scope: str = "column") -> None:
         """Show statistics for the current column or entire dataframe.
@@ -702,51 +699,51 @@ class DataFrameTable(DataTable):
         Args:
             scope: Either "column" for current column stats or "dataframe" for all columns.
         """
-        self._show_statistics(scope)
+        self.do_show_statistics(scope)
 
     def action_view_rows(self) -> None:
         """View rows by current cell value."""
-        self._view_rows()
+        self.do_view_rows()
 
     def action_view_rows_expr(self) -> None:
         """Open the advanced filter screen."""
-        self._view_rows_expr()
+        self.do_view_rows_expr()
 
     def action_edit_cell(self) -> None:
         """Edit the current cell."""
-        self._edit_cell()
+        self.do_edit_cell()
 
     def action_edit_column(self) -> None:
         """Edit the entire current column with an expression."""
-        self._edit_column()
+        self.do_edit_column()
 
     def action_add_column(self) -> None:
         """Add an empty column after the current column."""
-        self._add_column()
+        self.do_add_column()
 
     def action_add_column_expr(self) -> None:
         """Add a new column with optional expression after the current column."""
-        self._add_column_expr()
+        self.do_add_column_expr()
 
     def action_add_link_column(self) -> None:
         """Open AddLinkScreen to create a new link column from a Polars expression."""
-        self._add_link_column()
+        self.do_add_link_column()
 
     def action_rename_column(self) -> None:
         """Rename the current column."""
-        self._rename_column()
+        self.do_rename_column()
 
     def action_clear_cell(self) -> None:
         """Clear the current cell (set to None)."""
-        self._clear_cell()
+        self.do_clear_cell()
 
     def action_search_cursor_value(self) -> None:
         """Search cursor value in the current column."""
-        self._search_cursor_value()
+        self.do_search_cursor_value()
 
     def action_search_expr(self) -> None:
         """Search by expression in the current column."""
-        self._search_expr()
+        self.do_search_expr()
 
     def action_find_cursor_value(self, scope="column") -> None:
         """Find by cursor value.
@@ -754,7 +751,7 @@ class DataFrameTable(DataTable):
         Args:
             scope: "column" to find in current column, "global" to find across all columns.
         """
-        self._find_cursor_value(scope=scope)
+        self.do_find_cursor_value(scope=scope)
 
     def action_find_expr(self, scope="column") -> None:
         """Find by expression.
@@ -762,87 +759,87 @@ class DataFrameTable(DataTable):
         Args:
             scope: "column" to find in current column, "global" to find across all columns.
         """
-        self._find_expr(scope=scope)
+        self.do_find_expr(scope=scope)
 
     def action_replace(self) -> None:
         """Replace values in current column."""
-        self._replace()
+        self.do_replace()
 
     def action_replace_global(self) -> None:
         """Replace values across all columns."""
-        self._replace_global()
+        self.do_replace_global()
 
     def action_toggle_row_selection(self) -> None:
         """Toggle selection for the current row."""
-        self._toggle_row_selection()
+        self.do_toggle_row_selection()
 
     def action_toggle_selections(self) -> None:
         """Toggle all row selections."""
-        self._toggle_selections()
+        self.do_toggle_selections()
 
     def action_filter_rows(self) -> None:
         """Filter to show only selected rows."""
-        self._filter_rows()
+        self.do_filter_rows()
 
     def action_delete_row(self) -> None:
         """Delete the current row."""
-        self._delete_row()
+        self.do_delete_row()
 
     def action_delete_row_and_below(self) -> None:
         """Delete the current row and those below."""
-        self._delete_row(more="below")
+        self.do_delete_row(more="below")
 
     def action_delete_row_and_up(self) -> None:
         """Delete the current row and those above."""
-        self._delete_row(more="above")
+        self.do_delete_row(more="above")
 
     def action_duplicate_column(self) -> None:
         """Duplicate the current column."""
-        self._duplicate_column()
+        self.do_duplicate_column()
 
     def action_duplicate_row(self) -> None:
         """Duplicate the current row."""
-        self._duplicate_row()
+        self.do_duplicate_row()
 
     def action_undo(self) -> None:
         """Undo the last action."""
-        self._undo()
+        self.do_undo()
 
     def action_redo(self) -> None:
         """Redo the last undone action."""
-        self._redo()
+        self.do_redo()
 
     def action_reset(self) -> None:
         """Reset to the initial state."""
-        self._reset()
+        self.do_reset()
 
     def action_move_column_left(self) -> None:
         """Move the current column to the left."""
-        self._move_column("left")
+        self.do_move_column("left")
 
     def action_move_column_right(self) -> None:
         """Move the current column to the right."""
-        self._move_column("right")
+        self.do_move_column("right")
 
     def action_move_row_up(self) -> None:
         """Move the current row up."""
-        self._move_row("up")
+        self.do_move_row("up")
 
     def action_move_row_down(self) -> None:
         """Move the current row down."""
-        self._move_row("down")
+        self.do_move_row("down")
 
     def action_clear_selections_and_matches(self) -> None:
         """Clear all row selections and matches."""
-        self._clear_selections_and_matches()
+        self.do_clear_selections_and_matches()
 
     def action_cycle_cursor_type(self) -> None:
         """Cycle through cursor types."""
-        self._cycle_cursor_type()
+        self.do_cycle_cursor_type()
 
     def action_freeze_row_column(self) -> None:
         """Open the freeze screen."""
-        self._freeze_row_column()
+        self.do_freeze_row_column()
 
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility."""
@@ -852,7 +849,7 @@ class DataFrameTable(DataTable):
 
     def action_cast_column_dtype(self, dtype: str | pl.DataType) -> None:
         """Cast the current column to a different data type."""
-        self._cast_column_dtype(dtype)
+        self.do_cast_column_dtype(dtype)
 
     def action_copy_cell(self) -> None:
         """Copy the current cell to clipboard."""
@@ -861,7 +858,7 @@ class DataFrameTable(DataTable):
 
         try:
             cell_str = str(self.df.item(ridx, cidx))
-            self._copy_to_clipboard(cell_str, f"Copied: [$success]{cell_str[:50]}[/]")
+            self.do_copy_to_clipboard(cell_str, f"Copied: [$success]{cell_str[:50]}[/]")
         except IndexError:
             self.notify("Error copying cell", title="Clipboard", severity="error")
 
@@ -874,7 +871,7 @@ class DataFrameTable(DataTable):
             col_values = [str(val) for val in self.df[col_name].to_list()]
             col_str = "\n".join(col_values)
 
-            self._copy_to_clipboard(
+            self.do_copy_to_clipboard(
                 col_str,
                 f"Copied [$accent]{len(col_values)}[/] values from column [$success]{col_name}[/]",
             )
@@ -890,7 +887,7 @@ class DataFrameTable(DataTable):
             row_values = [str(val) for val in self.df.row(ridx)]
             row_str = "\t".join(row_values)
 
-            self._copy_to_clipboard(
+            self.do_copy_to_clipboard(
                 row_str,
                 f"Copied row [$accent]{ridx + 1}[/] with [$success]{len(row_values)}[/] values",
             )
@@ -900,40 +897,40 @@ class DataFrameTable(DataTable):
     def action_show_thousand_separator(self) -> None:
         """Toggle thousand separator for numeric display."""
         self.thousand_separator = not self.thousand_separator
-        self._setup_table()
+        self.setup_table()
         # status = "enabled" if self.thousand_separator else "disabled"
         # self.notify(f"Thousand separator {status}", title="Display")
 
     def action_next_match(self) -> None:
         """Go to the next matched cell."""
-        self._next_match()
+        self.do_next_match()
 
     def action_previous_match(self) -> None:
         """Go to the previous matched cell."""
-        self._previous_match()
+        self.do_previous_match()
 
     def action_next_selected_row(self) -> None:
         """Go to the next selected row."""
-        self._next_selected_row()
+        self.do_next_selected_row()
 
     def action_previous_selected_row(self) -> None:
         """Go to the previous selected row."""
-        self._previous_selected_row()
+        self.do_previous_selected_row()
 
     def action_simple_sql(self) -> None:
         """Open the SQL interface screen."""
-        self._simple_sql()
+        self.do_simple_sql()
 
     def action_advanced_sql(self) -> None:
         """Open the advanced SQL interface screen."""
-        self._advanced_sql()
+        self.do_advanced_sql()
 
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
-        self._check_and_load_more()
+        self.check_and_load_more()
 
     # Setup & Loading
-    def _setup_table(self, reset: bool = False) -> None:
+    def setup_table(self, reset: bool = False) -> None:
         """Setup the table for display.
 
         Row keys are 0-based indices, which map directly to dataframe row indices.
@@ -973,14 +970,14 @@ class DataFrameTable(DataTable):
         # Save current cursor position before clearing
         row_idx, col_idx = self.cursor_coordinate
 
-        self._setup_columns()
-        self._load_rows(stop)
+        self.setup_columns()
+        self.load_rows(stop)
 
         # Restore cursor position
         if row_idx < len(self.rows) and col_idx < len(self.columns):
             self.move_cursor(row=row_idx, column=col_idx)
 
-    def _determine_column_widths(self) -> dict[str, int]:
+    def determine_column_widths(self) -> dict[str, int]:
         """Determine optimal width for each column based on data type and content.
 
         For String columns:
@@ -1050,7 +1047,7 @@ class DataFrameTable(DataTable):
 
         return column_widths
 
-    def _setup_columns(self) -> None:
+    def setup_columns(self) -> None:
         """Clear table and setup columns.
 
         Column keys are header names from the dataframe.
@@ -1059,7 +1056,7 @@ class DataFrameTable(DataTable):
         self.clear(columns=True)
 
         # Get optimal column widths
-        column_widths = self._determine_column_widths()
+        column_widths = self.determine_column_widths()
 
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
@@ -1082,7 +1079,7 @@ class DataFrameTable(DataTable):
 
             self.add_column(Text(cell_value, justify=DtypeConfig(dtype).justify), key=col, width=width)
 
-    def _load_rows(self, stop: int | None = None, move_to_end: bool = False) -> None:
+    def load_rows(self, stop: int | None = None, move_to_end: bool = False) -> None:
         """Load a batch of rows into the table (synchronous wrapper).
 
         Args:
@@ -1104,7 +1101,7 @@ class DataFrameTable(DataTable):
 
             def _continue(result: bool) -> None:
                 if result:
-                    self._load_rows_async(stop, move_to_end=move_to_end)
+                    self.load_rows_async(stop, move_to_end=move_to_end)
 
             self.app.push_screen(
                 ConfirmScreen(
@@ -1117,10 +1114,10 @@ class DataFrameTable(DataTable):
             return
 
         # Load rows asynchronously
-        self._load_rows_async(stop, move_to_end=move_to_end)
+        self.load_rows_async(stop, move_to_end=move_to_end)
 
     @work(exclusive=True, description="Loading rows...")
-    async def _load_rows_async(self, stop: int, move_to_end: bool = False) -> None:
+    async def load_rows_async(self, stop: int, move_to_end: bool = False) -> None:
         """Perform loading with async to avoid blocking.
 
         Args:
@@ -1134,19 +1131,19 @@ class DataFrameTable(DataTable):
             # Load max BATCH_SIZE rows at a time
             chunk_size = min(self.BATCH_SIZE, stop - self.loaded_rows)
             next_stop = min(self.loaded_rows + chunk_size, stop)
-            self._load_rows_batch(next_stop)
+            self.load_rows_batch(next_stop)
 
             # If there's more to load, yield to event loop with delay
             if next_stop < stop:
                 await sleep_async(0.05)  # 50ms delay to allow UI updates
-                self._load_rows_async(stop, move_to_end=move_to_end)
+                self.load_rows_async(stop, move_to_end=move_to_end)
                 return
 
         # After loading completes, move cursor to end if requested
         if move_to_end:
             self.call_after_refresh(lambda: self.move_cursor(row=self.row_count - 1))
 
-    def _load_rows_batch(self, stop: int) -> None:
+    def load_rows_batch(self, stop: int) -> None:
         """Load a batch of rows into the table.
 
         Row keys are 0-based indices as strings, which map directly to dataframe row indices.
@@ -1192,7 +1189,7 @@ class DataFrameTable(DataTable):
             self.notify("Error loading rows", title="Load", severity="error")
             self.log(f"Error loading rows: {str(e)}")
 
-    def _check_and_load_more(self) -> None:
+    def check_and_load_more(self) -> None:
         """Check if we need to load more rows and load them."""
         # If we've loaded everything, no need to check
         if self.loaded_rows >= len(self.df):
@@ -1203,10 +1200,10 @@ class DataFrameTable(DataTable):
 
         # If visible area is close to the end of loaded rows, load more
         if bottom_visible_row >= self.loaded_rows - 10:
-            self._load_rows(self.loaded_rows + self.BATCH_SIZE)
+            self.load_rows(self.loaded_rows + self.BATCH_SIZE)
 
     # Highlighting
-    def _do_highlight(self, force: bool = False) -> None:
+    def apply_highlight(self, force: bool = False) -> None:
         """Update all rows, highlighting selected ones and restoring others to default.
 
         Args:
@@ -1216,10 +1213,10 @@ class DataFrameTable(DataTable):
         stop = rindex(self.selected_rows, True) + 1
         stop = max(stop, max(self.matches.keys(), default=0) + 1)
 
-        self._load_rows(stop)
-        self._highlight_table(force)
+        self.load_rows(stop)
+        self.highlight_table(force)
 
-    def _highlight_table(self, force: bool = False) -> None:
+    def highlight_table(self, force: bool = False) -> None:
         """Highlight selected rows/cells in red."""
         if not force and not any(self.selected_rows) and not self.matches:
             return  # Nothing to highlight
@@ -1256,7 +1253,7 @@ class DataFrameTable(DataTable):
                     self.update_cell(row.key, col.key, cell_text)
 
     # History & Undo
-    def _create_history(self, description: str) -> None:
+    def create_history(self, description: str) -> None:
         """Create the initial history state."""
         return History(
             description=description,
@@ -1274,7 +1271,7 @@ class DataFrameTable(DataTable):
             dirty=self.dirty,
         )
 
-    def _apply_history(self, history: History) -> None:
+    def apply_history(self, history: History) -> None:
         """Apply the current history state to the table."""
         if history is None:
             return
@@ -1294,23 +1291,23 @@ class DataFrameTable(DataTable):
         self.dirty = history.dirty
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
-    def _add_history(self, description: str, dirty: bool = False) -> None:
+    def add_history(self, description: str, dirty: bool = False) -> None:
         """Add the current state to the history stack.
 
         Args:
             description: Description of the action for this history entry.
             dirty: Whether this operation modifies the data (True) or just display state (False).
         """
-        history = self._create_history(description)
+        history = self.create_history(description)
         self.histories.append(history)
 
         # Mark table as dirty if this operation modifies data
         if dirty:
             self.dirty = True
 
-    def _undo(self) -> None:
+    def do_undo(self) -> None:
         """Undo the last action."""
         if not self.histories:
             self.notify("No actions to undo", title="Undo", severity="warning")
@@ -1320,14 +1317,14 @@ class DataFrameTable(DataTable):
         history = self.histories.pop()
 
         # Save current state for redo
-        self.history = self._create_history(history.description)
+        self.history = self.create_history(history.description)
 
         # Restore state
-        self._apply_history(history)
+        self.apply_history(history)
 
         self.notify(f"Reverted: {history.description}", title="Undo")
 
-    def _redo(self) -> None:
+    def do_redo(self) -> None:
         """Redo the last undone action."""
         if self.history is None:
             self.notify("No actions to redo", title="Redo", severity="warning")
@@ -1336,23 +1333,23 @@ class DataFrameTable(DataTable):
         description = self.history.description
 
         # Save current state for undo
-        self._add_history(description)
+        self.add_history(description)
 
         # Restore state
-        self._apply_history(self.history)
+        self.apply_history(self.history)
 
         # Clear redo state
         self.history = None
 
         self.notify(f"Reapplied: {description}", title="Redo")
 
-    def _reset(self) -> None:
+    def do_reset(self) -> None:
         """Reset the table to the initial state."""
-        self._setup_table(reset=True)
-        self._restore_dirty(default=False)
+        self.setup_table(reset=True)
+        self.restore_dirty(default=False)
         self.notify("Restored initial state", title="Reset")
 
-    def _restore_dirty(self, default: bool | None = None) -> None:
+    def restore_dirty(self, default: bool | None = None) -> None:
         """Restore the dirty state from the last history entry."""
         if self.last_history:
             self.dirty = self.last_history.dirty
@@ -1360,28 +1357,28 @@ class DataFrameTable(DataTable):
             self.dirty = default
 
     # Display
-    def _cycle_cursor_type(self) -> None:
+    def do_cycle_cursor_type(self) -> None:
         """Cycle through cursor types: cell -> row -> column -> cell."""
         next_type = get_next_item(CURSOR_TYPES, self.cursor_type)
         self.cursor_type = next_type
 
         # self.notify(f"Changed cursor type to [$success]{next_type}[/]", title="Cursor")
 
-    def _view_row_detail(self) -> None:
+    def do_view_row_detail(self) -> None:
         """Open a modal screen to view the selected row's details."""
         ridx = self.cursor_row_idx
 
         # Push the modal screen
         self.app.push_screen(RowDetailScreen(ridx, self))
 
-    def _show_frequency(self) -> None:
+    def do_show_frequency(self) -> None:
         """Show frequency distribution for the current column."""
         cidx = self.cursor_col_idx
 
         # Push the frequency modal screen
         self.app.push_screen(FrequencyScreen(cidx, self))
 
-    def _show_statistics(self, scope: str = "column") -> None:
+    def do_show_statistics(self, scope: str = "column") -> None:
         """Show statistics for the current column or entire dataframe.
 
         Args:
@@ -1395,11 +1392,11 @@ class DataFrameTable(DataTable):
             cidx = self.cursor_col_idx
             self.app.push_screen(StatisticsScreen(self, col_idx=cidx))
 
-    def _freeze_row_column(self) -> None:
+    def do_freeze_row_column(self) -> None:
         """Open the freeze screen to set fixed rows and columns."""
-        self.app.push_screen(FreezeScreen(), callback=self._do_freeze)
+        self.app.push_screen(FreezeScreen(), callback=self.freeze_row_column)
 
-    def _do_freeze(self, result: tuple[int, int] | None) -> None:
+    def freeze_row_column(self, result: tuple[int, int] | None) -> None:
         """Handle result from PinScreen.
 
         Args:
@@ -1411,7 +1408,7 @@ class DataFrameTable(DataTable):
         fixed_rows, fixed_columns = result
 
         # Add to history
-        self._add_history(f"Pinned [$accent]{fixed_rows}[/] rows and [$success]{fixed_columns}[/] columns")
+        self.add_history(f"Pinned [$accent]{fixed_rows}[/] rows and [$success]{fixed_columns}[/] columns")
 
         # Apply the pin settings to the table
         if fixed_rows >= 0:
@@ -1421,14 +1418,14 @@ class DataFrameTable(DataTable):
 
         # self.notify(f"Pinned [$accent]{fixed_rows}[/] rows and [$success]{fixed_columns}[/] columns", title="Pin")
 
-    def _hide_column(self) -> None:
+    def do_hide_column(self) -> None:
         """Hide the currently selected column from the table display."""
         col_key = self.cursor_col_key
         col_name = col_key.value
         col_idx = self.cursor_column
 
         # Add to history
-        self._add_history(f"Hid column [$success]{col_name}[/]")
+        self.add_history(f"Hid column [$success]{col_name}[/]")
 
         # Remove the column from the table display (but keep in dataframe)
         self.remove_column(col_key)
@@ -1442,7 +1439,7 @@ class DataFrameTable(DataTable):
 
         # self.notify(f"Hid column [$accent]{col_name}[/]. Press [$success]H[/] to show hidden columns", title="Hide")
 
-    def _expand_column(self) -> None:
+    def do_expand_column(self) -> None:
         """Expand the current column to show the widest cell in the loaded data."""
         col_idx = self.cursor_col_idx
         col_key = self.cursor_col_key
@@ -1479,7 +1476,7 @@ class DataFrameTable(DataTable):
             self.notify("Error expanding column", title="Expand", severity="error")
             self.log(f"Error expanding column `{col_name}`: {str(e)}")
 
-    def _show_hidden_rows_columns(self) -> None:
+    def do_show_hidden_rows_columns(self) -> None:
         """Show all hidden rows/columns by recreating the table."""
         # Get currently visible columns
         visible_cols = set(col.key for col in self.ordered_columns)
@@ -1492,14 +1489,14 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self._add_history("Showed hidden rows/columns")
+        self.add_history("Showed hidden rows/columns")
 
         # Clear hidden rows/columns tracking
         self.visible_rows = [True] * len(self.df)
         self.hidden_columns.clear()
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         self.notify(
             f"Showed [$accent]{hidden_row_count}[/] hidden row(s) and/or [$accent]{hidden_col_count}[/] column(s)",
@@ -1507,7 +1504,7 @@ class DataFrameTable(DataTable):
         )
 
     # Sort
-    def _sort_by_column(self, descending: bool = False) -> None:
+    def do_sort_by_column(self, descending: bool = False) -> None:
         """Sort by the currently selected column.
 
         Supports multi-column sorting:
@@ -1524,7 +1521,7 @@ class DataFrameTable(DataTable):
         old_desc = self.sorted_columns.get(col_name)
 
         # Add to history
-        self._add_history(f"Sorted on column [$success]{col_name}[/]")
+        self.add_history(f"Sorted on column [$success]{col_name}[/]")
         if old_desc is None:
             # Add new column to sort
             self.sorted_columns[col_name] = descending
@@ -1553,13 +1550,13 @@ class DataFrameTable(DataTable):
         self.df = df_sorted.drop(RIDX)
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         # Restore cursor position on the sorted column
         self.move_cursor(column=col_idx, row=0)
 
     # Edit
-    def _edit_cell(self, ridx: int = None, cidx: int = None) -> None:
+    def do_edit_cell(self, ridx: int = None, cidx: int = None) -> None:
         """Open modal to edit the selected cell."""
         ridx = self.cursor_row_idx if ridx is None else ridx
         cidx = self.cursor_col_idx if cidx is None else cidx
@@ -1567,10 +1564,10 @@ class DataFrameTable(DataTable):
         # Push the edit modal screen
         self.app.push_screen(
             EditCellScreen(ridx, cidx, self.df),
-            callback=self._do_edit_cell,
+            callback=self.edit_cell,
         )
 
-    def _do_edit_cell(self, result) -> None:
+    def edit_cell(self, result) -> None:
         """Handle result from EditCellScreen."""
         if result is None:
             return
@@ -1579,14 +1576,14 @@ class DataFrameTable(DataTable):
         if new_value is None:
             self.app.push_screen(
                 EditCellScreen(ridx, cidx, self.df),
-                callback=self._do_edit_cell,
+                callback=self.edit_cell,
             )
             return
 
         col_name = self.df.columns[cidx]
 
         # Add to history
-        self._add_history(f"Edited cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
+        self.add_history(f"Edited cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
 
         # Update the cell in the dataframe
         try:
@@ -1615,17 +1612,17 @@ class DataFrameTable(DataTable):
             self.notify("Error updating cell", title="Edit", severity="error")
             self.log(f"Error updating cell: {str(e)}")
 
-    def _edit_column(self) -> None:
+    def do_edit_column(self) -> None:
         """Open modal to edit the entire column with an expression."""
         cidx = self.cursor_col_idx
 
         # Push the edit column modal screen
         self.app.push_screen(
             EditColumnScreen(cidx, self.df),
-            callback=self._do_edit_column,
+            callback=self.edit_column,
         )
 
-    def _do_edit_column(self, result) -> None:
+    def edit_column(self, result) -> None:
         """Edit a column."""
         if result is None:
             return
@@ -1661,7 +1658,7 @@ class DataFrameTable(DataTable):
                 expr = pl.lit(str(term))
 
         # Add to history
-        self._add_history(f"Edited column [$accent]{col_name}[/] with expression", dirty=True)
+        self.add_history(f"Edited column [$accent]{col_name}[/] with expression", dirty=True)
 
         try:
             # Apply the expression to the column
@@ -1676,11 +1673,11 @@ class DataFrameTable(DataTable):
             return
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         # self.notify(f"Column [$accent]{col_name}[/] updated with [$success]{expr}[/]", title="Edit")
 
-    def _rename_column(self) -> None:
+    def do_rename_column(self) -> None:
         """Open modal to rename the selected column."""
         col_name = self.cursor_col_name
         col_idx = self.cursor_column
@@ -1688,10 +1685,10 @@ class DataFrameTable(DataTable):
         # Push the rename column modal screen
         self.app.push_screen(
             RenameColumnScreen(col_idx, col_name, self.df.columns),
-            callback=self._do_rename_column,
+            callback=self.rename_column,
         )
 
-    def _do_rename_column(self, result) -> None:
+    def rename_column(self, result) -> None:
         """Handle result from RenameColumnScreen."""
         if result is None:
             return
@@ -1700,12 +1697,12 @@ class DataFrameTable(DataTable):
         if new_name is None:
             self.app.push_screen(
                 RenameColumnScreen(col_idx, col_name, self.df.columns),
-                callback=self._do_rename_column,
+                callback=self.rename_column,
             )
             return
 
         # Add to history
-        self._add_history(f"Renamed column [$accent]{col_name}[/] to [$success]{new_name}[/]", dirty=True)
+        self.add_history(f"Renamed column [$accent]{col_name}[/] to [$success]{new_name}[/]", dirty=True)
 
         # Rename the column in the dataframe
         self.df = self.df.rename({col_name: new_name})
@@ -1720,14 +1717,14 @@ class DataFrameTable(DataTable):
             self.hidden_columns.add(new_name)
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         # Move cursor to the renamed column
         self.move_cursor(column=col_idx)
 
         # self.notify(f"Renamed column [$success]{col_name}[/] to [$success]{new_name}[/]", title="Column")
 
-    def _clear_cell(self) -> None:
+    def do_clear_cell(self) -> None:
         """Clear the current cell by setting its value to None."""
         row_key, col_key = self.cursor_key
         ridx = self.cursor_row_idx
@@ -1735,7 +1732,7 @@ class DataFrameTable(DataTable):
         col_name = self.cursor_col_name
 
         # Add to history
-        self._add_history(f"Cleared cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
+        self.add_history(f"Cleared cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
 
         # Update the cell to None in the dataframe
         try:
@@ -1759,7 +1756,7 @@ class DataFrameTable(DataTable):
             self.log(f"Error clearing cell: {str(e)}")
             raise e
 
-    def _add_column(self, col_name: str = None, col_value: pl.Expr = None) -> None:
+    def do_add_column(self, col_name: str = None, col_value: pl.Expr = None) -> None:
         """Add acolumn after the current column."""
         cidx = self.cursor_col_idx
 
@@ -1775,7 +1772,7 @@ class DataFrameTable(DataTable):
             new_name = col_name
 
         # Add to history
-        self._add_history(f"Added column [$success]{new_name}[/] after column {cidx + 1}", dirty=True)
+        self.add_history(f"Added column [$success]{new_name}[/] after column {cidx + 1}", dirty=True)
 
         try:
             # Create an empty column (all None values)
@@ -1794,7 +1791,7 @@ class DataFrameTable(DataTable):
             self.df = self.df.with_columns(new_col).select(select_cols)
 
             # Recreate table for display
-            self._setup_table()
+            self.setup_table()
 
             # Move cursor to the new column
             self.move_cursor(column=cidx + 1)
@@ -1805,15 +1802,15 @@ class DataFrameTable(DataTable):
             self.log(f"Error adding column: {str(e)}")
             raise e
 
-    def _add_column_expr(self) -> None:
+    def do_add_column_expr(self) -> None:
         """Open screen to add a new column with optional expression."""
         cidx = self.cursor_col_idx
         self.app.push_screen(
             AddColumnScreen(cidx, self.df),
-            self._do_add_column_expr,
+            self.add_column_expr,
         )
 
-    def _do_add_column_expr(self, result: tuple[int, str, str, pl.Expr] | None) -> None:
+    def add_column_expr(self, result: tuple[int, str, str, pl.Expr] | None) -> None:
         """Add a new column with an expression."""
         if result is None:
             return
@@ -1821,7 +1818,7 @@ class DataFrameTable(DataTable):
         cidx, new_col_name, expr = result
 
         # Add to history
-        self._add_history(f"Added column [$success]{new_col_name}[/] with expression {expr}.", dirty=True)
+        self.add_history(f"Added column [$success]{new_col_name}[/] with expression {expr}.", dirty=True)
 
         try:
             # Create the column
@@ -1837,7 +1834,7 @@ class DataFrameTable(DataTable):
             self.df = self.df.with_row_index(RIDX).with_columns(new_col).select(select_cols)
 
             # Recreate table for display
-            self._setup_table()
+            self.setup_table()
 
             # Move cursor to the new column
             self.move_cursor(column=cidx + 1)
@@ -1847,13 +1844,13 @@ class DataFrameTable(DataTable):
             self.notify("Error adding column", title="Add Column", severity="error")
             self.log(f"Error adding column `{new_col_name}`: {str(e)}")
 
-    def _add_link_column(self) -> None:
+    def do_add_link_column(self) -> None:
         self.app.push_screen(
             AddLinkScreen(self.cursor_col_idx, self.df),
-            callback=self._do_add_link_column,
+            callback=self.add_link_column,
         )
 
-    def _do_add_link_column(self, result: tuple[str, str] | None) -> None:
+    def add_link_column(self, result: tuple[str, str] | None) -> None:
         """Handle result from AddLinkScreen.
 
         Creates a new link column in the dataframe with clickable links based on a
@@ -1875,7 +1872,7 @@ class DataFrameTable(DataTable):
             return
         cidx, new_col_name, link_template = result
 
-        self._add_history(
+        self.add_history(
             f"Added link column [$accent]{new_col_name}[/] with template [$success]{link_template}[/].", dirty=True
         )
 
@@ -1904,7 +1901,7 @@ class DataFrameTable(DataTable):
             self.df = self.df.with_columns(new_col).select(select_cols)
 
             # Recreate table for display
-            self._setup_table()
+            self.setup_table()
 
             # Move cursor to the new column
             self.move_cursor(column=cidx + 1)
@@ -1915,7 +1912,7 @@ class DataFrameTable(DataTable):
             self.notify(f"Error adding link column [$error]{new_col_name}[/]", title="Add Link", severity="error")
             self.log(f"Error adding link column: {str(e)}")
 
-    def _delete_column(self, more: str = None) -> None:
+    def do_delete_column(self, more: str = None) -> None:
         """Remove the currently selected column from the table."""
         # Get the column to remove
         col_idx = self.cursor_column
@@ -1950,7 +1947,7 @@ class DataFrameTable(DataTable):
             message = f"Removed column [$success]{col_name}[/]"
 
         # Add to history
-        self._add_history(message, dirty=True)
+        self.add_history(message, dirty=True)
 
         # Remove the columns from the table display using the column names as keys
         for ck in col_keys_to_remove:
@@ -1979,7 +1976,7 @@ class DataFrameTable(DataTable):
 
         self.notify(message, title="Delete")
 
-    def _duplicate_column(self) -> None:
+    def do_duplicate_column(self) -> None:
         """Duplicate the currently selected column, inserting it right after the current column."""
         cidx = self.cursor_col_idx
         col_name = self.cursor_col_name
@@ -1988,7 +1985,7 @@ class DataFrameTable(DataTable):
         new_col_name = f"{col_name}_copy"
 
         # Add to history
-        self._add_history(f"Duplicated column [$success]{col_name}[/]", dirty=True)
+        self.add_history(f"Duplicated column [$success]{col_name}[/]", dirty=True)
 
         # Create new column and reorder columns to insert after current column
         cols_before = self.df.columns[: cidx + 1]
@@ -2012,14 +2009,14 @@ class DataFrameTable(DataTable):
         self.matches = new_matches
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         # Move cursor to the new duplicated column
         self.move_cursor(column=col_idx + 1)
 
         # self.notify(f"Duplicated column [$accent]{col_name}[/] as [$success]{new_col_name}[/]", title="Duplicate")
 
-    def _delete_row(self, more: str = None) -> None:
+    def do_delete_row(self, more: str = None) -> None:
         """Delete rows from the table and dataframe.
 
         Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.
@@ -2058,7 +2055,7 @@ class DataFrameTable(DataTable):
                 predicates[ridx] = False
 
         # Add to history
-        self._add_history(history_desc, dirty=True)
+        self.add_history(history_desc, dirty=True)
 
         # Apply the filter to remove rows
         try:
@@ -2079,13 +2076,13 @@ class DataFrameTable(DataTable):
         self.matches = defaultdict(set)
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         deleted_count = old_count - len(self.df)
         if deleted_count > 0:
             self.notify(f"Deleted [$accent]{deleted_count}[/] row(s)", title="Delete")
 
-    def _duplicate_row(self) -> None:
+    def do_duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""
         ridx = self.cursor_row_idx
 
@@ -2093,7 +2090,7 @@ class DataFrameTable(DataTable):
         row_to_duplicate = self.df.slice(ridx, 1)
 
         # Add to history
-        self._add_history(f"Duplicated row [$success]{ridx + 1}[/]", dirty=True)
+        self.add_history(f"Duplicated row [$success]{ridx + 1}[/]", dirty=True)
 
         # Concatenate: rows before + duplicated row + rows after
         df_before = self.df.slice(0, ridx + 1)
@@ -2118,14 +2115,14 @@ class DataFrameTable(DataTable):
         self.matches = new_matches
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         # Move cursor to the new duplicated row
         self.move_cursor(row=ridx + 1)
 
         # self.notify(f"Duplicated row [$success]{ridx + 1}[/]", title="Row")
 
-    def _move_column(self, direction: str) -> None:
+    def do_move_column(self, direction: str) -> None:
         """Move the current column left or right.
 
         Args:
@@ -2154,7 +2151,7 @@ class DataFrameTable(DataTable):
         swap_cidx = self.df.columns.index(swap_name)
 
         # Add to history
-        self._add_history(
+        self.add_history(
             f"Moved column [$success]{col_name}[/] {direction} (swapped with [$success]{swap_name}[/])", dirty=True
         )
 
@@ -2182,7 +2179,7 @@ class DataFrameTable(DataTable):
 
         # self.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move")
 
-    def _move_row(self, direction: str) -> None:
+    def do_move_row(self, direction: str) -> None:
         """Move the current row up or down.
 
         Args:
@@ -2209,7 +2206,7 @@ class DataFrameTable(DataTable):
         swap_key = self.coordinate_to_cell_key((swap_idx, 0)).row_key
 
         # Add to history
-        self._add_history(
+        self.add_history(
             f"Moved row [$success]{row_key.value}[/] {direction} (swapped with row [$success]{swap_key.value}[/])",
             dirty=True,
         )
@@ -2249,7 +2246,7 @@ class DataFrameTable(DataTable):
         # self.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move")
 
     # Type casting
-    def _cast_column_dtype(self, dtype: str) -> None:
+    def do_cast_column_dtype(self, dtype: str) -> None:
         """Cast the current column to a different data type.
 
         Args:
@@ -2274,7 +2271,7 @@ class DataFrameTable(DataTable):
             return  # No change needed
 
         # Add to history
-        self._add_history(
+        self.add_history(
             f"Cast column [$accent]{col_name}[/] from [$success]{current_dtype}[/] to [$success]{target_dtype}[/]",
             dirty=True,
         )
@@ -2284,7 +2281,7 @@ class DataFrameTable(DataTable):
             self.df = self.df.with_columns(pl.col(col_name).cast(target_dtype))
 
             # Recreate table for display
-            self._setup_table()
+            self.setup_table()
 
             self.notify(f"Cast column [$accent]{col_name}[/] to [$success]{target_dtype}[/]", title="Cast")
         except Exception as e:
@@ -2296,16 +2293,16 @@ class DataFrameTable(DataTable):
             self.log(f"Error casting column `{col_name}`: {str(e)}")
 
     # Search
-    def _search_cursor_value(self) -> None:
+    def do_search_cursor_value(self) -> None:
         """Search with cursor value in current column."""
         cidx = self.cursor_col_idx
 
         # Get the value of the currently selected cell
         term = NULL if self.cursor_value is None else str(self.cursor_value)
 
-        self._do_search((term, cidx, False, True))
+        self.search((term, cidx, False, True))
 
-    def _search_expr(self) -> None:
+    def do_search_expr(self) -> None:
         """Search by expression."""
         cidx = self.cursor_col_idx
 
@@ -2315,10 +2312,10 @@ class DataFrameTable(DataTable):
         # Push the search modal screen
         self.app.push_screen(
             SearchScreen("Search", term, self.df, cidx),
-            callback=self._do_search,
+            callback=self.search,
         )
 
-    def _do_search(self, result) -> None:
+    def search(self, result) -> None:
         """Search for a term."""
         if result is None:
             return
@@ -2386,7 +2383,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self._add_history(f"Searched [$accent]{term}[/] in column [$success]{col_name}[/]")
+        self.add_history(f"Searched [$accent]{term}[/] in column [$success]{col_name}[/]")
 
         # Update selected rows to include new matches
         for m in matches:
@@ -2396,10 +2393,10 @@ class DataFrameTable(DataTable):
         self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Search")
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
     # Find
-    def _find_matches(
+    def find_matches(
         self, term: str, cidx: int | None = None, match_nocase: bool = False, match_whole: bool = False
     ) -> dict[int, set[int]]:
         """Find matches for a term in the dataframe.
@@ -2461,7 +2458,7 @@ class DataFrameTable(DataTable):
 
         return matches
 
-    def _find_cursor_value(self, scope="column") -> None:
+    def do_find_cursor_value(self, scope="column") -> None:
         """Find by cursor value.
 
         Args:
@@ -2472,11 +2469,11 @@ class DataFrameTable(DataTable):
 
         if scope == "column":
             cidx = self.cursor_col_idx
-            self._do_find((term, cidx, False, True))
+            self.find((term, cidx, False, True))
         else:
-            self._do_find_global((term, None, False, True))
+            self.find_global((term, None, False, True))
 
-    def _find_expr(self, scope="column") -> None:
+    def do_find_expr(self, scope="column") -> None:
         """Open screen to find by expression.
 
         Args:
@@ -2489,10 +2486,10 @@ class DataFrameTable(DataTable):
         # Push the search modal screen
         self.app.push_screen(
             SearchScreen("Find", term, self.df, cidx),
-            callback=self._do_find if scope == "column" else self._do_find_global,
+            callback=self.find if scope == "column" else self.find_global,
         )
 
-    def _do_find(self, result) -> None:
+    def find(self, result) -> None:
         """Find a term in current column."""
         if result is None:
             return
@@ -2501,7 +2498,7 @@ class DataFrameTable(DataTable):
         col_name = self.df.columns[cidx]
 
         try:
-            matches = self._find_matches(term, cidx, match_nocase, match_whole)
+            matches = self.find_matches(term, cidx, match_nocase, match_whole)
         except Exception as e:
             self.notify(f"Error finding matches for [$error]{term}[/]", title="Find", severity="error")
             self.log(f"Error finding matches for `{term}`: {str(e)}")
@@ -2516,7 +2513,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self._add_history(f"Found [$accent]{term}[/] in column [$success]{col_name}[/]")
+        self.add_history(f"Found [$accent]{term}[/] in column [$success]{col_name}[/]")
 
         # Add to matches and count total
         match_count = sum(len(col_idxs) for col_idxs in matches.values())
@@ -2526,16 +2523,16 @@ class DataFrameTable(DataTable):
         self.notify(f"Found [$accent]{match_count}[/] matches for [$success]{term}[/]", title="Find")
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
-    def _do_find_global(self, result) -> None:
+    def find_global(self, result) -> None:
         """Global find a term across all columns."""
         if result is None:
             return
         term, cidx, match_nocase, match_whole = result
 
         try:
-            matches = self._find_matches(term, cidx=None, match_nocase=match_nocase, match_whole=match_whole)
+            matches = self.find_matches(term, cidx=None, match_nocase=match_nocase, match_whole=match_whole)
         except Exception as e:
             self.notify(f"Error finding matches for [$error]{term}[/]", title="Find", severity="error")
             self.log(f"Error finding matches for `{term}`: {str(e)}")
@@ -2550,7 +2547,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self._add_history(f"Found [$success]{term}[/] across all columns")
+        self.add_history(f"Found [$success]{term}[/] across all columns")
 
         # Add to matches and count total
         match_count = sum(len(col_idxs) for col_idxs in matches.values())
@@ -2562,9 +2559,9 @@ class DataFrameTable(DataTable):
         )
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
-    def _next_match(self) -> None:
+    def do_next_match(self) -> None:
         """Move cursor to the next match."""
         if not self.matches:
             self.notify("No matches to navigate", title="Next Match", severity="warning")
@@ -2586,7 +2583,7 @@ class DataFrameTable(DataTable):
         first_ridx, first_cidx = ordered_matches[0]
         self.move_cursor_to(first_ridx, first_cidx)
 
-    def _previous_match(self) -> None:
+    def do_previous_match(self) -> None:
         """Move cursor to the previous match."""
         if not self.matches:
             self.notify("No matches to navigate", title="Previous Match", severity="warning")
@@ -2614,7 +2611,7 @@ class DataFrameTable(DataTable):
         row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
         self.move_cursor(row=row_idx, column=col_idx)
 
-    def _next_selected_row(self) -> None:
+    def do_next_selected_row(self) -> None:
         """Move cursor to the next selected row."""
         if not any(self.selected_rows):
             self.notify("No selected rows to navigate", title="Next Selected Row", severity="warning")
@@ -2636,7 +2633,7 @@ class DataFrameTable(DataTable):
         first_ridx = selected_row_indices[0]
         self.move_cursor_to(first_ridx, self.cursor_col_idx)
 
-    def _previous_selected_row(self) -> None:
+    def do_previous_selected_row(self) -> None:
         """Move cursor to the previous selected row."""
         if not any(self.selected_rows):
             self.notify("No selected rows to navigate", title="Previous Selected Row", severity="warning")
@@ -2659,31 +2656,31 @@ class DataFrameTable(DataTable):
         self.move_cursor_to(last_ridx, self.cursor_col_idx)
 
     # Replace
-    def _replace(self) -> None:
+    def do_replace(self) -> None:
         """Open replace screen for current column."""
         # Push the replace modal screen
         self.app.push_screen(
             FindReplaceScreen(self, title="Find and Replace in Current Column"),
-            callback=self._do_replace,
+            callback=self.replace,
         )
 
-    def _do_replace(self, result) -> None:
+    def replace(self, result) -> None:
         """Handle replace in current column."""
-        self._handle_replace(result, self.cursor_col_idx)
+        self.handle_replace(result, self.cursor_col_idx)
 
-    def _replace_global(self) -> None:
+    def do_replace_global(self) -> None:
         """Open replace screen for all columns."""
         # Push the replace modal screen
         self.app.push_screen(
             FindReplaceScreen(self, title="Global Find and Replace"),
-            callback=self._do_replace_global,
+            callback=self.replace_global,
         )
 
-    def _do_replace_global(self, result) -> None:
+    def replace_global(self, result) -> None:
         """Handle replace across all columns."""
-        self._handle_replace(result, None)
+        self.handle_replace(result, None)
 
-    def _handle_replace(self, result, cidx) -> None:
+    def handle_replace(self, result, cidx) -> None:
         """Handle replace result from ReplaceScreen.
 
         Args:
@@ -2700,14 +2697,14 @@ class DataFrameTable(DataTable):
             col_name = self.df.columns[cidx]
 
         # Find all matches
-        matches = self._find_matches(term_find, cidx, match_nocase, match_whole)
+        matches = self.find_matches(term_find, cidx, match_nocase, match_whole)
 
         if not matches:
             self.notify(f"No matches found for [$warning]{term_find}[/]", title="Replace", severity="warning")
             return
 
         # Add to history
-        self._add_history(
+        self.add_history(
             f"Replaced [$accent]{term_find}[/] with [$success]{term_replace}[/] in column [$accent]{col_name}[/]",
             dirty=True,
         )
@@ -2716,11 +2713,11 @@ class DataFrameTable(DataTable):
         self.matches = {ridx: col_idxs.copy() for ridx, col_idxs in matches.items()}
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         # Store state for interactive replacement using dataclass
         sorted_rows = sorted(self.matches.keys())
-        self._replace_state = ReplaceState(
+        self.replace_state = ReplaceState(
             term_find=term_find,
             term_replace=term_replace,
             match_nocase=match_nocase,
@@ -2740,10 +2737,10 @@ class DataFrameTable(DataTable):
         try:
             if replace_all:
                 # Replace all occurrences
-                self._do_replace_all(term_find, term_replace)
+                self.replace_all(term_find, term_replace)
             else:
                 # Replace with confirmation for each occurrence
-                self._do_replace_interactive(term_find, term_replace)
+                self.replace_interactive(term_find, term_replace)
 
         except Exception as e:
             self.notify(
@@ -2753,23 +2750,23 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error replacing `{term_find}` with `{term_replace}`: {str(e)}")
 
-    def _do_replace_all(self, term_find: str, term_replace: str) -> None:
+    def replace_all(self, term_find: str, term_replace: str) -> None:
         """Replace all occurrences."""
-        state = self._replace_state
+        state = self.replace_state
         self.app.push_screen(
             ConfirmScreen(
                 "Replace All",
                 label=f"Replace [$success]{term_find}[/] with [$success]{term_replace or repr('')}[/] for all [$accent]{state.total_occurrence}[/] occurrences?",
             ),
-            callback=self._handle_replace_all_confirmation,
+            callback=self.handle_replace_all_confirmation,
         )
 
-    def _handle_replace_all_confirmation(self, result) -> None:
+    def handle_replace_all_confirmation(self, result) -> None:
         """Handle user's confirmation for replace all."""
         if result is None:
             return
 
-        state = self._replace_state
+        state = self.replace_state
         rows = state.rows
         cols_per_row = state.cols_per_row
 
@@ -2817,7 +2814,7 @@ class DataFrameTable(DataTable):
             state.replaced_occurrence += len(ridxs)
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         col_name = "all columns" if state.cidx is None else self.df.columns[state.cidx]
         self.notify(
@@ -2825,11 +2822,11 @@ class DataFrameTable(DataTable):
             title="Replace",
         )
 
-    def _do_replace_interactive(self, term_find: str, term_replace: str) -> None:
+    def replace_interactive(self, term_find: str, term_replace: str) -> None:
         """Replace with user confirmation for each occurrence."""
         try:
             # Start with first match
-            self._show_next_replace_confirmation()
+            self.show_next_replace_confirmation()
         except Exception as e:
             self.notify(
                 f"Error replacing [$accent]{term_find}[/] with [$error]{term_replace}[/]",
@@ -2838,9 +2835,9 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error in interactive replace: {str(e)}")
 
-    def _show_next_replace_confirmation(self) -> None:
+    def show_next_replace_confirmation(self) -> None:
         """Show confirmation for next replacement."""
-        state = self._replace_state
+        state = self.replace_state
         if state.done:
             # All done - show final notification
             col_name = "all columns" if state.cidx is None else self.df.columns[state.cidx]
@@ -2862,12 +2859,12 @@ class DataFrameTable(DataTable):
 
         self.app.push_screen(
             ConfirmScreen("Replace", label=label, maybe="Skip"),
-            callback=self._handle_replace_confirmation,
+            callback=self.handle_replace_confirmation,
         )
 
-    def _handle_replace_confirmation(self, result) -> None:
+    def handle_replace_confirmation(self, result) -> None:
         """Handle user's confirmation response."""
-        state = self._replace_state
+        state = self.replace_state
         if state.done:
             return
 
@@ -2910,7 +2907,7 @@ class DataFrameTable(DataTable):
         # Cancel
         else:
             state.done = True
-            self._setup_table()
+            self.setup_table()
             return
 
         # Move to next
@@ -2932,16 +2929,16 @@ class DataFrameTable(DataTable):
         )
 
         # # Recreate table for display
-        # self._setup_table()
+        # self.setup_table()
 
         # Show next confirmation
-        self._show_next_replace_confirmation()
+        self.show_next_replace_confirmation()
 
     # Selection & Match
-    def _toggle_selections(self) -> None:
+    def do_toggle_selections(self) -> None:
         """Toggle selected rows highlighting on/off."""
         # Add to history
-        self._add_history("Toggled row selection")
+        self.add_history("Toggled row selection")
 
         if False in self.visible_rows:
             # Some rows are hidden - invert only selected visible rows and clear selections for hidden rows
@@ -2959,12 +2956,12 @@ class DataFrameTable(DataTable):
             self.notify(f"Toggled selection for [$accent]{new_selected_count}[/] rows", title="Toggle")
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
-    def _toggle_row_selection(self) -> None:
+    def do_toggle_row_selection(self) -> None:
         """Select/deselect current row."""
         # Add to history
-        self._add_history("Toggled row selection")
+        self.add_history("Toggled row selection")
 
         ridx = self.cursor_row_idx
         self.selected_rows[ridx] = not self.selected_rows[ridx]
@@ -2985,7 +2982,7 @@ class DataFrameTable(DataTable):
 
             self.update_cell(row_key, col_key, cell_text)
 
-    def _clear_selections_and_matches(self) -> None:
+    def do_clear_selections_and_matches(self) -> None:
         """Clear all selected rows and matches without removing them from the dataframe."""
         # Check if any selected rows or matches
         if not any(self.selected_rows) and not self.matches:
@@ -2997,19 +2994,19 @@ class DataFrameTable(DataTable):
         )
 
         # Add to history
-        self._add_history("Cleared all selected rows")
+        self.add_history("Cleared all selected rows")
 
         # Clear all selections
         self.selected_rows = [False] * len(self.df)
         self.matches = defaultdict(set)
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         self.notify(f"Cleared selections for [$accent]{row_count}[/] rows", title="Clear")
 
     # Filter & View
-    def _filter_rows(self) -> None:
+    def do_filter_rows(self) -> None:
         """Keep only the rows with selections and matches, and remove others."""
         if not any(self.selected_rows) and not self.matches:
             self.notify("No rows to filter", title="Filter", severity="warning")
@@ -3020,7 +3017,7 @@ class DataFrameTable(DataTable):
         ]
 
         # Add to history
-        self._add_history("Filtered to selections and matches")
+        self.add_history("Filtered to selections and matches")
 
         # Apply filter to dataframe with row indices
         df_filtered = self.df.with_row_index(RIDX).filter(filter_expr)
@@ -3035,13 +3032,13 @@ class DataFrameTable(DataTable):
         self.df = df_filtered.drop(RIDX)
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         self.notify(
             f"Removed rows without selections or matches. Now showing [$accent]{len(self.df)}[/] rows", title="Filter"
         )
 
-    def _view_rows(self) -> None:
+    def do_view_rows(self) -> None:
         """View rows.
 
         If there are selected rows or matches, view those rows.
@@ -3060,9 +3057,9 @@ class DataFrameTable(DataTable):
             ridx = self.cursor_row_idx
             term = str(self.df.item(ridx, cidx))
 
-        self._do_view_rows((term, cidx, False, True))
+        self.view_rows((term, cidx, False, True))
 
-    def _view_rows_expr(self) -> None:
+    def do_view_rows_expr(self) -> None:
         """Open the filter screen to enter an expression."""
         ridx = self.cursor_row_idx
         cidx = self.cursor_col_idx
@@ -3070,10 +3067,10 @@ class DataFrameTable(DataTable):
 
         self.app.push_screen(
             FilterScreen(self.df, cidx, cursor_value),
-            callback=self._do_view_rows,
+            callback=self.view_rows,
         )
 
-    def _do_view_rows(self, result) -> None:
+    def view_rows(self, result) -> None:
         """Show only rows with selections or matches, and do hide others. Do not modify the dataframe."""
         if result is None:
             return
@@ -3138,7 +3135,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self._add_history(f"Filtered by expression [$success]{expr}[/]")
+        self.add_history(f"Filtered by expression [$success]{expr}[/]")
 
         # Mark unfiltered rows as invisible
         filtered_row_indices = set(df_filtered[RIDX].to_list())
@@ -3148,12 +3145,12 @@ class DataFrameTable(DataTable):
                     self.visible_rows[ridx] = False
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         self.notify(f"Filtered to [$accent]{matched_count}[/] matching rows", title="Filter")
 
     # Copy & Save
-    def _copy_to_clipboard(self, content: str, message: str) -> None:
+    def do_copy_to_clipboard(self, content: str, message: str) -> None:
         """Copy content to clipboard using pbcopy (macOS) or xclip (Linux).
 
         Args:
@@ -3176,7 +3173,7 @@ class DataFrameTable(DataTable):
         except FileNotFoundError:
             self.notify("Error copying to clipboard", title="Clipboard", severity="error")
 
-    def _save_to_file(self, _task_after_save=None) -> None:
+    def do_save_to_file(self, _task_after_save=None) -> None:
         """Open screen to save file."""
         self._task_after_save = _task_after_save
 
@@ -3184,10 +3181,10 @@ class DataFrameTable(DataTable):
         filename = "all-tabs.xlsx" if multi_tab else str(Path(self.filename).with_stem(self.tabname))
         self.app.push_screen(
             SaveFileScreen(filename, all_tabs=multi_tab),
-            callback=self._do_save_file,
+            callback=self.save_to_file,
         )
 
-    def _do_save_file(self, result) -> None:
+    def save_to_file(self, result) -> None:
         """Handle result from SaveFileScreen."""
         if result is None:
             return
@@ -3201,33 +3198,33 @@ class DataFrameTable(DataTable):
             self._pending_filename = filename
             self.app.push_screen(
                 ConfirmScreen("File already exists. Overwrite?"),
-                callback=self._on_overwrite_screen,
+                callback=self.confirm_overwrite,
             )
         else:
-            self._do_save(filename)
+            self.save_file(filename)
 
-    def _on_overwrite_screen(self, should_overwrite: bool) -> None:
+    def confirm_overwrite(self, should_overwrite: bool) -> None:
         """Handle result from ConfirmScreen."""
         if should_overwrite:
-            self._do_save(self._pending_filename)
+            self.save_file(self._pending_filename)
         else:
             # Go back to SaveFileScreen to allow user to enter a different name
             self.app.push_screen(
                 SaveFileScreen(self._pending_filename),
-                callback=self._do_save_file,
+                callback=self.save_to_file,
             )
 
-    def _do_save(self, filename: str) -> None:
+    def save_file(self, filename: str) -> None:
         """Actually save the dataframe to a file."""
         filepath = Path(filename)
         ext = filepath.suffix.lower()
 
         # Add to history
-        self._add_history(f"Saved dataframe to [$success]{filename}[/]")
+        self.add_history(f"Saved dataframe to [$success]{filename}[/]")
 
         try:
             if ext in (".xlsx", ".xls"):
-                self._do_save_excel(filename)
+                self.save_excel(filename)
             elif ext in (".tsv", ".tab"):
                 self.df.write_csv(filename, separator="\t")
             elif ext == ".json":
@@ -3265,7 +3262,7 @@ class DataFrameTable(DataTable):
             self.notify(f"Error saving [$error]{filename}[/]", title="Save", severity="error")
             self.log(f"Error saving file `{filename}`: {str(e)}")
 
-    def _do_save_excel(self, filename: str) -> None:
+    def save_excel(self, filename: str) -> None:
         """Save to an Excel file."""
         import xlsxwriter
 
@@ -3281,14 +3278,14 @@ class DataFrameTable(DataTable):
                     table.df.write_excel(workbook=wb, worksheet=worksheet)
 
     # SQL Interface
-    def _simple_sql(self) -> None:
+    def do_simple_sql(self) -> None:
         """Open the SQL interface screen."""
         self.app.push_screen(
             SimpleSqlScreen(self),
-            callback=self._do_simple_sql,
+            callback=self.simple_sql,
         )
 
-    def _do_simple_sql(self, result) -> None:
+    def simple_sql(self, result) -> None:
         """Handle SQL result result from SimpleSqlScreen."""
         if result is None:
             return
@@ -3298,30 +3295,30 @@ class DataFrameTable(DataTable):
         if where:
             sql += f" WHERE {where}"
 
-        self._do_sql(sql)
+        self.run_sql(sql)
 
-    def _advanced_sql(self) -> None:
+    def do_advanced_sql(self) -> None:
         """Open the advanced SQL interface screen."""
         self.app.push_screen(
             AdvancedSqlScreen(self),
-            callback=self._do_advanced_sql,
+            callback=self.advanced_sql,
         )
 
-    def _do_advanced_sql(self, result) -> None:
+    def advanced_sql(self, result) -> None:
         """Handle SQL result result from AdvancedSqlScreen."""
         if result is None:
             return
 
-        self._do_sql(result)
+        self.run_sql(result)
 
-    def _do_sql(self, sql: str) -> None:
+    def run_sql(self, sql: str) -> None:
         """Execute a SQL query directly.
 
         Args:
             sql: The SQL query string to execute.
         """
         # Add to history
-        self._add_history(f"SQL Query:\n[$accent]{sql}[/]", dirty=True)
+        self.add_history(f"SQL Query:\n[$accent]{sql}[/]", dirty=True)
 
         # Execute the SQL query
         try:
@@ -3336,7 +3333,7 @@ class DataFrameTable(DataTable):
             return
 
         # Recreate table for display
-        self._setup_table()
+        self.setup_table()
 
         self.notify(
             f"SQL query executed successfully. Now showing [$accent]{len(self.df)}[/] rows and [$accent]{len(self.df.columns)}[/] columns.",

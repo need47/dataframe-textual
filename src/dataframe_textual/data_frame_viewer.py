@@ -214,7 +214,7 @@ class DataFrameViewer(App):
             return
 
         if table.loaded_rows == 0:
-            table._setup_table()
+            table.setup_table()
 
     def action_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.
@@ -442,7 +442,7 @@ class DataFrameViewer(App):
                 """Handle the "save before closing?" confirmation."""
                 if result:
                     # User wants to save - close after save dialog opens
-                    active_table._save_to_file(task_after_save="close_tab")
+                    active_table.save_to_file(task_after_save="close_tab")
                 else:
                     # User wants to discard - close immediately
                     self.close_tab()
