@@ -15,7 +15,7 @@ from textual.widgets.tabbed_content import ContentTabs
 from .common import Source, get_next_item, load_file
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
-from .yes_no_screen import OpenFileScreen, SaveFileScreen
+from .yes_no_screen import ConfirmScreen, OpenFileScreen, SaveFileScreen
 
 
 class DataFrameViewer(App):
@@ -179,6 +179,39 @@ class DataFrameViewer(App):
 
         if table.loaded_rows == 0:
             table._setup_table()
+
+    def action_quit(self) -> None:
+        """Quit the application.
+
+        Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.
+        Otherwise, quits immediately.
+
+        Returns:
+            None
+        """
+        # Check for dirty tabs
+        dirty_tabs = [table for table in self.tabs.values() if table.dirty]
+
+        if dirty_tabs:
+            # Build list of dirty tab names
+            dirty_names = ", ".join(
+                [list(self.tabs.keys())[list(self.tabs.values()).index(table)].name for table in dirty_tabs]
+            )
+
+            def _do_quit(result: bool) -> None:
+                if result:
+                    self.exit()
+
+            self.push_screen(
+                ConfirmScreen(
+                    "Unsaved Changes",
+                    label=f"The following tabs have unsaved changes: {dirty_names}\n\nDiscard changes and quit?",
+                ),
+                callback=_do_quit,
+            )
+        else:
+            # No dirty tabs, quit normally
+            self.exit()
 
     def action_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.
