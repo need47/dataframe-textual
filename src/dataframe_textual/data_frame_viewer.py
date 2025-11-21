@@ -78,7 +78,7 @@ class DataFrameViewer(App):
             background: $block-cursor-background; /* Same as underline */
         }
         TabPane.dirty {
-            border: solid $warning;
+            border-bottom: thick $warning;
         }
     """
 
@@ -366,7 +366,6 @@ class DataFrameViewer(App):
         Returns:
             None
         """
-        self.log(f"Adding tab for file: {filename}")
         if filename and os.path.exists(filename):
             try:
                 n_tab = 0

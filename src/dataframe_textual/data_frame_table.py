@@ -560,16 +560,20 @@ class DataFrameTable(DataTable):
             old_dirty: The old dirty state.
             new_dirty: The new dirty state.
         """
+        if old_dirty == new_dirty:
+            return  # No change
+
         # Find the parent TabPane
-        try:
-            tab_pane = self.app.tabbed.active_pane
-            if new_dirty:
-                tab_pane.add_class("dirty")
-            else:
-                tab_pane.remove_class("dirty")
-        except Exception:
-            # Silently fail if parent is not available or not a TabPane
-            pass
+        for tab_pane in self.app.tabs:
+            if tab_pane.id == self.id:
+                tab_pane = tab_pane
+
+                if new_dirty:
+                    tab_pane.add_class("dirty")
+                else:
+                    tab_pane.remove_class("dirty")
+
+                break
 
     def move_cursor_to(self, ridx: int, cidx: int) -> None:
         """Move cursor based on the dataframe indices.

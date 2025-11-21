@@ -257,7 +257,18 @@ class YesNoScreen(ModalScreen):
     def on_key(self, event) -> None:
         """Handle key press events in the table screen."""
         if event.key == "enter":
-            self._handle_yes()
+            for button in self.query(Button):
+                if button.has_focus:
+                    if button.id == "yes":
+                        self._handle_yes()
+                    elif button.id == "maybe":
+                        self._handle_maybe()
+                    elif button.id == "no":
+                        self.dismiss(None)
+                    break
+            else:
+                self._handle_yes()
+
             event.stop()
         elif event.key == "escape":
             self.dismiss(None)
