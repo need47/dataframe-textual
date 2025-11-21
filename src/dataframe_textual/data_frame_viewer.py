@@ -149,7 +149,7 @@ class DataFrameViewer(App):
         """
         if len(self.tabs) == 1:
             self.query_one(ContentTabs).display = False
-            self._get_active_table().focus()
+            self.get_active_table().focus()
 
     def on_ready(self) -> None:
         """Called when the app is ready."""
@@ -190,7 +190,7 @@ class DataFrameViewer(App):
 
                 # Check if it's a ContentTab (tab header)
                 if isinstance(content_tab, ContentTab):
-                    self._rename_tab(content_tab)
+                    self.do_rename_tab(content_tab)
             except Exception as e:
                 self.log(f"Error handling tab rename click: {str(e)}")
                 pass
@@ -208,7 +208,7 @@ class DataFrameViewer(App):
             None
         """
         # Focus the table in the newly activated tab
-        if table := self._get_active_table():
+        if table := self.get_active_table():
             table.focus()
         else:
             return
@@ -239,7 +239,7 @@ class DataFrameViewer(App):
         Returns:
             None
         """
-        self.push_screen(OpenFileScreen(), self._do_add_tab)
+        self.push_screen(OpenFileScreen(), self.do_add_tab)
 
     def action_close_tab(self) -> None:
         """Close the current tab.
@@ -247,7 +247,7 @@ class DataFrameViewer(App):
         Checks for unsaved changes and prompts the user to save if needed.
         If this is the last tab, exits the app.
         """
-        self._close_tab()
+        self.do_close_tab()
 
     def action_close_all_tabs(self) -> None:
         """Close all tabs and exit the app.
@@ -255,7 +255,7 @@ class DataFrameViewer(App):
         Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.
         Otherwise, quits immediately.
         """
-        self._close_all_tabs()
+        self.do_close_all_tabs()
 
     def action_duplicate_tab(self) -> None:
         """Duplicate the currently active tab.
@@ -266,7 +266,7 @@ class DataFrameViewer(App):
         Returns:
             None
         """
-        if not (table := self._get_active_table()):
+        if not (table := self.get_active_table()):
             return
 
         # Get current tab info
@@ -337,7 +337,7 @@ class DataFrameViewer(App):
         # status = "shown" if tabs.display else "hidden"
         # self.notify(f"Tab bar [$success]{status}[/]", title="Toggle")
 
-    def _get_active_table(self) -> DataFrameTable | None:
+    def get_active_table(self) -> DataFrameTable | None:
         """Get the currently active DataFrameTable widget.
 
         Retrieves the table from the currently active tab. Returns None if no
@@ -354,7 +354,7 @@ class DataFrameViewer(App):
             self.notify("No active table found", title="Locate", severity="error")
         return None
 
-    def _do_add_tab(self, filename: str) -> None:
+    def do_add_tab(self, filename: str) -> None:
         """Add a tab for the opened file.
 
         Loads the specified file and creates one or more tabs for it. For Excel files,
@@ -371,7 +371,7 @@ class DataFrameViewer(App):
             try:
                 n_tab = 0
                 for source in load_file(filename, prefix_sheet=True):
-                    self._add_tab(source.frame, filename, source.tabname)
+                    self.add_tab(source.frame, filename, source.tabname)
                     n_tab += 1
                 # self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open")
             except Exception as e:
@@ -379,7 +379,7 @@ class DataFrameViewer(App):
         else:
             self.notify(f"File does not exist: [$warning]{filename}[/]", title="Open", severity="warning")
 
-    def _add_tab(self, df: pl.DataFrame, filename: str, tabname: str) -> None:
+    def add_tab(self, df: pl.DataFrame, filename: str, tabname: str) -> None:
         """Add new tab for the given DataFrame.
 
         Creates and adds a new tab with the provided DataFrame and configuration.
@@ -422,7 +422,7 @@ class DataFrameViewer(App):
         self.tabbed.active = tab.id
         table.focus()
 
-    def _close_tab(self) -> None:
+    def do_close_tab(self) -> None:
         """Close the currently active tab.
 
         Removes the active tab from the interface. If only one tab remains and no more
@@ -445,7 +445,7 @@ class DataFrameViewer(App):
                     active_table._save_to_file(task_after_save="close_tab")
                 else:
                     # User wants to discard - close immediately
-                    self._do_close_tab()
+                    self.close_tab()
 
             if active_table.dirty:
                 self.push_screen(
@@ -459,11 +459,11 @@ class DataFrameViewer(App):
                 )
             else:
                 # No unsaved changes - close immediately
-                self._do_close_tab()
+                self.close_tab()
         except Exception:
             pass
 
-    def _do_close_tab(self) -> None:
+    def close_tab(self) -> None:
         """Actually close the tab."""
         try:
             if not (active_pane := self.tabbed.active_pane):
@@ -478,7 +478,7 @@ class DataFrameViewer(App):
         except Exception:
             pass
 
-    def _close_all_tabs(self) -> None:
+    def do_close_all_tabs(self) -> None:
         """Close all tabs and quit the app.
 
         Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.
@@ -493,7 +493,7 @@ class DataFrameViewer(App):
 
             def _save_and_quit(result: bool) -> None:
                 if result:
-                    self._get_active_table()._save_to_file(task_after_save="quit_app")
+                    self.get_active_table()._save_to_file(task_after_save="quit_app")
                 else:
                     self.exit()
 
@@ -512,7 +512,7 @@ class DataFrameViewer(App):
             self.log(f"Error quitting all tabs: {str(e)}")
             pass
 
-    def _rename_tab(self, content_tab: ContentTab) -> None:
+    def do_rename_tab(self, content_tab: ContentTab) -> None:
         """Open the rename tab screen.
 
         Allows the user to rename the current tab and updates the table name accordingly.
@@ -532,10 +532,10 @@ class DataFrameViewer(App):
         # Push the rename screen
         self.push_screen(
             RenameTabScreen(content_tab, existing_tabs),
-            callback=self._do_rename_tab,
+            callback=self.rename_tab,
         )
 
-    def _do_rename_tab(self, result) -> None:
+    def rename_tab(self, result) -> None:
         """Handle result from RenameTabScreen."""
         if result is None:
             return
