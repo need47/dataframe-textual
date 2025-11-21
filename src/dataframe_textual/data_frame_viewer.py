@@ -25,8 +25,9 @@ class DataFrameViewer(App):
         # 📊 DataFrame Viewer - App Controls
 
         ## 🎯 File & Tab Management
-        - **Ctrl+O** - 📁 Add a new tab
         - **Ctrl+A** - 💾 Save all tabs
+        - **Ctrl+D** - 📋 Duplicate current tab
+        - **Ctrl+O** - 📁 Add a new tab
         - **Ctrl+W** - ❌ Close current tab
         - **>** or **b** - ▶️ Next tab
         - **<** - ◀️ Previous tab
@@ -53,8 +54,9 @@ class DataFrameViewer(App):
         ("q", "quit", "Quit"),
         ("f1", "toggle_help_panel", "Help"),
         ("B", "toggle_tab_bar", "Toggle Tab Bar"),
-        ("ctrl+o", "add_tab", "Add Tab"),
         ("ctrl+a", "save_all_tabs", "Save All Tabs"),
+        ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
+        ("ctrl+o", "add_tab", "Add Tab"),
         ("ctrl+w", "close_tab", "Close Tab"),
         ("greater_than_sign,b", "next_tab(1)", "Next Tab"),
         ("less_than_sign", "next_tab(-1)", "Prev Tab"),
@@ -231,6 +233,51 @@ class DataFrameViewer(App):
             return
         self._close_tab()
 
+    def action_duplicate_tab(self) -> None:
+        """Duplicate the currently active tab.
+
+        Creates a copy of the current tab with the same data and filename.
+        The new tab is named with '_copy' suffix and inserted after the current tab.
+
+        Returns:
+            None
+        """
+        if not (table := self._get_active_table()):
+            return
+
+        # Get current tab info
+        active_pane = self.tabbed.active_pane
+        current_tabname = active_pane.name
+        new_tabname = f"{current_tabname}_copy"
+
+        # Ensure unique tab name
+        counter = 1
+        while any(tab.name == new_tabname for tab in self.tabs):
+            new_tabname = f"{current_tabname}_{counter}"
+            counter += 1
+
+        # Create new table with the same dataframe and filename
+        new_table = DataFrameTable(
+            table.df,
+            table.filename,
+            name=new_tabname,
+            zebra_stripes=True,
+            id=f"tab_{len(self.tabs) + 1}",
+        )
+        new_pane = TabPane(new_tabname, new_table, name=new_tabname, id=new_table.id)
+
+        # Add the new tab
+        self.tabbed.add_pane(new_pane, after=active_pane)
+        self.tabs[new_pane] = new_table
+
+        # Show tab bar if needed
+        if len(self.tabs) > 1:
+            self.query_one(ContentTabs).display = True
+
+        # Activate and focus the new tab
+        self.tabbed.active = new_pane.id
+        new_table.focus()
+
     def action_next_tab(self, offset: int = 1) -> None:
         """Switch to the next tab or previous tab.
 
@@ -338,7 +385,7 @@ class DataFrameViewer(App):
             tab_idx = pending_tab_idx
             break
 
-        table = DataFrameTable(df, filename, zebra_stripes=True, id=tab_idx, name=tabname)
+        table = DataFrameTable(df, filename, name=tabname, zebra_stripes=True, id=tab_idx)
         tab = TabPane(tabname, table, name=tabname, id=tab_idx)
         self.tabbed.add_pane(tab)
         self.tabs[tab] = table

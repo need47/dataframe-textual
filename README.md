@@ -26,7 +26,8 @@ zcat compressed_data.csv.gz | dv -f csv editing, and manipulating data
 ### Advanced Features
 - 📂 **Multi-File Support** - Open multiple files in separate tabs
 - 🔄 **Tab Management** - Seamlessly switch between open files with keyboard shortcuts
-- 📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
+- � **Duplicate Tab** - Create a copy of the current tab with the same data
+- �📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
 - 🎯 **Cursor Type Cycling** - Switch between cell, row, and column selection modes
 - 🔗 **Link Column Creation** - Generate clickable URLs using template expressions with placeholder support
 
@@ -118,6 +119,8 @@ dv data1.tsv < data2.tsv
 When multiple files are opened:
 - Each file appears as a separate tab
 - Switch between tabs using `>` (next) or `<` (previous), or use `b` for cycling tabs
+- Save all tabs to Excel with `Ctrl+A`
+- Duplicate the current tab with `Ctrl+D`
 - Open additional files with `Ctrl+O`
 - Close the current tab with `Ctrl+W`
 - Each file maintains its own state (edits, sort order, selections, history, etc.)
@@ -197,9 +200,10 @@ zcat compressed_data.csv.gz | dv -f csv
 
 | Key | Action |
 |-----|--------|
+| `Ctrl+A` | Save all open tabs to Excel file |
+| `Ctrl+D` | Duplicate current tab |
 | `Ctrl+O` | Open file in a new tab |
 | `Ctrl+W` | Close current tab |
-| `Ctrl+A` | Save all open tabs to Excel file |
 | `b` | Cycle through tabs |
 | `>` | Move to next tab |
 | `<` | Move to previous tab |
