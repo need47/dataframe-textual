@@ -1,7 +1,6 @@
 """DataFrame Viewer application and utilities."""
 
 import os
-from functools import partial
 from pathlib import Path
 from textwrap import dedent
 
@@ -16,7 +15,7 @@ from textual.widgets.tabbed_content import ContentTab, ContentTabs
 from .common import Source, get_next_item, load_file
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
-from .yes_no_screen import ConfirmScreen, OpenFileScreen, RenameTabScreen, SaveFileScreen
+from .yes_no_screen import ConfirmScreen, OpenFileScreen, RenameTabScreen
 
 
 class DataFrameViewer(App):
@@ -26,14 +25,18 @@ class DataFrameViewer(App):
         # 📊 DataFrame Viewer - App Controls
 
         ## 🎯 File & Tab Management
-        - **Ctrl+A** - 💾 Save all tabs
+        - **>** - ▶️ Next tab
+        - **<** - ◀️ Previous tab
+        - **b** - 🔄 Cycle through tabs
+        - **B** - 👁️ Toggle tab bar visibility
+        - **q** - 🚪 Quit current tab (prompts to save unsaved changes)
+        - **Q** - 🚪 Quit all tabs (prompts to save unsaved changes)
+        - **Ctrl+Q** - 🚪 Force to quit app (discards unsaved changes)
+        - **Ctrl+S** - 💾 Save current tab or all tabs
         - **Ctrl+D** - 📋 Duplicate current tab
         - **Ctrl+O** - 📁 Add a new tab
-        - **Ctrl+W** - ❌ Close current tab
-        - **>** or **b** - ▶️ Next tab
-        - **<** - ◀️ Previous tab
-        - **B** - 👁️ Toggle tab bar visibility
-        - **q** - 🚪 Quit application
+        - **Ctrl+K** - ❌ Close current tab
+        - **Double-click tab** - ✏️ Rename current tab
 
         ## 🎨 View & Settings
         - **F1** - ❓ Toggle this help panel
@@ -44,6 +47,7 @@ class DataFrameViewer(App):
         - **Excel sheets** - 📊 Excel files auto-expand sheets into tabs
         - **Lazy loading** - ⚡ Large files load on demand
         - **Sticky tabs** - 📌 Tab bar stays visible when scrolling
+        - **Unsaved changes** - 🔴 Tabs with unsaved changes have a highlighted border
         - **Rich formatting** - 🎨 Color-coded data types
         - **Search & filter** - 🔍 Find and filter data quickly
         - **Sort & reorder** - ⬆️ Multi-column sort, drag rows/columns
@@ -52,15 +56,14 @@ class DataFrameViewer(App):
     """).strip()
 
     BINDINGS = [
-        ("q", "quit_confirm", "Quit"),
+        ("q", "close_tab", "Close current tab"),
+        ("Q", "close_all", "Close all tabs and quit app"),
         ("f1", "toggle_help_panel", "Help"),
         ("B", "toggle_tab_bar", "Toggle Tab Bar"),
-        ("ctrl+a", "save_all_tabs", "Save All Tabs"),
         ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
         ("ctrl+o", "add_tab", "Add Tab"),
-        ("ctrl+w", "close_tab", "Close Tab"),
-        ("greater_than_sign,b", "next_tab(1)", "Next Tab"),
-        ("less_than_sign", "next_tab(-1)", "Prev Tab"),
+        ("greater_than_sign,b", "next_tab(1)", "Next Tab"),  # '>' and 'b'
+        ("less_than_sign", "next_tab(-1)", "Prev Tab"),  # '<'
     ]
 
     CSS = """
@@ -213,45 +216,6 @@ class DataFrameViewer(App):
         if table.loaded_rows == 0:
             table._setup_table()
 
-    def action_quit_confirm(self) -> None:
-        """Quit the application.
-
-        Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.
-        Otherwise, quits immediately.
-
-        Returns:
-            None
-        """
-        # Check for dirty tabs
-        dirty_tabnames = [table.tabname for table in self.tabs.values() if table.dirty]
-        multi_tab = len(self.tabs) > 1
-
-        if dirty_tabnames:
-            # Build list of dirty tab names
-            dirty_tabs = "\n".join(f"  - [$warning]{tabname}[/]" for tabname in dirty_tabnames)
-
-            def _do_quit(result: bool) -> None:
-                if result:
-                    if active_table := self._get_active_table():
-                        active_table._save_to_file()
-                else:
-                    self.exit()
-
-            label = "The following tabs have unsaved changes:" if multi_tab else "This tab has unsaved changes:"
-
-            self.push_screen(
-                ConfirmScreen(
-                    "Unsaved Changes",
-                    label=f"{label}\n{dirty_tabs}\n\nSave changes?",
-                    yes="Save",
-                    no="Discard",
-                ),
-                callback=_do_quit,
-            )
-        else:
-            # No dirty tabs, quit normally
-            self.exit()
-
     def action_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.
 
@@ -277,33 +241,21 @@ class DataFrameViewer(App):
         """
         self.push_screen(OpenFileScreen(), self._do_add_tab)
 
-    def action_save_all_tabs(self) -> None:
-        """Save all open tabs to a single Excel file.
-
-        Displays a save dialog to choose filename and location, then saves all
-        open tabs as separate sheets in a single Excel workbook.
-
-        Returns:
-            None
-        """
-        callback = partial(self._get_active_table()._do_save_file, all_tabs=True)
-        self.push_screen(
-            SaveFileScreen("all-tabs.xlsx", title="Save All Tabs"),
-            callback=callback,
-        )
-
     def action_close_tab(self) -> None:
-        """Close the currently active tab.
+        """Close the current tab.
 
-        Closes the current tab. If this is the only tab, exits the application instead.
-
-        Returns:
-            None
+        Checks for unsaved changes and prompts the user to save if needed.
+        If this is the last tab, exits the app.
         """
-        if len(self.tabs) <= 1:
-            self.app.exit()
-            return
         self._close_tab()
+
+    def action_close_all_tabs(self) -> None:
+        """Close all tabs and exit the app.
+
+        Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.
+        Otherwise, quits immediately.
+        """
+        self._close_all_tabs()
 
     def action_duplicate_tab(self) -> None:
         """Duplicate the currently active tab.
@@ -414,11 +366,12 @@ class DataFrameViewer(App):
         Returns:
             None
         """
+        self.log(f"Adding tab for file: {filename}")
         if filename and os.path.exists(filename):
             try:
                 n_tab = 0
-                for lf, filename, tabname in load_file(filename, prefix_sheet=True):
-                    self._add_tab(lf, filename, tabname)
+                for source in load_file(filename, prefix_sheet=True):
+                    self._add_tab(source.frame, filename, source.tabname)
                     n_tab += 1
                 # self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open")
             except Exception as e:
@@ -479,14 +432,84 @@ class DataFrameViewer(App):
             None
         """
         try:
-            if len(self.tabs) == 1:
-                self.app.exit()
+            if not (active_pane := self.tabbed.active_pane):
+                return
+
+            if not (active_table := self.tabs.get(active_pane)):
+                return
+
+            def _on_save_confirm(result: bool) -> None:
+                """Handle the "save before closing?" confirmation."""
+                if result:
+                    # User wants to save - close after save dialog opens
+                    active_table._save_to_file(task_after_save="close_tab")
+                else:
+                    # User wants to discard - close immediately
+                    self._do_close_tab()
+
+            if active_table.dirty:
+                self.push_screen(
+                    ConfirmScreen(
+                        "Save to File",
+                        label="This tab has unsaved changes. Save changes?",
+                        yes="Save",
+                        no="Discard",
+                    ),
+                    callback=_on_save_confirm,
+                )
             else:
-                if active_pane := self.tabbed.active_pane:
-                    self.tabbed.remove_pane(active_pane.id)
-                    self.tabs.pop(active_pane)
-                    # self.notify(f"Closed tab [$success]{active_pane.name}[/]", title="Close")
-        except NoMatches:
+                # No unsaved changes - close immediately
+                self._do_close_tab()
+        except Exception:
+            pass
+
+    def _do_close_tab(self) -> None:
+        """Actually close the tab."""
+        try:
+            if not (active_pane := self.tabbed.active_pane):
+                return
+
+            self.tabbed.remove_pane(active_pane.id)
+            self.tabs.pop(active_pane)
+
+            # Quit app if no tabs remain
+            if len(self.tabs) == 0:
+                self.exit()
+        except Exception:
+            pass
+
+    def _close_all_tabs(self) -> None:
+        """Close all tabs and quit the app.
+
+        Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.
+        Otherwise, quits immediately.
+        """
+        try:
+            # Check for dirty tabs
+            dirty_tabnames = [table.tabname for table in self.tabs.values() if table.dirty]
+            if not dirty_tabnames:
+                self.exit()
+                return
+
+            def _save_and_quit(result: bool) -> None:
+                if result:
+                    self._get_active_table()._save_to_file(task_after_save="quit_app")
+                else:
+                    self.exit()
+
+            tab_list = "\n".join(f"  - {name}" for name in dirty_tabnames)
+            self.push_screen(
+                ConfirmScreen(
+                    "Unsaved Changes",
+                    label=f"The following tabs have unsaved changes:\n\n{tab_list}\n\nSave all changes?",
+                    yes="Save All",
+                    no="Discard All",
+                ),
+                callback=_save_and_quit,
+            )
+
+        except Exception as e:
+            self.log(f"Error quitting all tabs: {str(e)}")
             pass
 
     def _rename_tab(self, content_tab: ContentTab) -> None:

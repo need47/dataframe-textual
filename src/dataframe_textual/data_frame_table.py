@@ -3176,8 +3176,10 @@ class DataFrameTable(DataTable):
         except FileNotFoundError:
             self.notify("Error copying to clipboard", title="Clipboard", severity="error")
 
-    def _save_to_file(self) -> None:
+    def _save_to_file(self, _task_after_save=None) -> None:
         """Open screen to save file."""
+        self._task_after_save = _task_after_save
+
         multi_tab = len(self.app.tabs) > 1
         filename = "all-tabs.xlsx" if multi_tab else str(Path(self.filename).with_stem(self.tabname))
         self.app.push_screen(
@@ -3191,14 +3193,11 @@ class DataFrameTable(DataTable):
             return
         filename, all_tabs = result
 
-        filepath = Path(filename)
-        ext = filepath.suffix.lower()
-
         # Whether to save all tabs (for Excel files)
         self._all_tabs = all_tabs
 
         # Check if file exists
-        if filepath.exists():
+        if Path(filename).exists():
             self._pending_filename = filename
             self.app.push_screen(
                 ConfirmScreen("File already exists. Overwrite?"),
@@ -3243,10 +3242,16 @@ class DataFrameTable(DataTable):
 
             # Reset dirty flag after save
             if self._all_tabs:
-                for table in self.app.tabs.values():
+                tabs: dict[TabPane, DataFrameTable] = self.app.tabs
+                for table in tabs.values():
                     table.dirty = False
             else:
                 self.dirty = False
+
+            if self._task_after_save == "close_tab":
+                self.app._do_close_tab()
+            elif self._task_after_save == "quit_app":
+                self.app.exit()
 
             # From ConfirmScreen callback, so notify accordingly
             if self._all_tabs is True:

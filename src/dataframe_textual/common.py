@@ -480,23 +480,24 @@ def load_dataframe(
         else:
             source = filename
 
-        # Load from file
-        # Determine file format if not specified
-        if not file_format:
+        # If not specified, determine file format (may be different for each file)
+        fmt = file_format
+        if not fmt:
             ext = Path(filename).suffix.lower()
-            if ext == ".gz" or ext == ".bz2" or ext == ".xz":
+            if ext == ".gz":
                 ext = Path(filename).with_suffix("").suffix.lower()
             fmt = ext.removeprefix(".")
 
             # Default to TSV
-            file_format = fmt if fmt in SUPPORTED_FORMATS else "tsv"
+            if not fmt or fmt not in SUPPORTED_FORMATS:
+                fmt = "tsv"
 
         # Load the file
         data.extend(
             load_file(
                 source,
                 prefix_sheet=prefix_sheet,
-                file_format=file_format,
+                file_format=fmt,
                 has_header=has_header,
                 infer_schema=infer_schema,
                 comment_prefix=comment_prefix,
@@ -611,8 +612,15 @@ def load_file(
         List of `Source` objects.
     """
     data: list[Source] = []
+
     filename = f"stdin.{file_format}" if isinstance(source, StringIO) else source
     filepath = Path(filename)
+
+    if not file_format:
+        ext = filepath.suffix.lower()
+        if ext == ".gz":
+            ext = Path(filename).with_suffix("").suffix.lower()
+        file_format = ext.removeprefix(".")
 
     # Load based on file format
     if file_format in ("csv", "tsv"):

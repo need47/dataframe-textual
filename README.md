@@ -10,9 +10,6 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/J
 - 🚀 **Fast Loading** - Powered by Polars for efficient data handling
 - 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with various data types (e.g., integer, float, string)
 - ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls
-
-# Process compressed data from stdin
-zcat compressed_data.csv.gz | dv -f csv editing, and manipulating data
 - 📊 **Flexible Input** - Read from files and/or stdin (pipes/redirects)
 - 🔄 **Smart Pagination** - Lazy load rows on demand for handling large datasets
 
@@ -119,10 +116,9 @@ dv data1.tsv < data2.tsv
 When multiple files are opened:
 - Each file appears as a separate tab
 - Switch between tabs using `>` (next) or `<` (previous), or use `b` for cycling tabs
-- Save all tabs to Excel with `Ctrl+A`
+- Save current tab or all tabs with `Ctrl+S`
 - Duplicate the current tab with `Ctrl+D`
 - Open additional files with `Ctrl+O`
-- Close the current tab with `Ctrl+W`
 - Each file maintains its own state (edits, sort order, selections, history, etc.)
 
 ## Command Line Options
@@ -200,15 +196,17 @@ zcat compressed_data.csv.gz | dv -f csv
 
 | Key | Action |
 |-----|--------|
-| `Ctrl+A` | Save all open tabs to Excel file |
-| `Ctrl+D` | Duplicate current tab |
-| `Ctrl+O` | Open file in a new tab |
-| `Ctrl+W` | Close current tab |
-| `b` | Cycle through tabs |
 | `>` | Move to next tab |
 | `<` | Move to previous tab |
+| `b` | Cycle through tabs |
 | `B` | Toggle tab bar visibility |
-| `q` | Quit the application |
+| `q` | Close current tab (prompts to save unsaved changes) |
+| `Q` | Close all tabs and app (prompts to save unsaved changes) |
+| `Ctrl+Q` | Force to quit app (regardless off unsaved changes) |
+| `Ctrl+S` | Save current tab or all tabs to file |
+| `Ctrl+D` | Duplicate current tab |
+| `Ctrl+O` | Open file in a new tab |
+| `Double-click tab` | Rename current tab |
 
 #### View & Settings
 
@@ -766,6 +764,31 @@ The link template supports multiple placeholder types for maximum flexibility:
 **Tips:**
 - Use full undo (`u`) if template produces unexpected URLs
 - For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
+
+### 21. Tab Management
+
+Manage multiple files and dataframes simultaneously with tabs.
+
+**Tab Operations:**
+- **`Ctrl+O`** - Open file in a new tab
+- **`>`** - Move to next tab
+- **`<`** - Move to previous tab
+- **`b`** - Cycle through tabs
+- **`B`** - Toggle tab bar visibility
+- **`Double-click tab`** - Rename the tab
+- **`Ctrl+D`** - Duplicate current tab (creates a copy with same data and state)
+- **`Ctrl+S`** - Save current tab to file or all tabs in a single Excel file
+- **`q`** - Close current tab (closes tab, prompts to save if unsaved changes)
+- **`Q`** - Close all tabs and exit app (prompts to save tabs with unsaved changes)
+- **`Ctrl+Q`** - Force to quit app regardless of unsaved changes
+
+**Tab Operations:**
+
+**Saving & Quitting:**
+
+**Tips:**
+- Tabs with unsaved changes are highlighted with a bright border
+- Closing or quitting a tab with unsaved changes triggers a save prompt
 
 ## Dependencies
 
