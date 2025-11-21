@@ -5,11 +5,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .data_frame_table import DataFrameTable
 
+from pathlib import Path
+
 import polars as pl
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Button, Checkbox, Input, Label, Static
+from textual.widgets import Button, Checkbox, Input, Label, Static, TabPane
+from textual.widgets.tabbed_content import ContentTab
 
 from .common import NULL, DtypeConfig, tentative_expr, validate_expr
 
@@ -282,20 +285,37 @@ class SaveFileScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SaveFileScreen")
 
-    def __init__(self, filename: str, title="Save Tab"):
+    def __init__(self, filename: str, all_tabs: bool = False):
         super().__init__(
-            title=title,
+            title="Save",
+            label="Enter filename:",
             input=filename,
+            yes="Save Tab",
+            maybe="Save All Tabs" if all_tabs else None,
             on_yes_callback=self.handle_save,
+            on_maybe_callback=self.handle_save_all,
         )
 
     def handle_save(self):
         if self.input:
             input_filename = self.input.value.strip()
             if input_filename:
-                return input_filename
+                return input_filename, False
             else:
                 self.notify("Filename cannot be empty", title="Save", severity="error")
+                return None
+
+        return None
+
+    def handle_save_all(self):
+        if self.input:
+            input_filename = self.input.value.strip()
+            if input_filename:
+                filename = Path(input_filename).with_suffix(".xlsx")
+                self.input.value = str(filename)
+                return filename, True
+            else:
+                self.notify("Filename cannot be empty", title="Save All", severity="error")
                 return None
 
         return None
@@ -694,3 +714,43 @@ class FindReplaceScreen(YesNoScreen):
         replace_all = True
 
         return term_find, term_replace, match_nocase, match_whole, replace_all
+
+
+class RenameTabScreen(YesNoScreen):
+    """Modal screen to rename a tab."""
+
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "RenameTabScreen")
+
+    def __init__(self, content_tab: ContentTab, existing_tabs: list[TabPane]):
+        self.content_tab = content_tab
+        self.existing_tabs = existing_tabs
+        tab_name = content_tab.label_text
+
+        super().__init__(
+            title="Rename Tab",
+            label="New tab name",
+            input={"value": tab_name},
+            on_yes_callback=self._validate_input,
+        )
+
+    def _validate_input(self) -> None:
+        """Validate and save the new tab name."""
+        new_name = self.input.value.strip()
+
+        # Check if name is empty
+        if not new_name:
+            self.notify("Tab name cannot be empty", title="Rename Tab", severity="error")
+            return None
+
+        # Check if name changed
+        if new_name == self.content_tab.label_text:
+            self.notify("No changes made", title="Rename Tab", severity="warning")
+            return None
+
+        # Check if name already exists
+        if new_name in self.existing_tabs:
+            self.notify(f"Tab [$accent]{new_name}[/] already exists", title="Rename Tab", severity="error")
+            return None
+
+        # Return new name
+        return self.content_tab, new_name

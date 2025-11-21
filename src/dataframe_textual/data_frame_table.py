@@ -12,6 +12,7 @@ from rich.text import Text
 from textual import work
 from textual.coordinate import Coordinate
 from textual.events import Click
+from textual.reactive import reactive
 from textual.render import measure
 from textual.widgets import DataTable, TabPane
 from textual.widgets._data_table import (
@@ -211,6 +212,10 @@ class DataFrameTable(DataTable):
         ("G", "jump_bottom", "Jump to bottom"),
         ("ctrl+f", "forward_page", "Page down"),
         ("ctrl+b", "backward_page", "Page up"),
+        # Undo/Redo/Reset
+        ("u", "undo", "Undo"),
+        ("U", "redo", "Redo"),
+        ("ctrl+u", "reset", "Reset to initial state"),
         # Display
         ("h", "hide_column", "Hide column"),
         ("H", "show_hidden_rows_columns", "Show hidden rows/columns"),
@@ -285,14 +290,13 @@ class DataFrameTable(DataTable):
         # Sql
         ("l", "simple_sql", "Simple SQL interface"),
         ("L", "advanced_sql", "Advanced SQL interface"),
-        # Undo/Redo
-        ("u", "undo", "Undo"),
-        ("U", "redo", "Redo"),
-        ("ctrl+u", "reset", "Reset to initial state"),
     ]
     # fmt: on
 
-    def __init__(self, df: pl.DataFrame, filename: str = "", name: str = "", **kwargs) -> None:
+    # Track if dataframe has unsaved changes
+    dirty: reactive[bool] = reactive(False)
+
+    def __init__(self, df: pl.DataFrame, filename: str = "", tabname: str = "", **kwargs) -> None:
         """Initialize the DataFrameTable with a dataframe and manage all state.
 
         Sets up the table widget with display configuration, loads the dataframe, and
@@ -301,19 +305,18 @@ class DataFrameTable(DataTable):
         Args:
             df: The Polars DataFrame to display and edit.
             filename: Optional source filename for the data (used in save operations). Defaults to "".
-            name: Optional display name for the table tab. Defaults to "" (uses filename stem).
             **kwargs: Additional keyword arguments passed to the parent DataTable widget.
 
         Returns:
             None
         """
-        super().__init__(name=(name or Path(filename).stem), **kwargs)
+        super().__init__(**kwargs)
 
         # DataFrame state
         self.dataframe = df  # Original dataframe
         self.df = df  # Internal/working dataframe
-        self.filename = filename  # Current filename
-
+        self.filename = filename or "untitled.csv"  # Current filename
+        self.tabname = tabname or Path(filename).stem  # Tab name
         # Pagination & Loading
         self.INITIAL_BATCH_SIZE = (self.app.size.height // 100 + 1) * 100
         self.BATCH_SIZE = self.INITIAL_BATCH_SIZE // 2
@@ -340,9 +343,6 @@ class DataFrameTable(DataTable):
 
         # Whether to use thousand separator for numeric display
         self.thousand_separator = False
-
-        # Track if dataframe has unsaved changes
-        self.dirty = False
 
     @property
     def cursor_key(self) -> CellKey:
@@ -438,6 +438,15 @@ class DataFrameTable(DataTable):
             for cidx in sorted(self.matches[ridx]):
                 matches.append((ridx, cidx))
         return matches
+
+    @property
+    def last_history(self) -> History:
+        """Get the last history state.
+
+        Returns:
+            History: The most recent History object from the histories deque.
+        """
+        return self.histories[-1] if self.histories else None
 
     def get_row_key(self, row_idx: int) -> RowKey:
         """Get the row key for a given table row index.
@@ -543,6 +552,27 @@ class DataFrameTable(DataTable):
                 self.call_after_refresh(self._scroll_cursor_into_view)
             else:
                 self._scroll_cursor_into_view()
+
+    def watch_dirty(self, old_dirty: bool, new_dirty: bool) -> None:
+        """Watch for changes to the dirty state and update tab title.
+
+        When new_dirty is True, set the tab color to red.
+        When new_dirty is False, remove the red color.
+
+        Args:
+            old_dirty: The old dirty state.
+            new_dirty: The new dirty state.
+        """
+        # Find the parent TabPane
+        try:
+            tab_pane = self.app.tabbed.active_pane
+            if new_dirty:
+                tab_pane.add_class("dirty")
+            else:
+                tab_pane.remove_class("dirty")
+        except Exception:
+            # Silently fail if parent is not available or not a TabPane
+            pass
 
     def move_cursor_to(self, ridx: int, cidx: int) -> None:
         """Move cursor based on the dataframe indices.
@@ -784,8 +814,7 @@ class DataFrameTable(DataTable):
 
     def action_reset(self) -> None:
         """Reset to the initial state."""
-        self._setup_table(reset=True)
-        self.notify("Restored initial state", title="Reset")
+        self._reset()
 
     def action_move_column_left(self) -> None:
         """Move the current column to the left."""
@@ -1242,6 +1271,7 @@ class DataFrameTable(DataTable):
             fixed_columns=self.fixed_columns,
             cursor_coordinate=self.cursor_coordinate,
             matches={k: v.copy() for k, v in self.matches.items()},
+            dirty=self.dirty,
         )
 
     def _apply_history(self, history: History) -> None:
@@ -1274,7 +1304,6 @@ class DataFrameTable(DataTable):
             dirty: Whether this operation modifies the data (True) or just display state (False).
         """
         history = self._create_history(description)
-        history.dirty = dirty
         self.histories.append(history)
 
         # Mark table as dirty if this operation modifies data
@@ -1316,6 +1345,19 @@ class DataFrameTable(DataTable):
         self.history = None
 
         self.notify(f"Reapplied: {description}", title="Redo")
+
+    def _reset(self) -> None:
+        """Reset the table to the initial state."""
+        self._setup_table(reset=True)
+        self._restore_dirty(default=False)
+        self.notify("Restored initial state", title="Reset")
+
+    def _restore_dirty(self, default: bool | None = None) -> None:
+        """Restore the dirty state from the last history entry."""
+        if self.last_history:
+            self.dirty = self.last_history.dirty
+        elif default is not None:
+            self.dirty = default
 
     # Display
     def _cycle_cursor_type(self) -> None:
@@ -1521,10 +1563,6 @@ class DataFrameTable(DataTable):
         """Open modal to edit the selected cell."""
         ridx = self.cursor_row_idx if ridx is None else ridx
         cidx = self.cursor_col_idx if cidx is None else cidx
-        col_name = self.df.columns[cidx]
-
-        # Add to history
-        self._add_history(f"Edited cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
 
         # Push the edit modal screen
         self.app.push_screen(
@@ -1546,6 +1584,9 @@ class DataFrameTable(DataTable):
             return
 
         col_name = self.df.columns[cidx]
+
+        # Add to history
+        self._add_history(f"Edited cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
 
         # Update the cell in the dataframe
         try:
@@ -3137,12 +3178,19 @@ class DataFrameTable(DataTable):
 
     def _save_to_file(self) -> None:
         """Open screen to save file."""
-        self.app.push_screen(SaveFileScreen(self.filename), callback=self._do_save_file)
+        multi_tab = len(self.app.tabs) > 1
+        filename = "all-tabs.xlsx" if multi_tab else str(Path(self.filename).with_stem(self.tabname))
+        self.app.push_screen(
+            SaveFileScreen(filename, all_tabs=multi_tab),
+            callback=self._do_save_file,
+        )
 
-    def _do_save_file(self, filename: str | None, all_tabs: bool = False) -> None:
+    def _do_save_file(self, result) -> None:
         """Handle result from SaveFileScreen."""
-        if filename is None:
+        if result is None:
             return
+        filename, all_tabs = result
+
         filepath = Path(filename)
         ext = filepath.suffix.lower()
 
@@ -3156,8 +3204,6 @@ class DataFrameTable(DataTable):
                 ConfirmScreen("File already exists. Overwrite?"),
                 callback=self._on_overwrite_screen,
             )
-        elif ext in (".xlsx", ".xls"):
-            self._do_save_excel(filename)
         else:
             self._do_save(filename)
 
@@ -3194,9 +3240,22 @@ class DataFrameTable(DataTable):
 
             self.dataframe = self.df  # Update original dataframe
             self.filename = filename  # Update current filename
-            if not self._all_tabs:
-                extra = "current tab with " if len(self.app.tabs) > 1 else ""
-                self.notify(f"Saved {extra}[$accent]{len(self.df)}[/] rows to [$success]{filename}[/]", title="Save")
+
+            # Reset dirty flag after save
+            if self._all_tabs:
+                for table in self.app.tabs.values():
+                    table.dirty = False
+            else:
+                self.dirty = False
+
+            # From ConfirmScreen callback, so notify accordingly
+            if self._all_tabs is True:
+                self.notify(f"Saved all tabs to [$success]{filename}[/]", title="Save")
+            else:
+                self.notify(
+                    f"Saved current tab with [$accent]{len(self.df)}[/] rows to [$success]{filename}[/]", title="Save"
+                )
+
         except Exception as e:
             self.notify(f"Error saving [$error]{filename}[/]", title="Save", severity="error")
             self.log(f"Error saving file `{filename}`: {str(e)}")
@@ -3212,17 +3271,9 @@ class DataFrameTable(DataTable):
             # Multiple tabs - use xlsxwriter to create multiple sheets
             with xlsxwriter.Workbook(filename) as wb:
                 tabs: dict[TabPane, DataFrameTable] = self.app.tabs
-                for tab, table in tabs.items():
-                    worksheet = wb.add_worksheet(tab.name)
+                for table in tabs.values():
+                    worksheet = wb.add_worksheet(table.tabname)
                     table.df.write_excel(workbook=wb, worksheet=worksheet)
-
-        # From ConfirmScreen callback, so notify accordingly
-        if self._all_tabs is True:
-            self.notify(f"Saved all tabs to [$success]{filename}[/]", title="Save")
-        else:
-            self.notify(
-                f"Saved current tab with [$accent]{len(self.df)}[/] rows to [$success]{filename}[/]", title="Save"
-            )
 
     # SQL Interface
     def _simple_sql(self) -> None:

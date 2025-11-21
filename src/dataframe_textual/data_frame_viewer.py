@@ -8,14 +8,15 @@ from textwrap import dedent
 import polars as pl
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
+from textual.events import Click
 from textual.theme import BUILTIN_THEMES
 from textual.widgets import TabbedContent, TabPane
-from textual.widgets.tabbed_content import ContentTabs
+from textual.widgets.tabbed_content import ContentTab, ContentTabs
 
 from .common import Source, get_next_item, load_file
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
-from .yes_no_screen import ConfirmScreen, OpenFileScreen, SaveFileScreen
+from .yes_no_screen import ConfirmScreen, OpenFileScreen, RenameTabScreen, SaveFileScreen
 
 
 class DataFrameViewer(App):
@@ -51,7 +52,7 @@ class DataFrameViewer(App):
     """).strip()
 
     BINDINGS = [
-        ("q", "quit", "Quit"),
+        ("q", "quit_confirm", "Quit"),
         ("f1", "toggle_help_panel", "Help"),
         ("B", "toggle_tab_bar", "Toggle Tab Bar"),
         ("ctrl+a", "save_all_tabs", "Save All Tabs"),
@@ -72,6 +73,9 @@ class DataFrameViewer(App):
         }
         ContentTab.-active {
             background: $block-cursor-background; /* Same as underline */
+        }
+        TabPane.dirty {
+            border: solid $warning;
         }
     """
 
@@ -107,7 +111,7 @@ class DataFrameViewer(App):
             seen_names = set()
             for idx, source in enumerate(self.sources, start=1):
                 df, filename, tabname = source.frame, source.filename, source.tabname
-                tab_id = f"tab_{idx}"
+                tab_id = f"tab-{idx}"
 
                 if not tabname:
                     tabname = Path(filename).stem or tab_id
@@ -120,8 +124,8 @@ class DataFrameViewer(App):
                 seen_names.add(tabname)
 
                 try:
-                    table = DataFrameTable(df, filename, name=tabname, id=tab_id, zebra_stripes=True)
-                    tab = TabPane(tabname, table, name=tabname, id=tab_id)
+                    table = DataFrameTable(df, filename, tabname=tabname, id=tab_id, zebra_stripes=True)
+                    tab = TabPane(tabname, table, id=tab_id)
                     self.tabs[tab] = table
                     yield tab
                 except Exception as e:
@@ -144,6 +148,11 @@ class DataFrameViewer(App):
             self.query_one(ContentTabs).display = False
             self._get_active_table().focus()
 
+    def on_ready(self) -> None:
+        """Called when the app is ready."""
+        # self.log(self.tree)
+        pass
+
     def on_key(self, event) -> None:
         """Handle key press events at the application level.
 
@@ -158,6 +167,30 @@ class DataFrameViewer(App):
         if event.key == "k":
             self.theme = get_next_item(list(BUILTIN_THEMES.keys()), self.theme)
             self.notify(f"Switched to theme: [$success]{self.theme}[/]", title="Theme")
+
+    def on_click(self, event: Click) -> None:
+        """Handle mouse click events on tabs.
+
+        Detects double-clicks on tab headers and opens the rename screen.
+
+        Args:
+            event: The click event containing position information.
+
+        Returns:
+            None
+        """
+        # Check if this is a double-click (chain > 1) on a tab header
+        if event.chain > 1:
+            try:
+                # Get the widget that was clicked
+                content_tab = event.widget
+
+                # Check if it's a ContentTab (tab header)
+                if isinstance(content_tab, ContentTab):
+                    self._rename_tab(content_tab)
+            except Exception as e:
+                self.log(f"Error handling tab rename click: {str(e)}")
+                pass
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         """Handle tab activation events.
@@ -180,7 +213,7 @@ class DataFrameViewer(App):
         if table.loaded_rows == 0:
             table._setup_table()
 
-    def action_quit(self) -> None:
+    def action_quit_confirm(self) -> None:
         """Quit the application.
 
         Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.
@@ -190,22 +223,28 @@ class DataFrameViewer(App):
             None
         """
         # Check for dirty tabs
-        dirty_tabs = [table for table in self.tabs.values() if table.dirty]
+        dirty_tabnames = [table.tabname for table in self.tabs.values() if table.dirty]
+        multi_tab = len(self.tabs) > 1
 
-        if dirty_tabs:
+        if dirty_tabnames:
             # Build list of dirty tab names
-            dirty_names = ", ".join(
-                [list(self.tabs.keys())[list(self.tabs.values()).index(table)].name for table in dirty_tabs]
-            )
+            dirty_tabs = "\n".join(f"  - [$warning]{tabname}[/]" for tabname in dirty_tabnames)
 
             def _do_quit(result: bool) -> None:
                 if result:
+                    if active_table := self._get_active_table():
+                        active_table._save_to_file()
+                else:
                     self.exit()
+
+            label = "The following tabs have unsaved changes:" if multi_tab else "This tab has unsaved changes:"
 
             self.push_screen(
                 ConfirmScreen(
                     "Unsaved Changes",
-                    label=f"The following tabs have unsaved changes: {dirty_names}\n\nDiscard changes and quit?",
+                    label=f"{label}\n{dirty_tabs}\n\nSave changes?",
+                    yes="Save",
+                    no="Discard",
                 ),
                 callback=_do_quit,
             )
@@ -295,7 +334,7 @@ class DataFrameViewer(App):
             table.filename,
             name=new_tabname,
             zebra_stripes=True,
-            id=f"tab_{len(self.tabs) + 1}",
+            id=f"tab-{len(self.tabs) + 1}",
         )
         new_pane = TabPane(new_tabname, new_table, name=new_tabname, id=new_table.id)
 
@@ -409,9 +448,9 @@ class DataFrameViewer(App):
             counter += 1
 
         # Find an available tab index
-        tab_idx = f"tab_{len(self.tabs) + 1}"
+        tab_idx = f"tab-{len(self.tabs) + 1}"
         for idx in range(len(self.tabs)):
-            pending_tab_idx = f"tab_{idx + 1}"
+            pending_tab_idx = f"tab-{idx + 1}"
             if any(tab.id == pending_tab_idx for tab in self.tabs):
                 continue
 
@@ -449,3 +488,49 @@ class DataFrameViewer(App):
                     # self.notify(f"Closed tab [$success]{active_pane.name}[/]", title="Close")
         except NoMatches:
             pass
+
+    def _rename_tab(self, content_tab: ContentTab) -> None:
+        """Open the rename tab screen.
+
+        Allows the user to rename the current tab and updates the table name accordingly.
+
+        Args:
+            content_tab: The ContentTab to rename.
+
+        Returns:
+            None
+        """
+        if content_tab is None:
+            return
+
+        # Get list of existing tab names (excluding current tab)
+        existing_tabs = self.tabs.keys()
+
+        # Push the rename screen
+        self.push_screen(
+            RenameTabScreen(content_tab, existing_tabs),
+            callback=self._do_rename_tab,
+        )
+
+    def _do_rename_tab(self, result) -> None:
+        """Handle result from RenameTabScreen."""
+        if result is None:
+            return
+
+        content_tab: ContentTab
+        content_tab, new_name = result
+
+        # Update the tab name
+        old_name = content_tab.label_text
+        content_tab.label = new_name
+
+        # Mark tab as dirty to indicate name change
+        tab_id = content_tab.id.removeprefix("--content-tab-")
+        for tab, table in self.tabs.items():
+            if tab.id == tab_id:
+                table.tabname = new_name
+                table.dirty = True
+                table.focus()
+                break
+
+        self.notify(f"Renamed tab [$accent]{old_name}[/] to [$success]{new_name}[/]", title="Rename")
