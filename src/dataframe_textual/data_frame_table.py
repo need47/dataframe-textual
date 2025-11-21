@@ -79,6 +79,7 @@ class History:
     fixed_columns: int
     cursor_coordinate: Coordinate
     matches: dict[int, set[int]]
+    dirty: bool = False  # Whether this history state has unsaved changes
 
 
 @dataclass
@@ -339,6 +340,9 @@ class DataFrameTable(DataTable):
 
         # Whether to use thousand separator for numeric display
         self.thousand_separator = False
+
+        # Track if dataframe has unsaved changes
+        self.dirty = False
 
     @property
     def cursor_key(self) -> CellKey:
@@ -1257,18 +1261,25 @@ class DataFrameTable(DataTable):
         self.fixed_columns = history.fixed_columns
         self.cursor_coordinate = history.cursor_coordinate
         self.matches = {k: v.copy() for k, v in history.matches.items()} if history.matches else defaultdict(set)
+        self.dirty = history.dirty
 
         # Recreate table for display
         self._setup_table()
 
-    def _add_history(self, description: str) -> None:
+    def _add_history(self, description: str, dirty: bool = False) -> None:
         """Add the current state to the history stack.
 
         Args:
             description: Description of the action for this history entry.
+            dirty: Whether this operation modifies the data (True) or just display state (False).
         """
         history = self._create_history(description)
+        history.dirty = dirty
         self.histories.append(history)
+
+        # Mark table as dirty if this operation modifies data
+        if dirty:
+            self.dirty = True
 
     def _undo(self) -> None:
         """Undo the last action."""
@@ -1513,7 +1524,7 @@ class DataFrameTable(DataTable):
         col_name = self.df.columns[cidx]
 
         # Add to history
-        self._add_history(f"Edited cell [$success]({ridx + 1}, {col_name})[/]")
+        self._add_history(f"Edited cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
 
         # Push the edit modal screen
         self.app.push_screen(
@@ -1609,7 +1620,7 @@ class DataFrameTable(DataTable):
                 expr = pl.lit(str(term))
 
         # Add to history
-        self._add_history(f"Edited column [$accent]{col_name}[/] with expression")
+        self._add_history(f"Edited column [$accent]{col_name}[/] with expression", dirty=True)
 
         try:
             # Apply the expression to the column
@@ -1653,7 +1664,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self._add_history(f"Renamed column [$accent]{col_name}[/] to [$success]{new_name}[/]")
+        self._add_history(f"Renamed column [$accent]{col_name}[/] to [$success]{new_name}[/]", dirty=True)
 
         # Rename the column in the dataframe
         self.df = self.df.rename({col_name: new_name})
@@ -1683,7 +1694,7 @@ class DataFrameTable(DataTable):
         col_name = self.cursor_col_name
 
         # Add to history
-        self._add_history(f"Cleared cell [$success]({ridx + 1}, {col_name})[/]")
+        self._add_history(f"Cleared cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
 
         # Update the cell to None in the dataframe
         try:
@@ -1723,7 +1734,7 @@ class DataFrameTable(DataTable):
             new_name = col_name
 
         # Add to history
-        self._add_history(f"Added column [$success]{new_name}[/] after column {cidx + 1}")
+        self._add_history(f"Added column [$success]{new_name}[/] after column {cidx + 1}", dirty=True)
 
         try:
             # Create an empty column (all None values)
@@ -1769,7 +1780,7 @@ class DataFrameTable(DataTable):
         cidx, new_col_name, expr = result
 
         # Add to history
-        self._add_history(f"Added column [$success]{new_col_name}[/] with expression {expr}.")
+        self._add_history(f"Added column [$success]{new_col_name}[/] with expression {expr}.", dirty=True)
 
         try:
             # Create the column
@@ -1823,7 +1834,9 @@ class DataFrameTable(DataTable):
             return
         cidx, new_col_name, link_template = result
 
-        self._add_history(f"Added link column [$accent]{new_col_name}[/] with template [$success]{link_template}[/].")
+        self._add_history(
+            f"Added link column [$accent]{new_col_name}[/] with template [$success]{link_template}[/].", dirty=True
+        )
 
         try:
             # Hack to support PubChem link
@@ -1896,7 +1909,7 @@ class DataFrameTable(DataTable):
             message = f"Removed column [$success]{col_name}[/]"
 
         # Add to history
-        self._add_history(message)
+        self._add_history(message, dirty=True)
 
         # Remove the columns from the table display using the column names as keys
         for ck in col_keys_to_remove:
@@ -1934,7 +1947,7 @@ class DataFrameTable(DataTable):
         new_col_name = f"{col_name}_copy"
 
         # Add to history
-        self._add_history(f"Duplicated column [$success]{col_name}[/]")
+        self._add_history(f"Duplicated column [$success]{col_name}[/]", dirty=True)
 
         # Create new column and reorder columns to insert after current column
         cols_before = self.df.columns[: cidx + 1]
@@ -2004,7 +2017,7 @@ class DataFrameTable(DataTable):
                 predicates[ridx] = False
 
         # Add to history
-        self._add_history(history_desc)
+        self._add_history(history_desc, dirty=True)
 
         # Apply the filter to remove rows
         try:
@@ -2039,7 +2052,7 @@ class DataFrameTable(DataTable):
         row_to_duplicate = self.df.slice(ridx, 1)
 
         # Add to history
-        self._add_history(f"Duplicated row [$success]{ridx + 1}[/]")
+        self._add_history(f"Duplicated row [$success]{ridx + 1}[/]", dirty=True)
 
         # Concatenate: rows before + duplicated row + rows after
         df_before = self.df.slice(0, ridx + 1)
@@ -2100,7 +2113,9 @@ class DataFrameTable(DataTable):
         swap_cidx = self.df.columns.index(swap_name)
 
         # Add to history
-        self._add_history(f"Moved column [$success]{col_name}[/] {direction} (swapped with [$success]{swap_name}[/])")
+        self._add_history(
+            f"Moved column [$success]{col_name}[/] {direction} (swapped with [$success]{swap_name}[/])", dirty=True
+        )
 
         # Swap columns in the table's internal column locations
         self.check_idle()
@@ -2154,7 +2169,8 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self._add_history(
-            f"Moved row [$success]{row_key.value}[/] {direction} (swapped with row [$success]{swap_key.value}[/])"
+            f"Moved row [$success]{row_key.value}[/] {direction} (swapped with row [$success]{swap_key.value}[/])",
+            dirty=True,
         )
 
         # Swap rows in the table's internal row locations
@@ -2218,7 +2234,8 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self._add_history(
-            f"Cast column [$accent]{col_name}[/] from [$success]{current_dtype}[/] to [$success]{target_dtype}[/]"
+            f"Cast column [$accent]{col_name}[/] from [$success]{current_dtype}[/] to [$success]{target_dtype}[/]",
+            dirty=True,
         )
 
         try:
@@ -2650,7 +2667,8 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self._add_history(
-            f"Replaced [$accent]{term_find}[/] with [$success]{term_replace}[/] in column [$accent]{col_name}[/]"
+            f"Replaced [$accent]{term_find}[/] with [$success]{term_replace}[/] in column [$accent]{col_name}[/]",
+            dirty=True,
         )
 
         # Update matches
@@ -3247,7 +3265,7 @@ class DataFrameTable(DataTable):
             sql: The SQL query string to execute.
         """
         # Add to history
-        self._add_history(f"SQL Query:\n[$accent]{sql}[/]")
+        self._add_history(f"SQL Query:\n[$accent]{sql}[/]", dirty=True)
 
         # Execute the SQL query
         try:
