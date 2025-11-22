@@ -1,5 +1,6 @@
 """Modal screens for Polars sql manipulation"""
 
+from functools import partial
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -46,18 +47,20 @@ class SqlScreen(ModalScreen):
 
     """
 
-    def __init__(self, dftable: "DataFrameTable", on_yes_callback=None) -> None:
+    def __init__(self, dftable: "DataFrameTable", on_yes_callback=None, on_maybe_callback=None) -> None:
         """Initialize the SQL screen."""
         super().__init__()
         self.dftable = dftable  # DataFrameTable
         self.df: pl.DataFrame = dftable.df  # Polars DataFrame
         self.on_yes_callback = on_yes_callback
+        self.on_maybe_callback = on_maybe_callback
 
     def compose(self) -> ComposeResult:
         """Compose the SQL screen widget structure."""
         # Shared by subclasses
         with Horizontal(id="button-container"):
-            yield Button("Apply", id="yes", variant="success")
+            yield Button("View", id="yes", variant="success")
+            yield Button("Filter", id="maybe", variant="warning")
             yield Button("Cancel", id="no", variant="error")
 
     def on_key(self, event) -> None:
@@ -66,7 +69,16 @@ class SqlScreen(ModalScreen):
             self.app.pop_screen()
             event.stop()
         elif event.key == "enter":
-            self._handle_yes()
+            for button in self.query(Button):
+                if button.has_focus:
+                    if button.id == "yes":
+                        self._handle_yes()
+                    elif button.id == "maybe":
+                        self._handle_maybe()
+                    break
+            else:
+                self._handle_yes()
+
             event.stop()
         elif event.key == "escape":
             self.dismiss(None)
@@ -76,6 +88,8 @@ class SqlScreen(ModalScreen):
         """Handle button press events in the SQL screen."""
         if event.button.id == "yes":
             self._handle_yes()
+        elif event.button.id == "maybe":
+            self._handle_maybe()
         elif event.button.id == "no":
             self.dismiss(None)
 
@@ -83,6 +97,14 @@ class SqlScreen(ModalScreen):
         """Handle Yes button/Enter key press."""
         if self.on_yes_callback:
             result = self.on_yes_callback()
+            self.dismiss(result)
+        else:
+            self.dismiss(True)
+
+    def _handle_maybe(self) -> None:
+        """Handle Maybe button press."""
+        if self.on_maybe_callback:
+            result = self.on_maybe_callback()
             self.dismiss(result)
         else:
             self.dismiss(True)
@@ -133,25 +155,38 @@ class SimpleSqlScreen(SqlScreen):
         Returns:
             None
         """
-        super().__init__(dftable, on_yes_callback=self._handle_simple)
+        super().__init__(
+            dftable,
+            on_yes_callback=self._handle_simple,
+            on_maybe_callback=partial(
+                self._handle_simple,
+                view=False,
+            ),
+        )
 
     def compose(self) -> ComposeResult:
         """Compose the simple SQL screen widget structure."""
         with Container(id="sql-container") as container:
             container.border_title = "SQL Query"
             yield Label("Select columns (default to all):", id="select-label")
-            yield SelectionList(*[Selection(col, col) for col in self.df.columns], id="column-selection")
+            yield SelectionList(
+                *[Selection(col, col) for col in self.df.columns if col not in self.dftable.hidden_columns],
+                id="column-selection",
+            )
             yield Label("Where condition (optional)", id="where-label")
             yield Input(placeholder="e.g., age > 30 and height < 180", id="where-input")
             yield from super().compose()
 
-    def _handle_simple(self) -> None:
+    def _handle_simple(self, view: bool = True) -> None:
         """Handle Yes button/Enter key press."""
         selections = self.query_one(SelectionList).selected
-        columns = ", ".join(f"`{s}`" for s in selections) if selections else "*"
+        if not selections:
+            selections = [col for col in self.df.columns if col not in self.dftable.hidden_columns]
+
+        columns = ", ".join(f"`{s}`" for s in selections)
         where = self.query_one(Input).value.strip()
 
-        return columns, where
+        return columns, where, view
 
 
 class AdvancedSqlScreen(SqlScreen):
@@ -184,7 +219,11 @@ class AdvancedSqlScreen(SqlScreen):
         Returns:
             None
         """
-        super().__init__(dftable, on_yes_callback=self._handle_advanced)
+        super().__init__(
+            dftable,
+            on_yes_callback=self._handle_advanced,
+            on_maybe_callback=partial(self._handle_advanced, view=False),
+        )
 
     def compose(self) -> ComposeResult:
         """Compose the advanced SQL screen widget structure."""
@@ -197,6 +236,6 @@ class AdvancedSqlScreen(SqlScreen):
             )
             yield from super().compose()
 
-    def _handle_advanced(self) -> None:
+    def _handle_advanced(self, view: bool = True) -> None:
         """Handle Yes button/Enter key press."""
-        return self.query_one(TextArea).text.strip()
+        return self.query_one(TextArea).text.strip(), view

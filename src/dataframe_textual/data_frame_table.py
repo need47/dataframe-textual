@@ -3287,13 +3287,13 @@ class DataFrameTable(DataTable):
         """Handle SQL result result from SimpleSqlScreen."""
         if result is None:
             return
-        columns, where = result
+        columns, where, view = result
 
         sql = f"SELECT {columns} FROM self"
         if where:
             sql += f" WHERE {where}"
 
-        self.run_sql(sql)
+        self.run_sql(sql, view)
 
     def do_advanced_sql(self) -> None:
         """Open the advanced SQL interface screen."""
@@ -3306,28 +3306,58 @@ class DataFrameTable(DataTable):
         """Handle SQL result result from AdvancedSqlScreen."""
         if result is None:
             return
+        sql, view = result
 
-        self.run_sql(result)
+        self.run_sql(sql, view)
 
-    def run_sql(self, sql: str) -> None:
+    def run_sql(self, sql: str, view: bool = True) -> None:
         """Execute a SQL query directly.
 
         Args:
             sql: The SQL query string to execute.
         """
-        # Add to history
-        self.add_history(f"SQL Query:\n[$accent]{sql}[/]", dirty=True)
+
+        import re
+
+        RE_FROM_SELF = re.compile(r"\bfrom\s+self\b", re.IGNORECASE)
+
+        sql = RE_FROM_SELF.sub(f", `{RIDX}` FROM self", sql)
 
         # Execute the SQL query
         try:
-            self.df = self.df.sql(sql)
-        except Exception as e:
-            self.notify(f"Error executing SQL query [$error]{sql}[/]", title="SQL Query", severity="error")
-            self.log(f"Error executing SQL query `{sql}`: {str(e)}")
-            return
+            lf = self.df.lazy().with_row_index(RIDX)
+            if False in self.visible_rows:
+                lf = lf.filter(self.visible_rows)
 
-        if not len(self.df):
-            self.notify(f"SQL query returned no results for [$warning]{sql}[/]", title="SQL Query", severity="warning")
+            df_filtered = lf.sql(sql).collect()
+
+            if not len(df_filtered):
+                self.notify(
+                    f"SQL query returned no results for [$warning]{sql}[/]", title="SQL Query", severity="warning"
+                )
+                return
+
+            # Add to history
+            self.add_history(f"SQL Query:\n[$accent]{sql}[/]", dirty=not view)
+
+            if view:
+                # Just view - do not modify the dataframe
+                filtered_row_indices = set(df_filtered[RIDX].to_list())
+                if filtered_row_indices:
+                    self.visible_rows = [ridx in filtered_row_indices for ridx in range(len(self.visible_rows))]
+
+                filtered_col_names = set(df_filtered.columns)
+                if filtered_col_names:
+                    self.hidden_columns = {
+                        col_name for col_name in self.df.columns if col_name not in filtered_col_names
+                    }
+            else:  # filter - modify the dataframe
+                self.df = df_filtered.drop(RIDX)
+                self.visible_rows = [True] * len(self.df)
+                self.hidden_columns.clear()
+        except Exception as e:
+            self.notify(f"Error executing SQL query [$error]{sql}[/]", title="SQL Query", severity="error", timeout=10)
+            self.log(f"Error executing SQL query `{sql}`: {str(e)}")
             return
 
         # Recreate table for display
