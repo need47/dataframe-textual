@@ -412,7 +412,24 @@ class DataFrameViewer(App):
         table = DataFrameTable(df, filename, tabname=tabname, zebra_stripes=True, id=tab_idx)
         tab = TabPane(tabname, table, id=tab_idx)
         self.tabbed.add_pane(tab, before=before, after=after)
-        self.tabs[tab] = table
+
+        # Insert tab at specified position
+        tabs = list(self.tabs.keys())
+
+        if before and (idx := tabs.index(before)) != -1:
+            self.tabs = {
+                **{tab: self.tabs[tab] for tab in tabs[:idx]},
+                tab: table,
+                **{tab: self.tabs[tab] for tab in tabs[idx:]},
+            }
+        elif after and (idx := tabs.index(after)) != -1:
+            self.tabs = {
+                **{tab: self.tabs[tab] for tab in tabs[: idx + 1]},
+                tab: table,
+                **{tab: self.tabs[tab] for tab in tabs[idx + 1 :]},
+            }
+        else:
+            self.tabs[tab] = table
 
         if len(self.tabs) > 1:
             self.query_one(ContentTabs).display = True
