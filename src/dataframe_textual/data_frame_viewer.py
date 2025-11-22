@@ -29,13 +29,13 @@ class DataFrameViewer(App):
         - **<** - ◀️ Previous tab
         - **b** - 🔄 Cycle through tabs
         - **B** - 👁️ Toggle tab bar visibility
-        - **q** - 🚪 Quit current tab (prompts to save unsaved changes)
-        - **Q** - 🚪 Quit all tabs (prompts to save unsaved changes)
+        - **q** - ❌ Close current tab (prompts to save unsaved changes)
+        - **Q** - ❌ Close all tabs (prompts to save unsaved changes)
         - **Ctrl+Q** - 🚪 Force to quit app (discards unsaved changes)
-        - **Ctrl+S** - 💾 Save current tab or all tabs
+        - **Ctrl+T** - 💾 Save current tab to file
+        - **Ctrl+A** - 💾 Save all tabs to file
         - **Ctrl+D** - 📋 Duplicate current tab
-        - **Ctrl+O** - 📁 Add a new tab
-        - **Ctrl+K** - ❌ Close current tab
+        - **Ctrl+O** - 📁 Open a file
         - **Double-click tab** - ✏️ Rename current tab
 
         ## 🎨 View & Settings
@@ -44,24 +44,25 @@ class DataFrameViewer(App):
 
         ## ⭐ Features
         - **Multi-file support** - 📂 Open multiple CSV/Excel files as tabs
-        - **Excel sheets** - 📊 Excel files auto-expand sheets into tabs
         - **Lazy loading** - ⚡ Large files load on demand
         - **Sticky tabs** - 📌 Tab bar stays visible when scrolling
-        - **Unsaved changes** - 🔴 Tabs with unsaved changes have a highlighted border
+        - **Unsaved changes** - 🔴 Tabs with unsaved changes have a bright bottom border
         - **Rich formatting** - 🎨 Color-coded data types
         - **Search & filter** - 🔍 Find and filter data quickly
-        - **Sort & reorder** - ⬆️ Multi-column sort, drag rows/columns
-        - **Undo/Redo** - 🔄 Full history of operations
+        - **Sort & reorder** - ⬆️ Multi-column sort, reorder rows/columns
+        - **Undo/Redo/Reset** - 🔄 Full history of operations
         - **Freeze rows/cols** - 🔒 Pin header rows and columns
     """).strip()
 
     BINDINGS = [
         ("q", "close_tab", "Close current tab"),
-        ("Q", "close_all", "Close all tabs and quit app"),
-        ("f1", "toggle_help_panel", "Help"),
+        ("Q", "close_all_tabs", "Close all tabs and quit app"),
         ("B", "toggle_tab_bar", "Toggle Tab Bar"),
+        ("f1", "toggle_help_panel", "Help"),
+        ("ctrl+o", "open_file", "Open File"),
+        ("ctrl+t", "save_current_tab", "Save Current Tab"),
+        ("ctrl+a", "save_all_tabs", "Save All Tabs"),
         ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
-        ("ctrl+o", "add_tab", "Add Tab"),
         ("greater_than_sign,b", "next_tab(1)", "Next Tab"),  # '>' and 'b'
         ("less_than_sign", "next_tab(-1)", "Prev Tab"),  # '<'
     ]
@@ -78,7 +79,7 @@ class DataFrameViewer(App):
             background: $block-cursor-background; /* Same as underline */
         }
         TabPane.dirty {
-            border-bottom: thick $warning;
+            border-bottom: heavy $warning;
         }
     """
 
@@ -90,9 +91,6 @@ class DataFrameViewer(App):
         Args:
             sources: sources to load dataframes from, each as a tuple of
                      (DataFrame, filename, tabname).
-
-        Returns:
-            None
         """
         super().__init__()
         self.sources = sources
@@ -143,9 +141,6 @@ class DataFrameViewer(App):
 
         Initializes the app by hiding the tab bar for single-file mode and focusing
         the active table widget.
-
-        Returns:
-            None
         """
         if len(self.tabs) == 1:
             self.query_one(ContentTabs).display = False
@@ -163,9 +158,6 @@ class DataFrameViewer(App):
 
         Args:
             event: The key event object containing key information.
-
-        Returns:
-            None
         """
         if event.key == "k":
             self.theme = get_next_item(list(BUILTIN_THEMES.keys()), self.theme)
@@ -178,9 +170,6 @@ class DataFrameViewer(App):
 
         Args:
             event: The click event containing position information.
-
-        Returns:
-            None
         """
         # Check if this is a double-click (chain > 1) on a tab header
         if event.chain > 1:
@@ -203,9 +192,6 @@ class DataFrameViewer(App):
 
         Args:
             event: The tab activated event containing the activated tab pane.
-
-        Returns:
-            None
         """
         # Focus the table in the newly activated tab
         if table := self.get_active_table():
@@ -220,9 +206,6 @@ class DataFrameViewer(App):
         """Toggle the help panel on or off.
 
         Shows or hides the context-sensitive help panel. Creates it on first use.
-
-        Returns:
-            None
         """
         if self.help_panel:
             self.help_panel.display = not self.help_panel.display
@@ -230,16 +213,13 @@ class DataFrameViewer(App):
             self.help_panel = DataFrameHelpPanel()
             self.mount(self.help_panel)
 
-    def action_add_tab(self) -> None:
+    def action_open_tab(self) -> None:
         """Open file browser to load a file in a new tab.
 
         Displays the file open dialog for the user to select a file to load
         as a new tab in the interface.
-
-        Returns:
-            None
         """
-        self.push_screen(OpenFileScreen(), self.do_add_tab)
+        self.push_screen(OpenFileScreen(), self.do_open_tab)
 
     def action_close_tab(self) -> None:
         """Close the current tab.
@@ -257,40 +237,48 @@ class DataFrameViewer(App):
         """
         self.do_close_all_tabs()
 
+    def action_save_current_tab(self) -> None:
+        """Save the currently active tab to file.
+
+        Opens the save dialog for the active tab's DataFrameTable to save its data.
+        """
+        if table := self.get_active_table():
+            table.do_save_to_file(title="Save Current Tab")
+
+    def action_save_all_tabs(self) -> None:
+        """Save all open tabs to their respective files.
+
+        Iterates through all DataFrameTable widgets and opens the save dialog for each.
+        """
+        if table := self.get_active_table():
+            table.do_save_to_file(title="Save All Tabs", all_tabs=True)
+
     def action_duplicate_tab(self) -> None:
         """Duplicate the currently active tab.
 
         Creates a copy of the current tab with the same data and filename.
         The new tab is named with '_copy' suffix and inserted after the current tab.
-
-        Returns:
-            None
         """
         if not (table := self.get_active_table()):
             return
 
         # Get current tab info
-        active_pane = self.tabbed.active_pane
-        current_tabname = active_pane.name
+        current_tabname = table.tabname
         new_tabname = f"{current_tabname}_copy"
-
-        # Ensure unique tab name
-        counter = 1
-        while any(tab.name == new_tabname for tab in self.tabs):
-            new_tabname = f"{current_tabname}_{counter}"
-            counter += 1
+        new_tabname = self.get_unique_tabname(new_tabname)
 
         # Create new table with the same dataframe and filename
         new_table = DataFrameTable(
             table.df,
             table.filename,
-            name=new_tabname,
+            tabname=new_tabname,
             zebra_stripes=True,
             id=f"tab-{len(self.tabs) + 1}",
         )
-        new_pane = TabPane(new_tabname, new_table, name=new_tabname, id=new_table.id)
+        new_pane = TabPane(new_tabname, new_table, id=new_table.id)
 
         # Add the new tab
+        active_pane = self.tabbed.active_pane
         self.tabbed.add_pane(new_pane, after=active_pane)
         self.tabs[new_pane] = new_table
 
@@ -301,6 +289,7 @@ class DataFrameViewer(App):
         # Activate and focus the new tab
         self.tabbed.active = new_pane.id
         new_table.focus()
+        new_table.dirty = True  # Mark as dirty since it's a new unsaved tab
 
     def action_next_tab(self, offset: int = 1) -> None:
         """Switch to the next tab or previous tab.
@@ -310,9 +299,6 @@ class DataFrameViewer(App):
 
         Args:
             offset: Number of tabs to advance (+1 for next, -1 for previous). Defaults to 1.
-
-        Returns:
-            None
         """
         if len(self.tabs) <= 1:
             return
@@ -328,9 +314,6 @@ class DataFrameViewer(App):
 
         Shows or hides the tab bar at the bottom of the window. Useful for maximizing
         screen space in single-tab mode.
-
-        Returns:
-            None
         """
         tabs = self.query_one(ContentTabs)
         tabs.display = not tabs.display
@@ -354,17 +337,34 @@ class DataFrameViewer(App):
             self.notify("No active table found", title="Locate", severity="error")
         return None
 
-    def do_add_tab(self, filename: str) -> None:
-        """Add a tab for the opened file.
+    def get_unique_tabname(self, tab_name: str) -> str:
+        """Generate a unique tab name based on the given base name.
+
+        If the base name already exists among current tabs, appends an index
+        to make it unique.
+
+        Args:
+            tab_name: The desired base name for the tab.
+
+        Returns:
+            A unique tab name.
+        """
+        tabname = tab_name
+        counter = 1
+        while any(table.tabname == tabname for table in self.tabs.values()):
+            tabname = f"{tab_name}_{counter}"
+            counter += 1
+
+        return tabname
+
+    def do_open_file(self, filename: str) -> None:
+        """Open a file.
 
         Loads the specified file and creates one or more tabs for it. For Excel files,
         creates one tab per sheet. For other formats, creates a single tab.
 
         Args:
             filename: Path to the file to load and add as tab(s).
-
-        Returns:
-            None
         """
         if filename and os.path.exists(filename):
             try:
@@ -389,15 +389,8 @@ class DataFrameViewer(App):
             lf: The Polars DataFrame to display in the new tab.
             filename: The source filename for this data (used in table metadata).
             tabname: The display name for the tab.
-
-        Returns:
-            None
         """
-        # Ensure unique tab names
-        counter = 1
-        while any(tab.name == tabname for tab in self.tabs):
-            tabname = f"{tabname}_{counter}"
-            counter += 1
+        tabname = self.get_unique_tabname(tabname)
 
         # Find an available tab index
         tab_idx = f"tab-{len(self.tabs) + 1}"
@@ -409,8 +402,8 @@ class DataFrameViewer(App):
             tab_idx = pending_tab_idx
             break
 
-        table = DataFrameTable(df, filename, name=tabname, zebra_stripes=True, id=tab_idx)
-        tab = TabPane(tabname, table, name=tabname, id=tab_idx)
+        table = DataFrameTable(df, filename, tabname=tabname, zebra_stripes=True, id=tab_idx)
+        tab = TabPane(tabname, table, id=tab_idx)
         self.tabbed.add_pane(tab)
         self.tabs[tab] = table
 
@@ -426,9 +419,6 @@ class DataFrameViewer(App):
 
         Removes the active tab from the interface. If only one tab remains and no more
         can be closed, the application exits instead.
-
-        Returns:
-            None
         """
         try:
             if not (active_pane := self.tabbed.active_pane):
@@ -518,9 +508,6 @@ class DataFrameViewer(App):
 
         Args:
             content_tab: The ContentTab to rename.
-
-        Returns:
-            None
         """
         if content_tab is None:
             return

@@ -305,10 +305,8 @@ class DataFrameTable(DataTable):
         Args:
             df: The Polars DataFrame to display and edit.
             filename: Optional source filename for the data (used in save operations). Defaults to "".
+            tabname: Optional name for the tab displaying this dataframe. Defaults to "".
             **kwargs: Additional keyword arguments passed to the parent DataTable widget.
-
-        Returns:
-            None
         """
         super().__init__(**kwargs)
 
@@ -510,9 +508,6 @@ class DataFrameTable(DataTable):
         Args:
             old_coordinate: The previous cursor coordinate.
             new_coordinate: The new cursor coordinate.
-
-        Returns:
-            None
         """
         if old_coordinate != new_coordinate:
             # Emit CellSelected message for cell cursor type (keyboard navigation only)
@@ -596,9 +591,6 @@ class DataFrameTable(DataTable):
 
         Called by Textual when the widget is first added to the display tree.
         Currently a placeholder as table setup is deferred until first use.
-
-        Returns:
-            None
         """
         # self.setup_table()
         pass
@@ -611,9 +603,6 @@ class DataFrameTable(DataTable):
 
         Args:
             event: The key event object.
-
-        Returns:
-            None
         """
         if event.key in ("pagedown", "down"):
             # Let the table handle the navigation first
@@ -626,9 +615,6 @@ class DataFrameTable(DataTable):
 
         Args:
             event: The click event containing row and column information.
-
-        Returns:
-            None
         """
         if self.cursor_type == "cell" and event.chain > 1:  # only on double-click or more
             try:
@@ -1868,9 +1854,6 @@ class DataFrameTable(DataTable):
 
         Args:
             result: Tuple of (cidx, new_col_name, link_template) or None if cancelled.
-
-        Returns:
-            None
         """
         if result is None:
             return
@@ -3177,14 +3160,13 @@ class DataFrameTable(DataTable):
         except FileNotFoundError:
             self.notify("Error copying to clipboard", title="Clipboard", severity="error")
 
-    def do_save_to_file(self, _task_after_save=None) -> None:
+    def do_save_to_file(self, title: str = "Save to File", all_tabs=False, task_after_save=None) -> None:
         """Open screen to save file."""
-        self._task_after_save = _task_after_save
+        self._task_after_save = task_after_save
 
-        multi_tab = len(self.app.tabs) > 1
-        filename = "all-tabs.xlsx" if multi_tab else str(Path(self.filename).with_stem(self.tabname))
+        filename = "all-tabs.xlsx" if all_tabs else str(Path(self.filename).with_stem(self.tabname))
         self.app.push_screen(
-            SaveFileScreen(filename, all_tabs=multi_tab),
+            SaveFileScreen(title, filename, all_tabs=all_tabs),
             callback=self.save_to_file,
         )
 
@@ -3255,15 +3237,13 @@ class DataFrameTable(DataTable):
                 self.app.exit()
 
             # From ConfirmScreen callback, so notify accordingly
-            if self._all_tabs is True:
-                self.notify(f"Saved all tabs to [$success]{filename}[/]", title="Save")
+            if self._all_tabs:
+                self.notify(f"Saved all tabs to [$success]{filename}[/]", title="Save to File")
             else:
-                self.notify(
-                    f"Saved current tab with [$accent]{len(self.df)}[/] rows to [$success]{filename}[/]", title="Save"
-                )
+                self.notify(f"Saved current tab to [$success]{filename}[/]", title="Save to File")
 
         except Exception as e:
-            self.notify(f"Error saving [$error]{filename}[/]", title="Save", severity="error")
+            self.notify(f"Error saving [$error]{filename}[/]", title="Save to File", severity="error")
             self.log(f"Error saving file `{filename}`: {str(e)}")
 
     def save_excel(self, filename: str) -> None:
