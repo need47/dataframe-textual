@@ -431,7 +431,10 @@ class DataFrameViewer(App):
                 """Handle the "save before closing?" confirmation."""
                 if result:
                     # User wants to save - close after save dialog opens
-                    active_table.save_to_file(task_after_save="close_tab")
+                    active_table.do_save_to_file(title="Save Current Tab", task_after_save="close_tab")
+                elif result is None:
+                    # User cancelled - do nothing
+                    return
                 else:
                     # User wants to discard - close immediately
                     self.close_tab()
@@ -439,10 +442,11 @@ class DataFrameViewer(App):
             if active_table.dirty:
                 self.push_screen(
                     ConfirmScreen(
-                        "Save to File",
+                        "Close Tab",
                         label="This tab has unsaved changes. Save changes?",
                         yes="Save",
-                        no="Discard",
+                        maybe="Discard",
+                        no="Cancel",
                     ),
                     callback=_on_save_confirm,
                 )

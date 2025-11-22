@@ -3232,7 +3232,7 @@ class DataFrameTable(DataTable):
                 self.dirty = False
 
             if self._task_after_save == "close_tab":
-                self.app._do_close_tab()
+                self.app.do_close_tab()
             elif self._task_after_save == "quit_app":
                 self.app.exit()
 
