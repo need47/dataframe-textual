@@ -2690,8 +2690,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self.add_history(
-            f"Replaced [$accent]{term_find}[/] with [$success]{term_replace}[/] in column [$accent]{col_name}[/]",
-            dirty=True,
+            f"Replaced [$accent]{term_find}[/] with [$success]{term_replace}[/] in column [$accent]{col_name}[/]"
         )
 
         # Update matches
@@ -2801,6 +2800,10 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
+        # Mark as dirty if any replacements were made
+        if state.replaced_occurrence > 0:
+            self.dirty = True
+
         col_name = "all columns" if state.cidx is None else self.df.columns[state.cidx]
         self.notify(
             f"Replaced [$accent]{state.replaced_occurrence}[/] of [$accent]{state.total_occurrence}[/] in [$success]{col_name}[/]",
@@ -2830,6 +2833,10 @@ class DataFrameTable(DataTable):
             if state.skipped_occurrence > 0:
                 msg += f", [$warning]{state.skipped_occurrence}[/] skipped"
             self.notify(msg, title="Replace")
+
+            if state.replaced_occurrence > 0:
+                self.dirty = True
+
             return
 
         # Move cursor to next match
@@ -2892,29 +2899,25 @@ class DataFrameTable(DataTable):
         # Cancel
         else:
             state.done = True
-            self.setup_table()
-            return
 
-        # Move to next
-        if state.current_cpos + 1 < len(state.cols_per_row[state.current_rpos]):
-            state.current_cpos += 1
-        else:
-            state.current_cpos = 0
-            state.current_rpos += 1
+        if not state.done:
+            # Get the new value of the current cell after replacement
+            new_cell_value = self.df.item(ridx, cidx)
+            row_key = str(ridx)
+            col_key = col_name
+            self.update_cell(
+                row_key, col_key, Text(str(new_cell_value), style=HIGHLIGHT_COLOR, justify=DtypeConfig(dtype).justify)
+            )
 
-        if state.current_rpos >= len(state.rows):
-            state.done = True
+            # Move to next
+            if state.current_cpos + 1 < len(state.cols_per_row[state.current_rpos]):
+                state.current_cpos += 1
+            else:
+                state.current_cpos = 0
+                state.current_rpos += 1
 
-        # Get the new value of the current cell after replacement
-        new_cell_value = self.df.item(ridx, cidx)
-        row_key = str(ridx)
-        col_key = col_name
-        self.update_cell(
-            row_key, col_key, Text(str(new_cell_value), style=HIGHLIGHT_COLOR, justify=DtypeConfig(dtype).justify)
-        )
-
-        # # Recreate table for display
-        # self.setup_table()
+            if state.current_rpos >= len(state.rows):
+                state.done = True
 
         # Show next confirmation
         self.show_next_replace_confirmation()
