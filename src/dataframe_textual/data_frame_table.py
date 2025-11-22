@@ -3006,7 +3006,7 @@ class DataFrameTable(DataTable):
         ]
 
         # Add to history
-        self.add_history("Filtered to selections and matches")
+        self.add_history("Filtered to selections and matches", dirty=True)
 
         # Apply filter to dataframe with row indices
         df_filtered = self.df.with_row_index(RIDX).filter(filter_expr)
@@ -3109,13 +3109,18 @@ class DataFrameTable(DataTable):
         if False in self.visible_rows:
             lf = lf.filter(self.visible_rows)
 
+        if isinstance(expr, (list, pl.Series)):
+            expr_str = str(list(expr)[:10]) + ("..." if len(expr) > 10 else "")
+        else:
+            expr_str = str(expr)
+
         # Apply the filter expression
         try:
             df_filtered = lf.filter(expr).collect()
         except Exception as e:
             self.histories.pop()  # Remove last history entry
-            self.notify(f"Error applying filter [$error]{expr}[/]", title="Filter", severity="error")
-            self.log(f"Error applying filter `{expr}`: {str(e)}")
+            self.notify(f"Error applying filter [$error]{expr_str}[/]", title="Filter", severity="error")
+            self.log(f"Error applying filter `{expr_str}`: {str(e)}")
             return
 
         matched_count = len(df_filtered)
@@ -3124,7 +3129,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self.add_history(f"Filtered by expression [$success]{expr}[/]")
+        self.add_history(f"Filtered by expression [$success]{expr_str}[/]", dirty=True)
 
         # Mark unfiltered rows as invisible
         filtered_row_indices = set(df_filtered[RIDX].to_list())
