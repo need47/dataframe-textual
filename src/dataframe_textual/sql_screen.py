@@ -157,11 +157,8 @@ class SimpleSqlScreen(SqlScreen):
         """
         super().__init__(
             dftable,
-            on_yes_callback=self._handle_simple,
-            on_maybe_callback=partial(
-                self._handle_simple,
-                view=False,
-            ),
+            on_yes_callback=self.handle_simple,
+            on_maybe_callback=partial(self.handle_simple, view=False),
         )
 
     def compose(self) -> ComposeResult:
@@ -177,7 +174,7 @@ class SimpleSqlScreen(SqlScreen):
             yield Input(placeholder="e.g., age > 30 and height < 180", id="where-input")
             yield from super().compose()
 
-    def _handle_simple(self, view: bool = True) -> None:
+    def handle_simple(self, view: bool = True) -> None:
         """Handle Yes button/Enter key press."""
         selections = self.query_one(SelectionList).selected
         if not selections:
@@ -221,8 +218,8 @@ class AdvancedSqlScreen(SqlScreen):
         """
         super().__init__(
             dftable,
-            on_yes_callback=self._handle_advanced,
-            on_maybe_callback=partial(self._handle_advanced, view=False),
+            on_yes_callback=self.handle_advanced,
+            on_maybe_callback=partial(self.handle_advanced, view=False),
         )
 
     def compose(self) -> ComposeResult:
@@ -236,6 +233,6 @@ class AdvancedSqlScreen(SqlScreen):
             )
             yield from super().compose()
 
-    def _handle_advanced(self, view: bool = True) -> None:
+    def handle_advanced(self, view: bool = True) -> None:
         """Handle Yes button/Enter key press."""
         return self.query_one(TextArea).text.strip(), view

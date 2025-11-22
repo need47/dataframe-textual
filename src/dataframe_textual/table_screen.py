@@ -202,17 +202,17 @@ class RowDetailScreen(TableScreen):
             event: The key event object.
         """
         if event.key == "v":
-            # Filter the main table by the selected value
+            # View the main table by the selected value
             self.filter_or_view_selected_value(self.get_cidx_name_value(), action="view")
             event.stop()
         elif event.key == "quotation_mark":  # '"'
-            # Highlight the main table by the selected value
+            # Filter the main table by the selected value
             self.filter_or_view_selected_value(self.get_cidx_name_value(), action="filter")
             event.stop()
         elif event.key == "comma":
             event.stop()
 
-    def get_cidx_name_value(self) -> tuple[str, Any] | None:
+    def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
         cidx = self.table.cursor_row
         if cidx >= len(self.df.columns):
             return None  # Invalid row
@@ -242,14 +242,14 @@ class StatisticsScreen(TableScreen):
 
         if self.col_idx is None:
             # Dataframe statistics
-            self._build_dataframe_stats()
+            self.build_dataframe_stats()
             self.table.cursor_type = "column"
         else:
             # Column statistics
-            self._build_column_stats()
+            self.build_column_stats()
             self.table.cursor_type = "row"
 
-    def _build_column_stats(self) -> None:
+    def build_column_stats(self) -> None:
         """Build statistics for a single column."""
         col_name = self.df.columns[self.col_idx]
         lf = self.df.lazy()
@@ -290,7 +290,7 @@ class StatisticsScreen(TableScreen):
                 Text(value, style=dc.style, justify=dc.justify),
             )
 
-    def _build_dataframe_stats(self) -> None:
+    def build_dataframe_stats(self) -> None:
         """Build statistics for the entire dataframe."""
         lf = self.df.lazy()
 
@@ -367,11 +367,11 @@ class FrequencyScreen(TableScreen):
     def on_key(self, event):
         if event.key == "left_square_bracket":  # '['
             # Sort by current column in ascending order
-            self._sort_by_column(descending=False)
+            self.sort_by_column(descending=False)
             event.stop()
         elif event.key == "right_square_bracket":  # ']'
             # Sort by current column in descending order
-            self._sort_by_column(descending=True)
+            self.sort_by_column(descending=True)
             event.stop()
         elif event.key == "v":
             # Filter the main table by the selected value
@@ -466,7 +466,7 @@ class FrequencyScreen(TableScreen):
             key="total",
         )
 
-    def _sort_by_column(self, descending: bool) -> None:
+    def sort_by_column(self, descending: bool) -> None:
         """Sort the dataframe by the selected column and refresh the main table."""
         row_idx, col_idx = self.table.cursor_coordinate
         col_sort = col_idx if col_idx == 0 else 1
@@ -491,7 +491,7 @@ class FrequencyScreen(TableScreen):
         # order = "desc" if descending else "asc"
         # self.notify(f"Sorted by [on $primary]{col_name}[/] ({order})", title="Sort")
 
-    def get_cidx_name_value(self) -> tuple[str, str] | None:
+    def get_cidx_name_value(self) -> tuple[str, str, str] | None:
         row_idx = self.table.cursor_row
         if row_idx >= len(self.df[:, 0]):  # first column
             return None  # Skip the last `Total` row
