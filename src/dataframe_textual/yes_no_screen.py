@@ -295,17 +295,21 @@ class SaveFileScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SaveFileScreen")
 
-    def __init__(self, title: str, filename: str, all_tabs: bool = False):
+    def __init__(
+        self, filename: str, title: str = "Save to File", all_tabs: bool | None = None, multi_tab: bool = False
+    ):
         super().__init__(
             title=title,
             label="Enter filename",
             input=filename,
             yes="Save",
+            maybe="Save All Tabs" if (all_tabs is None and multi_tab) else None,
             no="Cancel",
             on_yes_callback=self.handle_save,
+            on_maybe_callback=self.handle_save,
         )
 
-        self.all_tabs = all_tabs
+        self.all_tabs = all_tabs or (all_tabs is None and multi_tab)
 
     def handle_save(self):
         if self.input:

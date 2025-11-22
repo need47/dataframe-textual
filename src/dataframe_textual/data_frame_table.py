@@ -3162,13 +3162,20 @@ class DataFrameTable(DataTable):
         except FileNotFoundError:
             self.notify("Error copying to clipboard", title="Clipboard", severity="error")
 
-    def do_save_to_file(self, title: str = "Save to File", all_tabs=False, task_after_save=None) -> None:
+    def do_save_to_file(
+        self, title: str = "Save to File", all_tabs: bool | None = None, task_after_save: str | None = None
+    ) -> None:
         """Open screen to save file."""
         self._task_after_save = task_after_save
 
-        filename = "all-tabs.xlsx" if all_tabs else str(Path(self.filename).with_stem(self.tabname))
+        multi_tab = len(self.app.tabs) > 1
+        filename = (
+            "all-tabs.xlsx"
+            if all_tabs or (all_tabs is None and multi_tab)
+            else str(Path(self.filename).with_stem(self.tabname))
+        )
         self.app.push_screen(
-            SaveFileScreen(title, filename, all_tabs=all_tabs),
+            SaveFileScreen(filename, title=title, all_tabs=all_tabs, multi_tab=multi_tab),
             callback=self.save_to_file,
         )
 

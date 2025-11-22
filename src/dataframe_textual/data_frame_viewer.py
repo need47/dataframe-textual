@@ -243,7 +243,7 @@ class DataFrameViewer(App):
         Opens the save dialog for the active tab's DataFrameTable to save its data.
         """
         if table := self.get_active_table():
-            table.do_save_to_file(title="Save Current Tab")
+            table.do_save_to_file(title="Save Current Tab", all_tabs=False)
 
     def action_save_all_tabs(self) -> None:
         """Save all open tabs to their respective files.
