@@ -213,13 +213,13 @@ class DataFrameViewer(App):
             self.help_panel = DataFrameHelpPanel()
             self.mount(self.help_panel)
 
-    def action_open_tab(self) -> None:
+    def action_open_file(self) -> None:
         """Open file browser to load a file in a new tab.
 
         Displays the file open dialog for the user to select a file to load
         as a new tab in the interface.
         """
-        self.push_screen(OpenFileScreen(), self.do_open_tab)
+        self.push_screen(OpenFileScreen(), self.do_open_file)
 
     def action_close_tab(self) -> None:
         """Close the current tab.

@@ -940,6 +940,9 @@ class DataFrameTable(DataTable):
             self.fixed_rows = 0
             self.fixed_columns = 0
             self.matches = defaultdict(set)
+            self.histories.clear()
+            self.history = None
+            self.dirty = False
 
         # Lazy load up to INITIAL_BATCH_SIZE visible rows
         stop, visible_count = self.INITIAL_BATCH_SIZE, 0
@@ -1336,7 +1339,6 @@ class DataFrameTable(DataTable):
     def do_reset(self) -> None:
         """Reset the table to the initial state."""
         self.setup_table(reset=True)
-        self.restore_dirty(default=False)
         self.notify("Restored initial state", title="Reset")
 
     def restore_dirty(self, default: bool | None = None) -> None:
