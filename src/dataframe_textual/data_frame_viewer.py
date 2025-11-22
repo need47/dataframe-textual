@@ -370,7 +370,7 @@ class DataFrameViewer(App):
             try:
                 n_tab = 0
                 for source in load_file(filename, prefix_sheet=True):
-                    self.add_tab(source.frame, filename, source.tabname)
+                    self.add_tab(source.frame, filename, source.tabname, after=self.tabbed.active_pane)
                     n_tab += 1
                 # self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open")
             except Exception as e:
@@ -378,7 +378,14 @@ class DataFrameViewer(App):
         else:
             self.notify(f"File does not exist: [$warning]{filename}[/]", title="Open", severity="warning")
 
-    def add_tab(self, df: pl.DataFrame, filename: str, tabname: str) -> None:
+    def add_tab(
+        self,
+        df: pl.DataFrame,
+        filename: str,
+        tabname: str,
+        before: TabPane | str | None = None,
+        after: TabPane | str | None = None,
+    ) -> None:
         """Add new tab for the given DataFrame.
 
         Creates and adds a new tab with the provided DataFrame and configuration.
@@ -404,7 +411,7 @@ class DataFrameViewer(App):
 
         table = DataFrameTable(df, filename, tabname=tabname, zebra_stripes=True, id=tab_idx)
         tab = TabPane(tabname, table, id=tab_idx)
-        self.tabbed.add_pane(tab)
+        self.tabbed.add_pane(tab, before=before, after=after)
         self.tabs[tab] = table
 
         if len(self.tabs) > 1:
