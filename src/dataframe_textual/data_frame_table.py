@@ -1513,7 +1513,7 @@ class DataFrameTable(DataTable):
         old_desc = self.sorted_columns.get(col_name)
 
         # Add to history
-        self.add_history(f"Sorted on column [$success]{col_name}[/]")
+        self.add_history(f"Sorted on column [$success]{col_name}[/]", dirty=True)
         if old_desc is None:
             # Add new column to sort
             self.sorted_columns[col_name] = descending

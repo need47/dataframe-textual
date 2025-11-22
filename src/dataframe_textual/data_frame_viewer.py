@@ -487,16 +487,26 @@ class DataFrameViewer(App):
             def _save_and_quit(result: bool) -> None:
                 if result:
                     self.get_active_table()._save_to_file(task_after_save="quit_app")
+                elif result is None:
+                    # User cancelled - do nothing
+                    return
                 else:
+                    # User wants to discard - quit immediately
                     self.exit()
 
-            tab_list = "\n".join(f"  - {name}" for name in dirty_tabnames)
+            tab_list = "\n".join(f"  - [$warning]{name}[/]" for name in dirty_tabnames)
+            label = (
+                f"The following tabs have unsaved changes:\n\n{tab_list}\n\nSave all changes?"
+                if len(dirty_tabnames) > 1
+                else f"The tab [$warning]{dirty_tabnames[0]}[/] has unsaved changes.\n\nSave changes?"
+            )
             self.push_screen(
                 ConfirmScreen(
-                    "Unsaved Changes",
-                    label=f"The following tabs have unsaved changes:\n\n{tab_list}\n\nSave all changes?",
-                    yes="Save All",
-                    no="Discard All",
+                    "Close All Tabs",
+                    label=label,
+                    yes="Save",
+                    maybe="Discard",
+                    no="Cancel",
                 ),
                 callback=_save_and_quit,
             )
