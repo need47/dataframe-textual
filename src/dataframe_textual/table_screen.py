@@ -97,59 +97,60 @@ class TableScreen(ModalScreen):
             self.build_table()
             event.stop()
 
-    def _filter_or_highlight_selected_value(
-        self, col_name_value: tuple[str, Any] | None, action: str = "filter"
-    ) -> None:
-        """Apply filter or highlight action by the selected value.
+    def filter_or_view_selected_value(self, cidx_name_value: tuple[int, str, Any] | None, action: str = "view") -> None:
+        """Apply filter or view action by the selected value.
 
-        Filters or highlights rows in the main table based on a selected value from
+        Filters or views rows in the main table based on a selected value from
         this table (typically frequency or row detail). Updates the main table's display
         and notifies the user of the action.
 
         Args:
-            col_name_value: Tuple of (column_name, column_value) to filter/highlight by, or None.
-            action: Either "filter" to hide non-matching rows, or "highlight" to select matching rows. Defaults to "filter".
-
-        Returns:
-            None
+            col_name_value: Tuple of (column_name, column_value) to filter/view by, or None.
+            action: Either "filter" to hide non-matching rows, or "view" to show matching rows. Defaults to "view".
         """
-        if col_name_value is None:
+        if cidx_name_value is None:
             return
-        col_name, col_value = col_name_value
+        cidx, col_name, col_value = cidx_name_value
+        self.log(f"Filtering or viewing by {col_name} == {col_value}")
 
         # Handle NULL values
         if col_value == NULL:
             # Create expression for NULL values
             expr = pl.col(col_name).is_null()
-            value_display = "[$success]NULL[/]"
+            value_display = f"[$success]{NULL_DISPLAY}[/]"
         else:
             # Create expression for the selected value
             expr = pl.col(col_name) == col_value
             value_display = f"[$success]{col_value}[/]"
 
-        matched_indices = set(self.dftable.df.with_row_index(RIDX).filter(expr)[RIDX].to_list())
+        df_filtered = self.dftable.df.with_row_index(RIDX).filter(expr)
+        self.log(f"Filtered dataframe has {len(df_filtered)} rows")
+
+        matched_indices = set(df_filtered[RIDX].to_list())
+        if not matched_indices:
+            self.notify(
+                f"No matches found for [$warning]{col_name}[/] == {value_display}",
+                title="No Matches",
+                severity="warning",
+            )
+            return
 
         # Apply the action
         if action == "filter":
-            # Update visible_rows to reflect the filter
-            for i in range(len(self.dftable.visible_rows)):
-                self.dftable.visible_rows[i] = i in matched_indices
-            title = "Filter"
-            message = f"Filtered by [$accent]{col_name}[/] == [$success]{value_display}[/]"
-        else:  # action == "highlight"
-            # Update selected_rows to reflect the highlights
+            # Update selections
             for i in range(len(self.dftable.selected_rows)):
                 self.dftable.selected_rows[i] = i in matched_indices
-            title = "Highlight"
-            message = f"Highlighted [$accent]{col_name}[/] == [$success]{value_display}[/]"
 
-        # Recreate the table display with updated data in the main app
-        self.dftable.setup_table()
+            # Update main table display
+            self.dftable.do_filter_rows()
+
+        else:  # action == "view"
+            # Update visible rows
+            expr = [i in matched_indices for i in range(len(self.dftable.df))]
+            self.dftable.view_rows((expr, cidx, False, True))
 
         # Dismiss the frequency screen
         self.app.pop_screen()
-
-        self.notify(message, title=title)
 
 
 class RowDetailScreen(TableScreen):
@@ -199,30 +200,27 @@ class RowDetailScreen(TableScreen):
 
         Args:
             event: The key event object.
-
-        Returns:
-            None
         """
         if event.key == "v":
             # Filter the main table by the selected value
-            self._filter_or_highlight_selected_value(self._get_col_name_value(), action="filter")
+            self.filter_or_view_selected_value(self.get_cidx_name_value(), action="view")
             event.stop()
         elif event.key == "quotation_mark":  # '"'
             # Highlight the main table by the selected value
-            self._filter_or_highlight_selected_value(self._get_col_name_value(), action="highlight")
+            self.filter_or_view_selected_value(self.get_cidx_name_value(), action="filter")
             event.stop()
         elif event.key == "comma":
             event.stop()
 
-    def _get_col_name_value(self) -> tuple[str, Any] | None:
-        row_idx = self.table.cursor_row
-        if row_idx >= len(self.df.columns):
+    def get_cidx_name_value(self) -> tuple[str, Any] | None:
+        cidx = self.table.cursor_row
+        if cidx >= len(self.df.columns):
             return None  # Invalid row
 
-        col_name = self.df.columns[row_idx]
-        col_value = self.df.item(self.ridx, row_idx)
+        col_name = self.df.columns[cidx]
+        col_value = self.df.item(self.ridx, cidx)
 
-        return col_name, col_value
+        return cidx, col_name, col_value
 
 
 class StatisticsScreen(TableScreen):
@@ -351,16 +349,16 @@ class FrequencyScreen(TableScreen):
 
     CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "FrequencyScreen")
 
-    def __init__(self, col_idx: int, dftable: "DataFrameTable") -> None:
+    def __init__(self, cidx: int, dftable: "DataFrameTable") -> None:
         super().__init__(dftable)
-        self.col_idx = col_idx
+        self.cidx = cidx
         self.sorted_columns = {
             1: True,  # Count
         }
 
         df = dftable.df.filter(dftable.visible_rows) if False in dftable.visible_rows else dftable.df
         self.total_count = len(df)
-        self.df: pl.DataFrame = df[df.columns[self.col_idx]].value_counts(sort=True).sort("count", descending=True)
+        self.df: pl.DataFrame = df[df.columns[self.cidx]].value_counts(sort=True).sort("count", descending=True)
 
     def on_mount(self) -> None:
         """Create the frequency table."""
@@ -377,11 +375,11 @@ class FrequencyScreen(TableScreen):
             event.stop()
         elif event.key == "v":
             # Filter the main table by the selected value
-            self._filter_or_highlight_selected_value(self._get_col_name_value(), action="filter")
+            self.filter_or_view_selected_value(self.get_cidx_name_value(), action="view")
             event.stop()
         elif event.key == "quotation_mark":  # '"'
             # Highlight the main table by the selected value
-            self._filter_or_highlight_selected_value(self._get_col_name_value(), action="highlight")
+            self.filter_or_view_selected_value(self.get_cidx_name_value(), action="filter")
             event.stop()
 
     def build_table(self) -> None:
@@ -389,8 +387,8 @@ class FrequencyScreen(TableScreen):
         self.table.clear(columns=True)
 
         # Create frequency table
-        column = self.dftable.df.columns[self.col_idx]
-        dtype = self.dftable.df.dtypes[self.col_idx]
+        column = self.dftable.df.columns[self.cidx]
+        dtype = self.dftable.df.dtypes[self.cidx]
         dc = DtypeConfig(dtype)
 
         # Add column headers with sort indicators
@@ -493,15 +491,15 @@ class FrequencyScreen(TableScreen):
         # order = "desc" if descending else "asc"
         # self.notify(f"Sorted by [on $primary]{col_name}[/] ({order})", title="Sort")
 
-    def _get_col_name_value(self) -> tuple[str, str] | None:
+    def get_cidx_name_value(self) -> tuple[str, str] | None:
         row_idx = self.table.cursor_row
         if row_idx >= len(self.df[:, 0]):  # first column
             return None  # Skip the last `Total` row
 
-        col_name = self.dftable.df.columns[self.col_idx]
-        col_dtype = self.dftable.df.dtypes[self.col_idx]
+        col_name = self.dftable.df.columns[self.cidx]
+        col_dtype = self.dftable.df.dtypes[self.cidx]
 
         cell_value = self.table.get_cell_at(Coordinate(row_idx, 0))
         col_value = NULL if cell_value.plain == NULL_DISPLAY else DtypeConfig(col_dtype).convert(cell_value.plain)
 
-        return col_name, col_value
+        return self.cidx, col_name, col_value

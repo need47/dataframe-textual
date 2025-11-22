@@ -916,6 +916,27 @@ class DataFrameTable(DataTable):
         self.check_and_load_more()
 
     # Setup & Loading
+    def reset_df(self, new_df: pl.DataFrame, dirty: bool = True) -> None:
+        """Reset the dataframe to a new one and refresh the table.
+
+        Args:
+            new_df: The new Polars DataFrame to set.
+            dirty: Whether to mark the table as dirty (unsaved changes). Defaults to True.
+        """
+        # Set new dataframe and reset table
+        self.df = new_df
+        self.loaded_rows = 0
+        self.sorted_columns = {}
+        self.hidden_columns = set()
+        self.selected_rows = [False] * len(self.df)
+        self.visible_rows = [True] * len(self.df)
+        self.fixed_rows = 0
+        self.fixed_columns = 0
+        self.matches = defaultdict(set)
+        self.histories.clear()
+        self.history = None
+        self.dirty = dirty  # Mark as dirty since data changed
+
     def setup_table(self, reset: bool = False) -> None:
         """Setup the table for display.
 
@@ -927,18 +948,7 @@ class DataFrameTable(DataTable):
 
         # Reset to original dataframe
         if reset:
-            self.df = self.dataframe
-            self.loaded_rows = 0
-            self.sorted_columns = {}
-            self.hidden_columns = set()
-            self.selected_rows = [False] * len(self.df)
-            self.visible_rows = [True] * len(self.df)
-            self.fixed_rows = 0
-            self.fixed_columns = 0
-            self.matches = defaultdict(set)
-            self.histories.clear()
-            self.history = None
-            self.dirty = False
+            self.reset_df(self.dataframe, dirty=False)
 
         # Lazy load up to INITIAL_BATCH_SIZE visible rows
         stop, visible_count = self.INITIAL_BATCH_SIZE, 0
@@ -3010,20 +3020,15 @@ class DataFrameTable(DataTable):
         # Apply filter to dataframe with row indices
         df_filtered = self.df.with_row_index(RIDX).filter(filter_expr)
 
-        # Update selections and matches
-        self.selected_rows = [self.selected_rows[ridx] for ridx in df_filtered[RIDX]]
-        self.matches = {
-            idx: self.matches[ridx].copy() for idx, ridx in enumerate(df_filtered[RIDX]) if ridx in self.matches
-        }
-
         # Update dataframe
-        self.df = df_filtered.drop(RIDX)
+        self.reset_df(df_filtered.drop(RIDX))
 
         # Recreate table for display
         self.setup_table()
 
         self.notify(
-            f"Removed rows without selections or matches. Now showing [$accent]{len(self.df)}[/] rows", title="Filter"
+            f"Filtered rows with selections or matches and removed others. Now showing [$accent]{len(self.df)}[/] rows",
+            title="Filter",
         )
 
     def do_view_rows(self) -> None:
@@ -3043,7 +3048,8 @@ class DataFrameTable(DataTable):
         # Otherwise, use the current cell value
         else:
             ridx = self.cursor_row_idx
-            term = str(self.df.item(ridx, cidx))
+            value = self.df.item(ridx, cidx)
+            term = NULL if value is None else str(value)
 
         self.view_rows((term, cidx, False, True))
 
@@ -3051,10 +3057,11 @@ class DataFrameTable(DataTable):
         """Open the filter screen to enter an expression."""
         ridx = self.cursor_row_idx
         cidx = self.cursor_col_idx
-        cursor_value = str(self.df.item(ridx, cidx))
+        cursor_value = self.df.item(ridx, cidx)
+        term = NULL if cursor_value is None else str(cursor_value)
 
         self.app.push_screen(
-            FilterScreen(self.df, cidx, cursor_value),
+            FilterScreen(self.df, cidx, term),
             callback=self.view_rows,
         )
 
@@ -3108,10 +3115,7 @@ class DataFrameTable(DataTable):
         if False in self.visible_rows:
             lf = lf.filter(self.visible_rows)
 
-        if isinstance(expr, (list, pl.Series)):
-            expr_str = str(list(expr)[:10]) + ("..." if len(expr) > 10 else "")
-        else:
-            expr_str = str(expr)
+        expr_str = "boolean list or series" if isinstance(expr, (list, pl.Series)) else str(expr)
 
         # Apply the filter expression
         try:
@@ -3128,7 +3132,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self.add_history(f"Filtered by expression [$success]{expr_str}[/]", dirty=True)
+        self.add_history(f"Filtered by expression [$success]{expr_str}[/]")
 
         # Mark unfiltered rows as invisible
         filtered_row_indices = set(df_filtered[RIDX].to_list())

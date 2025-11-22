@@ -494,13 +494,13 @@ class FilterScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "FilterScreen")
 
-    def __init__(self, df: pl.DataFrame, cidx: int, input_value: str | None = None):
+    def __init__(self, df: pl.DataFrame, cidx: int, term: str | None = None):
         self.df = df
         self.cidx = cidx
         super().__init__(
             title="Filter by Expression",
             label="e.g., NULL, $1 > 50, $name == 'text', $_ > 100, $a < $b, $_.str.contains('sub')",
-            input=input_value,
+            input=term,
             checkbox="Match Nocase",
             checkbox2="Match Whole",
             on_yes_callback=self._get_input,
