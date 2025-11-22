@@ -558,17 +558,13 @@ class DataFrameTable(DataTable):
         if old_dirty == new_dirty:
             return  # No change
 
-        # Find the parent TabPane
-        for tab_pane in self.app.tabs:
-            if tab_pane.id == self.id:
-                tab_pane = tab_pane
-
-                if new_dirty:
-                    tab_pane.add_class("dirty")
-                else:
-                    tab_pane.remove_class("dirty")
-
-                break
+        # Find the corresponding ContentTab
+        content_tab = self.app.query_one(f"#--content-tab-{self.id}")
+        if content_tab:
+            if new_dirty:
+                content_tab.add_class("dirty")
+            else:
+                content_tab.remove_class("dirty")
 
     def move_cursor_to(self, ridx: int, cidx: int) -> None:
         """Move cursor based on the dataframe indices.

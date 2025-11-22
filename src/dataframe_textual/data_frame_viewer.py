@@ -78,8 +78,8 @@ class DataFrameViewer(App):
         ContentTab.-active {
             background: $block-cursor-background; /* Same as underline */
         }
-        TabPane.dirty {
-            border-bottom: heavy $warning;
+        ContentTab.dirty {
+            background: $warning-darken-3;
         }
     """
 
