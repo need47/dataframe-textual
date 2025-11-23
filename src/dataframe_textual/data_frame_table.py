@@ -952,7 +952,7 @@ class DataFrameTable(DataTable):
             self.reset_df(self.dataframe, dirty=False)
 
         # Lazy load up to INITIAL_BATCH_SIZE visible rows
-        stop, visible_count = self.INITIAL_BATCH_SIZE, 0
+        stop, visible_count, row_idx = self.INITIAL_BATCH_SIZE, 0, 0
         for row_idx, visible in enumerate(self.visible_rows):
             if not visible:
                 continue
@@ -3006,17 +3006,29 @@ class DataFrameTable(DataTable):
 
     # Filter & View
     def do_filter_rows(self) -> None:
-        """Keep only the rows with selections and matches, and remove others."""
-        if not any(self.selected_rows) and not self.matches:
-            self.notify("No rows to filter", title="Filter", severity="warning")
-            return
+        """Keep only the rows with selections and cell matches, and remove others."""
+        if any(self.selected_rows) or self.matches:
+            message = "Filter to rows with selection and cell matches (other rows removed)"
+            filter_expr = [
+                True if (selected or ridx in self.matches) else False
+                for ridx, selected in enumerate(self.selected_rows)
+            ]
+        else:  # Search cursor value in current column
+            message = "Filter to rows matching cursor value (other rows removed)"
+            ridx = self.cursor_row_idx
+            cidx = self.cursor_col_idx
+            value = self.df.item(ridx, cidx)
 
-        filter_expr = [
-            True if (selected or ridx in self.matches) else False for ridx, selected in enumerate(self.selected_rows)
-        ]
+            col_name = self.df.columns[cidx]
+            if value is None:
+                filter_expr = pl.col(col_name).is_null()
+            else:
+                filter_expr = pl.col(col_name) == value
+
+        self.log(f"Applying filter expression: {filter_expr}, col_name: {col_name}, value: {repr(value)}")
 
         # Add to history
-        self.add_history("Filtered to selections and matches", dirty=True)
+        self.add_history(message, dirty=True)
 
         # Apply filter to dataframe with row indices
         df_filtered = self.df.with_row_index(RIDX).filter(filter_expr)
@@ -3027,10 +3039,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        self.notify(
-            f"Filtered rows with selections or matches and removed others. Now showing [$accent]{len(self.df)}[/] rows",
-            title="Filter",
-        )
+        self.notify(f"{message}. Now showing [$accent]{len(self.df)}[/] rows", title="Filter")
 
     def do_view_rows(self) -> None:
         """View rows.
