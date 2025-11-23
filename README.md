@@ -23,8 +23,8 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/J
 ### Advanced Features
 - 📂 **Multi-File Support** - Open multiple files in separate tabs
 - 🔄 **Tab Management** - Seamlessly switch between open files with keyboard shortcuts
-- � **Duplicate Tab** - Create a copy of the current tab with the same data
-- �📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
+- 📑 **Duplicate Tab** - Create a copy of the current tab with the same data
+- 📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
 - 🎯 **Cursor Type Cycling** - Switch between cell, row, and column selection modes
 - 🔗 **Link Column Creation** - Generate clickable URLs using template expressions with placeholder support
 
@@ -44,7 +44,7 @@ This installs an executable `dv`.
 
 Then run:
 ```bash
-dv <csv_file>
+dv <file>
 ```
 
 ### Using [uv](https://docs.astral.sh/uv/)
@@ -58,7 +58,7 @@ cd dataframe-textual
 uv sync --extra excel  # with Excel support
 
 # Run directly with uv
-uv run dv <csv_file>
+uv run dv <file>
 ```
 
 ### Development installation
@@ -83,8 +83,8 @@ pip install -e ".[excel,dev]"
 # After pip install dataframe-textual
 dv pokemon.csv
 
-# Or if running from source
-python main.py pokemon.csv
+# Or run from module
+python -m dataframe-textual pokemon.csv
 
 # Or with uv
 uv run python main.py pokemon.csv
@@ -114,22 +114,23 @@ dv data1.tsv < data2.tsv
 ```
 
 When multiple files are opened:
-- Each file appears as a separate tab
-- Switch between tabs using `>` (next) or `<` (previous), or use `b` for cycling tabs
-- Save current tab or all tabs with `Ctrl+S`
+- Each file appears as a separate tab. An Excel file may contain multiple tabs.
+- Switch between tabs using `>` (next) or `<` (previous), or use `b` for cycling through tabs
+- Save current tab to file with `Ctrl+T`
+- Save all tabs to file with `Ctrl+A`
 - Duplicate the current tab with `Ctrl+D`
 - Open additional files with `Ctrl+O`
-- Each file maintains its own state (edits, sort order, selections, history, etc.)
+- Each file maintains its own state (edits, sort order, selections, history, etc.) and allow undo/redo.
 
 ## Command Line Options
 
 ```
 usage: dv [-h] [-f {csv,excel,tsv,parquet,json,ndjson}] [-H] [-I] [-E] [-c COMMENT_PREFIX] [-q QUOTE_CHAR] [-l SKIP_LINES] [-a SKIP_ROWS_AFTER_HEADER] [-n NULL [NULL ...]] [files ...]
 
-Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).
+Interactive terminal based viewer/editor for tabular data (e.g., CSV/TSV/Excel).
 
 positional arguments:
-  files                 Files to view (or read from stdin)
+  files                 Input files (or read from stdin)
 
 options:
   -h, --help            show this help message and exit
@@ -141,7 +142,7 @@ options:
   -c, --comment-prefix COMMENT_PREFIX
                         Comment lines are skipped when reading CSV/TSV (default: skip none)
   -q, --quote-char QUOTE_CHAR
-                        Quote character for reading CSV/TSV (default: "; use None to disable)
+                        Quote character for reading CSV/TSV (default: "; use -q without argument value to disable)
   -l, --skip-lines SKIP_LINES
                         Skip lines when reading CSV/TSV (default: 0)
   -a, --skip-rows-after-header SKIP_ROWS_AFTER_HEADER
@@ -168,7 +169,7 @@ dv -l 3 data_with_meta.csv
 # Skip 1 row after header (e.g., units row)
 dv -a 1 data_with_units.csv
 
-# CSV with comment lines
+# Skip comment lines
 dv -c "#" commented_data.csv
 
 # Treat specific values as null/missing (e.g., 'NA', 'N/A', '-')
@@ -202,18 +203,19 @@ zcat compressed_data.csv.gz | dv -f csv
 | `B` | Toggle tab bar visibility |
 | `q` | Close current tab (prompts to save unsaved changes) |
 | `Q` | Close all tabs and app (prompts to save unsaved changes) |
-| `Ctrl+Q` | Force to quit app (regardless off unsaved changes) |
-| `Ctrl+S` | Save current tab or all tabs to file |
+| `Ctrl+Q` | Force to quit app (regardless of unsaved changes) |
+| `Ctrl+T` | Save current tab to file |
+| `Ctrl+A` | Save all tabs to file |
 | `Ctrl+D` | Duplicate current tab |
 | `Ctrl+O` | Open file in a new tab |
-| `Double-click tab` | Rename current tab |
+| `Double-click tab` | Rename tab |
 
 #### View & Settings
 
 | Key | Action |
 |-----|--------|
 | `F1` | Toggle help panel |
-| `k` | Cycle through themes |
+| `k` | Cycle through dark, light and other themes |
 
 ---
 
@@ -230,10 +232,12 @@ zcat compressed_data.csv.gz | dv -f csv
 | `Home` / `End` | Jump to first/last column |
 | `Ctrl + Home` / `Ctrl + End` | Jump to page top/bottom |
 | `PageDown` / `PageUp` | Scroll down/up one page |
-| `Ctrl+F` | Page down |
-| `Ctrl+B` | Page up |
+| `Ctrl+F` | Page forward |
+| `Ctrl+B` | Page backforward |
 
 #### Undo/Redo/Reset
+| Key | Action |
+|-----|--------|
 | `u` | Undo last action |
 | `U` | Redo last undone action |
 | `Ctrl+U` | Reset to initial state |
@@ -242,7 +246,7 @@ zcat compressed_data.csv.gz | dv -f csv
 
 | Key | Action |
 |-----|--------|
-| `Enter` | Record view of current row |
+| `Enter` | Record view of current row transposed |
 | `F` | Show frequency distribution for current column |
 | `s` | Show statistics for current column |
 | `S` | Show statistics for entire dataframe |
@@ -251,6 +255,8 @@ zcat compressed_data.csv.gz | dv -f csv
 | `_` (underscore) | Expand column to full width |
 | `z` | Freeze rows and columns |
 | `,` | Toggle thousand separator for numeric display |
+| `h` | Hide current column |
+| `H` | Show all hidden rows/columns |
 
 #### Data Editing
 
@@ -259,37 +265,35 @@ zcat compressed_data.csv.gz | dv -f csv
 | `Double-click` | Edit cell or rename column header |
 | `delete` | Clear current cell (set to NULL) |
 | `e` | Edit current cell (respects data type) |
-| `E` | Edit entire column with expression |
+| `E` | Edit entire column with value/expression |
 | `a` | Add empty column after current |
 | `A` | Add column with name and value/expression |
-| `@` | Add a link column from template |
+| `@` | Add a link column from URL template |
 | `-` (minus) | Delete current column |
 | `x` | Delete current row |
 | `X` | Delete current row and all those below |
 | `Ctrl+X` | Delete current row and all those above |
 | `d` | Duplicate current column (appends '_copy' suffix) |
 | `D` | Duplicate current row |
-| `h` | Hide current column |
-| `H` | Show all hidden rows/columns |
 
 #### Searching & Filtering
 
 | Key | Action |
 |-----|--------|
-| `\` | Search in current column using cursor value and select rows |
-| `\|` (pipe) | Search in current column with expression and select rows |
+| `\` | Search in current column using cursor value and select matching rows |
+| `\|` (pipe) | Search in current column with expression and select matching rows |
 | `{` | Go to previous selected row |
 | `}` | Go to next selected row |
-| `/` | Find in current column with cursor value and highlight matches |
-| `?` | Find in current column with expression and highlight matches |
-| `n` | Go to next match |
-| `N` | Go to previous match |
+| `/` | Find in current column with cursor value and highlight matching cells |
+| `?` | Find in current column with expression and highlight matching cells |
+| `n` | Go to next matching cell |
+| `N` | Go to previous matching cell |
 | `'` | Select/deselect current row |
-| `t` | Toggle selected rows (invßert) |
-| `T` | Clear all selected rows and/or matches |
-| `"` (quote) | Filter to selected rows and remove others |
-| `v` | View only rows (and hide others) by selected rows and/or matches or cursor value |
-| `V` | View only rows (and hide others) by expression |
+| `t` | Toggle row selections (invert) |
+| `T` | Clear all row selections and/or cell matches |
+| `"` (quote) | Filter to selected rows (and remove others) |
+| `v` | View rows (and hide others) by row selections and/or cell matches or cursor value |
+| `V` | View rows (and hide others) by expression |
 
 #### SQL Interface
 
@@ -307,7 +311,7 @@ zcat compressed_data.csv.gz | dv -f csv
 | `r` | Find and replace in current column (interactive or replace all) |
 | `R` | Find and replace across all columns (interactive or replace all) |
 
-#### Sorting
+#### Sorting (supporting multiple columns)
 
 | Key | Action |
 |-----|--------|
@@ -347,10 +351,10 @@ zcat compressed_data.csv.gz | dv -f csv
 
 Columns are automatically styled based on their data type:
 - **integer**: Cyan text, right-aligned
-- **float**: Magenta text, right-aligned
+- **float**: Yellow text, right-aligned
 - **string**: Green text, left-aligned
 - **boolean**: Blue text, centered
-- **temporal**: Yellow text, centered
+- **temporal**: Magenta text, centered
 
 ### 2. Row Detail View
 
@@ -367,28 +371,28 @@ Useful for examining wide datasets where columns don't fit well on screen.
 The application provides multiple search modes for different use cases:
 
 **Search Operations** - Search by value/expression in current column and select rows:
-- **`\` - Column Cursor Search**: Search cursor value
-- **`|` - Column Expression Search**: Opens dialog to search with custom expression
+- `\` - Search cursor value
+- `|` - Opens dialog to search with custom expression
 
-**Find Operations** - Find by value/expression and highlight matches:
-- **`/` - Column Find**: Find cursor value within current column
-- **`?` - Column Expression Find**: Open dialog to search current column with expression
-- **`;` - Global Find**: Find cursor value across all columns
-- **`:` - Global Expression Find**: Open dialog to search all columns with expression
+**Find Operations** - Find by value/expression and highlight matching cells:
+- `/` - Find cursor value within current column
+- `?` - Open dialog to search current column with expression
+- `;` - Find cursor value across all columns
+- `:` - Open dialog to search all columns with expression
 
 **Selection & Filtering**:
-- **`'` - Toggle Row Selection**: Select/deselect current row (marks it for filtering or viewing)
-- **`t` - Invert Selections**: Flip selections of all rows
-- **`T` - Clear Selections**: Remove all row selections and matches
-- **`"` - Filter Selected**: View only the selected rows (others removed)
-- **`v` - View by Value**: View rows by selected rows or cursor value (others hidden but preserved)
-- **`V` - View by Expression**: View rows using custom expression (others hidden but preserved)
+- `'` - Select/deselect current row (marks it for filtering or viewing)
+- `t` - Flip selections of all rows
+- `T` - Clear all row selections and cell matches
+- `"` - View only the selected rows and (others removed)
+- `v` - View rows by selected rows or cursor value (others hidden but preserved)
+- `V` - View rows using custom expression (others hidden but preserved)
 
 **Advanced Matching Options**:
 
 When searching or finding, you can use checkboxes in the dialog to enable:
-- **Match Nocase**: Ignore case differences (e.g., "john", "John", "JOHN" all match)
-- **Match Whole**: Match complete value, not partial substrings or words (e.g., "cat" won't match in "catfish")
+- **Match Nocase**: Ignore case differences
+- **Match Whole**: Match complete value, not partial substrings or words
 
 These options work with plain text searches. Use Polars regex patterns in expressions for more control:
 - **Case-insensitive matching in expressions**: Use `(?i)` prefix in regex (e.g., `(?i)john`)
@@ -400,13 +404,13 @@ These options work with plain text searches. Use Polars regex patterns in expres
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 - Use `u` to undo any search or filter
 
-### 3b. Find & Replace
+### 4. Find & Replace
 
 The application provides powerful find and replace functionality for both single-column and global replacements.
 
 **Replace Operations**:
-- **`r` - Column Replace**: Replace values in the current column
-- **`R` - Global Replace**: Replace values across all columns
+- `r` - Replace values in the current column
+- `R` - Replace values across all columns
 
 **How It Works:**
 
@@ -426,7 +430,7 @@ When you press `r` or `R`, a dialog opens where you can enter:
 - Full undo support with `u`
 - Useful for bulk replacements when you're confident about the change
 
-**Replace Interactive** (`r` or `R` → Choose "Replace Interactive"):
+**Replace Interactive** (`r` or `R` → Choose "Replace"):
 - Shows each match one at a time with a preview of the replacement
 - For each match, press:
   - `Enter` or press the `Yes` button - **Replace this occurrence** and move to next
@@ -459,7 +463,7 @@ When you press `r` or `R`, a dialog opens where you can enter:
 - For complex replacements, use Polars expressions or regex patterns in the find term
 - Test with a small dataset first before large replacements
 
-### 4. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
+### 5. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
 
 Complex values or filters can be specified via Polars expressions, with the following adaptions for convenience:
 
@@ -513,14 +517,14 @@ Complex values or filters can be specified via Polars expressions, with the foll
 - Use column names that match exactly (case-sensitive)
 - Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
 
-### 5. Sorting
+### 6. Sorting
 
 - Press `[` to sort current column ascending
 - Press `]` to sort current column descending
 - Multi-column sorting supported (press multiple times on different columns)
 - Press same key twice to remove the column from sorting
 
-### 6. Frequency Distribution
+### 7. Frequency Distribution
 
 Press `F` to see value distributions of the current column. The modal shows:
 - Value, Count, Percentage, Histogram
@@ -538,7 +542,7 @@ This is useful for:
 - Identifying rare or common values
 - Finding the most/least frequent entries
 
-### 7. Column & Dataframe Statistics
+### 8. Column & Dataframe Statistics
 
 Press `s` to see summary statistics for the current column, or press `S` for statistics across the entire dataframe.
 
@@ -562,7 +566,7 @@ This is useful for:
 - Quick statistical summaries without external tools
 - Comparing statistics across columns
 
-### 8. Data Editing
+### 9. Data Editing
 
 **Edit Cell** (`e` or **Double-click**):
 - Opens modal for editing current cell
@@ -586,7 +590,7 @@ This is useful for:
 **Delete Column** (`-`):
 - Removes the entire column from display and dataframe
 
-### 9. Hide & Show Columns
+### 10. Hide & Show Columns
 
 **Hide Column** (`h`):
 - Temporarily hides the current column from display
@@ -596,7 +600,7 @@ This is useful for:
 **Show Hidden Rows/Columns** (`H`):
 - Restores all previously hidden rows/columns to the display
 
-### 10. Duplicate Column
+### 11. Duplicate Column
 
 Press `d` to duplicate the current column:
 - Creates a new column immediately after the current column
@@ -609,7 +613,7 @@ This is useful for:
 - Working with alternative versions of column data
 - Comparing original vs. processed column values side-by-side
 
-### 11. Duplicate Row
+### 12. Duplicate Row
 
 Press `D` to duplicate the current row:
 - Creates a new row immediately after the current row
@@ -620,7 +624,7 @@ This is useful for:
 - Creating variations of existing data records
 - Batch adding similar rows with modifications
 
-### 12. Column & Row Reordering
+### 13. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
 - Swaps adjacent columns
@@ -630,12 +634,12 @@ This is useful for:
 - Swaps adjacent rows
 - Reorder is preserved when saving
 
-### 13. Freeze Rows and Columns
+### 14. Freeze Rows and Columns
 
 Press `z` to open the dialog:
 - Enter number of fixed rows and/or columns to keep top rows/columns visible while scrolling
 
-### 13.5. Thousand Separator Toggle
+### 14.5. Thousand Separator Toggle
 
 Press `,` to toggle thousand separator formatting for numeric data:
 - Applies to **integer** and **float** columns
@@ -645,14 +649,14 @@ Press `,` to toggle thousand separator formatting for numeric data:
 - Display-only: does not modify underlying data in the dataframe
 - State persists during the session
 
-### 14. Save File
+### 15. Save File
 
 Press `Ctrl+S` to save:
 - Save filtered, edited, or sorted data back to file
 - Choose filename in modal dialog
 - Confirm if file already exists
 
-### 15. Undo/Redo/Reset
+### 16. Undo/Redo/Reset
 
 **Undo** (`u`):
 - Reverts last action with full state restoration
@@ -670,7 +674,7 @@ Press `Ctrl+S` to save:
 - Clears all edits, deletions, selections, filters, and sorts
 - Useful for starting fresh without reloading the file
 
-### 16. Column Type Conversion
+### 17. Column Type Conversion
 
 Press the type conversion keys to instantly cast the current column to a different data type:
 
@@ -687,14 +691,14 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 **Note**: Type conversion attempts to preserve data where possible. Conversions may lose data (e.g., float to int rounding).
 
-### 17. Cursor Type Cycling
+### 18. Cursor Type Cycling
 
 Press `K` to cycle through selection modes:
 1. **Cell mode**: Highlight individual cell (and its row/column headers)
 2. **Row mode**: Highlight entire row
 3. **Column mode**: Highlight entire column
 
-### 18. SQL Interface
+### 19. SQL Interface
 
 The SQL interface provides two modes for querying your dataframe:
 
@@ -728,7 +732,7 @@ FROM self
 WHERE (age > 25 AND salary > 50000) OR department = 'Management'
 ```
 
-### 19. Clipboard Operations
+### 20. Clipboard Operations
 
 Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux
 **Note** May require a X server to work
@@ -738,7 +742,7 @@ Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux
 - Press `Ctrl+R` to copy row values (delimited by tab)
 - Hold `Shift` to select with mouse
 
-### 20. Link Column Creation
+### 21. Link Column Creation
 
 Press `@` to create a new column containing dynamically generated URLs using template.
 
@@ -765,7 +769,7 @@ The link template supports multiple placeholder types for maximum flexibility:
 - Use full undo (`u`) if template produces unexpected URLs
 - For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
 
-### 21. Tab Management
+### 22. Tab Management
 
 Manage multiple files and dataframes simultaneously with tabs.
 
@@ -777,17 +781,14 @@ Manage multiple files and dataframes simultaneously with tabs.
 - **`B`** - Toggle tab bar visibility
 - **`Double-click tab`** - Rename the tab
 - **`Ctrl+D`** - Duplicate current tab (creates a copy with same data and state)
-- **`Ctrl+S`** - Save current tab to file or all tabs in a single Excel file
+- **`Ctrl+T`** - Save current tab to file
+- **`Ctrl+A`** - Save all tabs in a single Excel file
 - **`q`** - Close current tab (closes tab, prompts to save if unsaved changes)
 - **`Q`** - Close all tabs and exit app (prompts to save tabs with unsaved changes)
 - **`Ctrl+Q`** - Force to quit app regardless of unsaved changes
 
-**Tab Operations:**
-
-**Saving & Quitting:**
-
 **Tips:**
-- Tabs with unsaved changes are highlighted with a bright border
+- Tabs with unsaved changes are indicated with a bright background
 - Closing or quitting a tab with unsaved changes triggers a save prompt
 
 ## Dependencies

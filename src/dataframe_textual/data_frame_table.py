@@ -29,6 +29,7 @@ from .common import (
     NULL_DISPLAY,
     RIDX,
     SUBSCRIPT_DIGITS,
+    SUPPORTED_FORMATS,
     DtypeConfig,
     format_row,
     get_next_item,
@@ -3221,24 +3222,39 @@ class DataFrameTable(DataTable):
         """Actually save the dataframe to a file."""
         filepath = Path(filename)
         ext = filepath.suffix.lower()
+        if ext.endswith(".gz"):
+            ext = Path(filename).with_suffix("").suffix.lower()
+
+        fmt = ext.removeprefix(".")
+        if fmt not in SUPPORTED_FORMATS:
+            self.notify(
+                f"Unsupported file format [$warning]{fmt}[/]. Use [$accent]CSV[/] as fallback. Supported formats: {', '.join(SUPPORTED_FORMATS)}",
+                title="Save to File",
+                severity="warning",
+            )
+            fmt = "csv"
 
         # Add to history
         self.add_history(f"Saved dataframe to [$success]{filename}[/]")
 
         try:
-            if ext in (".xlsx", ".xls"):
-                self.save_excel(filename)
-            elif ext in (".tsv", ".tab"):
+            if fmt == "csv":
+                self.df.write_csv(filename)
+            elif fmt in ("tsv", "tab"):
                 self.df.write_csv(filename, separator="\t")
-            elif ext == ".json":
+            elif fmt in ("xlsx", "xls"):
+                self.save_excel(filename)
+            elif fmt == "json":
                 self.df.write_json(filename)
-            elif ext == ".parquet":
+            elif fmt == "ndjson":
+                self.df.write_ndjson(filename)
+            elif fmt == "parquet":
                 self.df.write_parquet(filename)
-            else:
+            else:  # Fallback to CSV
                 self.df.write_csv(filename)
 
-            self.dataframe = self.df  # Update original dataframe
-            self.filename = filename  # Update current filename
+            # Update current filename
+            self.filename = filename
 
             # Reset dirty flag after save
             if self._all_tabs:

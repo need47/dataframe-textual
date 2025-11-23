@@ -12,7 +12,7 @@ import polars as pl
 from rich.text import Text
 
 # Supported file formats
-SUPPORTED_FORMATS = {"tsv", "csv", "excel", "xlsx", "xls", "parquet", "json", "ndjson"}
+SUPPORTED_FORMATS = {"tsv", "tab", "csv", "excel", "xlsx", "xls", "parquet", "json", "ndjson"}
 
 
 # Boolean string mappings

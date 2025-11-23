@@ -36,7 +36,7 @@ class DataFrameViewer(App):
         - **Ctrl+A** - 💾 Save all tabs to file
         - **Ctrl+D** - 📋 Duplicate current tab
         - **Ctrl+O** - 📁 Open a file
-        - **Double-click tab** - ✏️ Rename current tab
+        - **Double-click tab** - ✏️ Rename tab
 
         ## 🎨 View & Settings
         - **F1** - ❓ Toggle this help panel
