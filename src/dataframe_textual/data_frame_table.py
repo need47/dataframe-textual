@@ -417,7 +417,7 @@ class DataFrameTable(DataTable):
         Returns:
             bool: True if there are hidden rows, False otherwise.
         """
-        return any(v for v in self.visible_rows if v is False)
+        return any(1 for v in self.visible_rows if v is False)
 
     @property
     def ordered_selected_rows(self) -> list[int]:
@@ -2385,7 +2385,6 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-    # Selection & Match
     def do_toggle_selections(self) -> None:
         """Toggle selected rows highlighting on/off."""
         # Add to history
@@ -3002,7 +3001,6 @@ class DataFrameTable(DataTable):
         self.show_next_replace_confirmation()
 
     # View & Filter
-
     def do_view_rows(self) -> None:
         """View rows.
 
@@ -3127,18 +3125,17 @@ class DataFrameTable(DataTable):
     def do_filter_rows(self) -> None:
         """Keep only the rows with selections and cell matches, and remove others."""
         if any(self.selected_rows) or self.matches:
-            message = "Filter to rows with selection and cell matches (other rows removed)"
+            message = "Filtered to rows with selection and cell matches (other rows removed)"
             filter_expr = [
                 True if (selected or ridx in self.matches) else False
                 for ridx, selected in enumerate(self.selected_rows)
             ]
         else:  # Search cursor value in current column
-            message = "Filter to rows matching cursor value (other rows removed)"
-            ridx = self.cursor_row_idx
+            message = "Filtered to rows matching cursor value (other rows removed)"
             cidx = self.cursor_col_idx
-            value = self.df.item(ridx, cidx)
-
             col_name = self.df.columns[cidx]
+            value = self.cursor_value
+
             if value is None:
                 filter_expr = pl.col(col_name).is_null()
             else:
@@ -3392,9 +3389,18 @@ class DataFrameTable(DataTable):
                         col_name for col_name in self.df.columns if col_name not in filtered_col_names
                     }
             else:  # filter - modify the dataframe
-                self.df = df_filtered.drop(RIDX)
-                self.visible_rows = [True] * len(self.df)
-                self.hidden_columns.clear()
+                # Update selected rows
+                selected_rows = [self.selected_rows[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))]
+
+                # Update matches
+                matches = {ridx: self.matches[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))}
+
+                # Update dataframe
+                self.reset_df(df_filtered.drop(RIDX))
+
+                # Restore selected rows and matches
+                self.selected_rows = selected_rows
+                self.matches = matches
         except Exception as e:
             self.notify(f"Error executing SQL query [$error]{sql}[/]", title="SQL Query", severity="error", timeout=10)
             self.log(f"Error executing SQL query `{sql}`: {str(e)}")
