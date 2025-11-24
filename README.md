@@ -137,7 +137,7 @@ options:
   -f, --format {csv,excel,tsv,parquet,json,ndjson}
                         Specify the format of the input files
   -H, --no-header       Specify that input files have no header row
-  -I, --no-inferrence   Do not infer data types when reading CSV/TSV
+  -I, --no-inference   Do not infer data types when reading CSV/TSV
   -E, --ignore-errors   Ignore errors when reading CSV/TSV
   -c, --comment-prefix COMMENT_PREFIX
                         Comment lines are skipped when reading CSV/TSV (default: skip none)
@@ -208,7 +208,7 @@ zcat compressed_data.csv.gz | dv -f csv
 | `Ctrl+A` | Save all tabs to file |
 | `Ctrl+D` | Duplicate current tab |
 | `Ctrl+O` | Open file in a new tab |
-| `Double-click tab` | Rename tab |
+| `Double-click` | Rename tab |
 
 #### View & Settings
 
@@ -366,16 +366,16 @@ Useful for examining wide datasets where columns don't fit well on screen.
 - Press `"` to **filter** all rows containing the selected column value (and remove others)
 - Press `q` or `Escape` to close the modal
 
-### 3. Search & Select/Highlight
+### 3. Search & Find
 
 The application provides multiple search modes for different use cases:
 
 **Search Operations** - Search by value/expression in current column and select rows:
-- `\` - Search cursor value
+- `\` - Search cursor value (respects data type)
 - `|` - Opens dialog to search with custom expression
 
 **Find Operations** - Find by value/expression and highlight matching cells:
-- `/` - Find cursor value within current column
+- `/` - Find cursor value within current column (respects data type)
 - `?` - Open dialog to search current column with expression
 - `;` - Find cursor value across all columns
 - `:` - Open dialog to search all columns with expression
@@ -389,8 +389,8 @@ The application provides multiple search modes for different use cases:
 - `V` - **View** rows using custom expression (others hidden but preserved)
 
 **Note**:
-- The `"` (Filter) and `v`/`V` (View) operations appear similar but have very different effects on your data. See section 3b "Filter vs. View - Understanding the Difference" for detailed guidance on when to use each.
-- If currently there are no selectet rows and no matching cells, the `"` (Filter) and `v` (View) will use cursor value for search.
+- The `"` (Filter) and `v`/`V` (View) operations appear similar but have very different effects on your data. See *section 3.1* to understand the difference.
+- If currently there are no selected rows and no matching cells, the `"` (Filter) and `v` (View) will use cursor value for search.
 
 **Advanced Matching Options**:
 
@@ -398,9 +398,7 @@ When searching or finding, you can use checkboxes in the dialog to enable:
 - **Match Nocase**: Ignore case differences
 - **Match Whole**: Match complete value, not partial substrings or words
 
-These options work with plain text searches. Use Polars regex patterns in expressions for more control:
-- **Case-insensitive matching in expressions**: Use `(?i)` prefix in regex (e.g., `(?i)john`)
-- **Word boundaries in expressions**: Use `\b` in regex (e.g., `\bjohn\b` matches whole word)
+These options work with plain text searches. Use Polars regex patterns in expressions for more control. For example, use `(?i)` prefix in regex (e.g., `(?i)john`) for case-insensitive matching.
 
 **Quick Tips:**
 - Search results highlight matching rows/cells in **red**
@@ -408,7 +406,7 @@ These options work with plain text searches. Use Polars regex patterns in expres
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 - Use `u` to undo any search or filter
 
-### 3b. Filter vs. View
+### 3.1 Filter vs. View
 
 Both operations show selected rows, but with fundamentally different effects:
 
@@ -429,7 +427,7 @@ Both operations show selected rows, but with fundamentally different effects:
 
 Both support full undo with `u`.
 
-### 4. Replace
+### 4. Find & Replace
 
 Replace values in current column (`r`) or across all columns (`R`).
 
@@ -454,7 +452,7 @@ When you press `r` or `R`, enter:
 - Type `NULL` to replace null/missing values
 - Use `Match Nocase` for case-insensitive matching
 - Use `Match Whole` to avoid partial replacements
-- Supprot undo (`u`)
+- Support undo (`u`)
 
 ### 5. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
 
@@ -538,15 +536,9 @@ This is useful for:
 
 ### 8. Column & Dataframe Statistics
 
-Press `s` to see summary statistics for the current column, or press `S` for statistics across the entire dataframe.
-
-**Column Statistics** (`s`):
-- Shows calculated statistics using Polars' `describe()` method
-- Displays: count, null count, mean, median, std, min, max, etc.
-
-**Dataframe Statistics** (`S`):
-- Shows statistics for all numeric and applicable columns simultaneously
-- Displays: count, null count, mean, median, std, min, max, etc.
+Show summary statistics (count, null count, mean, median, std, min, max, etc.) using Polars' `describe()` method.
+- `s` for the current column
+- `S` for all columns across the entire dataframe
 
 **In the Statistics Modal**:
 - Press `q` or `Escape` to close the statistics table
@@ -584,41 +576,31 @@ This is useful for:
 **Delete Column** (`-`):
 - Removes the entire column from display and dataframe
 
-### 10. Hide & Show Columns
+**Add Empty Column** (`a`):
+- Adds a new empty column after the current column
+- Column is initialized with NULL values for all rows
 
-**Hide Column** (`h`):
-- Temporarily hides the current column from display
-- Column data is preserved in the dataframe
-- Hidden columns are included in saves
+**Add Column with Value/Expression** (`A`):
+- Opens dialog to specify column name and initial value/expression
+- Value can be a constant (e.g., `0`, `"text"`) or a Polars expression (e.g., `$age * 2`)
+- Expression can reference other columns and perform calculations
+- Useful for creating derived columns or adding data with formulas
 
-**Show Hidden Columns** (`H`):
-- Restores all previously hidden columns (and hidden rows) to the display
-
-### 11. Duplicate Column
-
-Press `d` to duplicate the current column:
+**Duplicate Column** (`d`):
 - Creates a new column immediately after the current column
 - New column has '_copy' suffix (e.g., 'price' → 'price_copy')
-- Duplicate preserves all data from original column
-- New column is inserted into the dataframe
+- Useful for creating backups before transformation
 
-This is useful for:
-- Creating backup copies of columns before transformation
-- Working with alternative versions of column data
-- Comparing original vs. processed column values side-by-side
-
-### 12. Duplicate Row
-
-Press `D` to duplicate the current row:
+**Duplicate Row** (`D`):
 - Creates a new row immediately after the current row
 - Duplicate preserves all data from original row
-- New row is inserted into the dataframe
+- Useful for batch adding similar records
 
-This is useful for:
-- Creating variations of existing data records
-- Batch adding similar rows with modifications
+**Hide/Show Columns** (`h` / `H`):
+- `h` - Temporarily hide current column (data preserved)
+- `H` - Restore all hidden columns and rows
 
-### 13. Column & Row Reordering
+### 10. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
 - Swaps adjacent columns
@@ -628,12 +610,12 @@ This is useful for:
 - Swaps adjacent rows
 - Reorder is preserved when saving
 
-### 14. Freeze Rows and Columns
+### 11. Freeze Rows and Columns
 
 Press `z` to open the dialog:
 - Enter number of fixed rows and/or columns to keep top rows/columns visible while scrolling
 
-### 14.5. Thousand Separator Toggle
+### 12. Thousand Separator Toggle
 
 Press `,` to toggle thousand separator formatting for numeric data:
 - Applies to **integer** and **float** columns
@@ -643,14 +625,11 @@ Press `,` to toggle thousand separator formatting for numeric data:
 - Display-only: does not modify underlying data in the dataframe
 - State persists during the session
 
-### 15. Save File
+### 13. Save File
 
-Press `Ctrl+S` to save:
-- Save filtered, edited, or sorted data back to file
-- Choose filename in modal dialog
-- Confirm if file already exists
+Press `Ctrl+S` to save filtered, edited, or sorted data back to file
 
-### 16. Undo/Redo/Reset
+### 14. Undo/Redo/Reset
 
 **Undo** (`u`):
 - Reverts last action with full state restoration
@@ -668,7 +647,7 @@ Press `Ctrl+S` to save:
 - Clears all edits, deletions, selections, filters, and sorts
 - Useful for starting fresh without reloading the file
 
-### 17. Column Type Conversion
+### 15. Column Type Conversion
 
 Press the type conversion keys to instantly cast the current column to a different data type:
 
@@ -685,14 +664,14 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 **Note**: Type conversion attempts to preserve data where possible. Conversions may lose data (e.g., float to int rounding).
 
-### 18. Cursor Type Cycling
+### 16. Cursor Type Cycling
 
 Press `K` to cycle through selection modes:
 1. **Cell mode**: Highlight individual cell (and its row/column headers)
 2. **Row mode**: Highlight entire row
 3. **Column mode**: Highlight entire column
 
-### 19. SQL Interface
+### 17. SQL Interface
 
 The SQL interface provides two modes for querying your dataframe:
 
@@ -726,17 +705,18 @@ FROM self
 WHERE (age > 25 AND salary > 50000) OR department = 'Management'
 ```
 
-### 20. Clipboard Operations
+### 18. Clipboard Operations
 
-Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux
-**Note** May require a X server to work
+Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
+
+**Note** May require a X server to work.
 
 - Press `c` to copy cursor value
 - Press `Ctrl+C` to copy column values
 - Press `Ctrl+R` to copy row values (delimited by tab)
 - Hold `Shift` to select with mouse
 
-### 21. Link Column Creation
+### 19. Link Column Creation
 
 Press `@` to create a new column containing dynamically generated URLs using template.
 
@@ -744,16 +724,11 @@ Press `@` to create a new column containing dynamically generated URLs using tem
 
 The link template supports multiple placeholder types for maximum flexibility:
 
-- **`$_`** - Current column (the column where cursor was when `@` was pressed)
-  - Example: `https://example.com/search/$_` - Uses values from the current column
+- **`$_`** - Current column (the column where cursor was when `@` was pressed), e.g., `https://example.com/search/$_` - Uses values from the current column
 
-- **`$1`, `$2`, `$3`, etc.** - Column by 1-based position index
-  - Example: `https://example.com/product/$1/details/$2` - Uses 1st and 2nd columns
-  - Index corresponds to column display order (left-to-right)
+- **`$1`, `$2`, `$3`, etc.** - Column by 1-based position index, e.g., `https://example.com/product/$1/details/$2` - Uses 1st and 2nd columns
 
-- **`$name`** - Column by name (use actual column names)
-  - Example: `https://pubchem.ncbi.nlm.nih.gov/search?q=$product_id` - Uses `product_id` column
-  - Example: `https://example.com/$region/$city/data` - Uses `region` and `city` columns
+- **`$name`** - Column by name (use actual column names), e.g., `https://example.com/$region/$city/data` - Uses `region` and `city` columns
 
 **Features:**
 - **Multiple Placeholders**: Mix and match placeholders in a single template
@@ -763,7 +738,7 @@ The link template supports multiple placeholder types for maximum flexibility:
 - Use full undo (`u`) if template produces unexpected URLs
 - For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
 
-### 22. Tab Management
+### 20. Tab Management
 
 Manage multiple files and dataframes simultaneously with tabs.
 
@@ -773,7 +748,7 @@ Manage multiple files and dataframes simultaneously with tabs.
 - **`<`** - Move to previous tab
 - **`b`** - Cycle through tabs
 - **`B`** - Toggle tab bar visibility
-- **`Double-click tab`** - Rename the tab
+- **`Double-click`** - Rename the tab
 - **`Ctrl+D`** - Duplicate current tab (creates a copy with same data and state)
 - **`Ctrl+T`** - Save current tab to file
 - **`Ctrl+A`** - Save all tabs in a single Excel file

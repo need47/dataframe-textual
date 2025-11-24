@@ -37,7 +37,7 @@ def cli() -> argparse.Namespace:
         help="Specify that input files have no header row when reading CSV/TSV",
     )
     parser.add_argument(
-        "-I", "--no-inferrence", action="store_true", help="Do not infer data types when reading CSV/TSV"
+        "-I", "--no-inference", action="store_true", help="Do not infer data types when reading CSV/TSV"
     )
     parser.add_argument("-E", "--ignore-errors", action="store_true", help="Ignore errors when reading CSV/TSV")
     parser.add_argument(
@@ -80,7 +80,7 @@ def main() -> None:
         args.files,
         file_format=args.format,
         has_header=not args.no_header,
-        infer_schema=not args.no_inferrence,
+        infer_schema=not args.no_inference,
         comment_prefix=args.comment_prefix,
         quote_char=args.quote_char,
         skip_lines=args.skip_lines,
