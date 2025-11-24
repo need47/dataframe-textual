@@ -155,7 +155,10 @@ def format_float(value: float, thousand_separator: bool = False, precision: int 
     """
 
     if (val := int(value)) == value:
-        return f"{val:,}" if thousand_separator else str(val)
+        if precision > 0:
+            return f"{val:,}" if thousand_separator else str(val)
+        else:
+            return f"{val:,.{-precision}f}" if thousand_separator else f"{val:.{-precision}f}"
     else:
         if precision > 0:
             return f"{value:,.{precision}f}" if thousand_separator else f"{value:.{precision}f}"

@@ -455,7 +455,7 @@ class FrequencyScreen(TableScreen):
                 justify="right",
             ),
             Text(
-                format_float(100.0, self.thousand_separator),
+                format_float(100.0, self.thousand_separator, precision=-2 if len(self.df) > 1 else 2),
                 style="bold",
                 justify="right",
             ),
