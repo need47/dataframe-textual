@@ -169,7 +169,7 @@ dv -l 3 data_with_meta.csv
 # Skip 1 row after header (e.g., units row)
 dv -a 1 data_with_units.csv
 
-# Skip comment lines
+# Skip comment lines (or just -c)
 dv -c "#" commented_data.csv
 
 # Treat specific values as null/missing (e.g., 'NA', 'N/A', '-')
@@ -391,7 +391,8 @@ When searching or finding, you can use checkboxes in the dialog to enable:
 These options work with plain text searches. Use Polars regex patterns in expressions for more control. For example, use `(?i)` prefix in regex (e.g., `(?i)john`) for case-insensitive matching.
 
 **Quick Tips:**
-- Search results highlight matching rows/cells in **red**
+- Search results highlight matching rows in **red**
+- Use expression for advanced selection (e.g., $attack > $defense)
 - Multiple searches **accumulate** - each new search adds to the selections or matches
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 - Use `u` to undo any search or filter

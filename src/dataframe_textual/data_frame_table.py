@@ -3001,40 +3001,7 @@ class DataFrameTable(DataTable):
         # Show next confirmation
         self.show_next_replace_confirmation()
 
-    # Filter & View
-    def do_filter_rows(self) -> None:
-        """Keep only the rows with selections and cell matches, and remove others."""
-        if any(self.selected_rows) or self.matches:
-            message = "Filter to rows with selection and cell matches (other rows removed)"
-            filter_expr = [
-                True if (selected or ridx in self.matches) else False
-                for ridx, selected in enumerate(self.selected_rows)
-            ]
-        else:  # Search cursor value in current column
-            message = "Filter to rows matching cursor value (other rows removed)"
-            ridx = self.cursor_row_idx
-            cidx = self.cursor_col_idx
-            value = self.df.item(ridx, cidx)
-
-            col_name = self.df.columns[cidx]
-            if value is None:
-                filter_expr = pl.col(col_name).is_null()
-            else:
-                filter_expr = pl.col(col_name) == value
-
-        # Add to history
-        self.add_history(message, dirty=True)
-
-        # Apply filter to dataframe with row indices
-        df_filtered = self.df.with_row_index(RIDX).filter(filter_expr)
-
-        # Update dataframe
-        self.reset_df(df_filtered.drop(RIDX))
-
-        # Recreate table for display
-        self.setup_table()
-
-        self.notify(f"{message}. Now showing [$success]{len(self.df)}[/] rows", title="Filter")
+    # View & Filter
 
     def do_view_rows(self) -> None:
         """View rows.
@@ -3156,6 +3123,50 @@ class DataFrameTable(DataTable):
         self.setup_table()
 
         self.notify(f"Filtered to [$success]{matched_count}[/] matching rows", title="Filter")
+
+    def do_filter_rows(self) -> None:
+        """Keep only the rows with selections and cell matches, and remove others."""
+        if any(self.selected_rows) or self.matches:
+            message = "Filter to rows with selection and cell matches (other rows removed)"
+            filter_expr = [
+                True if (selected or ridx in self.matches) else False
+                for ridx, selected in enumerate(self.selected_rows)
+            ]
+        else:  # Search cursor value in current column
+            message = "Filter to rows matching cursor value (other rows removed)"
+            ridx = self.cursor_row_idx
+            cidx = self.cursor_col_idx
+            value = self.df.item(ridx, cidx)
+
+            col_name = self.df.columns[cidx]
+            if value is None:
+                filter_expr = pl.col(col_name).is_null()
+            else:
+                filter_expr = pl.col(col_name) == value
+
+        # Add to history
+        self.add_history(message, dirty=True)
+
+        # Apply filter to dataframe with row indices
+        df_filtered = self.df.with_row_index(RIDX).filter(filter_expr)
+
+        # Update selected rows
+        selected_rows = [self.selected_rows[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))]
+
+        # Update matches
+        matches = {ridx: self.matches[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))}
+
+        # Update dataframe
+        self.reset_df(df_filtered.drop(RIDX))
+
+        # Restore selected rows and matches
+        self.selected_rows = selected_rows
+        self.matches = matches
+
+        # Recreate table for display
+        self.setup_table()
+
+        self.notify(f"{message}. Now showing [$success]{len(self.df)}[/] rows", title="Filter")
 
     # Copy & Save
     def do_copy_to_clipboard(self, content: str, message: str) -> None:
