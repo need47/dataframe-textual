@@ -680,7 +680,11 @@ class FindReplaceScreen(YesNoScreen):
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ReplaceScreen")
 
     def __init__(self, dftable: "DataFrameTable", title: str = "Find and Replace"):
-        term_find = str(dftable.cursor_value)
+        if (cursor_value := dftable.cursor_value) is None:
+            term_find = NULL
+        else:
+            term_find = str(cursor_value)
+
         super().__init__(
             title=title,
             label="Find",

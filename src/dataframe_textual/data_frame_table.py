@@ -2270,7 +2270,7 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error casting column `{col_name}`: {str(e)}")
 
-    # Search
+    # Row selection
     def do_select_row_cursor_value(self) -> None:
         """Search with cursor value in current column."""
         cidx = self.cursor_col_idx
@@ -2385,7 +2385,78 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-    # Find
+    # Selection & Match
+    def do_toggle_selections(self) -> None:
+        """Toggle selected rows highlighting on/off."""
+        # Add to history
+        self.add_history("Toggled row selection")
+
+        if self.has_hidden_rows:
+            # Some rows are hidden - invert only selected visible rows and clear selections for hidden rows
+            for i in range(len(self.selected_rows)):
+                if self.visible_rows[i]:
+                    self.selected_rows[i] = not self.selected_rows[i]
+                else:
+                    self.selected_rows[i] = False
+        else:
+            # Invert all selected rows
+            self.selected_rows = [not selected for selected in self.selected_rows]
+
+        # Check if we're highlighting or un-highlighting
+        if new_selected_count := self.selected_rows.count(True):
+            self.notify(f"Toggled selection for [$success]{new_selected_count}[/] rows", title="Toggle")
+
+        # Recreate table for display
+        self.setup_table()
+
+    def do_toggle_row_selection(self) -> None:
+        """Select/deselect current row."""
+        # Add to history
+        self.add_history("Toggled row selection")
+
+        ridx = self.cursor_row_idx
+        self.selected_rows[ridx] = not self.selected_rows[ridx]
+
+        row_key = str(ridx)
+        match_cols = self.matches.get(ridx, set())
+        for col_idx, col in enumerate(self.ordered_columns):
+            col_key = col.key
+            cell_text: Text = self.get_cell(row_key, col_key)
+
+            if self.selected_rows[ridx] or (col_idx in match_cols):
+                cell_text.style = HIGHLIGHT_COLOR
+            else:
+                # Reset to default style based on dtype
+                dtype = self.df.dtypes[col_idx]
+                dc = DtypeConfig(dtype)
+                cell_text.style = dc.style
+
+            self.update_cell(row_key, col_key, cell_text)
+
+    def do_clear_selections_and_matches(self) -> None:
+        """Clear all selected rows and matches without removing them from the dataframe."""
+        # Check if any selected rows or matches
+        if not any(self.selected_rows) and not self.matches:
+            self.notify("No selections to clear", title="Clear", severity="warning")
+            return
+
+        row_count = sum(
+            1 if (selected or idx in self.matches) else 0 for idx, selected in enumerate(self.selected_rows)
+        )
+
+        # Add to history
+        self.add_history("Cleared all selected rows")
+
+        # Clear all selections
+        self.selected_rows = [False] * len(self.df)
+        self.matches = defaultdict(set)
+
+        # Recreate table for display
+        self.setup_table()
+
+        self.notify(f"Cleared selections for [$success]{row_count}[/] rows", title="Clear")
+
+    # Find & Replace
     def find_matches(
         self, term: str, cidx: int | None = None, match_nocase: bool = False, match_whole: bool = False
     ) -> dict[int, set[int]]:
@@ -2647,7 +2718,6 @@ class DataFrameTable(DataTable):
         last_ridx = selected_row_indices[-1]
         self.move_cursor_to(last_ridx, self.cursor_col_idx)
 
-    # Replace
     def do_replace(self) -> None:
         """Open replace screen for current column."""
         # Push the replace modal screen
@@ -2930,77 +3000,6 @@ class DataFrameTable(DataTable):
 
         # Show next confirmation
         self.show_next_replace_confirmation()
-
-    # Selection & Match
-    def do_toggle_selections(self) -> None:
-        """Toggle selected rows highlighting on/off."""
-        # Add to history
-        self.add_history("Toggled row selection")
-
-        if self.has_hidden_rows:
-            # Some rows are hidden - invert only selected visible rows and clear selections for hidden rows
-            for i in range(len(self.selected_rows)):
-                if self.visible_rows[i]:
-                    self.selected_rows[i] = not self.selected_rows[i]
-                else:
-                    self.selected_rows[i] = False
-        else:
-            # Invert all selected rows
-            self.selected_rows = [not selected for selected in self.selected_rows]
-
-        # Check if we're highlighting or un-highlighting
-        if new_selected_count := self.selected_rows.count(True):
-            self.notify(f"Toggled selection for [$success]{new_selected_count}[/] rows", title="Toggle")
-
-        # Recreate table for display
-        self.setup_table()
-
-    def do_toggle_row_selection(self) -> None:
-        """Select/deselect current row."""
-        # Add to history
-        self.add_history("Toggled row selection")
-
-        ridx = self.cursor_row_idx
-        self.selected_rows[ridx] = not self.selected_rows[ridx]
-
-        row_key = str(ridx)
-        match_cols = self.matches.get(ridx, set())
-        for col_idx, col in enumerate(self.ordered_columns):
-            col_key = col.key
-            cell_text: Text = self.get_cell(row_key, col_key)
-
-            if self.selected_rows[ridx] or (col_idx in match_cols):
-                cell_text.style = HIGHLIGHT_COLOR
-            else:
-                # Reset to default style based on dtype
-                dtype = self.df.dtypes[col_idx]
-                dc = DtypeConfig(dtype)
-                cell_text.style = dc.style
-
-            self.update_cell(row_key, col_key, cell_text)
-
-    def do_clear_selections_and_matches(self) -> None:
-        """Clear all selected rows and matches without removing them from the dataframe."""
-        # Check if any selected rows or matches
-        if not any(self.selected_rows) and not self.matches:
-            self.notify("No selections to clear", title="Clear", severity="warning")
-            return
-
-        row_count = sum(
-            1 if (selected or idx in self.matches) else 0 for idx, selected in enumerate(self.selected_rows)
-        )
-
-        # Add to history
-        self.add_history("Cleared all selected rows")
-
-        # Clear all selections
-        self.selected_rows = [False] * len(self.df)
-        self.matches = defaultdict(set)
-
-        # Recreate table for display
-        self.setup_table()
-
-        self.notify(f"Cleared selections for [$success]{row_count}[/] rows", title="Clear")
 
     # Filter & View
     def do_filter_rows(self) -> None:
