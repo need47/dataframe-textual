@@ -366,7 +366,7 @@ Useful for examining wide datasets where columns don't fit well on screen.
 - Press `"` to **filter** all rows containing the selected column value (and remove others)
 - Press `q` or `Escape` to close the modal
 
-### 3. Search & Filtering
+### 3. Search & Select/Highlight
 
 The application provides multiple search modes for different use cases:
 
@@ -384,9 +384,13 @@ The application provides multiple search modes for different use cases:
 - `'` - Select/deselect current row (marks it for filtering or viewing)
 - `t` - Flip selections of all rows
 - `T` - Clear all row selections and cell matches
-- `"` - View only the selected rows and (others removed)
-- `v` - View rows by selected rows or cursor value (others hidden but preserved)
-- `V` - View rows using custom expression (others hidden but preserved)
+- `"` - **Filter** to rows that are selected and contain matching cells (removes all others permanently)
+- `v` - **View** rows that are selected or contain matching cells (others hidden but preserved)
+- `V` - **View** rows using custom expression (others hidden but preserved)
+
+**Note**:
+- The `"` (Filter) and `v`/`V` (View) operations appear similar but have very different effects on your data. See section 3b "Filter vs. View - Understanding the Difference" for detailed guidance on when to use each.
+- If currently there are no selectet rows and no matching cells, the `"` (Filter) and `v` (View) will use cursor value for search.
 
 **Advanced Matching Options**:
 
@@ -404,64 +408,53 @@ These options work with plain text searches. Use Polars regex patterns in expres
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 - Use `u` to undo any search or filter
 
-### 4. Find & Replace
+### 3b. Filter vs. View
 
-The application provides powerful find and replace functionality for both single-column and global replacements.
+Both operations show selected rows, but with fundamentally different effects:
 
-**Replace Operations**:
-- `r` - Replace values in the current column
-- `R` - Replace values across all columns
+| Operation | Keyboard | Effect | Data Preserved |
+|-----------|----------|--------|-----------------|
+| **View** | `v`, `V` | Hides non-matching rows | Yes (hidden, can be restored by `H`) |
+| **Filter** | `"` | Removes non-matching rows | No (permanently deleted) |
+
+**When to use View** (`v` or `V`):
+- Exploring or analyzing data safely
+- Switching between different perspectives
+- Press `H` to restore hidden rows (and hidden columns)
+
+**When to use Filter** (`"`):
+- Cleaning data (removing unwanted rows)
+- Creating a trimmed dataset for export
+- Permanent row removal from your dataframe
+
+Both support full undo with `u`.
+
+### 4. Replace
+
+Replace values in current column (`r`) or across all columns (`R`).
 
 **How It Works:**
 
-When you press `r` or `R`, a dialog opens where you can enter:
-1. **Find term**: The value or expression to search for
-2. **Replace term**: What to replace matches with
-3. **Matching options**:
-   - **Match Nocase**: Ignore case differences when matching (unchecked by default)
-   - **Match Whole**: Match complete words only, not partial words (unchecked by default)
-4. **Replace option**:
-   - Choose **"Replace All"** to replace all matches at once (with confirmation)
-   - Otherwise, review and confirm each match individually
+When you press `r` or `R`, enter:
+1. **Find term**: Value or expression to search for (done by string value)
+2. **Replace term**: Replacement value
+3. **Matching options**: Match Nocase (ignore case), Match Whole (complete match only)
+4. **Replace mode**: All at once or interactive review
 
-**Replace All** (`r` or `R` → Choose "Replace All"):
-- Shows a confirmation dialog with the number of matches and replacements
-- Replaces all matches with a single operation
-- Full undo support with `u`
-- Useful for bulk replacements when you're confident about the change
+**Replace All**:
+- Replaces all matches with one operation
+- Shows confirmation with match count
 
-**Replace Interactive** (`r` or `R` → Choose "Replace"):
-- Shows each match one at a time with a preview of the replacement
-- For each match, press:
-  - `Enter` or press the `Yes` button - **Replace this occurrence** and move to next
-  - Press the `Skip` button - **Skip this occurrence** and move to next
-  - `Escape` or press the `No` button - **Cancel** remaining replacements (but keep already-made replacements)
-- Displays progress: `Occurrence X of Y` (Y = total occurrences, X = current)
-- Useful for careful replacements where you want to review each change
-
-**For Global Replace (`R`)**:
-- Searches and replaces across all columns simultaneously
-- Each column can have different matching behavior (string matching for text, numeric for numbers)
-- Preview shows which columns contain matches before replacement
-- Useful for standardizing values across multiple columns
-
-**Features:**
-- **Full history support**: Use `u` (undo) to revert any replacement
-- **Visual feedback**: Matching cells are highlighted before you choose replacement mode
-- **Safe operations**: Requires confirmation before replacing
-- **Progress tracking**: Shows how many replacements have been made during interactive mode
-- **Type-aware**: Respects column data types when matching and replacing
-- **Flexible matching**: Support for case-insensitive and whole-word matching
+**Replace Interactive**:
+- Review each match one at a time (confirm, skip, or cancel)
+- Shows progress: `X of Y`
 
 **Tips:**
-- **NULL**: Replace null/missing values (type `NULL`)
-- Use interactive mode for one-time replacements to be absolutely sure
-- Use "Replace All" for routine replacements (e.g., fixing typos, standardizing formats)
-- Use **Match Nocase** for matching variations of names or titles
-- Use **Match Whole** to avoid unintended partial replacements
-- Use `u` immediately if you accidentally replace something wrong
-- For complex replacements, use Polars expressions or regex patterns in the find term
-- Test with a small dataset first before large replacements
+- Search are done by string value (i.e. ignoring data type)
+- Type `NULL` to replace null/missing values
+- Use `Match Nocase` for case-insensitive matching
+- Use `Match Whole` to avoid partial replacements
+- Supprot undo (`u`)
 
 ### 5. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
 
@@ -481,6 +474,7 @@ Complex values or filters can be specified via Polars expressions, with the foll
 - `$age < 30` - Age less than 30
 - `$status == 'active'` - Status exactly matches 'active'
 - `$name != 'Unknown'` - Name is not 'Unknown'
+- `$# <= 10` - Top 10 rows
 
 **Logical Operators:**
 - `&` - AND
@@ -597,8 +591,8 @@ This is useful for:
 - Column data is preserved in the dataframe
 - Hidden columns are included in saves
 
-**Show Hidden Rows/Columns** (`H`):
-- Restores all previously hidden rows/columns to the display
+**Show Hidden Columns** (`H`):
+- Restores all previously hidden columns (and hidden rows) to the display
 
 ### 11. Duplicate Column
 

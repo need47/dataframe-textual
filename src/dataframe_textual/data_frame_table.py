@@ -34,7 +34,6 @@ from .common import (
     format_row,
     get_next_item,
     parse_placeholders,
-    rindex,
     sleep_async,
     tentative_expr,
     validate_expr,
@@ -412,6 +411,15 @@ class DataFrameTable(DataTable):
             Any: The value of the cell at the cursor position.
         """
         return self.df.item(self.cursor_row_idx, self.cursor_col_idx)
+
+    @property
+    def has_hidden_rows(self) -> bool:
+        """Check if there are any hidden rows.
+
+        Returns:
+            bool: True if there are hidden rows, False otherwise.
+        """
+        return any(v for v in self.visible_rows if v is False)
 
     @property
     def ordered_selected_rows(self) -> list[int]:
@@ -939,8 +947,8 @@ class DataFrameTable(DataTable):
         self.fixed_rows = 0
         self.fixed_columns = 0
         self.matches = defaultdict(set)
-        self.histories.clear()
-        self.history = None
+        # self.histories.clear()
+        # self.history = None
         self.dirty = dirty  # Mark as dirty since data changed
 
     def setup_table(self, reset: bool = False) -> None:
@@ -1206,56 +1214,6 @@ class DataFrameTable(DataTable):
         # If visible area is close to the end of loaded rows, load more
         if bottom_visible_row >= self.loaded_rows - 10:
             self.load_rows(self.loaded_rows + self.BATCH_SIZE)
-
-    # Highlighting
-    def apply_highlight(self, force: bool = False) -> None:
-        """Update all rows, highlighting selected ones and restoring others to default.
-
-        Args:
-            force: If True, clear all highlights and restore default styles.
-        """
-        # Ensure all selected rows or matches are loaded
-        stop = rindex(self.selected_rows, True) + 1
-        stop = max(stop, max(self.matches.keys(), default=0) + 1)
-
-        self.load_rows(stop)
-        self.highlight_table(force)
-
-    def highlight_table(self, force: bool = False) -> None:
-        """Highlight selected rows/cells in red."""
-        if not force and not any(self.selected_rows) and not self.matches:
-            return  # Nothing to highlight
-
-        # Update all rows based on selected state
-        for row in self.ordered_rows:
-            ridx = int(row.key.value)  # 0-based index
-            is_selected = self.selected_rows[ridx]
-            match_cols = self.matches.get(ridx, set())
-
-            if not force and not is_selected and not match_cols:
-                continue  # No highlight needed for this row
-
-            # Update all cells in this row
-            for col_idx, col in enumerate(self.ordered_columns):
-                if not force and not is_selected and col_idx not in match_cols:
-                    continue  # No highlight needed for this cell
-
-                cell_text: Text = self.get_cell(row.key, col.key)
-                need_update = False
-
-                if is_selected or col_idx in match_cols:
-                    cell_text.style = HIGHLIGHT_COLOR
-                    need_update = True
-                elif force:
-                    # Restore original style based on dtype
-                    dtype = self.df.schema[col.key.value]
-                    dc = DtypeConfig(dtype)
-                    cell_text.style = dc.style
-                    need_update = True
-
-                # Update the cell in the table
-                if need_update:
-                    self.update_cell(row.key, col.key, cell_text)
 
     # History & Undo
     def create_history(self, description: str) -> None:
@@ -2386,7 +2344,7 @@ class DataFrameTable(DataTable):
 
         # Lazyframe for filtering
         lf = self.df.lazy().with_row_index(RIDX)
-        if False in self.visible_rows:
+        if self.has_hidden_rows:
             lf = lf.filter(self.visible_rows)
 
         # Apply filter to get matched row indices
@@ -2441,7 +2399,7 @@ class DataFrameTable(DataTable):
 
         # Lazyframe for filtering
         lf = self.df.lazy().with_row_index(RIDX)
-        if False in self.visible_rows:
+        if self.has_hidden_rows:
             lf = lf.filter(self.visible_rows)
 
         # Determine which columns to search: single column or all columns
@@ -2971,7 +2929,7 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history("Toggled row selection")
 
-        if False in self.visible_rows:
+        if self.has_hidden_rows:
             # Some rows are hidden - invert only selected visible rows and clear selections for hidden rows
             for i in range(len(self.selected_rows)):
                 if self.visible_rows[i]:
@@ -3158,7 +3116,7 @@ class DataFrameTable(DataTable):
         lf = self.df.lazy().with_row_index(RIDX)
 
         # Apply existing visibility filter first
-        if False in self.visible_rows:
+        if self.has_hidden_rows:
             lf = lf.filter(self.visible_rows)
 
         expr_str = "boolean list or series" if isinstance(expr, (list, pl.Series)) else str(expr)
@@ -3390,7 +3348,7 @@ class DataFrameTable(DataTable):
         # Execute the SQL query
         try:
             lf = self.df.lazy().with_row_index(RIDX)
-            if False in self.visible_rows:
+            if self.has_hidden_rows:
                 lf = lf.filter(self.visible_rows)
 
             df_filtered = lf.sql(sql).collect()
