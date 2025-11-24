@@ -125,7 +125,7 @@ class DataFrameTable(DataTable):
         - **U** - 🔄 Redo last undone action
         - **Ctrl+U** - 🔁 Reset to initial state
 
-        ## 👁️ Viewing & Display
+        ## 👁️ Display
         - **Enter** - 📋 Show row details in modal
         - **F** - 📊 Show frequency distribution
         - **s** - 📈 Show statistics for current column
@@ -143,31 +143,31 @@ class DataFrameTable(DataTable):
         - **]** - 🔽 Sort column descending
         - *(Multi-column sort supported)*
 
-        ## 🔍 Searching & Filtering
-        - **|** - 🔎 Search in current column with expression
-        - **\\\\** - 🔎 Search in current column using cursor value
+        ## ✅ Row Selection
+        - **\\\\** - ✅ Select rows in current column using cursor value
+        - **|** - ✅ Select rows with expression
+        - **'** - ✅ Select/deselect current row
+        - **t** - 💡 Toggle row selection (invert all)
+        - **T** - 🧹 Clear all selections and matches
+        - **{** - ⬆️ Go to previous selected row
+        - **}** - ⬇️ Go to next selected row
+        - *(Supports case-insensitive & whole-word matching)*
+
+        ## 🔎 Find & Replace
         - **/** - 🔎 Find in current column with cursor value
         - **?** - 🔎 Find in current column with expression
         - **;** - 🌐 Global find using cursor value
         - **:** - 🌐 Global find with expression
         - **n** - ⬇️ Go to next match
         - **N** - ⬆️ Go to previous match
-        - **v** - 👁️ View/filter rows by cell or selected rows and hide others
-        - **V** - 🔧 View/filter rows by expression and hide others
-        - *(All search/find support case-insensitive & whole-word matching)*
-
-        ## ✏️ Replace
         - **r** - 🔄 Replace in current column (interactive or all)
         - **R** - 🔄 Replace across all columns (interactive or all)
         - *(Supports case-insensitive & whole-word matching)*
 
-        ## ✅ Selection & Filter
-        - **'** - ✓️ Select/deselect current row
-        - **t** - 💡 Toggle row selection (invert all)
-        - **T** - 🧹 Clear all selections and matches
-        - **{** - ⬆️ Go to previous selected row
-        - **}** - ⬇️ Go to next selected row
-        - **"** - 📍 Filter selected rows and remove others
+        ## 👁️ View & Filter
+        - **"** - 📍 Filter selected rows (removes others)
+        - **v** - 👁️ View rows that are selected or contain matching cells (hide others)
+        - **V** - 🔧 View rows by expression (hides others)
 
         ## 🔍 SQL Interface
         - **l** - 💬 Open simple SQL interface (select columns & where clause)
@@ -242,25 +242,23 @@ class DataFrameTable(DataTable):
         ("v", "view_rows", "View rows"),
         ("V", "view_rows_expr", "View rows by expression"),
         ("quotation_mark", "filter_rows", "Filter selected"),  # `"`
-        # Search
-        ("backslash", "search_cursor_value", "Search column with cursor value"),  # `\`
-        ("vertical_line", "search_expr", "Search column with expression"),  # `|`
+        # Row Selection
+        ("backslash", "select_row_cursor_value", "Select rows with cursor value in current column"),  # `\`
+        ("vertical_line", "select_row_expr", "Select rows with expression"),  # `|`
         ("right_curly_bracket", "next_selected_row", "Go to next selected row"),  # `}`
         ("left_curly_bracket", "previous_selected_row", "Go to previous selected row"),  # `{`
-        # Find
+        ("apostrophe", "toggle_row_selection", "Toggle row selection"),  # `'`
+        ("t", "toggle_selections", "Toggle all row selections"),
+        ("T", "clear_selections_and_matches", "Clear selections"),
+        # Find & Replace
         ("slash", "find_cursor_value", "Find in column with cursor value"),  # `/`
         ("question_mark", "find_expr", "Find in column with expression"),  # `?`
         ("semicolon", "find_cursor_value('global')", "Global find with cursor value"),  # `;`
         ("colon", "find_expr('global')", "Global find with expression"),  # `:`
         ("n", "next_match", "Go to next match"),  # `n`
         ("N", "previous_match", "Go to previous match"),  # `Shift+n`
-        # Replace
         ("r", "replace", "Replace in column"),  # `r`
         ("R", "replace_global", "Replace global"),  # `Shift+R`
-        # Selection
-        ("apostrophe", "toggle_row_selection", "Toggle row selection"),  # `'`
-        ("t", "toggle_selections", "Toggle all row selections"),
-        ("T", "clear_selections_and_matches", "Clear selections"),
         # Delete
         ("delete", "clear_cell", "Clear cell"),
         ("minus", "delete_column", "Delete column"),  # `-`
@@ -732,13 +730,13 @@ class DataFrameTable(DataTable):
         """Clear the current cell (set to None)."""
         self.do_clear_cell()
 
-    def action_search_cursor_value(self) -> None:
-        """Search cursor value in the current column."""
-        self.do_search_cursor_value()
+    def action_select_row_cursor_value(self) -> None:
+        """Select rows with cursor value in the current column."""
+        self.do_select_row_cursor_value()
 
-    def action_search_expr(self) -> None:
-        """Search by expression in the current column."""
-        self.do_search_expr()
+    def action_select_row_expr(self) -> None:
+        """Select rows by expression."""
+        self.do_select_row_expr()
 
     def action_find_cursor_value(self, scope="column") -> None:
         """Find by cursor value.
@@ -2273,17 +2271,22 @@ class DataFrameTable(DataTable):
             self.log(f"Error casting column `{col_name}`: {str(e)}")
 
     # Search
-    def do_search_cursor_value(self) -> None:
+    def do_select_row_cursor_value(self) -> None:
         """Search with cursor value in current column."""
         cidx = self.cursor_col_idx
+        col_name = self.cursor_col_name
 
         # Get the value of the currently selected cell
         term = NULL if self.cursor_value is None else str(self.cursor_value)
+        if self.cursor_value is None:
+            term = pl.col(col_name).is_null()
+        else:
+            term = pl.col(col_name) == self.cursor_value
 
-        self.search((term, cidx, False, True))
+        self.select_row((term, cidx, False, True))
 
-    def do_search_expr(self) -> None:
-        """Search by expression."""
+    def do_select_row_expr(self) -> None:
+        """Select rows by expression."""
         cidx = self.cursor_col_idx
 
         # Use current cell value as default search term
@@ -2292,21 +2295,26 @@ class DataFrameTable(DataTable):
         # Push the search modal screen
         self.app.push_screen(
             SearchScreen("Search", term, self.df, cidx),
-            callback=self.search,
+            callback=self.select_row,
         )
 
-    def search(self, result) -> None:
-        """Search for a term."""
+    def select_row(self, result) -> None:
+        """Select rows by value or expression."""
         if result is None:
             return
 
         term, cidx, match_nocase, match_whole = result
         col_name = self.df.columns[cidx]
 
-        if term == NULL:
+        # Already a Polars expression
+        if isinstance(term, pl.Expr):
+            expr = term
+
+        # Null case
+        elif term == NULL:
             expr = pl.col(col_name).is_null()
 
-        # Support for polars expressions
+        # Expression in string form
         elif tentative_expr(term):
             try:
                 expr = validate_expr(term, self.df.columns, cidx)

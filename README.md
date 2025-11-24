@@ -242,7 +242,7 @@ zcat compressed_data.csv.gz | dv -f csv
 | `U` | Redo last undone action |
 | `Ctrl+U` | Reset to initial state |
 
-#### Viewing & Display
+#### Display
 
 | Key | Action |
 |-----|--------|
@@ -276,23 +276,36 @@ zcat compressed_data.csv.gz | dv -f csv
 | `d` | Duplicate current column (appends '_copy' suffix) |
 | `D` | Duplicate current row |
 
-#### Searching & Filtering
+#### Row Selection
 
 | Key | Action |
 |-----|--------|
-| `\` | Search in current column using cursor value and select matching rows |
-| `\|` (pipe) | Search in current column with expression and select matching rows |
+| `\` | Select rows that matches cursor value in current column |
+| `\|` (pipe) | Select rows by expression |
 | `{` | Go to previous selected row |
 | `}` | Go to next selected row |
+| `'` | Select/deselect current row |
+| `t` | Toggle row selections (invert) |
+| `T` | Clear all row selections and/or cell matches |
+
+#### Find & Replace
+
+| Key | Action |
+|-----|--------|
 | `/` | Find in current column with cursor value and highlight matching cells |
 | `?` | Find in current column with expression and highlight matching cells |
 | `n` | Go to next matching cell |
 | `N` | Go to previous matching cell |
-| `'` | Select/deselect current row |
-| `t` | Toggle row selections (invert) |
-| `T` | Clear all row selections and/or cell matches |
-| `"` (quote) | Filter to selected rows (and remove others) |
-| `v` | View rows (and hide others) by row selections and/or cell matches or cursor value |
+| `;` | Find across all columns with cursor value |
+| `:` | Find across all columns with expression |
+| `r` | Find and replace in current column (interactive or replace all) |
+| `R` | Find and replace across all columns (interactive or replace all) |
+
+#### View & Filter
+| Key | Action |
+|-----|--------|
+| `"` (quote) | Filter to rows that are selected or contain matching cells (and remove others) |
+| `v` | View rows (and hide others) by row selections and cell matches or cursor value |
 | `V` | View rows (and hide others) by expression |
 
 #### SQL Interface
@@ -301,15 +314,6 @@ zcat compressed_data.csv.gz | dv -f csv
 |-----|--------|
 | `l` | Simple SQL interface (select columns & where clause) |
 | `L` | Advanced SQL interface (full SQL query with syntax highlight) |
-
-#### Find & Replace
-
-| Key | Action |
-|-----|--------|
-| `;` | Find across all columns with cursor value |
-| `:` | Find across all columns with expression |
-| `r` | Find and replace in current column (interactive or replace all) |
-| `R` | Find and replace across all columns (interactive or replace all) |
 
 #### Sorting (supporting multiple columns)
 
@@ -366,31 +370,17 @@ Useful for examining wide datasets where columns don't fit well on screen.
 - Press `"` to **filter** all rows containing the selected column value (and remove others)
 - Press `q` or `Escape` to close the modal
 
-### 3. Search & Find
+### 3. Row Selection
 
-The application provides multiple search modes for different use cases:
+The application provides multiple modes for selecting rows (marks it for filtering or viewing):
 
-**Search Operations** - Search by value/expression in current column and select rows:
-- `\` - Search cursor value (respects data type)
-- `|` - Opens dialog to search with custom expression
-
-**Find Operations** - Find by value/expression and highlight matching cells:
-- `/` - Find cursor value within current column (respects data type)
-- `?` - Open dialog to search current column with expression
-- `;` - Find cursor value across all columns
-- `:` - Open dialog to search all columns with expression
-
-**Selection & Filtering**:
-- `'` - Select/deselect current row (marks it for filtering or viewing)
+- `\` - Select rows that match cursor value in current column (respects data type)
+- `|` - Opens dialog to select rows with custom expression
+- `'` - Select/deselect current row 
 - `t` - Flip selections of all rows
 - `T` - Clear all row selections and cell matches
-- `"` - **Filter** to rows that are selected and contain matching cells (removes all others permanently)
-- `v` - **View** rows that are selected or contain matching cells (others hidden but preserved)
-- `V` - **View** rows using custom expression (others hidden but preserved)
-
-**Note**:
-- The `"` (Filter) and `v`/`V` (View) operations appear similar but have very different effects on your data. See *section 3.1* to understand the difference.
-- If currently there are no selected rows and no matching cells, the `"` (Filter) and `v` (View) will use cursor value for search.
+- `{` - Go to previous selected row
+- `}` - Go to next selected row
 
 **Advanced Matching Options**:
 
@@ -406,28 +396,14 @@ These options work with plain text searches. Use Polars regex patterns in expres
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 - Use `u` to undo any search or filter
 
-### 3.1 Filter vs. View
-
-Both operations show selected rows, but with fundamentally different effects:
-
-| Operation | Keyboard | Effect | Data Preserved |
-|-----------|----------|--------|-----------------|
-| **View** | `v`, `V` | Hides non-matching rows | Yes (hidden, can be restored by `H`) |
-| **Filter** | `"` | Removes non-matching rows | No (permanently deleted) |
-
-**When to use View** (`v` or `V`):
-- Exploring or analyzing data safely
-- Switching between different perspectives
-- Press `H` to restore hidden rows (and hidden columns)
-
-**When to use Filter** (`"`):
-- Cleaning data (removing unwanted rows)
-- Creating a trimmed dataset for export
-- Permanent row removal from your dataframe
-
-Both support full undo with `u`.
-
 ### 4. Find & Replace
+**Find Operations** - Find by value/expression and highlight matching cells:
+- `/` - Find cursor value within current column (respects data type)
+- `?` - Open dialog to search current column with expression
+- `;` - Find cursor value across all columns
+- `:` - Open dialog to search all columns with expression
+- `n` - Go to next matching cell
+- `N` - Go to previous matching cell
 
 Replace values in current column (`r`) or across all columns (`R`).
 
@@ -454,7 +430,30 @@ When you press `r` or `R`, enter:
 - Use `Match Whole` to avoid partial replacements
 - Support undo (`u`)
 
-### 5. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
+### 5. Filter vs. View
+
+Both operations show rows that are selected or contain matching cells, but with fundamentally different effects:
+
+| Operation | Keyboard | Effect | Data Preserved |
+|-----------|----------|--------|-----------------|
+| **View** | `v`, `V` | Hides non-matching rows | Yes (hidden, can be restored by `H`) |
+| **Filter** | `"` | Removes non-matching rows | No (permanently deleted) |
+
+**When to use View** (`v` or `V`):
+- Exploring or analyzing data safely
+- Switching between different perspectives
+- Press `H` to restore hidden rows (and hidden columns)
+
+**When to use Filter** (`"`):
+- Cleaning data (removing unwanted rows)
+- Creating a trimmed dataset for export
+- Permanent row removal from your dataframe
+
+**Note**:
+- If currently there are no selected rows and no matching cells, the `"` (Filter) and `v` (View) will use cursor value for search.
+- Both support full undo with `u`.
+
+### 6. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
 
 Complex values or filters can be specified via Polars expressions, with the following adaptions for convenience:
 
@@ -509,14 +508,14 @@ Complex values or filters can be specified via Polars expressions, with the foll
 - Use column names that match exactly (case-sensitive)
 - Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
 
-### 6. Sorting
+### 7. Sorting
 
 - Press `[` to sort current column ascending
 - Press `]` to sort current column descending
 - Multi-column sorting supported (press multiple times on different columns)
 - Press same key twice to remove the column from sorting
 
-### 7. Frequency Distribution
+### 8. Frequency Distribution
 
 Press `F` to see value distributions of the current column. The modal shows:
 - Value, Count, Percentage, Histogram
@@ -534,7 +533,7 @@ This is useful for:
 - Identifying rare or common values
 - Finding the most/least frequent entries
 
-### 8. Column & Dataframe Statistics
+### 9. Column & Dataframe Statistics
 
 Show summary statistics (count, null count, mean, median, std, min, max, etc.) using Polars' `describe()` method.
 - `s` for the current column
@@ -552,7 +551,7 @@ This is useful for:
 - Quick statistical summaries without external tools
 - Comparing statistics across columns
 
-### 9. Data Editing
+### 10. Data Editing
 
 **Edit Cell** (`e` or **Double-click**):
 - Opens modal for editing current cell
@@ -600,7 +599,7 @@ This is useful for:
 - `h` - Temporarily hide current column (data preserved)
 - `H` - Restore all hidden columns and rows
 
-### 10. Column & Row Reordering
+### 11. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
 - Swaps adjacent columns
@@ -610,12 +609,12 @@ This is useful for:
 - Swaps adjacent rows
 - Reorder is preserved when saving
 
-### 11. Freeze Rows and Columns
+### 12. Freeze Rows and Columns
 
 Press `z` to open the dialog:
 - Enter number of fixed rows and/or columns to keep top rows/columns visible while scrolling
 
-### 12. Thousand Separator Toggle
+### 13. Thousand Separator Toggle
 
 Press `,` to toggle thousand separator formatting for numeric data:
 - Applies to **integer** and **float** columns
@@ -625,11 +624,11 @@ Press `,` to toggle thousand separator formatting for numeric data:
 - Display-only: does not modify underlying data in the dataframe
 - State persists during the session
 
-### 13. Save File
+### 14. Save File
 
 Press `Ctrl+S` to save filtered, edited, or sorted data back to file
 
-### 14. Undo/Redo/Reset
+### 15. Undo/Redo/Reset
 
 **Undo** (`u`):
 - Reverts last action with full state restoration
@@ -647,7 +646,7 @@ Press `Ctrl+S` to save filtered, edited, or sorted data back to file
 - Clears all edits, deletions, selections, filters, and sorts
 - Useful for starting fresh without reloading the file
 
-### 15. Column Type Conversion
+### 16. Column Type Conversion
 
 Press the type conversion keys to instantly cast the current column to a different data type:
 
@@ -664,14 +663,14 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 **Note**: Type conversion attempts to preserve data where possible. Conversions may lose data (e.g., float to int rounding).
 
-### 16. Cursor Type Cycling
+### 17. Cursor Type Cycling
 
 Press `K` to cycle through selection modes:
 1. **Cell mode**: Highlight individual cell (and its row/column headers)
 2. **Row mode**: Highlight entire row
 3. **Column mode**: Highlight entire column
 
-### 17. SQL Interface
+### 18. SQL Interface
 
 The SQL interface provides two modes for querying your dataframe:
 
@@ -705,7 +704,7 @@ FROM self
 WHERE (age > 25 AND salary > 50000) OR department = 'Management'
 ```
 
-### 18. Clipboard Operations
+### 19. Clipboard Operations
 
 Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 
@@ -716,7 +715,7 @@ Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 - Press `Ctrl+R` to copy row values (delimited by tab)
 - Hold `Shift` to select with mouse
 
-### 19. Link Column Creation
+### 20. Link Column Creation
 
 Press `@` to create a new column containing dynamically generated URLs using template.
 
@@ -738,7 +737,7 @@ The link template supports multiple placeholder types for maximum flexibility:
 - Use full undo (`u`) if template produces unexpected URLs
 - For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
 
-### 20. Tab Management
+### 21. Tab Management
 
 Manage multiple files and dataframes simultaneously with tabs.
 
