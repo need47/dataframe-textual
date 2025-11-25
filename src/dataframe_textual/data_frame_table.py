@@ -472,11 +472,11 @@ class DataFrameTable(DataTable):
         """
         return self._column_locations.get_key(col_idx)
 
-    def should_highlight(self, cursor: Coordinate, target_cell: Coordinate, type_of_cursor: CursorType) -> bool:
+    def _should_highlight(self, cursor: Coordinate, target_cell: Coordinate, type_of_cursor: CursorType) -> bool:
         """Determine if the given cell should be highlighted because of the cursor.
 
-        In "cell" mode, also highlights the row and column headers. In "row" and "column"
-        modes, highlights the entire row or column respectively.
+        In "cell" mode, also highlights the row and column headers. This overrides the default
+        behavior of DataTable which only highlights the exact cell under the cursor.
 
         Args:
             cursor: The current position of the cursor.
@@ -1484,6 +1484,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self.add_history(f"Sorted on column [$success]{col_name}[/]", dirty=True)
+
         if old_desc is None:
             # Add new column to sort
             self.sorted_columns[col_name] = descending
@@ -1495,18 +1496,27 @@ class DataFrameTable(DataTable):
             del self.sorted_columns[col_name]
             self.sorted_columns[col_name] = descending
 
+        lf = self.df.lazy().with_row_index(RIDX)
+
         # Apply multi-column sort
         if sort_cols := list(self.sorted_columns.keys()):
             descending_flags = list(self.sorted_columns.values())
-            df_sorted = self.df.with_row_index(RIDX).sort(sort_cols, descending=descending_flags, nulls_last=True)
-        else:
-            # No sort columns - restore original order
-            df_sorted = self.df.with_row_index(RIDX)
+            lf = lf.sort(sort_cols, descending=descending_flags, nulls_last=True)
 
-        # Updated selected_rows and visible_rows to match new order
+        df_sorted = lf.collect()
+
+        # Updated visible rows, selected rows, and cell matches to match new order
         old_row_indices = df_sorted[RIDX].to_list()
-        self.selected_rows = [self.selected_rows[i] for i in old_row_indices]
-        self.visible_rows = [self.visible_rows[i] for i in old_row_indices]
+        if self.has_hidden_rows:
+            self.visible_rows = [self.visible_rows[old_ridx] for old_ridx in old_row_indices]
+        if any(self.selected_rows):
+            self.selected_rows = [self.selected_rows[old_ridx] for old_ridx in old_row_indices]
+        if any(self.matches):
+            self.matches = {
+                new_ridx: self.matches[old_ridx]
+                for new_ridx, old_ridx in enumerate(old_row_indices)
+                if old_ridx in self.matches
+            }
 
         # Update the dataframe
         self.df = df_sorted.drop(RIDX)
@@ -2373,14 +2383,14 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self.add_history(f"Searched [$success]{term}[/] in column [$accent]{col_name}[/]")
+        self.add_history(f"Selected [$success]{match_count}[/] for [$accent]{term}[/]")
 
         # Update selected rows to include new matches
         for m in matches:
             self.selected_rows[m] = True
 
         # Show notification immediately, then start highlighting
-        self.notify(f"Found [$success]{match_count}[/] matches for [$accent]{term}[/]", title="Search")
+        self.notify(f"Selected [$success]{match_count}[/] for [$accent]{term}[/]", title="Search")
 
         # Recreate table for display
         self.setup_table()
@@ -2464,6 +2474,8 @@ class DataFrameTable(DataTable):
         Args:
             term: The search term (can be NULL, expression, or plain text)
             cidx: Column index for column-specific search. If None, searches all columns.
+            match_nocase: Whether to perform case-insensitive matching (for string terms)
+            match_whole: Whether to match the whole cell content (for string terms)
 
         Returns:
             Dictionary mapping row indices to sets of column indices containing matches.
