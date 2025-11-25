@@ -1660,7 +1660,7 @@ class DataFrameTable(DataTable):
     def do_rename_column(self, col_idx: int | None) -> None:
         """Open modal to rename the selected column."""
         col_idx = self.cursor_column if col_idx is None else col_idx
-        col_name = self._column_locations.get_key(col_idx).value
+        col_name = self.get_column_key(col_idx).value
 
         # Push the rename column modal screen
         self.app.push_screen(
