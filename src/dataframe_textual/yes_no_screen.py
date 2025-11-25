@@ -359,7 +359,7 @@ class EditCellScreen(YesNoScreen):
 
         # Input
         df_value = df.item(ridx, cidx)
-        self.input_value = "" if df_value is None else str(df_value).strip()
+        self.input_value = NULL if df_value is None else str(df_value)
 
         super().__init__(
             title="Edit Cell",
@@ -377,16 +377,16 @@ class EditCellScreen(YesNoScreen):
 
         # Handle empty input
         if not new_value_str:
-            new_value = None
+            new_value = ""
             self.notify(
-                "Empty value provided. If you want to clear the cell, press [$accent]x[/].",
-                title="Edit",
+                "Empty value provided. If you want to clear the cell, press [$accent]Delete[/].",
+                title="Edit Cell",
                 severity="warning",
             )
         # Check if value changed
         elif new_value_str == self.input_value:
             new_value = None
-            self.notify("No changes made", title="Edit", severity="warning")
+            self.notify("No changes made", title="Edit Cell", severity="warning")
         else:
             # Parse and validate based on column dtype
             try:
@@ -394,7 +394,7 @@ class EditCellScreen(YesNoScreen):
             except Exception as e:
                 self.notify(
                     f"Failed to convert [$accent]{new_value_str}[/] to [$error]{self.dtype}[/]: {str(e)}",
-                    title="Edit",
+                    title="Edit Cell",
                     severity="error",
                 )
                 return None
