@@ -573,7 +573,7 @@ class DataFrameTable(DataTable):
             else:
                 content_tab.remove_class("dirty")
 
-    def move_cursor_to(self, ridx: int, cidx: int) -> None:
+    def move_cursor_to(self, ridx: int | None = None, cidx: int | None = None) -> None:
         """Move cursor based on the dataframe indices.
 
         Args:
@@ -584,8 +584,8 @@ class DataFrameTable(DataTable):
         if ridx >= self.loaded_rows:
             self.load_rows(stop=ridx + self.BATCH_SIZE)
 
-        row_key = str(ridx)
-        col_key = self.df.columns[cidx]
+        row_key = self.cursor_row_key if ridx is None else str(ridx)
+        col_key = self.cursor_col_key if cidx is None else self.df.columns[cidx]
         row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
         self.move_cursor(row=row_idx, column=col_idx)
 

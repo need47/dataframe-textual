@@ -209,7 +209,25 @@ class RowDetailScreen(TableScreen):
             # Filter the main table by the selected value
             self.filter_or_view_selected_value(self.get_cidx_name_value(), action="filter")
             event.stop()
-        elif event.key == "comma":
+        elif event.key == "right_curly_bracket":  # '}'
+            # Move to the next visible row
+            ridx = self.ridx + 1
+            while ridx < len(self.df) and not self.dftable.visible_rows[ridx]:
+                ridx += 1
+            if ridx < len(self.df):
+                self.ridx = ridx
+                self.dftable.move_cursor_to(self.ridx)
+                self.build_table()
+            event.stop()
+        elif event.key == "left_curly_bracket":  # '{'
+            # Move to the previous visible row
+            ridx = self.ridx - 1
+            while ridx >= 0 and not self.dftable.visible_rows[ridx]:
+                ridx -= 1
+            if ridx >= 0:
+                self.ridx = ridx
+                self.dftable.move_cursor_to(self.ridx)
+                self.build_table()
             event.stop()
 
     def get_cidx_name_value(self) -> tuple[int, str, Any] | None:

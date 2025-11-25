@@ -369,6 +369,8 @@ Useful for examining wide datasets where columns don't fit well on screen.
 **In the Row Detail Modal**:
 - Press `v` to **view** all rows containing the selected column value (and hide others)
 - Press `"` to **filter** all rows containing the selected column value (and remove others)
+- Press `{` to move to the **previous row** (respects hidden rows)
+- Press `}` to move to the **next row** (respects hidden rows)
 - Press `q` or `Escape` to close the modal
 
 ### 3. Row Selection
