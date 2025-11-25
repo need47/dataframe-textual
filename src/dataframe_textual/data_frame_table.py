@@ -2369,28 +2369,32 @@ class DataFrameTable(DataTable):
         try:
             matches = set(lf.filter(expr).select(RIDX).collect().to_series().to_list())
         except Exception as e:
-            self.notify(f"Error applying search filter [$error]{term}[/]", title="Search", severity="error", timeout=10)
+            self.notify(
+                f"Error applying search filter `[$error]{term}[/]`", title="Search", severity="error", timeout=10
+            )
             self.log(f"Error applying search filter `{term}`: {str(e)}")
             return
 
         match_count = len(matches)
         if match_count == 0:
             self.notify(
-                f"No matches found for [$warning]{term}[/]. Try [$accent](?i)abc[/] for case-insensitive search.",
+                f"No matches found for `[$warning]{term}[/]`. Try [$accent](?i)abc[/] for case-insensitive search.",
                 title="Search",
                 severity="warning",
             )
             return
 
+        message = f"Found [$success]{match_count}[/] matching row(s) for `[$accent]{term}[/]`"
+
         # Add to history
-        self.add_history(f"Selected [$success]{match_count}[/] for [$accent]{term}[/]")
+        self.add_history(message)
 
         # Update selected rows to include new matches
         for m in matches:
             self.selected_rows[m] = True
 
         # Show notification immediately, then start highlighting
-        self.notify(f"Selected [$success]{match_count}[/] for [$accent]{term}[/]", title="Search")
+        self.notify(message, title="Select Row")
 
         # Recreate table for display
         self.setup_table()
@@ -2574,27 +2578,27 @@ class DataFrameTable(DataTable):
         try:
             matches = self.find_matches(term, cidx, match_nocase, match_whole)
         except Exception as e:
-            self.notify(f"Error finding matches for [$error]{term}[/]", title="Find", severity="error", timeout=10)
+            self.notify(f"Error finding matches for `[$error]{term}[/]`", title="Find", severity="error", timeout=10)
             self.log(f"Error finding matches for `{term}`: {str(e)}")
             return
 
         if not matches:
             self.notify(
-                f"No matches found for [$warning]{term}[/] in current column. Try [$accent](?i)abc[/] for case-insensitive search.",
+                f"No matches found for `[$warning]{term}[/]` in current column. Try [$accent](?i)abc[/] for case-insensitive search.",
                 title="Find",
                 severity="warning",
             )
             return
 
         # Add to history
-        self.add_history(f"Found [$success]{term}[/] in column [$accent]{col_name}[/]")
+        self.add_history(f"Found `[$success]{term}[/]` in column [$accent]{col_name}[/]")
 
         # Add to matches and count total
         match_count = sum(len(col_idxs) for col_idxs in matches.values())
         for ridx, col_idxs in matches.items():
             self.matches[ridx].update(col_idxs)
 
-        self.notify(f"Found [$success]{match_count}[/] matches for [$accent]{term}[/]", title="Find")
+        self.notify(f"Found [$success]{match_count}[/] matches for `[$accent]{term}[/]`", title="Find")
 
         # Recreate table for display
         self.setup_table()
@@ -2608,20 +2612,20 @@ class DataFrameTable(DataTable):
         try:
             matches = self.find_matches(term, cidx=None, match_nocase=match_nocase, match_whole=match_whole)
         except Exception as e:
-            self.notify(f"Error finding matches for [$error]{term}[/]", title="Find", severity="error", timeout=10)
+            self.notify(f"Error finding matches for `[$error]{term}[/]`", title="Find", severity="error", timeout=10)
             self.log(f"Error finding matches for `{term}`: {str(e)}")
             return
 
         if not matches:
             self.notify(
-                f"No matches found for [$warning]{term}[/] in any column. Try [$accent](?i)abc[/] for case-insensitive search.",
+                f"No matches found for `[$warning]{term}[/]` in any column. Try [$accent](?i)abc[/] for case-insensitive search.",
                 title="Global Find",
                 severity="warning",
             )
             return
 
         # Add to history
-        self.add_history(f"Found [$success]{term}[/] across all columns")
+        self.add_history(f"Found `[$success]{term}[/]` across all columns")
 
         # Add to matches and count total
         match_count = sum(len(col_idxs) for col_idxs in matches.values())
@@ -2629,7 +2633,8 @@ class DataFrameTable(DataTable):
             self.matches[ridx].update(col_idxs)
 
         self.notify(
-            f"Found [$success]{match_count}[/] matches for [$accent]{term}[/] across all columns", title="Global Find"
+            f"Found [$success]{match_count}[/] matches for `[$accent]{term}[/]` across all columns",
+            title="Global Find",
         )
 
         # Recreate table for display
@@ -2826,12 +2831,10 @@ class DataFrameTable(DataTable):
     def replace_all(self, term_find: str, term_replace: str) -> None:
         """Replace all occurrences."""
         state = self.replace_state
-        display_find = repr(term_find) if not term_find or term_find.isspace() else term_find
-        display_replace = repr(term_replace) if not term_replace or term_replace.isspace() else term_replace
         self.app.push_screen(
             ConfirmScreen(
                 "Replace All",
-                label=f"Replace [$success]{display_find}[/] with [$success]{display_replace}[/] for all [$accent]{state.total_occurrence}[/] occurrences?",
+                label=f"Replace `[$success]{term_find}[/]` with `[$success]{term_replace}[/]` for all [$accent]{state.total_occurrence}[/] occurrences?",
             ),
             callback=self.handle_replace_all_confirmation,
         )
@@ -2939,11 +2942,7 @@ class DataFrameTable(DataTable):
         state.current_occurrence += 1
 
         # Show confirmation
-        display_find = repr(state.term_find) if not state.term_find or state.term_find.isspace() else state.term_find
-        display_replace = (
-            repr(state.term_replace) if not state.term_replace or state.term_replace.isspace() else state.term_replace
-        )
-        label = f"Replace [$warning]{display_find}[/] with [$success]{display_replace}[/] ({state.current_occurrence} of {state.total_occurrence})?"
+        label = f"Replace `[$warning]{state.term_find}[/]` with `[$success]{state.term_replace}[/]` ({state.current_occurrence} of {state.total_occurrence})?"
 
         self.app.push_screen(
             ConfirmScreen("Replace", label=label, maybe="Skip"),
