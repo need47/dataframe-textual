@@ -467,6 +467,7 @@ Complex values or filters can be specified via Polars expressions, with the foll
 - `$_` - Current column (based on cursor position)
 - `$1`, `$2`, etc. - Column by 1-based index
 - `$age`, `$salary` - Column by name (use actual column names)
+- `` $`col name` `` - Column by name with spaces (backtick quoted)
 
 **Row References:**
 - `$#` - Current row index (1-based)
@@ -492,6 +493,7 @@ Complex values or filters can be specified via Polars expressions, with the foll
 - `($score >= 80) & ($score <= 90)` - Score between 80 and 90
 - `~($status == 'inactive')` - Status is not inactive
 - `$revenue > $expenses` - Revenue exceeds expenses
+- ``$`product id` > 100`` - Product ID with spaces in column name greater than 100
 
 **String Matching:** ([Polars string API reference](https://docs.pola.rs/api/python/stable/reference/series/string.html))
 - `$name.str.contains("John")` - Name contains "John" (case-sensitive)
@@ -681,7 +683,7 @@ Press `K` to cycle through selection modes:
 The SQL interface provides two modes for querying your dataframe:
 
 #### Simple SQL Interface (`l`)
-Select specific columns and apply WHERE conditions without writing full SQL:
+SELECT specific columns and apply WHERE conditions without writing full SQL:
 - Choose which columns to include in results
 - Specify WHERE clause for filtering
 - Ideal for quick filtering and column selection
@@ -697,17 +699,14 @@ Execute complete SQL queries for advanced data manipulation:
 **Examples:**
 ```sql
 -- Filter and select specific rows and/or columns
-SELECT name, age FROM self WHERE age > 30
+SELECT name, age 
+FROM self 
+WHERE age > 30
 
--- Aggregate with GROUP BY
-SELECT department, COUNT(*) as count, AVG(salary) as avg_salary
-FROM self
-GROUP BY department
-
--- Complex filtering with multiple conditions
+-- Use backticks (`) for column names with spaces
 SELECT *
 FROM self
-WHERE (age > 25 AND salary > 50000) OR department = 'Management'
+WHERE `product id` = 7
 ```
 
 ### 19. Clipboard Operations
