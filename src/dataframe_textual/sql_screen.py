@@ -151,9 +151,6 @@ class SimpleSqlScreen(SqlScreen):
 
         Args:
             dftable: Reference to the parent DataFrameTable widget.
-
-        Returns:
-            None
         """
         super().__init__(
             dftable,
@@ -165,12 +162,12 @@ class SimpleSqlScreen(SqlScreen):
         """Compose the simple SQL screen widget structure."""
         with Container(id="sql-container") as container:
             container.border_title = "SQL Query"
-            yield Label("Select columns (default to all):", id="select-label")
+            yield Label("SELECT columns (all if none selected):", id="select-label")
             yield SelectionList(
                 *[Selection(col, col) for col in self.df.columns if col not in self.dftable.hidden_columns],
                 id="column-selection",
             )
-            yield Label("Where condition (optional)", id="where-label")
+            yield Label("WHERE condition (optional)", id="where-label")
             yield Input(placeholder="e.g., age > 30 and height < 180", id="where-input")
             yield from super().compose()
 
@@ -212,9 +209,6 @@ class AdvancedSqlScreen(SqlScreen):
 
         Args:
             dftable: Reference to the parent DataFrameTable widget.
-
-        Returns:
-            None
         """
         super().__init__(
             dftable,
@@ -227,7 +221,7 @@ class AdvancedSqlScreen(SqlScreen):
         with Container(id="sql-container") as container:
             container.border_title = "Advanced SQL Query"
             yield TextArea.code_editor(
-                placeholder="Enter SQL query (use `self` as the table name), e.g., \n\nSELECT * \nFROM self \nWHERE age > 30",
+                placeholder="Enter SQL query, e.g., \n\nSELECT * \nFROM self \nWHERE age > 30\n\n- use 'self' as the table name\n- use backticks (`) for column names with spaces.",
                 id="sql-textarea",
                 language="sql",
             )

@@ -259,6 +259,7 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
     - `$#` - Row index (1-based, requires '^__ridx__^' column to be present)
     - `$1`, `$2`, etc. - Column index (1-based)
     - `$name` - Column name (e.g., `$product_id`)
+    - `$\`col name\`` - Column name with spaces (e.g., `$\`product id\``)
 
     Args:
         template: The template string containing placeholders and literal text
@@ -274,8 +275,15 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
     if "$" not in template or template.endswith("$"):
         return [template]
 
-    # Regex matches: $_ or $\d+ or $\w+ (column names)
-    placeholder_pattern = r"\$(_|#|\d+|[a-zA-Z_]\w*)"
+    # Regex matches: $_ or $# or $\d+ or $`...` (backtick-quoted names with spaces) or $\w+ (column names)
+    # Pattern explanation:
+    # \$(_|#|\d+|`[^`]+`|[a-zA-Z_]\w*)
+    # - $_ : current column
+    # - $# : row index
+    # - $\d+ : column by index (1-based)
+    # - $`[^`]+` : column by name with spaces (backtick quoted)
+    # - $[a-zA-Z_]\w* : column by name without spaces
+    placeholder_pattern = r"\$(_|#|\d+|`[^`]+`|[a-zA-Z_]\w*)"
     placeholders = re.finditer(placeholder_pattern, template)
 
     parts = []
@@ -308,6 +316,13 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
                 parts.append(pl.col(col_ref))
             except IndexError:
                 raise ValueError(f"Invalid column index: ${placeholder} (valid range: $1 to ${len(columns)})")
+        elif placeholder.startswith("`") and placeholder.endswith("`"):
+            # $`col name` refers to column by name with spaces
+            col_ref = placeholder[1:-1]  # Remove backticks
+            if col_ref in columns:
+                parts.append(pl.col(col_ref))
+            else:
+                raise ValueError(f"Column not found: ${placeholder} (available columns: {', '.join(columns)})")
         else:
             # $name refers to column by name
             if placeholder in columns:
@@ -336,6 +351,7 @@ def parse_polars_expression(expression: str, columns: list[str], current_cidx: i
     - $# - Row index (1-based, requires '^__ridx__^' column to be present)
     - $1, $2, etc. - Column index (1-based)
     - $col_name - Column name (valid identifier starting with _ or letter)
+    - $`col name` - Column name with spaces (backtick quoted)
 
     Examples:
     - "$_ > 50" -> "pl.col('current_col') > 50"
@@ -343,6 +359,7 @@ def parse_polars_expression(expression: str, columns: list[str], current_cidx: i
     - "$1 > 50" -> "pl.col('col0') > 50"
     - "$name == 'Alex'" -> "pl.col('name') == 'Alex'"
     - "$age < $salary" -> "pl.col('age') < pl.col('salary')"
+    - "$`product id` > 100" -> "pl.col('product id') > 100"
 
     Args:
         expression: The input expression as a string.

@@ -1840,10 +1840,10 @@ class DataFrameTable(DataTable):
     def add_link_column(self, result: tuple[str, str] | None) -> None:
         """Handle result from AddLinkScreen.
 
-        Creates a new link column in the dataframe with clickable links based on a
-        user-provided template. Supports multiple placeholder types:
+        Creates a new link column in the dataframe based on a user-provided template.
+        Supports multiple placeholder types:
         - `$_` - Current column (based on cursor position)
-        - `$1`, `$2`, etc. - Column by 1-based position index
+        - `$1`, `$2`, etc. - Column by index (1-based)
         - `$name` - Column by name (e.g., `$id`, `$product_name`)
 
         The template is evaluated for each row using Polars expressions with vectorized
