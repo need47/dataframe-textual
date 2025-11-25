@@ -622,13 +622,13 @@ class DataFrameTable(DataTable):
         if self.cursor_type == "cell" and event.chain > 1:  # only on double-click or more
             try:
                 row_idx = event.style.meta["row"]
-                # col_idx = event.style.meta["column"]
+                col_idx = event.style.meta["column"]
             except (KeyError, TypeError):
                 return  # Unable to get row/column info
 
             # header row
             if row_idx == -1:
-                self.do_rename_column()
+                self.do_rename_column(col_idx)
             else:
                 self.do_edit_cell()
 
@@ -1657,10 +1657,10 @@ class DataFrameTable(DataTable):
 
         # self.notify(f"Column [$accent]{col_name}[/] updated with [$success]{expr}[/]", title="Edit Column")
 
-    def do_rename_column(self) -> None:
+    def do_rename_column(self, col_idx: int | None) -> None:
         """Open modal to rename the selected column."""
-        col_name = self.cursor_col_name
-        col_idx = self.cursor_column
+        col_idx = self.cursor_column if col_idx is None else col_idx
+        col_name = self._column_locations.get_key(col_idx).value
 
         # Push the rename column modal screen
         self.app.push_screen(

@@ -71,7 +71,10 @@ cd dataframe-textual
 # Install from local source
 pip install -e .
 
-# Or with development dependencies
+# With Excel support
+pip install -e ".[excel]"
+
+# With development dependencies
 pip install -e ".[excel,dev]"
 ```
 
