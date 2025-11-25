@@ -41,6 +41,7 @@ class DataFrameViewer(App):
         ## 🎨 View & Settings
         - **F1** - ❓ Toggle this help panel
         - **k** - 🌙 Cycle through themes
+        - **Ctrl+P -> Screenshot** - 📸 Capture terminal view as a SVG image
 
         ## ⭐ Features
         - **Multi-file support** - 📂 Open multiple CSV/Excel files as tabs

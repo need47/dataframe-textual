@@ -26,7 +26,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/J
 - 📑 **Duplicate Tab** - Create a copy of the current tab with the same data
 - 📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
 - 🎯 **Cursor Type Cycling** - Switch between cell, row, and column selection modes
-- 🔗 **Link Column Creation** - Generate clickable URLs using template expressions with placeholder support
+- 📸 **Take Screenshot** - Capture terminal view as a SVG image
 
 ## Installation
 
@@ -216,6 +216,7 @@ zcat compressed_data.csv.gz | dv -f csv
 |-----|--------|
 | `F1` | Toggle help panel |
 | `k` | Cycle through dark, light and other themes |
+| `Ctrl+P` -> `Screenshot` | Capture terminal view as a SVG image |
 
 ---
 
@@ -376,7 +377,7 @@ The application provides multiple modes for selecting rows (marks it for filteri
 
 - `\` - Select rows that match cursor value in current column (respects data type)
 - `|` - Opens dialog to select rows with custom expression
-- `'` - Select/deselect current row 
+- `'` - Select/deselect current row
 - `t` - Flip selections of all rows
 - `T` - Clear all row selections and cell matches
 - `{` - Go to previous selected row
