@@ -2826,10 +2826,12 @@ class DataFrameTable(DataTable):
     def replace_all(self, term_find: str, term_replace: str) -> None:
         """Replace all occurrences."""
         state = self.replace_state
+        display_find = repr(term_find) if not term_find or term_find.isspace() else term_find
+        display_replace = repr(term_replace) if not term_replace or term_replace.isspace() else term_replace
         self.app.push_screen(
             ConfirmScreen(
                 "Replace All",
-                label=f"Replace [$success]{term_find}[/] with [$success]{term_replace or repr('')}[/] for all [$accent]{state.total_occurrence}[/] occurrences?",
+                label=f"Replace [$success]{display_find}[/] with [$success]{display_replace}[/] for all [$accent]{state.total_occurrence}[/] occurrences?",
             ),
             callback=self.handle_replace_all_confirmation,
         )
@@ -2937,7 +2939,11 @@ class DataFrameTable(DataTable):
         state.current_occurrence += 1
 
         # Show confirmation
-        label = f"Replace [$warning]{state.term_find}[/] with [$success]{state.term_replace}[/] ({state.current_occurrence} of {state.total_occurrence})?"
+        display_find = repr(state.term_find) if not state.term_find or state.term_find.isspace() else state.term_find
+        display_replace = (
+            repr(state.term_replace) if not state.term_replace or state.term_replace.isspace() else state.term_replace
+        )
+        label = f"Replace [$warning]{display_find}[/] with [$success]{display_replace}[/] ({state.current_occurrence} of {state.total_occurrence})?"
 
         self.app.push_screen(
             ConfirmScreen("Replace", label=label, maybe="Skip"),

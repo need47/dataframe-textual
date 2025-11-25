@@ -373,7 +373,7 @@ class EditCellScreen(YesNoScreen):
 
     def _validate_input(self) -> None:
         """Validate and save the edited value."""
-        new_value_str = self.input.value.strip()
+        new_value_str = self.input.value  # Do not strip to preserve spaces
 
         # Handle empty input
         if not new_value_str:
@@ -477,7 +477,7 @@ class SearchScreen(YesNoScreen):
 
     def _validate_input(self) -> tuple[str, int, bool, bool]:
         """Validate the input and return it."""
-        term = self.input.value.strip()
+        term = self.input.value  # Do not strip to preserve spaces
 
         if not term:
             self.notify("Term cannot be empty", title=self.title, severity="error")
@@ -508,7 +508,7 @@ class FilterScreen(YesNoScreen):
 
     def _get_input(self) -> tuple[str, int, bool, bool]:
         """Get input."""
-        term = self.input.value.strip()
+        term = self.input.value  # Do not strip to preserve spaces
         match_nocase = self.checkbox.value
         match_whole = self.checkbox2.value
 
@@ -590,7 +590,7 @@ class EditColumnScreen(YesNoScreen):
 
     def _get_input(self) -> tuple[str, int]:
         """Get input."""
-        term = self.input.value.strip()
+        term = self.input.value  # Do not strip to preserve spaces
         return term, self.cidx
 
 
@@ -606,11 +606,11 @@ class AddColumnScreen(YesNoScreen):
         self.existing_columns = set(df.columns)
         super().__init__(
             title="Add Column",
-            label="Enter column name",
+            label="Column name",
             input="Link" if link else "Column name",
-            label2="Enter link template, e.g., https://example.com/$_/id/$1, PC/compound/$cid"
+            label2="Link template, e.g., https://example.com/$_/id/$1, PC/compound/$cid"
             if link
-            else "Enter value or Polars expression, e.g., abc, pl.lit(123), NULL, $_ * 2, $1 + $total, $_.str.to_uppercase(), pl.concat_str($_, pl.lit('-suffix'))",
+            else "Value or Polars expression, e.g., abc, pl.lit(123), NULL, $_ * 2, $1 + $total, $_.str.to_uppercase(), pl.concat_str($_, pl.lit('-suffix'))",
             input2="Link template" if link else "Column value or expression",
             on_yes_callback=self._get_input,
         )
@@ -618,7 +618,7 @@ class AddColumnScreen(YesNoScreen):
     def _get_input(self) -> tuple[int, str, str] | None:
         """Validate and return the new column configuration."""
         col_name = self.input.value.strip()
-        term = self.input2.value.strip()
+        term = self.input2.value  # Do not strip to preserve spaces
 
         # Validate column name
         if not col_name:
@@ -702,8 +702,8 @@ class FindReplaceScreen(YesNoScreen):
 
     def _get_input(self) -> tuple[str, str, bool, bool, bool]:
         """Get input."""
-        term_find = self.input.value.strip()
-        term_replace = self.input2.value.strip()
+        term_find = self.input.value  # Do not strip to preserve spaces
+        term_replace = self.input2.value  # Do not strip to preserve spaces
         match_nocase = self.checkbox.value
         match_whole = self.checkbox2.value
         replace_all = False
@@ -712,8 +712,8 @@ class FindReplaceScreen(YesNoScreen):
 
     def _get_input_replace_all(self) -> tuple[str, str, bool, bool, bool]:
         """Get input for 'Replace All'."""
-        term_find = self.input.value.strip()
-        term_replace = self.input2.value.strip()
+        term_find = self.input.value  # Do not strip to preserve spaces
+        term_replace = self.input2.value  # Do not strip to preserve spaces
         match_nocase = self.checkbox.value
         match_whole = self.checkbox2.value
         replace_all = True
