@@ -33,7 +33,9 @@ class DataFrameViewer(App):
         - **Q** - ❌ Close all tabs (prompts to save unsaved changes)
         - **Ctrl+Q** - 🚪 Force to quit app (discards unsaved changes)
         - **Ctrl+T** - 💾 Save current tab to file
+        - **w** - 💾 Save current tab to file (overwrite without prompt)
         - **Ctrl+A** - 💾 Save all tabs to file
+        - **W** - 💾 Save all tabs to file (overwrite without prompt)
         - **Ctrl+D** - 📋 Duplicate current tab
         - **Ctrl+O** - 📁 Open a file
         - **Double-click** - ✏️ Rename tab
@@ -63,6 +65,8 @@ class DataFrameViewer(App):
         ("ctrl+o", "open_file", "Open File"),
         ("ctrl+t", "save_current_tab", "Save Current Tab"),
         ("ctrl+a", "save_all_tabs", "Save All Tabs"),
+        ("w", "save_current_tab_overwrite", "Save Current Tab (overwrite)"),
+        ("W", "save_all_tabs_overwrite", "Save All Tabs (overwrite)"),
         ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
         ("greater_than_sign,b", "next_tab(1)", "Next Tab"),  # '>' and 'b'
         ("less_than_sign", "next_tab(-1)", "Prev Tab"),  # '<'
@@ -246,6 +250,11 @@ class DataFrameViewer(App):
         if table := self.get_active_table():
             table.do_save_to_file(title="Save Current Tab", all_tabs=False)
 
+    def action_save_current_tab_overwrite(self) -> None:
+        """Save the currently active tab to file, overwriting if it exists."""
+        if table := self.get_active_table():
+            table.save_to_file((table.filename, False, False))
+
     def action_save_all_tabs(self) -> None:
         """Save all open tabs to their respective files.
 
@@ -253,6 +262,11 @@ class DataFrameViewer(App):
         """
         if table := self.get_active_table():
             table.do_save_to_file(title="Save All Tabs", all_tabs=True)
+
+    def action_save_all_tabs_overwrite(self) -> None:
+        """Save all open tabs to their respective files, overwriting if they exist."""
+        if table := self.get_active_table():
+            table.save_to_file((table.filename, True, False))
 
     def action_duplicate_tab(self) -> None:
         """Duplicate the currently active tab.

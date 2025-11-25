@@ -205,7 +205,9 @@ zcat compressed_data.csv.gz | dv -f csv
 | `Q` | Close all tabs and app (prompts to save unsaved changes) |
 | `Ctrl+Q` | Force to quit app (regardless of unsaved changes) |
 | `Ctrl+T` | Save current tab to file |
+| `w` | Save current tab to file (overwrite without prompt) |
 | `Ctrl+A` | Save all tabs to file |
+| `W` | Save all tabs to file (overwrite without prompt) |
 | `Ctrl+D` | Duplicate current tab |
 | `Ctrl+O` | Open file in a new tab |
 | `Double-click` | Rename tab |
@@ -754,7 +756,9 @@ Manage multiple files and dataframes simultaneously with tabs.
 - **`Double-click`** - Rename the tab
 - **`Ctrl+D`** - Duplicate current tab (creates a copy with same data and state)
 - **`Ctrl+T`** - Save current tab to file
+- **`w`** - Save current tab to file (overwrite without prompt)
 - **`Ctrl+A`** - Save all tabs in a single Excel file
+- **`W`** - Save all tabs to file (overwrite without prompt)
 - **`q`** - Close current tab (closes tab, prompts to save if unsaved changes)
 - **`Q`** - Close all tabs and exit app (prompts to save tabs with unsaved changes)
 - **`Ctrl+Q`** - Force to quit app regardless of unsaved changes

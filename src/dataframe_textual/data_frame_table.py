@@ -3222,13 +3222,13 @@ class DataFrameTable(DataTable):
         """Handle result from SaveFileScreen."""
         if result is None:
             return
-        filename, all_tabs = result
+        filename, all_tabs, overwrite_prompt = result
 
         # Whether to save all tabs (for Excel files)
         self._all_tabs = all_tabs
 
         # Check if file exists
-        if Path(filename).exists():
+        if overwrite_prompt and Path(filename).exists():
             self._pending_filename = filename
             self.app.push_screen(
                 ConfirmScreen("File already exists. Overwrite?"),
@@ -3294,10 +3294,11 @@ class DataFrameTable(DataTable):
             else:
                 self.dirty = False
 
-            if self._task_after_save == "close_tab":
-                self.app.do_close_tab()
-            elif self._task_after_save == "quit_app":
-                self.app.exit()
+            if hasattr(self, "_task_after_save"):
+                if self._task_after_save == "close_tab":
+                    self.app.do_close_tab()
+                elif self._task_after_save == "quit_app":
+                    self.app.exit()
 
             # From ConfirmScreen callback, so notify accordingly
             if self._all_tabs:

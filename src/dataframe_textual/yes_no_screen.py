@@ -314,7 +314,7 @@ class SaveFileScreen(YesNoScreen):
         if self.input:
             input_filename = self.input.value.strip()
             if input_filename:
-                return input_filename, self.all_tabs
+                return input_filename, self.all_tabs, True  # Overwrite prompt
             else:
                 self.notify("Filename cannot be empty", title="Save", severity="error")
                 return None
