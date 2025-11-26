@@ -76,7 +76,7 @@ class DtypeClass:
     convert: Any
 
     def format(
-        self, val: Any, style: str | None = None, apply_justify: bool = True, thousand_separator: bool = False
+        self, val: Any, style: str | None = None, justify: str | None = None, thousand_separator: bool = False
     ) -> str:
         """Format the value according to its data type.
 
@@ -84,7 +84,7 @@ class DtypeClass:
             val: The value to format.
 
         Returns:
-            The formatted value as a string.
+            The formatted value as a Text.
         """
         # Format the value
         if val is None:
@@ -98,8 +98,8 @@ class DtypeClass:
 
         return Text(
             text_val,
-            style=style or self.style,
-            justify=self.justify if apply_justify else "",
+            style="" if style == "" else (style or self.style),
+            justify="" if justify == "" else (justify or self.justify),
             overflow="ellipsis",
             no_wrap=True,
         )
@@ -217,7 +217,7 @@ def format_row(vals, dtypes, styles=None, apply_justify=True, thousand_separator
             dc.format(
                 val,
                 style=styles[idx] if styles and styles[idx] else None,
-                apply_justify=apply_justify,
+                justify=None if apply_justify else "",
                 thousand_separator=thousand_separator,
             )
         )

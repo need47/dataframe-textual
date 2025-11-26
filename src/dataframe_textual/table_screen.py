@@ -293,19 +293,9 @@ class StatisticsScreen(TableScreen):
         # Add rows
         for row in stats_df.rows():
             stat_label, stat_value = row
-            value = stat_value
-            if stat_value is None:
-                value = NULL_DISPLAY
-            elif dc.gtype == "integer" and self.thousand_separator:
-                value = f"{stat_value:,}"
-            elif dc.gtype == "float":
-                value = format_float(stat_value, self.thousand_separator)
-            else:
-                value = str(stat_value)
-
             self.table.add_row(
-                Text(stat_label, justify="left"),
-                Text(value, style=dc.style, justify=dc.justify),
+                stat_label,
+                dc.format(stat_value, thousand_separator=self.thousand_separator),
             )
 
     def build_dataframe_stats(self) -> None:
@@ -347,17 +337,7 @@ class StatisticsScreen(TableScreen):
                 col_dtype = stats_df.dtypes[idx]
                 dc = DtypeConfig(col_dtype)
 
-                value = stat_value
-                if stat_value is None:
-                    value = NULL_DISPLAY
-                elif dc.gtype == "integer" and self.thousand_separator:
-                    value = f"{stat_value:,}"
-                elif dc.gtype == "float":
-                    value = format_float(stat_value, self.thousand_separator)
-                else:
-                    value = str(stat_value)
-
-                formatted_row.append(Text(value, style=dc.style, justify=dc.justify))
+                formatted_row.append(dc.format(stat_value, thousand_separator=self.thousand_separator))
 
             self.table.add_row(*formatted_row)
 
@@ -430,33 +410,18 @@ class FrequencyScreen(TableScreen):
             self.table.add_column(Text(header_text, justify=justify), key=key)
 
         # Get style config for Int64 and Float64
-        ds_int = DtypeConfig(pl.Int64)
-        ds_float = DtypeConfig(pl.Float64)
+        dc_int = DtypeConfig(pl.Int64)
+        dc_float = DtypeConfig(pl.Float64)
 
         # Add rows to the frequency table
         for row_idx, row in enumerate(self.df.rows()):
             column, count = row
             percentage = (count / self.total_count) * 100
 
-            if column is None:
-                value = NULL_DISPLAY
-            elif dc.gtype == "integer" and self.thousand_separator:
-                value = f"{column:,}"
-            elif dc.gtype == "float":
-                value = format_float(column, self.thousand_separator)
-            else:
-                value = str(column)
-
             self.table.add_row(
-                Text(value, style=dc.style, justify=dc.justify),
-                Text(
-                    f"{count:,}" if self.thousand_separator else str(count), style=ds_int.style, justify=ds_int.justify
-                ),
-                Text(
-                    format_float(percentage, self.thousand_separator),
-                    style=ds_float.style,
-                    justify=ds_float.justify,
-                ),
+                dc.format(column),
+                dc_int.format(count),
+                dc_float.format(percentage, thousand_separator=self.thousand_separator),
                 Bar(
                     highlight_range=(0.0, percentage / 100 * 10),
                     width=10,
@@ -583,10 +548,11 @@ class MetaColumnScreen(TableScreen):
 
         # Add a row for each column
         for idx, (col_name, col_type) in enumerate(schema.items(), 1):
+            dc = DtypeConfig(col_type)
             self.table.add_row(
                 dc_int.format(idx),
-                dc_str.format(col_name),
-                dc_str.format(str(col_type)),
+                col_name,
+                dc_str.format(str(col_type), style=dc.style),
             )
 
         self.table.cursor_type = "none"
