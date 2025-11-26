@@ -284,7 +284,7 @@ class DataFrameViewer(App):
 
         # Create new table with the same dataframe and filename
         new_table = DataFrameTable(
-            table.df,
+            table.df.clone(),
             table.filename,
             tabname=new_tabname,
             zebra_stripes=True,

@@ -1154,7 +1154,8 @@ class DataFrameTable(DataTable):
             # Load max BATCH_SIZE rows at a time
             chunk_size = min(self.BATCH_SIZE, stop - self.loaded_rows)
             next_stop = min(self.loaded_rows + chunk_size, stop)
-            self.load_rows_batch(next_stop)
+            self.load_rows_range(self.loaded_rows, next_stop)
+            self.loaded_rows = next_stop
 
             # If there's more to load, yield to event loop with delay
             if next_stop < stop:
@@ -1166,17 +1167,17 @@ class DataFrameTable(DataTable):
         if move_to_end:
             self.call_after_refresh(lambda: self.move_cursor(row=self.row_count - 1))
 
-    def load_rows_batch(self, stop: int) -> None:
+    def load_rows_range(self, start: int, stop: int) -> None:
         """Load a batch of rows into the table.
 
         Row keys are 0-based indices as strings, which map directly to dataframe row indices.
         Row labels are 1-based indices as strings.
 
         Args:
+            start: Start loading rows from this index.
             stop: Stop loading rows when this index is reached.
         """
         try:
-            start = self.loaded_rows
             df_slice = self.df.slice(start, stop - start)
 
             for ridx, row in enumerate(df_slice.rows(), start):
@@ -1202,11 +1203,11 @@ class DataFrameTable(DataTable):
                 # Always add labels so they can be shown/hidden via CSS
                 self.add_row(*formatted_row, key=str(ridx), label=str(ridx + 1))
 
-            # Update loaded rows count
-            self.loaded_rows = stop
+            # # Update loaded rows count
+            # self.loaded_rows = stop
 
             # self.notify(f"Loaded [$accent]{self.loaded_rows}/{len(self.df)}[/] rows from [$success]{self.name}[/]", title="Load")
-            self.log(f"Loaded {self.loaded_rows}/{len(self.df)} rows from `{self.filename or self.name}`")
+            self.log(f"Loaded {start}-{stop}/{len(self.df)} rows from `{self.filename or self.name}`")
 
         except Exception as e:
             self.notify("Error loading rows", title="Load", severity="error", timeout=10)
