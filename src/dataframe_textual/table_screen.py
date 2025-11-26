@@ -418,7 +418,7 @@ class FrequencyScreen(TableScreen):
 
             self.table.add_row(
                 dc.format(column),
-                dc_int.format(count),
+                dc_int.format(count, thousand_separator=self.thousand_separator),
                 dc_float.format(percentage, thousand_separator=self.thousand_separator),
                 Bar(
                     highlight_range=(0.0, percentage / 100 * 10),
@@ -503,15 +503,15 @@ class MetaShape(TableScreen):
         """Build the metadata table."""
         self.table.clear(columns=True)
         self.table.add_column("")
-        self.table.add_column("Count")
+        self.table.add_column(Text("Count", justify="right"))
 
         # Get shape information
         num_rows, num_cols = self.df.shape
         dc_int = DtypeConfig(pl.Int64)
 
         # Add rows to the table
-        self.table.add_row("Row", dc_int.format(num_rows))
-        self.table.add_row("Column", dc_int.format(num_cols))
+        self.table.add_row("Row", dc_int.format(num_rows, thousand_separator=self.thousand_separator))
+        self.table.add_row("Column", dc_int.format(num_cols, thousand_separator=self.thousand_separator))
 
         self.table.cursor_type = "none"
 
@@ -526,9 +526,6 @@ class MetaColumnScreen(TableScreen):
 
         Populates the table with information about each column in the dataframe,
         including ID (1-based index), Name, and Type.
-
-        Returns:
-            None
         """
         self.build_table()
 
@@ -548,9 +545,9 @@ class MetaColumnScreen(TableScreen):
         for idx, (col_name, col_type) in enumerate(schema.items(), 1):
             dc = DtypeConfig(col_type)
             self.table.add_row(
-                dc_int.format(idx),
+                dc_int.format(idx, thousand_separator=self.thousand_separator),
                 col_name,
-                dc_str.format(str(col_type), style=dc.style),
+                dc_str.format(col_type, style=dc.style),
             )
 
         self.table.cursor_type = "none"
