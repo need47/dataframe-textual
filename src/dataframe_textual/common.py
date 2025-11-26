@@ -34,6 +34,29 @@ NULL = "NULL"
 NULL_DISPLAY = "-"
 
 
+def format_float(value: float, thousand_separator: bool = False, precision: int = 2) -> str:
+    """Format a float value, keeping integers without decimal point.
+
+    Args:
+        val: The float value to format.
+        thousand_separator: Whether to include thousand separators. Defaults to False.
+
+    Returns:
+        The formatted float as a string.
+    """
+
+    if (val := int(value)) == value:
+        if precision > 0:
+            return f"{val:,}" if thousand_separator else str(val)
+        else:
+            return f"{val:,.{-precision}f}" if thousand_separator else f"{val:.{-precision}f}"
+    else:
+        if precision > 0:
+            return f"{value:,.{precision}f}" if thousand_separator else f"{value:.{precision}f}"
+        else:
+            return f"{value:,f}" if thousand_separator else str(value)
+
+
 @dataclass
 class DtypeClass:
     """Data type class configuration.
@@ -51,6 +74,35 @@ class DtypeClass:
     justify: str
     itype: str
     convert: Any
+
+    def format(
+        self, val: Any, style: str | None = None, apply_justify: bool = True, thousand_separator: bool = False
+    ) -> str:
+        """Format the value according to its data type.
+
+        Args:
+            val: The value to format.
+
+        Returns:
+            The formatted value as a string.
+        """
+        # Format the value
+        if val is None:
+            text_val = NULL_DISPLAY
+        elif self.gtype == "integer" and thousand_separator:
+            text_val = f"{val:,}"
+        elif self.gtype == "float":
+            text_val = format_float(val, thousand_separator)
+        else:
+            text_val = str(val)
+
+        return Text(
+            text_val,
+            style=style or self.style,
+            justify=self.justify if apply_justify else "",
+            overflow="ellipsis",
+            no_wrap=True,
+        )
 
 
 # itype is used by Input widget for input validation
@@ -143,29 +195,6 @@ def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
         return STYLES[pl.Unknown]
 
 
-def format_float(value: float, thousand_separator: bool = False, precision: int = 2) -> str:
-    """Format a float value, keeping integers without decimal point.
-
-    Args:
-        val: The float value to format.
-        thousand_separator: Whether to include thousand separators. Defaults to False.
-
-    Returns:
-        The formatted float as a string.
-    """
-
-    if (val := int(value)) == value:
-        if precision > 0:
-            return f"{val:,}" if thousand_separator else str(val)
-        else:
-            return f"{val:,.{-precision}f}" if thousand_separator else f"{val:.{-precision}f}"
-    else:
-        if precision > 0:
-            return f"{value:,.{precision}f}" if thousand_separator else f"{value:.{precision}f}"
-        else:
-            return f"{value:,f}" if thousand_separator else str(value)
-
-
 def format_row(vals, dtypes, styles=None, apply_justify=True, thousand_separator=False) -> list[Text]:
     """Format a single row with proper styling and justification.
 
@@ -184,24 +213,12 @@ def format_row(vals, dtypes, styles=None, apply_justify=True, thousand_separator
 
     for idx, (val, dtype) in enumerate(zip(vals, dtypes, strict=True)):
         dc = DtypeConfig(dtype)
-
-        # Format the value
-        if val is None:
-            text_val = NULL_DISPLAY
-        elif dc.gtype == "integer" and thousand_separator:
-            text_val = f"{val:,}"
-        elif dc.gtype == "float":
-            text_val = format_float(val, thousand_separator)
-        else:
-            text_val = str(val)
-
         formatted_row.append(
-            Text(
-                text_val,
-                style=styles[idx] if styles and styles[idx] else dc.style,
-                justify=dc.justify if apply_justify else "",
-                overflow="ellipsis",
-                no_wrap=True,
+            dc.format(
+                val,
+                style=styles[idx] if styles and styles[idx] else None,
+                apply_justify=apply_justify,
+                thousand_separator=thousand_separator,
             )
         )
 
@@ -259,7 +276,7 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
     - `$#` - Row index (1-based, requires '^__ridx__^' column to be present)
     - `$1`, `$2`, etc. - Column index (1-based)
     - `$name` - Column name (e.g., `$product_id`)
-    - `$\`col name\`` - Column name with spaces (e.g., `$\`product id\``)
+    - `` $`col name` `` - Column name with spaces (e.g., `` $`product id` ``)
 
     Args:
         template: The template string containing placeholders and literal text

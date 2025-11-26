@@ -521,3 +521,72 @@ class FrequencyScreen(TableScreen):
         col_value = NULL if cell_value.plain == NULL_DISPLAY else DtypeConfig(col_dtype).convert(cell_value.plain)
 
         return self.cidx, col_name, col_value
+
+
+class MetaShape(TableScreen):
+    """Modal screen to display metadata about the dataframe."""
+
+    CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "MetadataScreen")
+
+    def on_mount(self) -> None:
+        """Initialize the metadata screen.
+
+        Populates the table with metadata information about the dataframe,
+        including row and column counts.
+        """
+        self.build_table()
+
+    def build_table(self) -> None:
+        """Build the metadata table."""
+        self.table.clear(columns=True)
+        self.table.add_column("")
+        self.table.add_column("Count")
+
+        # Get shape information
+        num_rows, num_cols = self.df.shape
+        dc_int = DtypeConfig(pl.Int64)
+
+        # Add rows to the table
+        self.table.add_row("Row", dc_int.format(num_rows))
+        self.table.add_row("Column", dc_int.format(num_cols))
+
+        self.table.cursor_type = "none"
+
+
+class MetaColumnScreen(TableScreen):
+    """Modal screen to display metadata about the columns in the dataframe."""
+
+    CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "MetaColumnScreen")
+
+    def on_mount(self) -> None:
+        """Initialize the column metadata screen.
+
+        Populates the table with information about each column in the dataframe,
+        including ID (1-based index), Name, and Type.
+
+        Returns:
+            None
+        """
+        self.build_table()
+
+    def build_table(self) -> None:
+        """Build the column metadata table."""
+        self.table.clear(columns=True)
+        self.table.add_column("Column")
+        self.table.add_column("Name")
+        self.table.add_column("Type")
+
+        # Get schema information
+        schema = self.df.schema
+        dc_int = DtypeConfig(pl.Int64)
+        dc_str = DtypeConfig(pl.String)
+
+        # Add a row for each column
+        for idx, (col_name, col_type) in enumerate(schema.items(), 1):
+            self.table.add_row(
+                dc_int.format(idx),
+                dc_str.format(col_name),
+                dc_str.format(str(col_type)),
+            )
+
+        self.table.cursor_type = "none"

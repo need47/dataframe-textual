@@ -526,7 +526,25 @@ Complex values or filters can be specified via Polars expressions, with the foll
 - Multi-column sorting supported (press multiple times on different columns)
 - Press same key twice to remove the column from sorting
 
-### 8. Frequency Distribution
+### 8. Dataframe & Column Metadata
+
+View quick metadata about your dataframe and columns to understand their structure and content.
+
+**Dataframe Metadata** (`m`):
+- Press `m` to open a modal displaying:
+  - **Rows** - Total number of rows in the dataframe
+  - **Columns** - Total number of columns in the dataframe
+
+**Column Metadata** (`M`):
+- Press `M` to open a modal displaying details for all columns:
+  - **ID** - 1-based column index
+  - **Name** - Column name
+  - **Type** - Data type (e.g., Int64, String, Float64, Boolean)
+
+**In Metadata Modals**:
+- Press `q` or `Escape` to close
+
+### 9. Frequency Distribution
 
 Press `F` to see value distributions of the current column. The modal shows:
 - Value, Count, Percentage, Histogram
@@ -544,7 +562,7 @@ This is useful for:
 - Identifying rare or common values
 - Finding the most/least frequent entries
 
-### 9. Column & Dataframe Statistics
+### 10. Column & Dataframe Statistics
 
 Show summary statistics (count, null count, mean, median, std, min, max, etc.) using Polars' `describe()` method.
 - `s` for the current column
@@ -562,7 +580,7 @@ This is useful for:
 - Quick statistical summaries without external tools
 - Comparing statistics across columns
 
-### 10. Data Editing
+### 11. Data Editing
 
 **Edit Cell** (`e` or **Double-click**):
 - Opens modal for editing current cell
@@ -610,7 +628,7 @@ This is useful for:
 - `h` - Temporarily hide current column (data preserved)
 - `H` - Restore all hidden columns and rows
 
-### 11. Column & Row Reordering
+### 12. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
 - Swaps adjacent columns
@@ -620,12 +638,12 @@ This is useful for:
 - Swaps adjacent rows
 - Reorder is preserved when saving
 
-### 12. Freeze Rows and Columns
+### 13. Freeze Rows and Columns
 
 Press `z` to open the dialog:
 - Enter number of fixed rows and/or columns to keep top rows/columns visible while scrolling
 
-### 13. Thousand Separator Toggle
+### 14. Thousand Separator Toggle
 
 Press `,` to toggle thousand separator formatting for numeric data:
 - Applies to **integer** and **float** columns
@@ -635,11 +653,11 @@ Press `,` to toggle thousand separator formatting for numeric data:
 - Display-only: does not modify underlying data in the dataframe
 - State persists during the session
 
-### 14. Save File
+### 15. Save File
 
 Press `Ctrl+S` to save filtered, edited, or sorted data back to file
 
-### 15. Undo/Redo/Reset
+### 16. Undo/Redo/Reset
 
 **Undo** (`u`):
 - Reverts last action with full state restoration
@@ -657,7 +675,7 @@ Press `Ctrl+S` to save filtered, edited, or sorted data back to file
 - Clears all edits, deletions, selections, filters, and sorts
 - Useful for starting fresh without reloading the file
 
-### 16. Column Type Conversion
+### 17. Column Type Conversion
 
 Press the type conversion keys to instantly cast the current column to a different data type:
 
@@ -674,14 +692,14 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 **Note**: Type conversion attempts to preserve data where possible. Conversions may lose data (e.g., float to int rounding).
 
-### 17. Cursor Type Cycling
+### 18. Cursor Type Cycling
 
 Press `K` to cycle through selection modes:
 1. **Cell mode**: Highlight individual cell (and its row/column headers)
 2. **Row mode**: Highlight entire row
 3. **Column mode**: Highlight entire column
 
-### 18. SQL Interface
+### 19. SQL Interface
 
 The SQL interface provides two modes for querying your dataframe:
 
@@ -702,8 +720,8 @@ Execute complete SQL queries for advanced data manipulation:
 **Examples:**
 ```sql
 -- Filter and select specific rows and/or columns
-SELECT name, age 
-FROM self 
+SELECT name, age
+FROM self
 WHERE age > 30
 
 -- Use backticks (`) for column names with spaces
@@ -712,7 +730,7 @@ FROM self
 WHERE `product id` = 7
 ```
 
-### 19. Clipboard Operations
+### 20. Clipboard Operations
 
 Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 
@@ -723,7 +741,7 @@ Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 - Press `Ctrl+R` to copy row values (delimited by tab)
 - Hold `Shift` to select with mouse
 
-### 20. Link Column Creation
+### 21. Link Column Creation
 
 Press `@` to create a new column containing dynamically generated URLs using template.
 
@@ -745,7 +763,7 @@ The link template supports multiple placeholder types for maximum flexibility:
 - Use full undo (`u`) if template produces unexpected URLs
 - For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
 
-### 21. Tab Management
+### 22. Tab Management
 
 Manage multiple files and dataframes simultaneously with tabs.
 

@@ -39,7 +39,7 @@ from .common import (
     validate_expr,
 )
 from .sql_screen import AdvancedSqlScreen, SimpleSqlScreen
-from .table_screen import FrequencyScreen, RowDetailScreen, StatisticsScreen
+from .table_screen import FrequencyScreen, MetaColumnScreen, MetaShape, RowDetailScreen, StatisticsScreen
 from .yes_no_screen import (
     AddColumnScreen,
     AddLinkScreen,
@@ -130,6 +130,8 @@ class DataFrameTable(DataTable):
         - **F** - 📊 Show frequency distribution
         - **s** - 📈 Show statistics for current column
         - **S** - 📊 Show statistics for entire dataframe
+        - **m** - 📐 Show dataframe metadata (row/column counts)
+        - **M** - 📋 Show column metadata (ID, name, type)
         - **h** - 👁️ Hide current column
         - **H** - 👀 Show all hidden rows/columns
         - **_** - 📏 Expand column to full width
@@ -230,7 +232,9 @@ class DataFrameTable(DataTable):
         ("ctrl+r", "copy_row", "Copy row to clipboard"),
         # Save
         ("ctrl+s", "save_to_file", "Save to file"),
-        # Detail, Frequency, and Statistics
+        # Metadata, Detail, Frequency, and Statistics
+        ("m", "metadata_shape", "Show metadata for row count and column count"),
+        ("M", "metadata_column", "Show metadata for column"),
         ("enter", "view_row_detail", "View row details"),
         ("F", "show_frequency", "Show frequency"),
         ("s", "show_statistics", "Show statistics for column"),
@@ -693,6 +697,14 @@ class DataFrameTable(DataTable):
             scope: Either "column" for current column stats or "dataframe" for all columns.
         """
         self.do_show_statistics(scope)
+
+    def action_metadata_shape(self) -> None:
+        """Show metadata about the dataframe (row and column counts)."""
+        self.do_metadata_shape()
+
+    def action_metadata_column(self) -> None:
+        """Show metadata for the current column."""
+        self.do_metadata_column()
 
     def action_view_rows(self) -> None:
         """View rows by current cell value."""
@@ -1351,6 +1363,14 @@ class DataFrameTable(DataTable):
             # Show statistics for current column
             cidx = self.cursor_col_idx
             self.app.push_screen(StatisticsScreen(self, col_idx=cidx))
+
+    def do_metadata_shape(self) -> None:
+        """Show metadata about the dataframe (row and column counts)."""
+        self.app.push_screen(MetaShape(self))
+
+    def do_metadata_column(self) -> None:
+        """Show metadata for all columns in the dataframe."""
+        self.app.push_screen(MetaColumnScreen(self))
 
     def do_freeze_row_column(self) -> None:
         """Open the freeze screen to set fixed rows and columns."""
