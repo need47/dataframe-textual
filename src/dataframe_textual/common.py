@@ -195,7 +195,7 @@ def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
         return STYLES[pl.Unknown]
 
 
-def format_row(vals, dtypes, styles=None, apply_justify=True, thousand_separator=False) -> list[Text]:
+def format_row(vals, dtypes, styles=None, thousand_separator=False) -> list[Text]:
     """Format a single row with proper styling and justification.
 
     Converts raw row values to formatted Rich Text objects with appropriate
@@ -204,7 +204,6 @@ def format_row(vals, dtypes, styles=None, apply_justify=True, thousand_separator
     Args:
         vals: The list of values in the row.
         dtypes: The list of data types corresponding to each value.
-        apply_justify: Whether to apply justification styling. Defaults to True.
 
     Returns:
         A list of Rich Text objects with proper formatting applied.
@@ -217,7 +216,6 @@ def format_row(vals, dtypes, styles=None, apply_justify=True, thousand_separator
             dc.format(
                 val,
                 style=styles[idx] if styles and styles[idx] else None,
-                justify=None if apply_justify else "",
                 thousand_separator=thousand_separator,
             )
         )
