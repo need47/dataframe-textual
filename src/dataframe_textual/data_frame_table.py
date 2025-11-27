@@ -3,13 +3,15 @@
 import sys
 from collections import defaultdict, deque
 from dataclasses import dataclass
+from itertools import zip_longest
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
 import polars as pl
-from rich.text import Text
+from rich.text import Text, TextType
 from textual import work
+from textual._two_way_dict import TwoWayDict
 from textual.coordinate import Coordinate
 from textual.events import Click
 from textual.reactive import reactive
@@ -18,8 +20,11 @@ from textual.widgets import DataTable, TabPane
 from textual.widgets._data_table import (
     CellDoesNotExist,
     CellKey,
+    CellType,
     ColumnKey,
     CursorType,
+    DuplicateKey,
+    Row,
     RowKey,
 )
 
@@ -34,6 +39,7 @@ from .common import (
     format_row,
     get_next_item,
     parse_placeholders,
+    round_to_nearest_hundreds,
     sleep_async,
     tentative_expr,
     validate_expr,
@@ -56,6 +62,9 @@ from .yes_no_screen import (
 
 # Color for highlighting selections and matches
 HIGHLIGHT_COLOR = "red"
+
+# Buffer size for loading rows
+BUFFER_SIZE = 5
 
 # Warning threshold for loading rows
 WARN_ROWS_THRESHOLD = 50_000
@@ -115,7 +124,7 @@ class DataFrameTable(DataTable):
         - **g** - ⬆️ Jump to first row
         - **G** - ⬇️ Jump to last row
         - **HOME/END** - 🎯 Jump to first/last column
-        - **Ctrl+HOME/END** - 🎯 Jump to page top/bottom
+        - **Ctrl+HOME/END** - 🎯 Jump to page top/top
         - **Ctrl+F** - 📜 Page down
         - **Ctrl+B** - 📜 Page up
         - **PgUp/PgDn** - 📜 Page up/down
@@ -318,9 +327,9 @@ class DataFrameTable(DataTable):
         self.filename = filename or "untitled.csv"  # Current filename
         self.tabname = tabname or Path(filename).stem  # Tab name
         # Pagination & Loading
-        self.INITIAL_BATCH_SIZE = (self.app.size.height // 100 + 1) * 100
-        self.BATCH_SIZE = self.INITIAL_BATCH_SIZE // 2
+        self.BATCH_SIZE = max((self.app.size.height // 100 + 1) * 100, 100)
         self.loaded_rows = 0  # Track how many rows are currently loaded
+        self.loaded_ranges: list[tuple[int, int]] = []  # List of (start, end) row indices that are loaded
 
         # State tracking (all 0-based indexing)
         self.sorted_columns: dict[str, bool] = {}  # col_name -> descending
@@ -585,8 +594,8 @@ class DataFrameTable(DataTable):
             cidx: Column index (0-based) in the dataframe.
         """
         # Ensure the target row is loaded
-        if ridx >= self.loaded_rows:
-            self.load_rows(stop=ridx + self.BATCH_SIZE)
+        start, stop = round_to_nearest_hundreds(ridx)
+        self.load_rows_range(start, stop)
 
         row_key = self.cursor_row_key if ridx is None else str(ridx)
         col_key = self.cursor_col_key if cidx is None else self.df.columns[cidx]
@@ -605,15 +614,26 @@ class DataFrameTable(DataTable):
     def on_key(self, event) -> None:
         """Handle key press events for pagination.
 
-        Currently handles "pagedown" and "down" keys to trigger lazy loading of additional rows
+        Currently handles `pageup`/`pagedown` and `up`/`down` keys to trigger lazy loading of additional rows
         when scrolling near the end of the loaded data.
 
         Args:
             event: The key event object.
         """
-        if event.key in ("pagedown", "down"):
+        if event.key in ("pageup", "up"):
             # Let the table handle the navigation first
-            self.check_and_load_more()
+            self.check_and_load_up()
+        elif event.key in ("pagedown", "down"):
+            # Let the table handle the navigation first
+            self.check_and_load_down()
+        elif event.key == "ctrl+pageup":
+            # Let the table handle the navigation first
+            self.action_page_up()
+            self.check_and_load_up()
+        elif event.key == "ctrl+pagedown":
+            # Let the table handle the navigation first
+            self.action_page_down()
+            self.check_and_load_down()
 
     def on_click(self, event: Click) -> None:
         """Handle mouse click events on the table.
@@ -643,12 +663,15 @@ class DataFrameTable(DataTable):
 
     def action_jump_bottom(self) -> None:
         """Jump to the bottom of the table."""
-        self.load_rows(move_to_end=True)
+        stop = len(self.df)
+        start = max(0, (stop - self.BATCH_SIZE) // 100 * 100)
+        self.load_rows_range(start, stop)
+        self.move_cursor(row=self.row_count - 1)
 
     def action_forward_page(self) -> None:
         """Scroll down one page."""
         super().action_page_down()
-        self.check_and_load_more()
+        self.check_and_load_down()
 
     def action_backward_page(self) -> None:
         """Scroll up one page."""
@@ -935,9 +958,13 @@ class DataFrameTable(DataTable):
         """Open the advanced SQL interface screen."""
         self.do_advanced_sql()
 
+    def on_mouse_scroll_up(self, event) -> None:
+        """Load more rows when scrolling up with mouse."""
+        self.check_and_load_up()
+
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
-        self.check_and_load_more()
+        self.check_and_load_down()
 
     # Setup & Loading
     def reset_df(self, new_df: pl.DataFrame, dirty: bool = True) -> None:
@@ -974,27 +1001,27 @@ class DataFrameTable(DataTable):
         if reset:
             self.reset_df(self.dataframe, dirty=False)
 
-        # Lazy load up to INITIAL_BATCH_SIZE visible rows
-        stop, visible_count, row_idx = self.INITIAL_BATCH_SIZE, 0, 0
+        # Lazy load up to BATCH_SIZE visible rows
+        stop, visible_count, row_idx = self.BATCH_SIZE, 0, 0
         for row_idx, visible in enumerate(self.visible_rows):
             if not visible:
                 continue
             visible_count += 1
-            if visible_count > self.INITIAL_BATCH_SIZE:
-                stop = row_idx + self.BATCH_SIZE
+            if visible_count > self.BATCH_SIZE:
+                stop = row_idx
                 break
         else:
-            stop = row_idx + self.BATCH_SIZE
+            stop = row_idx
 
-        # # Ensure all selected rows or matches are loaded
-        # stop = max(stop, rindex(self.selected_rows, True) + 1)
-        # stop = max(stop, max(self.matches.keys(), default=0) + 1)
+        # Round up to next 100
+        if stop % 100 != 0:
+            stop = (stop // 100 + 1) * 100
 
         # Save current cursor position before clearing
         row_idx, col_idx = self.cursor_coordinate
 
         self.setup_columns()
-        self.load_rows(stop)
+        self.load_rows_range(0, stop)
 
         # Restore cursor position
         if row_idx < len(self.rows) and col_idx < len(self.columns):
@@ -1027,7 +1054,7 @@ class DataFrameTable(DataTable):
             return column_widths
 
         # Sample a reasonable number of rows to calculate widths (don't scan entire dataframe)
-        sample_size = min(self.INITIAL_BATCH_SIZE, len(self.df))
+        sample_size = min(self.BATCH_SIZE, len(self.df))
         sample_lf = self.df.lazy().slice(0, sample_size)
 
         # Determine widths for each column
@@ -1167,64 +1194,369 @@ class DataFrameTable(DataTable):
         if move_to_end:
             self.call_after_refresh(lambda: self.move_cursor(row=self.row_count - 1))
 
-    def load_rows_range(self, start: int, stop: int) -> None:
+    def _calculate_load_range(self, start: int, stop: int) -> list[tuple[int, int]]:
+        """Calculate the actual ranges to load, accounting for already-loaded ranges.
+
+        Handles complex cases where a loaded range is fully contained within the requested
+        range (creating head and tail segments to load). All overlapping/adjacent loaded
+        ranges are merged first to minimize gaps.
+
+        Args:
+            start: Requested start index (0-based).
+            stop: Requested stop index (0-based, exclusive).
+
+        Returns:
+            List of (actual_start, actual_stop) tuples to load. Empty list if the entire
+            requested range is already loaded.
+
+        Example:
+            If loaded ranges are [(150, 250)] and requesting (100, 300):
+            - Returns [(100, 150), (250, 300)] to load head and tail
+            If loaded ranges are [(0, 100), (100, 200)] and requesting (50, 150):
+            - After merging, loaded_ranges becomes [(0, 200)]
+            - Returns [] (already fully loaded)
+        """
+        if not self.loaded_ranges:
+            return [(start, stop)]
+
+        # Sort loaded ranges by start index
+        sorted_ranges = sorted(self.loaded_ranges)
+
+        # Merge overlapping/adjacent ranges
+        merged = []
+        for range_start, range_stop in sorted_ranges:
+            if merged and range_start <= merged[-1][1]:
+                # Overlapping or adjacent: merge
+                merged[-1] = (merged[-1][0], max(merged[-1][1], range_stop))
+            else:
+                merged.append((range_start, range_stop))
+
+        self.loaded_ranges = merged
+
+        # Calculate ranges to load by finding gaps in the merged ranges
+        ranges_to_load = []
+        current_pos = start
+
+        for range_start, range_stop in merged:
+            # If there's a gap before this loaded range, add it to load list
+            if current_pos < range_start and current_pos < stop:
+                gap_end = min(range_start, stop)
+                ranges_to_load.append((current_pos, gap_end))
+                current_pos = range_stop
+            elif current_pos >= range_stop:
+                # Already moved past this loaded range
+                continue
+            else:
+                # Current position is inside this loaded range, skip past it
+                current_pos = max(current_pos, range_stop)
+
+        # If there's remaining range after all loaded ranges, add it
+        if current_pos < stop:
+            ranges_to_load.append((current_pos, stop))
+
+        return ranges_to_load
+
+    def _merge_loaded_ranges(self) -> None:
+        """Merge adjacent and overlapping ranges in self.loaded_ranges.
+
+        Ranges like (0, 100) and (100, 200) are merged into (0, 200).
+        """
+        if len(self.loaded_ranges) <= 1:
+            return
+
+        # Sort by start index
+        sorted_ranges = sorted(self.loaded_ranges)
+
+        # Merge overlapping/adjacent ranges
+        merged = [sorted_ranges[0]]
+        for range_start, range_stop in sorted_ranges[1:]:
+            # Overlapping or adjacent: merge
+            if range_start <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], range_stop))
+            else:
+                merged.append((range_start, range_stop))
+
+        self.loaded_ranges = merged
+
+    def _find_insert_position_for_row(self, ridx: int) -> int:
+        """Find the correct table position to insert a row with the given dataframe index.
+
+        In the table display, rows are ordered by their dataframe index, regardless of
+        the internal row keys. This method finds where a row should be inserted based on
+        its dataframe index and the indices of already-loaded rows.
+
+        Args:
+            ridx: The 0-based dataframe row index.
+
+        Returns:
+            The 0-based table position where the row should be inserted.
+        """
+        # Count how many already-loaded rows have lower dataframe indices
+        # Iterate through loaded rows instead of iterating 0..ridx for efficiency
+        insert_pos = 0
+        for row_key in self._row_locations:
+            loaded_ridx = int(row_key.value)
+            if loaded_ridx < ridx:
+                insert_pos += 1
+
+        return insert_pos
+
+    def load_rows_segment(self, segment_start: int, segment_stop: int) -> int:
+        """Load a single contiguous segment of rows into the table.
+
+        This is the core loading logic that inserts rows at correct positions,
+        respecting visibility and selection states. Used by load_rows_range()
+        to handle each segment independently.
+
+        Args:
+            segment_start: Start loading rows from this index (0-based).
+            segment_stop: Stop loading rows when this index is reached (0-based, exclusive).
+        """
+        # Record this range before loading
+        self.loaded_ranges.append((segment_start, segment_stop))
+
+        # Load the dataframe slice
+        df_slice = self.df.slice(segment_start, segment_stop - segment_start)
+
+        # Load each row at the correct position
+        for ridx, row in enumerate(df_slice.rows(), segment_start):
+            if not self.visible_rows[ridx]:
+                continue  # Skip hidden rows
+
+            is_selected = self.selected_rows[ridx]
+            match_cols = self.matches.get(ridx, set())
+
+            vals, dtypes, styles = [], [], []
+            for cidx, (val, col, dtype) in enumerate(zip(row, self.df.columns, self.df.dtypes)):
+                if col in self.hidden_columns:
+                    continue  # Skip hidden columns
+
+                vals.append(val)
+                dtypes.append(dtype)
+
+                # Highlight entire row with selection or cells with matches
+                styles.append(HIGHLIGHT_COLOR if is_selected or cidx in match_cols else None)
+
+            formatted_row = format_row(vals, dtypes, styles=styles, thousand_separator=self.thousand_separator)
+
+            # Find correct insertion position and insert
+            insert_pos = self._find_insert_position_for_row(ridx)
+            self.insert_row(*formatted_row, key=str(ridx), label=str(ridx + 1), position=insert_pos)
+
+        # Number of rows loaded in this segment
+        segment_count = len(df_slice)
+
+        # Update loaded rows count
+        self.loaded_rows += segment_count
+
+        return segment_count
+
+    def load_rows_range(self, start: int, stop: int) -> int:
         """Load a batch of rows into the table.
 
         Row keys are 0-based indices as strings, which map directly to dataframe row indices.
         Row labels are 1-based indices as strings.
 
+        Intelligently handles range loading:
+        1. Calculates which ranges actually need loading (avoiding reloading)
+        2. Handles complex cases where loaded ranges create "holes" (head and tail segments)
+        3. Inserts rows at correct positions in the table
+        4. Merges adjacent/overlapping ranges to optimize future loading
+
         Args:
-            start: Start loading rows from this index.
-            stop: Stop loading rows when this index is reached.
+            start: Start loading rows from this index (0-based).
+            stop: Stop loading rows when this index is reached (0-based, exclusive).
         """
+        start = max(0, start)  # Clamp to non-negative
+        stop = min(stop, len(self.df))  # Clamp to dataframe length
+
         try:
-            df_slice = self.df.slice(start, stop - start)
+            # Calculate actual ranges to load, accounting for already-loaded ranges
+            ranges_to_load = self._calculate_load_range(start, stop)
 
-            for ridx, row in enumerate(df_slice.rows(), start):
-                if not self.visible_rows[ridx]:
-                    continue  # Skip hidden rows
+            # If nothing needs loading, return early
+            if not ranges_to_load:
+                self.log(f"Range {start}-{stop} already loaded, skipping")
+                return 0
 
-                is_selected = self.selected_rows[ridx]
-                match_cols = self.matches.get(ridx, set())
+            # Track the number of loaded rows in this range
+            range_count = 0
 
-                vals, dtypes, styles = [], [], []
-                for cidx, (val, col, dtype) in enumerate(zip(row, self.df.columns, self.df.dtypes)):
-                    if col in self.hidden_columns:
-                        continue  # Skip hidden columns
+            # Load each segment
+            for segment_start, segment_stop in ranges_to_load:
+                range_count += self.load_rows_segment(segment_start, segment_stop)
 
-                    vals.append(val)
-                    dtypes.append(dtype)
+            # Merge adjacent/overlapping ranges to optimize storage
+            self._merge_loaded_ranges()
 
-                    # Highlight entire row with selection or cells with matches
-                    styles.append(HIGHLIGHT_COLOR if is_selected or cidx in match_cols else None)
-
-                formatted_row = format_row(vals, dtypes, styles=styles, thousand_separator=self.thousand_separator)
-
-                # Always add labels so they can be shown/hidden via CSS
-                self.add_row(*formatted_row, key=str(ridx), label=str(ridx + 1))
-
-            # # Update loaded rows count
-            # self.loaded_rows = stop
-
-            # self.notify(f"Loaded [$accent]{self.loaded_rows}/{len(self.df)}[/] rows from [$success]{self.name}[/]", title="Load")
-            self.log(f"Loaded {start}-{stop}/{len(self.df)} rows from `{self.filename or self.name}`")
+            self.log(f"Loaded {range_count} rows for range {start}-{stop}/{len(self.df)}")
+            return range_count
 
         except Exception as e:
             self.notify("Error loading rows", title="Load", severity="error", timeout=10)
             self.log(f"Error loading rows: {str(e)}")
+            return 0
 
-    def check_and_load_more(self) -> None:
+    def check_and_load_up(self) -> None:
+        """Check if we need to load more rows and load them."""
+        # If we've loaded everything, no need to check
+        if self.loaded_rows >= len(self.df):
+            return
+
+        top_row_index = int(self.scroll_y)
+        top_row_key = self._row_locations.get_key(top_row_index + BUFFER_SIZE)
+        top_ridx = int(top_row_key.value) if top_row_key else 0
+
+        # Load upward
+        start, stop = round_to_nearest_hundreds(top_ridx - BUFFER_SIZE * 2)
+        range_count = self.load_rows_range(start, stop)
+
+        # self.log(
+        #     "========",
+        #     f"{self.size.height = }",
+        #     f"{self.header_height = }",
+        #     f"{self.scroll_y = }",
+        #     f"{top_row_index = }",
+        #     f"{top_ridx = }",
+        #     f"{start = }",
+        #     f"{stop = }",
+        #     f"{range_count = }",
+        #     f"{self.loaded_ranges = }",
+        # )
+
+        # Adjust scroll to maintain position if rows were loaded above
+        if range_count > 0:
+            self.move_cursor(row=top_row_index + range_count)
+
+    def check_and_load_down(self) -> None:
         """Check if we need to load more rows and load them."""
         # If we've loaded everything, no need to check
         if self.loaded_rows >= len(self.df):
             return
 
         visible_row_count = self.size.height - self.header_height
-        bottom_visible_row = self.scroll_y + visible_row_count
+        bottom_row_index = self.scroll_y + (visible_row_count - BUFFER_SIZE)
 
-        # If visible area is close to the end of loaded rows, load more
-        if bottom_visible_row >= self.loaded_rows - 10:
-            self.load_rows(self.loaded_rows + self.BATCH_SIZE)
+        bottom_row_key = self._row_locations.get_key(bottom_row_index)
+        bottom_ridx = int(bottom_row_key.value) if bottom_row_key else 0
+
+        # Load downward
+        start, stop = round_to_nearest_hundreds(bottom_ridx + BUFFER_SIZE * 2)
+        range_count = self.load_rows_range(start, stop)
+
+        # self.log(
+        #     "========",
+        #     f"{self.size.height = }",
+        #     f"{self.header_height = }",
+        #     f"{self.scroll_y = }",
+        #     f"{bottom_row_index = }",
+        #     f"{bottom_ridx = }",
+        #     f"{start = }",
+        #     f"{stop = }",
+        #     f"{range_count = }",
+        #     f"{self.loaded_ranges = }",
+        # )
+
+    def insert_row(
+        self,
+        *cells: CellType,
+        height: int | None = 1,
+        key: str | None = None,
+        label: TextType | None = None,
+        position: int | None = None,
+    ) -> RowKey:
+        """Insert a row at a specific position in the DataTable.
+
+        When inserting, all rows at and after the insertion position are shifted down,
+        and their entries in self._row_locations are updated accordingly.
+
+        Args:
+            *cells: Positional arguments should contain cell data.
+            height: The height of a row (in lines). Use `None` to auto-detect the optimal
+                height.
+            key: A key which uniquely identifies this row. If None, it will be generated
+                for you and returned.
+            label: The label for the row. Will be displayed to the left if supplied.
+            position: The 0-based row index where the new row should be inserted.
+                If None, inserts at the end (same as add_row). If out of bounds,
+                inserts at the nearest valid position.
+
+        Returns:
+            Unique identifier for this row. Can be used to retrieve this row regardless
+                of its current location in the DataTable (it could have moved after
+                being added due to sorting or insertion/deletion of other rows).
+
+        Raises:
+            DuplicateKey: If a row with the given key already exists.
+            ValueError: If more cells are provided than there are columns.
+        """
+        # Default to appending if position not specified or >= row_count
+        row_count = self.row_count
+        if position is None or position >= row_count:
+            return self.add_row(*cells, height=height, key=key, label=label)
+
+        # Clamp position to valid range [0, row_count)
+        position = max(0, position)
+
+        row_key = RowKey(key)
+        if row_key in self._row_locations:
+            raise DuplicateKey(f"The row key {row_key!r} already exists.")
+
+        if len(cells) > len(self.ordered_columns):
+            raise ValueError("More values provided than there are columns.")
+
+        # TC: Rebuild self._row_locations to shift rows at and after position down by 1
+        # Create a mapping of old index -> new index
+        old_to_new = {}
+        for old_idx in range(row_count):
+            if old_idx < position:
+                old_to_new[old_idx] = old_idx  # No change
+            else:
+                old_to_new[old_idx] = old_idx + 1  # Shift down by 1
+
+        # Update _row_locations with the new indices
+        new_row_locations = TwoWayDict({})
+        for row_key_item in self._row_locations:
+            old_idx = self._row_locations.get(row_key_item)
+            new_idx = old_to_new.get(old_idx, old_idx)
+            new_row_locations[row_key_item] = new_idx
+
+        # Update the internal mapping
+        self._row_locations = new_row_locations
+        # TC
+
+        row_index = position
+        # Map the key of this row to its current index
+        self._row_locations[row_key] = row_index
+        self._data[row_key] = {column.key: cell for column, cell in zip_longest(self.ordered_columns, cells)}
+
+        label = Text.from_markup(label, end="") if isinstance(label, str) else label
+
+        # Rows with auto-height get a height of 0 because 1) we need an integer height
+        # to do some intermediate computations and 2) because 0 doesn't impact the data
+        # table while we don't figure out how tall this row is.
+        self.rows[row_key] = Row(
+            row_key,
+            height or 0,
+            label,
+            height is None,
+        )
+        self._new_rows.add(row_key)
+        self._require_update_dimensions = True
+        self.cursor_coordinate = self.cursor_coordinate
+
+        # If a position has opened for the cursor to appear, where it previously
+        # could not (e.g. when there's no data in the table), then a highlighted
+        # event is posted, since there's now a highlighted cell when there wasn't
+        # before.
+        cell_now_available = self.row_count == 1 and len(self.columns) > 0
+        visible_cursor = self.show_cursor and self.cursor_type != "none"
+        if cell_now_available and visible_cursor:
+            self._highlight_cursor()
+
+        self._update_count += 1
+        self.check_idle()
+        return row_key
 
     # History & Undo
     def create_history(self, description: str) -> None:
