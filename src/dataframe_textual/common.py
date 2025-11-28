@@ -743,7 +743,7 @@ async def sleep_async(seconds: float) -> None:
     await asyncio.sleep(seconds)
 
 
-def round_to_nearest_hundreds(num: int) -> tuple[int, int]:
+def round_to_nearest_hundreds(num: int, N: int = 100) -> tuple[int, int]:
     """Round a number to the nearest hundred boundaries.
 
     Given a number, return a tuple of the two closest hundreds that bracket it.
@@ -764,6 +764,6 @@ def round_to_nearest_hundreds(num: int) -> tuple[int, int]:
         >>> round_to_nearest_hundreds(200)
         (200, 300)
     """
-    lower = (num // 100) * 100
-    upper = lower + 100
+    lower = (num // N) * N
+    upper = lower + N
     return (lower, upper)

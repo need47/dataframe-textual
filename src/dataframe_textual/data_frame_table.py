@@ -223,6 +223,8 @@ class DataFrameTable(DataTable):
         ("G", "jump_bottom", "Jump to bottom"),
         ("ctrl+f", "forward_page", "Page down"),
         ("ctrl+b", "backward_page", "Page up"),
+        ("pageup", "page_up", "Page up"),
+        ("pagedown", "page_down", "Page down"),
         # Undo/Redo/Reset
         ("u", "undo", "Undo"),
         ("U", "redo", "Redo"),
@@ -463,6 +465,22 @@ class DataFrameTable(DataTable):
         """
         return self.histories[-1] if self.histories else None
 
+    def _round_to_nearest_hundreds(self, num: int):
+        """Round a number to the nearest hundreds.
+
+        Args:
+            num: The number to round.
+        """
+        return round_to_nearest_hundreds(num, N=self.BATCH_SIZE)
+
+    def get_row_idx(self, row_key: RowKey) -> int:
+        """Get the row index for a given table row key.
+
+        Args:
+            row_key: Row key as string.
+        """
+        return super().get_row_index(row_key)
+
     def get_row_key(self, row_idx: int) -> RowKey:
         """Get the row key for a given table row index.
 
@@ -474,7 +492,18 @@ class DataFrameTable(DataTable):
         """
         return self._row_locations.get_key(row_idx)
 
-    def get_column_key(self, col_idx: int) -> ColumnKey:
+    def get_col_idx(self, col_key: ColumnKey) -> int:
+        """Get the column index for a given table column key.
+
+        Args:
+            col_key: Column key as string.
+
+        Returns:
+            Corresponding column index as int.
+        """
+        return super().get_column_index(col_key)
+
+    def get_col_key(self, col_idx: int) -> ColumnKey:
         """Get the column key for a given table column index.
 
         Args:
@@ -594,7 +623,7 @@ class DataFrameTable(DataTable):
             cidx: Column index (0-based) in the dataframe.
         """
         # Ensure the target row is loaded
-        start, stop = round_to_nearest_hundreds(ridx)
+        start, stop = self._round_to_nearest_hundreds(ridx)
         self.load_rows_range(start, stop)
 
         row_key = self.cursor_row_key if ridx is None else str(ridx)
@@ -614,26 +643,15 @@ class DataFrameTable(DataTable):
     def on_key(self, event) -> None:
         """Handle key press events for pagination.
 
-        Currently handles `pageup`/`pagedown` and `up`/`down` keys to trigger lazy loading of additional rows
-        when scrolling near the end of the loaded data.
-
         Args:
             event: The key event object.
         """
-        if event.key in ("pageup", "up"):
+        if event.key == "up":
             # Let the table handle the navigation first
-            self.check_and_load_up()
-        elif event.key in ("pagedown", "down"):
+            self.load_rows_up()
+        elif event.key == "down":
             # Let the table handle the navigation first
-            self.check_and_load_down()
-        elif event.key == "ctrl+pageup":
-            # Let the table handle the navigation first
-            self.action_page_up()
-            self.check_and_load_up()
-        elif event.key == "ctrl+pagedown":
-            # Let the table handle the navigation first
-            self.action_page_down()
-            self.check_and_load_down()
+            self.load_rows_down()
 
     def on_click(self, event: Click) -> None:
         """Handle mouse click events on the table.
@@ -664,18 +682,37 @@ class DataFrameTable(DataTable):
     def action_jump_bottom(self) -> None:
         """Jump to the bottom of the table."""
         stop = len(self.df)
-        start = max(0, (stop - self.BATCH_SIZE) // 100 * 100)
+        start = max(0, ((stop - self.BATCH_SIZE) // self.BATCH_SIZE + 1) * self.BATCH_SIZE)
         self.load_rows_range(start, stop)
         self.move_cursor(row=self.row_count - 1)
 
-    def action_forward_page(self) -> None:
-        """Scroll down one page."""
+    def action_page_up(self) -> None:
+        """Move the cursor one page up."""
+        self._set_hover_cursor(False)
+        if self.show_cursor and self.cursor_type in ("cell", "row"):
+            height = self.scrollable_content_region.height - (self.header_height if self.show_header else 0)
+
+            col_idx = self.cursor_column
+            ridx = self.cursor_row_idx
+            next_ridx = max(0, ridx - height - BUFFER_SIZE)
+            start, stop = self._round_to_nearest_hundreds(next_ridx)
+            self.load_rows_range(start, stop)
+
+            self.move_cursor(row=self.get_row_idx(str(next_ridx)), column=col_idx)
+        else:
+            super().action_page_up()
+
+    def action_page_down(self) -> None:
         super().action_page_down()
-        self.check_and_load_down()
+        self.load_rows_down()
 
     def action_backward_page(self) -> None:
         """Scroll up one page."""
-        super().action_page_up()
+        self.action_page_up()
+
+    def action_forward_page(self) -> None:
+        """Scroll down one page."""
+        self.action_page_down()
 
     def action_view_row_detail(self) -> None:
         """View details of the current row."""
@@ -960,11 +997,11 @@ class DataFrameTable(DataTable):
 
     def on_mouse_scroll_up(self, event) -> None:
         """Load more rows when scrolling up with mouse."""
-        self.check_and_load_up()
+        self.load_rows_up()
 
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
-        self.check_and_load_down()
+        self.load_rows_down()
 
     # Setup & Loading
     def reset_df(self, new_df: pl.DataFrame, dirty: bool = True) -> None:
@@ -1013,9 +1050,9 @@ class DataFrameTable(DataTable):
         else:
             stop = row_idx
 
-        # Round up to next 100
-        if stop % 100 != 0:
-            stop = (stop // 100 + 1) * 100
+        # Round up to next hundreds
+        if stop % self.BATCH_SIZE != 0:
+            stop = (stop // self.BATCH_SIZE + 1) * self.BATCH_SIZE
 
         # Save current cursor position before clearing
         row_idx, col_idx = self.cursor_coordinate
@@ -1044,7 +1081,7 @@ class DataFrameTable(DataTable):
         column_widths = {}
 
         # Get available width for the table (with some padding for borders/scrollbar)
-        available_width = self.size.width - 4  # Account for borders and scrollbar
+        available_width = self.scrollable_content_region.width
 
         # Calculate how much width we need for string columns first
         string_cols = [col for col, dtype in zip(self.df.columns, self.df.dtypes) if dtype == pl.String]
@@ -1397,65 +1434,78 @@ class DataFrameTable(DataTable):
             self.log(f"Error loading rows: {str(e)}")
             return 0
 
-    def check_and_load_up(self) -> None:
+    def load_rows_up(self) -> None:
         """Check if we need to load more rows and load them."""
         # If we've loaded everything, no need to check
         if self.loaded_rows >= len(self.df):
             return
 
-        top_row_index = int(self.scroll_y)
-        top_row_key = self._row_locations.get_key(top_row_index + BUFFER_SIZE)
-        top_ridx = int(top_row_key.value) if top_row_key else 0
+        top_row_index = int(self.scroll_y) + BUFFER_SIZE
+        top_row_key = self.get_row_key(top_row_index)
+
+        if top_row_key:
+            top_ridx = int(top_row_key.value)
+        else:
+            top_ridx = 0
+            self.log(f"No top row key at index {top_row_index}, defaulting to 0")
 
         # Load upward
-        start, stop = round_to_nearest_hundreds(top_ridx - BUFFER_SIZE * 2)
+        start, stop = self._round_to_nearest_hundreds(top_ridx - BUFFER_SIZE * 2)
         range_count = self.load_rows_range(start, stop)
 
         # self.log(
         #     "========",
-        #     f"{self.size.height = }",
-        #     f"{self.header_height = }",
-        #     f"{self.scroll_y = }",
-        #     f"{top_row_index = }",
-        #     f"{top_ridx = }",
-        #     f"{start = }",
-        #     f"{stop = }",
-        #     f"{range_count = }",
+        #     f"{self.scrollable_content_region.height = },",
+        #     f"{self.header_height = },",
+        #     f"{self.scroll_y = },",
+        #     f"{top_row_index = },",
+        #     f"{top_ridx = },",
+        #     f"{start = },",
+        #     f"{stop = },",
+        #     f"{range_count = },",
         #     f"{self.loaded_ranges = }",
         # )
 
         # Adjust scroll to maintain position if rows were loaded above
         if range_count > 0:
             self.move_cursor(row=top_row_index + range_count)
+            self.log(f"Loaded up: {range_count} rows in range {start}-{stop}/{len(self.df)}")
 
-    def check_and_load_down(self) -> None:
+    def load_rows_down(self) -> None:
         """Check if we need to load more rows and load them."""
         # If we've loaded everything, no need to check
         if self.loaded_rows >= len(self.df):
             return
 
-        visible_row_count = self.size.height - self.header_height
-        bottom_row_index = self.scroll_y + (visible_row_count - BUFFER_SIZE)
+        visible_row_count = self.scrollable_content_region.height - self.header_height
+        bottom_row_index = self.scroll_y + visible_row_count - BUFFER_SIZE
 
-        bottom_row_key = self._row_locations.get_key(bottom_row_index)
-        bottom_ridx = int(bottom_row_key.value) if bottom_row_key else 0
+        bottom_row_key = self.get_row_key(bottom_row_index)
+        if bottom_row_key:
+            bottom_ridx = int(bottom_row_key.value)
+        else:
+            bottom_ridx = 0
+            self.log(f"No bottom row key at index {bottom_row_index}, defaulting to 0")
 
         # Load downward
-        start, stop = round_to_nearest_hundreds(bottom_ridx + BUFFER_SIZE * 2)
+        start, stop = self._round_to_nearest_hundreds(bottom_ridx + BUFFER_SIZE * 2)
         range_count = self.load_rows_range(start, stop)
 
         # self.log(
         #     "========",
-        #     f"{self.size.height = }",
-        #     f"{self.header_height = }",
-        #     f"{self.scroll_y = }",
-        #     f"{bottom_row_index = }",
-        #     f"{bottom_ridx = }",
-        #     f"{start = }",
-        #     f"{stop = }",
-        #     f"{range_count = }",
+        #     f"{self.scrollable_content_region.height = },",
+        #     f"{self.header_height = },",
+        #     f"{self.scroll_y = },",
+        #     f"{bottom_row_index = },",
+        #     f"{bottom_ridx = },",
+        #     f"{start = },",
+        #     f"{stop = },",
+        #     f"{range_count = },",
         #     f"{self.loaded_ranges = }",
         # )
+
+        if range_count > 0:
+            self.log(f"Loaded down: {range_count} rows in range {start}-{stop}/{len(self.df)}")
 
     def insert_row(
         self,
@@ -1517,7 +1567,7 @@ class DataFrameTable(DataTable):
         # Update _row_locations with the new indices
         new_row_locations = TwoWayDict({})
         for row_key_item in self._row_locations:
-            old_idx = self._row_locations.get(row_key_item)
+            old_idx = self.get_row_idx(row_key_item)
             new_idx = old_to_new.get(old_idx, old_idx)
             new_row_locations[row_key_item] = new_idx
 
@@ -2013,7 +2063,7 @@ class DataFrameTable(DataTable):
     def do_rename_column(self, col_idx: int | None) -> None:
         """Open modal to rename the selected column."""
         col_idx = self.cursor_column if col_idx is None else col_idx
-        col_name = self.get_column_key(col_idx).value
+        col_name = self.get_col_key(col_idx).value
 
         # Push the rename column modal screen
         self.app.push_screen(
@@ -2264,7 +2314,7 @@ class DataFrameTable(DataTable):
         # Remove all columns before the current column
         if more == "before":
             for i in range(col_idx + 1):
-                col_key = self.get_column_key(i)
+                col_key = self.get_col_key(i)
                 col_names_to_remove.append(col_key.value)
                 col_keys_to_remove.append(col_key)
 
@@ -2273,7 +2323,7 @@ class DataFrameTable(DataTable):
         # Remove all columns after the current column
         elif more == "after":
             for i in range(col_idx, len(self.columns)):
-                col_key = self.get_column_key(i)
+                col_key = self.get_col_key(i)
                 col_names_to_remove.append(col_key.value)
                 col_keys_to_remove.append(col_key)
 
@@ -2558,8 +2608,8 @@ class DataFrameTable(DataTable):
             self._row_locations[row_key],
             self._row_locations[swap_key],
         ) = (
-            self._row_locations.get(swap_key),
-            self._row_locations.get(row_key),
+            self.get_row_idx(swap_key),
+            self.get_row_idx(row_key),
         )
 
         self._update_count += 1
