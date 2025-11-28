@@ -2456,7 +2456,14 @@ class DataFrameTable(DataTable):
 
         # Apply the filter to remove rows
         try:
-            df = self.df.filter(predicates)
+            df = (
+                self.df.lazy()
+                .filter(predicates)
+                .drop(RIDX)
+                .with_row_index(RIDX)
+                .select(pl.exclude(RIDX), RIDX)
+                .collect()
+            )
         except Exception as e:
             self.notify(f"Error deleting row(s): {e}", title="Delete", severity="error", timeout=10)
             self.histories.pop()  # Remove last history entry
@@ -2484,17 +2491,23 @@ class DataFrameTable(DataTable):
         ridx = self.cursor_row_idx
 
         # Get the row to duplicate
-        row_to_duplicate = self.df.slice(ridx, 1)
+        row_to_duplicate = self.df.slice(ridx, 1).lazy()
 
         # Add to history
         self.add_history(f"Duplicated row [$success]{ridx + 1}[/]", dirty=True)
 
         # Concatenate: rows before + duplicated row + rows after
-        df_before = self.df.slice(0, ridx + 1)
-        df_after = self.df.slice(ridx + 1)
+        df_before = self.df.slice(0, ridx + 1).lazy()
+        df_after = self.df.slice(ridx + 1).lazy()
 
         # Combine the parts
-        self.df = pl.concat([df_before, row_to_duplicate, df_after])
+        self.df = (
+            pl.concat([df_before, row_to_duplicate, df_after])
+            .drop(RIDX)
+            .with_row_index(RIDX)
+            .select(pl.exclude(RIDX), RIDX)
+            .collect()
+        )
 
         # Update selected and visible rows tracking to account for new row
         new_selected_rows = self.selected_rows[: ridx + 1] + [self.selected_rows[ridx]] + self.selected_rows[ridx + 1 :]
@@ -2631,14 +2644,20 @@ class DataFrameTable(DataTable):
         swap_ridx = int(swap_key.value)  # 0-based
         first, second = sorted([ridx, swap_ridx])
 
-        self.df = pl.concat(
-            [
-                self.df.slice(0, first),
-                self.df.slice(second, 1),
-                self.df.slice(first + 1, second - first - 1),
-                self.df.slice(first, 1),
-                self.df.slice(second + 1),
-            ]
+        self.df = (
+            pl.concat(
+                [
+                    self.df.slice(0, first).lazy(),
+                    self.df.slice(second, 1).lazy(),
+                    self.df.slice(first + 1, second - first - 1).lazy(),
+                    self.df.slice(first, 1).lazy(),
+                    self.df.slice(second + 1).lazy(),
+                ]
+            )
+            .drop(RIDX)
+            .with_row_index(RIDX)
+            .select(pl.exclude(RIDX), RIDX)
+            .collect()
         )
 
         # self.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move")
