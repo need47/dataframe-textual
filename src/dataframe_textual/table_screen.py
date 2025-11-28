@@ -123,7 +123,7 @@ class TableScreen(ModalScreen):
             expr = pl.col(col_name) == col_value
             value_display = f"[$success]{col_value}[/]"
 
-        df_filtered = self.dftable.df.with_row_index(RIDX).filter(expr)
+        df_filtered = self.dftable.df.filter(expr)
         self.log(f"Filtered dataframe has {len(df_filtered)} rows")
 
         matched_indices = set(df_filtered[RIDX].to_list())
