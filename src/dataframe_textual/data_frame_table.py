@@ -39,6 +39,7 @@ from .common import (
     format_row,
     get_next_item,
     parse_placeholders,
+    rindex,
     round_to_nearest_hundreds,
     sleep_async,
     tentative_expr,
@@ -325,7 +326,7 @@ class DataFrameTable(DataTable):
 
         # DataFrame state
         self.dataframe = df  # Original dataframe
-        self.df = df  # Internal/working dataframe
+        self.df = df.lazy().with_row_index(RIDX).select(*df.columns, RIDX).collect()  # Internal/working dataframe
         self.filename = filename or "untitled.csv"  # Current filename
         self.tabname = tabname or Path(filename).stem  # Tab name
         # Pagination & Loading
@@ -681,7 +682,7 @@ class DataFrameTable(DataTable):
 
     def action_jump_bottom(self) -> None:
         """Jump to the bottom of the table."""
-        stop = len(self.df)
+        stop = rindex(self.visible_rows, True) + 1  # Stop at the last visible row
         start = max(0, ((stop - self.BATCH_SIZE) // self.BATCH_SIZE + 1) * self.BATCH_SIZE)
         self.load_rows_range(start, stop)
         self.move_cursor(row=self.row_count - 1)
@@ -1148,7 +1149,7 @@ class DataFrameTable(DataTable):
 
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
-            if col in self.hidden_columns:
+            if col in self.hidden_columns or col.startswith(RIDX):
                 continue  # Skip hidden columns
             for idx, c in enumerate(self.sorted_columns, 1):
                 if c == col:
@@ -1369,7 +1370,7 @@ class DataFrameTable(DataTable):
 
             vals, dtypes, styles = [], [], []
             for cidx, (val, col, dtype) in enumerate(zip(row, self.df.columns, self.df.dtypes)):
-                if col in self.hidden_columns:
+                if col in self.hidden_columns or col.startswith(RIDX):
                     continue  # Skip hidden columns
 
                 vals.append(val)
@@ -1457,18 +1458,18 @@ class DataFrameTable(DataTable):
         start, stop = self._round_to_nearest_hundreds(top_ridx - BUFFER_SIZE * 2)
         range_count = self.load_rows_range(start, stop)
 
-        # self.log(
-        #     "========",
-        #     f"{self.scrollable_content_region.height = },",
-        #     f"{self.header_height = },",
-        #     f"{self.scroll_y = },",
-        #     f"{top_row_index = },",
-        #     f"{top_ridx = },",
-        #     f"{start = },",
-        #     f"{stop = },",
-        #     f"{range_count = },",
-        #     f"{self.loaded_ranges = }",
-        # )
+        self.log(
+            "========",
+            f"{self.scrollable_content_region.height = },",
+            f"{self.header_height = },",
+            f"{self.scroll_y = },",
+            f"{top_row_index = },",
+            f"{top_ridx = },",
+            f"{start = },",
+            f"{stop = },",
+            f"{range_count = },",
+            f"{self.loaded_ranges = }",
+        )
 
         # Adjust scroll to maintain position if rows were loaded above
         if range_count > 0:
@@ -1495,18 +1496,18 @@ class DataFrameTable(DataTable):
         start, stop = self._round_to_nearest_hundreds(bottom_ridx + BUFFER_SIZE * 2)
         range_count = self.load_rows_range(start, stop)
 
-        # self.log(
-        #     "========",
-        #     f"{self.scrollable_content_region.height = },",
-        #     f"{self.header_height = },",
-        #     f"{self.scroll_y = },",
-        #     f"{bottom_row_index = },",
-        #     f"{bottom_ridx = },",
-        #     f"{start = },",
-        #     f"{stop = },",
-        #     f"{range_count = },",
-        #     f"{self.loaded_ranges = }",
-        # )
+        self.log(
+            "========",
+            f"{self.scrollable_content_region.height = },",
+            f"{self.header_height = },",
+            f"{self.scroll_y = },",
+            f"{bottom_row_index = },",
+            f"{bottom_ridx = },",
+            f"{start = },",
+            f"{stop = },",
+            f"{range_count = },",
+            f"{self.loaded_ranges = }",
+        )
 
         if range_count > 0:
             self.log(f"Loaded down: {range_count} rows in range {start}-{stop}/{len(self.df)}")
@@ -1903,12 +1904,15 @@ class DataFrameTable(DataTable):
             del self.sorted_columns[col_name]
             self.sorted_columns[col_name] = descending
 
-        lf = self.df.lazy().with_row_index(RIDX)
+        lf = self.df.lazy()
 
         # Apply multi-column sort
         if sort_cols := list(self.sorted_columns.keys()):
             descending_flags = list(self.sorted_columns.values())
             lf = lf.sort(sort_cols, descending=descending_flags, nulls_last=True)
+        else:
+            # No sort columns - restore original order by RIDX
+            lf = lf.sort(RIDX)
 
         df_sorted = lf.collect()
 
@@ -1926,7 +1930,7 @@ class DataFrameTable(DataTable):
             }
 
         # Update the dataframe
-        self.df = df_sorted.drop(RIDX)
+        self.df = df_sorted
 
         # Recreate table for display
         self.setup_table()
@@ -2223,7 +2227,7 @@ class DataFrameTable(DataTable):
 
             # Build the new dataframe with columns reordered
             select_cols = cols_before + [new_col_name] + cols_after
-            self.df = self.df.with_row_index(RIDX).with_columns(new_col).select(select_cols)
+            self.df = self.df.with_columns(new_col).select(select_cols)
 
             # Recreate table for display
             self.setup_table()
@@ -2452,13 +2456,13 @@ class DataFrameTable(DataTable):
 
         # Apply the filter to remove rows
         try:
-            df = self.df.with_row_index(RIDX).filter(predicates)
+            df = self.df.filter(predicates)
         except Exception as e:
             self.notify(f"Error deleting row(s): {e}", title="Delete", severity="error", timeout=10)
             self.histories.pop()  # Remove last history entry
             return
 
-        self.df = df.drop(RIDX)
+        self.df = df
 
         # Update selected and visible rows tracking
         old_row_indices = set(df[RIDX].to_list())
@@ -2768,7 +2772,7 @@ class DataFrameTable(DataTable):
                     )
 
         # Lazyframe for filtering
-        lf = self.df.lazy().with_row_index(RIDX)
+        lf = self.df.lazy()
         if self.has_hidden_rows:
             lf = lf.filter(self.visible_rows)
 
@@ -2899,7 +2903,7 @@ class DataFrameTable(DataTable):
         matches: dict[int, set[int]] = defaultdict(set)
 
         # Lazyframe for filtering
-        lf = self.df.lazy().with_row_index(RIDX)
+        lf = self.df.lazy()
         if self.has_hidden_rows:
             lf = lf.filter(self.visible_rows)
 
@@ -3509,7 +3513,7 @@ class DataFrameTable(DataTable):
                     )
 
         # Lazyframe with row indices
-        lf = self.df.lazy().with_row_index(RIDX)
+        lf = self.df.lazy()
 
         # Apply existing visibility filter first
         if self.has_hidden_rows:
@@ -3569,7 +3573,7 @@ class DataFrameTable(DataTable):
         self.add_history(message, dirty=True)
 
         # Apply filter to dataframe with row indices
-        df_filtered = self.df.with_row_index(RIDX).filter(filter_expr)
+        df_filtered = self.df.filter(filter_expr)
 
         # Update selected rows
         selected_rows = [self.selected_rows[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))]
@@ -3578,7 +3582,7 @@ class DataFrameTable(DataTable):
         matches = {ridx: self.matches[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))}
 
         # Update dataframe
-        self.reset_df(df_filtered.drop(RIDX))
+        self.reset_df(df_filtered)
 
         # Restore selected rows and matches
         self.selected_rows = selected_rows
@@ -3680,20 +3684,21 @@ class DataFrameTable(DataTable):
         self.add_history(f"Saved dataframe to [$success]{filename}[/]")
 
         try:
+            df = self.df.select(pl.exclude(RIDX))
             if fmt == "csv":
-                self.df.write_csv(filename)
+                df.write_csv(filename)
             elif fmt in ("tsv", "tab"):
-                self.df.write_csv(filename, separator="\t")
+                df.write_csv(filename, separator="\t")
             elif fmt in ("xlsx", "xls"):
                 self.save_excel(filename)
             elif fmt == "json":
-                self.df.write_json(filename)
+                df.write_json(filename)
             elif fmt == "ndjson":
-                self.df.write_ndjson(filename)
+                df.write_ndjson(filename)
             elif fmt == "parquet":
-                self.df.write_parquet(filename)
+                df.write_parquet(filename)
             else:  # Fallback to CSV
-                self.df.write_csv(filename)
+                df.write_csv(filename)
 
             # Update current filename
             self.filename = filename
@@ -3728,14 +3733,14 @@ class DataFrameTable(DataTable):
 
         if not self._all_tabs or len(self.app.tabs) == 1:
             # Single tab - save directly
-            self.df.write_excel(filename)
+            self.df.select(pl.exclude(RIDX)).write_excel(filename)
         else:
             # Multiple tabs - use xlsxwriter to create multiple sheets
             with xlsxwriter.Workbook(filename) as wb:
                 tabs: dict[TabPane, DataFrameTable] = self.app.tabs
                 for table in tabs.values():
                     worksheet = wb.add_worksheet(table.tabname)
-                    table.df.write_excel(workbook=wb, worksheet=worksheet)
+                    table.df.select(pl.exclude(RIDX)).write_excel(workbook=wb, worksheet=worksheet)
 
     # SQL Interface
     def do_simple_sql(self) -> None:
@@ -3779,15 +3784,9 @@ class DataFrameTable(DataTable):
             sql: The SQL query string to execute.
         """
 
-        import re
-
-        RE_FROM_SELF = re.compile(r"\bfrom\s+self\b", re.IGNORECASE)
-
-        sql = RE_FROM_SELF.sub(f", `{RIDX}` FROM self", sql)
-
         # Execute the SQL query
         try:
-            lf = self.df.lazy().with_row_index(RIDX)
+            lf = self.df.lazy()
             if self.has_hidden_rows:
                 lf = lf.filter(self.visible_rows)
 
@@ -3821,7 +3820,7 @@ class DataFrameTable(DataTable):
                 matches = {ridx: self.matches[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))}
 
                 # Update dataframe
-                self.reset_df(df_filtered.drop(RIDX))
+                self.reset_df(df_filtered)
 
                 # Restore selected rows and matches
                 self.selected_rows = selected_rows

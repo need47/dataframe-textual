@@ -13,6 +13,8 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, SelectionList, TextArea
 from textual.widgets.selection_list import Selection
 
+from .common import RIDX
+
 
 class SqlScreen(ModalScreen):
     """Base class for modal screens handling SQL query."""
@@ -164,7 +166,11 @@ class SimpleSqlScreen(SqlScreen):
             container.border_title = "SQL Query"
             yield Label("SELECT columns (all if none selected):", id="select-label")
             yield SelectionList(
-                *[Selection(col, col) for col in self.df.columns if col not in self.dftable.hidden_columns],
+                *[
+                    Selection(col, col)
+                    for col in self.df.columns
+                    if col not in self.dftable.hidden_columns and not col.startswith(RIDX)
+                ],
                 id="column-selection",
             )
             yield Label("WHERE condition (optional)", id="where-label")
@@ -175,7 +181,9 @@ class SimpleSqlScreen(SqlScreen):
         """Handle Yes button/Enter key press."""
         selections = self.query_one(SelectionList).selected
         if not selections:
-            selections = [col for col in self.df.columns if col not in self.dftable.hidden_columns]
+            selections = [
+                col for col in self.df.columns if col not in self.dftable.hidden_columns and not col.startswith(RIDX)
+            ]
 
         columns = ", ".join(f"`{s}`" for s in selections)
         where = self.query_one(Input).value.strip()
