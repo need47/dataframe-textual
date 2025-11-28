@@ -1263,8 +1263,11 @@ class DataFrameTable(DataTable):
         # Merge overlapping/adjacent ranges
         merged = []
         for range_start, range_stop in sorted_ranges:
-            if merged and range_start <= merged[-1][1]:
-                # Overlapping or adjacent: merge
+            # Fully covered, no need to load anything
+            if range_start <= start and range_stop >= stop:
+                return []
+            # Overlapping or adjacent: merge
+            elif merged and range_start <= merged[-1][1]:
                 merged[-1] = (merged[-1][0], max(merged[-1][1], range_stop))
             else:
                 merged.append((range_start, range_stop))
@@ -1478,7 +1481,7 @@ class DataFrameTable(DataTable):
         if self.loaded_rows >= len(self.df):
             return
 
-        visible_row_count = self.scrollable_content_region.height - self.header_height
+        visible_row_count = self.scrollable_content_region.height - (self.header_height if self.show_header else 0)
         bottom_row_index = self.scroll_y + visible_row_count - BUFFER_SIZE
 
         bottom_row_key = self.get_row_key(bottom_row_index)
