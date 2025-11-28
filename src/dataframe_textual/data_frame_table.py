@@ -3775,7 +3775,7 @@ class DataFrameTable(DataTable):
             return
         sql, view = result
 
-        sql = sql.replace("$#", f"`{RIDX}`")
+        sql = sql.replace("$#", f"(`{RIDX}` + 1)")
         self.run_sql(sql, view)
 
     def run_sql(self, sql: str, view: bool = True) -> None:
