@@ -80,6 +80,7 @@ class History:
 
     description: str
     df: pl.DataFrame
+    df_view: pl.DataFrame | None
     filename: str
     loaded_rows: int
     sorted_columns: dict[str, bool]
@@ -329,6 +330,10 @@ class DataFrameTable(DataTable):
         self.df = df.lazy().with_row_index(RIDX).select(pl.exclude(RIDX), RIDX).collect()  # Internal/working dataframe
         self.filename = filename or "untitled.csv"  # Current filename
         self.tabname = tabname or Path(filename).stem  # Tab name
+
+        # In view mode, this is the copy of self.df
+        self.df_view = None
+
         # Pagination & Loading
         self.BATCH_SIZE = max((self.app.size.height // 100 + 1) * 100, 100)
         self.loaded_rows = 0  # Track how many rows are currently loaded
@@ -1632,6 +1637,7 @@ class DataFrameTable(DataTable):
         return History(
             description=description,
             df=self.df,
+            df_view=self.df_view,
             filename=self.filename,
             loaded_rows=self.loaded_rows,
             sorted_columns=self.sorted_columns.copy(),
@@ -1652,6 +1658,7 @@ class DataFrameTable(DataTable):
 
         # Restore state
         self.df = history.df
+        self.df_view = history.df_view
         self.filename = history.filename
         self.loaded_rows = history.loaded_rows
         self.sorted_columns = history.sorted_columns.copy()
@@ -1861,18 +1868,17 @@ class DataFrameTable(DataTable):
 
     def do_show_hidden_rows_columns(self) -> None:
         """Show all hidden rows/columns by recreating the table."""
-        # Get currently visible columns
-        visible_cols = set(col.key for col in self.ordered_columns)
-
-        hidden_row_count = sum(0 if visible else 1 for visible in self.visible_rows)
-        hidden_col_count = sum(0 if col in visible_cols else 1 for col in self.df.columns)
-
-        if not hidden_row_count and not hidden_col_count:
-            self.notify("No hidden columns or rows to show", title="Show", severity="warning")
+        if not self.has_hidden_rows and not self.hidden_columns and self.df_view is None:
+            self.notify("No hidden rows or columns to show", title="Show", severity="warning")
             return
 
         # Add to history
         self.add_history("Showed hidden rows/columns")
+
+        # If in a filtered view, restore the full dataframe
+        if self.df_view is not None:
+            self.df = self.df_view
+            self.df_view = None
 
         # Clear hidden rows/columns tracking
         self.visible_rows = [True] * len(self.df)
@@ -1881,10 +1887,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        self.notify(
-            f"Showed [$success]{hidden_row_count}[/] hidden row(s) and/or [$accent]{hidden_col_count}[/] column(s)",
-            title="Show",
-        )
+        self.notify("Showed hidden row(s) and/or hidden column(s)", title="Show")
 
     # Sort
     def do_sort_by_column(self, descending: bool = False) -> None:
@@ -3551,12 +3554,23 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(f"Filtered by expression [$success]{expr_str}[/]")
 
-        # Mark unfiltered rows as invisible
-        filtered_row_indices = set(df_filtered[RIDX].to_list())
-        if filtered_row_indices:
-            for ridx in range(len(self.visible_rows)):
-                if ridx not in filtered_row_indices:
-                    self.visible_rows[ridx] = False
+        self.log("df_filtered[RIDX] = " + str(df_filtered[RIDX].to_list()))
+
+        # Create a view of self.df as a copy
+        if self.df_view is None:
+            self.df_view = self.df
+
+        self.df = df_filtered
+        self.visible_rows = [True] * len(self.df)
+
+        # # Mark unfiltered rows as invisible
+        # filtered_row_indices = set(df_filtered[RIDX].to_list())
+        # if filtered_row_indices:
+        #     for ridx in range(len(self.visible_rows)):
+        #         if ridx not in filtered_row_indices:
+        #             self.visible_rows[ridx] = False
+
+        self.log(f"self.visible_rows = {self.visible_rows}")
 
         # Recreate table for display
         self.setup_table()
@@ -3696,21 +3710,22 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(f"Saved dataframe to [$success]{filename}[/]")
 
+        df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RIDX))
         try:
             if fmt == "csv":
-                self.df.write_csv(filename)
+                df.write_csv(filename)
             elif fmt in ("tsv", "tab"):
-                self.df.write_csv(filename, separator="\t")
+                df.write_csv(filename, separator="\t")
             elif fmt in ("xlsx", "xls"):
                 self.save_excel(filename)
             elif fmt == "json":
-                self.df.write_json(filename)
+                df.write_json(filename)
             elif fmt == "ndjson":
-                self.df.write_ndjson(filename)
+                df.write_ndjson(filename)
             elif fmt == "parquet":
-                self.df.write_parquet(filename)
+                df.write_parquet(filename)
             else:  # Fallback to CSV
-                self.df.write_csv(filename)
+                df.write_csv(filename)
 
             # Update current filename
             self.filename = filename
@@ -3745,14 +3760,16 @@ class DataFrameTable(DataTable):
 
         if not self._all_tabs or len(self.app.tabs) == 1:
             # Single tab - save directly
-            self.df.write_excel(filename)
+            df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RIDX))
+            df.write_excel(filename)
         else:
             # Multiple tabs - use xlsxwriter to create multiple sheets
             with xlsxwriter.Workbook(filename) as wb:
                 tabs: dict[TabPane, DataFrameTable] = self.app.tabs
                 for table in tabs.values():
                     worksheet = wb.add_worksheet(table.tabname)
-                    table.df.write_excel(workbook=wb, worksheet=worksheet)
+                    df = (table.df if table.df_view is None else table.df_view).select(pl.exclude(RIDX))
+                    df.write_excel(workbook=wb, worksheet=worksheet)
 
     # SQL Interface
     def do_simple_sql(self) -> None:
