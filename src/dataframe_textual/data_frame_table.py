@@ -2223,7 +2223,7 @@ class DataFrameTable(DataTable):
 
             # Build the new dataframe with columns reordered
             select_cols = cols_before + [new_col_name] + cols_after
-            self.df = self.df.with_row_index(RIDX).with_columns(new_col).select(select_cols)
+            self.df = self.df.lazy().with_row_index(RIDX).with_columns(new_col).select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -2452,7 +2452,7 @@ class DataFrameTable(DataTable):
 
         # Apply the filter to remove rows
         try:
-            df = self.df.with_row_index(RIDX).filter(predicates)
+            df = self.df.lazy().with_row_index(RIDX).filter(predicates).collect()
         except Exception as e:
             self.notify(f"Error deleting row(s): {e}", title="Delete", severity="error", timeout=10)
             self.histories.pop()  # Remove last history entry
@@ -2480,17 +2480,17 @@ class DataFrameTable(DataTable):
         ridx = self.cursor_row_idx
 
         # Get the row to duplicate
-        row_to_duplicate = self.df.slice(ridx, 1)
+        row_to_duplicate = self.df.slice(ridx, 1).lazy()
 
         # Add to history
         self.add_history(f"Duplicated row [$success]{ridx + 1}[/]", dirty=True)
 
         # Concatenate: rows before + duplicated row + rows after
-        df_before = self.df.slice(0, ridx + 1)
-        df_after = self.df.slice(ridx + 1)
+        df_before = self.df.slice(0, ridx + 1).lazy()
+        df_after = self.df.slice(ridx + 1).lazy()
 
         # Combine the parts
-        self.df = pl.concat([df_before, row_to_duplicate, df_after])
+        self.df = pl.concat([df_before, row_to_duplicate, df_after]).collect()
 
         # Update selected and visible rows tracking to account for new row
         new_selected_rows = self.selected_rows[: ridx + 1] + [self.selected_rows[ridx]] + self.selected_rows[ridx + 1 :]
@@ -2629,13 +2629,13 @@ class DataFrameTable(DataTable):
 
         self.df = pl.concat(
             [
-                self.df.slice(0, first),
-                self.df.slice(second, 1),
-                self.df.slice(first + 1, second - first - 1),
-                self.df.slice(first, 1),
-                self.df.slice(second + 1),
+                self.df.slice(0, first).lazy(),
+                self.df.slice(second, 1).lazy(),
+                self.df.slice(first + 1, second - first - 1).lazy(),
+                self.df.slice(first, 1).lazy(),
+                self.df.slice(second + 1).lazy(),
             ]
-        )
+        ).collect()
 
         # self.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move")
 
@@ -3569,7 +3569,7 @@ class DataFrameTable(DataTable):
         self.add_history(message, dirty=True)
 
         # Apply filter to dataframe with row indices
-        df_filtered = self.df.with_row_index(RIDX).filter(filter_expr)
+        df_filtered = self.df.lazy().with_row_index(RIDX).filter(filter_expr).collect()
 
         # Update selected rows
         selected_rows = [self.selected_rows[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))]
@@ -3779,11 +3779,7 @@ class DataFrameTable(DataTable):
             sql: The SQL query string to execute.
         """
 
-        import re
-
-        RE_FROM_SELF = re.compile(r"\bfrom\s+self\b", re.IGNORECASE)
-
-        sql = RE_FROM_SELF.sub(f", `{RIDX}` FROM self", sql)
+        sql = sql.replace("$#", f"(`{RIDX}` + 1)")
 
         # Execute the SQL query
         try:
