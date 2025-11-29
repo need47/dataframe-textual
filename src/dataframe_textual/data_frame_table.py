@@ -1033,7 +1033,6 @@ class DataFrameTable(DataTable):
         Column keys are header names from the dataframe.
         """
         self.loaded_rows = 0
-        self.loaded_ranges.clear()
         self.show_row_labels = True
 
         # Reset to original dataframe
