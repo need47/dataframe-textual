@@ -74,9 +74,6 @@ class DataFrameHelpPanel(Widget):
 
         Initializes the help panel by setting up a watcher for focused widget changes
         to dynamically update help text based on which widget has focus.
-
-        Returns:
-            None
         """
 
         # def update_help(focused_widget: Widget | None):

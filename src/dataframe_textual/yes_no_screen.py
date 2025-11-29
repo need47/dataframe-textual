@@ -119,9 +119,6 @@ class YesNoScreen(ModalScreen):
             maybe: Optional Maybe button text/dict. Defaults to None.
             no: Text or dict for the No button. If None, hides the No button. Defaults to "No".
             on_yes_callback: Optional callable that takes no args and returns the value to dismiss with when Yes is pressed. Defaults to None.
-
-        Returns:
-            None
         """
         super().__init__()
         self.title = title

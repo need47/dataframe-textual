@@ -45,9 +45,6 @@ class TableScreen(ModalScreen):
 
         Args:
             dftable: Reference to the parent DataFrameTable widget.
-
-        Returns:
-            None
         """
         super().__init__()
         self.dftable = dftable  # DataFrameTable
@@ -71,9 +68,6 @@ class TableScreen(ModalScreen):
 
         Subclasses should implement this method to populate the DataTable
         with appropriate columns and rows based on the specific screen's purpose.
-
-        Returns:
-            None
         """
         raise NotImplementedError("Subclasses must implement build_table method.")
 
@@ -85,9 +79,6 @@ class TableScreen(ModalScreen):
 
         Args:
             event: The key event object.
-
-        Returns:
-            None
         """
         if event.key in ("q", "escape"):
             self.app.pop_screen()
@@ -123,7 +114,7 @@ class TableScreen(ModalScreen):
             expr = pl.col(col_name) == col_value
             value_display = f"[$success]{col_value}[/]"
 
-        df_filtered = self.dftable.df.filter(expr)
+        df_filtered = self.dftable.df.lazy().with_row_index(RIDX).filter(expr).collect()
         self.log(f"Filtered dataframe has {len(df_filtered)} rows")
 
         matched_indices = set(df_filtered[RIDX].to_list())
@@ -167,9 +158,6 @@ class RowDetailScreen(TableScreen):
 
         Populates the table with column names and values from the selected row
         of the main DataFrame. Sets the table cursor type to "row".
-
-        Returns:
-            None
         """
         self.build_table()
 
