@@ -3554,8 +3554,6 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(f"Filtered by expression [$success]{expr_str}[/]")
 
-        self.log("df_filtered[RIDX] = " + str(df_filtered[RIDX].to_list()))
-
         # Create a view of self.df as a copy
         if self.df_view is None:
             self.df_view = self.df
@@ -3563,14 +3561,11 @@ class DataFrameTable(DataTable):
         self.df = df_filtered
         self.visible_rows = [True] * len(self.df)
 
-        # # Mark unfiltered rows as invisible
-        # filtered_row_indices = set(df_filtered[RIDX].to_list())
-        # if filtered_row_indices:
-        #     for ridx in range(len(self.visible_rows)):
-        #         if ridx not in filtered_row_indices:
-        #             self.visible_rows[ridx] = False
+        # Update selected rows
+        self.selected_rows = [self.selected_rows[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))]
 
-        self.log(f"self.visible_rows = {self.visible_rows}")
+        # Update matches
+        self.matches = {ridx: self.matches[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))}
 
         # Recreate table for display
         self.setup_table()
