@@ -114,7 +114,7 @@ class TableScreen(ModalScreen):
             expr = pl.col(col_name) == col_value
             value_display = f"[$success]{col_value}[/]"
 
-        df_filtered = self.dftable.df.lazy().with_row_index(RIDX).filter(expr).collect()
+        df_filtered = self.dftable.df.lazy().filter(expr).collect()
         self.log(f"Filtered dataframe has {len(df_filtered)} rows")
 
         matched_indices = set(df_filtered[RIDX].to_list())

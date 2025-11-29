@@ -367,7 +367,7 @@ def parse_polars_expression(expression: str, columns: list[str], current_cidx: i
 
     Replaces column references with Polars col() expressions:
     - $_ - Current selected column
-    - $# - Row index (1-based, requires '^__ridx__^' column to be present)
+    - $# - Row index (1-based)
     - $1, $2, etc. - Column index (1-based)
     - $col_name - Column name (valid identifier starting with _ or letter)
     - $`col name` - Column name with spaces (backtick quoted)

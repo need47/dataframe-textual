@@ -326,7 +326,7 @@ class DataFrameTable(DataTable):
 
         # DataFrame state
         self.dataframe = df  # Original dataframe
-        self.df = df  # Internal/working dataframe
+        self.df = df.lazy().with_row_index(RIDX).select(pl.exclude(RIDX), RIDX).collect()  # Internal/working dataframe
         self.filename = filename or "untitled.csv"  # Current filename
         self.tabname = tabname or Path(filename).stem  # Tab name
         # Pagination & Loading
@@ -1162,8 +1162,8 @@ class DataFrameTable(DataTable):
 
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
-            if col in self.hidden_columns:
-                continue  # Skip hidden columns
+            if col in self.hidden_columns or col == RIDX:
+                continue  # Skip hidden columns and internal RIDX
             for idx, c in enumerate(self.sorted_columns, 1):
                 if c == col:
                     # Add sort indicator to column header
@@ -1383,8 +1383,8 @@ class DataFrameTable(DataTable):
 
             vals, dtypes, styles = [], [], []
             for cidx, (val, col, dtype) in enumerate(zip(row, self.df.columns, self.df.dtypes)):
-                if col in self.hidden_columns:
-                    continue  # Skip hidden columns
+                if col in self.hidden_columns or col == RIDX:
+                    continue  # Skip hidden columns and internal RIDX
 
                 vals.append(val)
                 dtypes.append(dtype)
@@ -1917,12 +1917,15 @@ class DataFrameTable(DataTable):
             del self.sorted_columns[col_name]
             self.sorted_columns[col_name] = descending
 
-        lf = self.df.lazy().with_row_index(RIDX)
+        lf = self.df.lazy()
 
         # Apply multi-column sort
         if sort_cols := list(self.sorted_columns.keys()):
             descending_flags = list(self.sorted_columns.values())
             lf = lf.sort(sort_cols, descending=descending_flags, nulls_last=True)
+        else:
+            # No sort - restore original order by adding a temporary index column
+            lf = lf.sort(RIDX)
 
         df_sorted = lf.collect()
 
@@ -2237,7 +2240,7 @@ class DataFrameTable(DataTable):
 
             # Build the new dataframe with columns reordered
             select_cols = cols_before + [new_col_name] + cols_after
-            self.df = self.df.lazy().with_row_index(RIDX).with_columns(new_col).select(select_cols).collect()
+            self.df = self.df.lazy().with_columns(new_col).select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -2466,7 +2469,7 @@ class DataFrameTable(DataTable):
 
         # Apply the filter to remove rows
         try:
-            df = self.df.lazy().with_row_index(RIDX).filter(predicates).collect()
+            df = self.df.lazy().filter(predicates).collect()
         except Exception as e:
             self.notify(f"Error deleting row(s): {e}", title="Delete", severity="error", timeout=10)
             self.histories.pop()  # Remove last history entry
@@ -2782,7 +2785,7 @@ class DataFrameTable(DataTable):
                     )
 
         # Lazyframe for filtering
-        lf = self.df.lazy().with_row_index(RIDX)
+        lf = self.df.lazy()
         if self.has_hidden_rows:
             lf = lf.filter(self.visible_rows)
 
@@ -2913,7 +2916,7 @@ class DataFrameTable(DataTable):
         matches: dict[int, set[int]] = defaultdict(set)
 
         # Lazyframe for filtering
-        lf = self.df.lazy().with_row_index(RIDX)
+        lf = self.df.lazy()
         if self.has_hidden_rows:
             lf = lf.filter(self.visible_rows)
 
@@ -3523,7 +3526,7 @@ class DataFrameTable(DataTable):
                     )
 
         # Lazyframe with row indices
-        lf = self.df.lazy().with_row_index(RIDX)
+        lf = self.df.lazy()
 
         # Apply existing visibility filter first
         if self.has_hidden_rows:
@@ -3583,7 +3586,7 @@ class DataFrameTable(DataTable):
         self.add_history(message, dirty=True)
 
         # Apply filter to dataframe with row indices
-        df_filtered = self.df.lazy().with_row_index(RIDX).filter(filter_expr).collect()
+        df_filtered = self.df.lazy().filter(filter_expr).collect()
 
         # Update selected rows
         selected_rows = [self.selected_rows[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))]
@@ -3797,7 +3800,7 @@ class DataFrameTable(DataTable):
 
         # Execute the SQL query
         try:
-            lf = self.df.lazy().with_row_index(RIDX)
+            lf = self.df.lazy()
             if self.has_hidden_rows:
                 lf = lf.filter(self.visible_rows)
 
