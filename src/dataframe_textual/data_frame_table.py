@@ -39,6 +39,7 @@ from .common import (
     format_row,
     get_next_item,
     parse_placeholders,
+    rindex,
     round_to_nearest_hundreds,
     sleep_async,
     tentative_expr,
@@ -681,8 +682,21 @@ class DataFrameTable(DataTable):
 
     def action_jump_bottom(self) -> None:
         """Jump to the bottom of the table."""
-        stop = len(self.df)
-        start = max(0, ((stop - self.BATCH_SIZE) // self.BATCH_SIZE + 1) * self.BATCH_SIZE)
+        stop = rindex(self.visible_rows, True) + 1
+
+        visible_count = 0
+        for i, visible in enumerate(reversed(self.visible_rows)):
+            if visible:
+                visible_count += 1
+            if visible_count >= self.BATCH_SIZE:
+                start = len(self.visible_rows) - 1 - i
+                break
+        else:
+            start = 0
+
+        if start % self.BATCH_SIZE != 0:
+            start = (start // self.BATCH_SIZE) * self.BATCH_SIZE
+
         self.load_rows_range(start, stop)
         self.move_cursor(row=self.row_count - 1)
 
@@ -1417,7 +1431,7 @@ class DataFrameTable(DataTable):
 
             # If nothing needs loading, return early
             if not ranges_to_load:
-                self.log(f"Range {start}-{stop} already loaded, skipping")
+                # self.log(f"Range {start}-{stop} already loaded, skipping")
                 return 0
 
             # Track the number of loaded rows in this range

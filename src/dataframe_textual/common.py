@@ -224,7 +224,7 @@ def format_row(vals, dtypes, styles: list[str | None] | None = None, thousand_se
     return formatted_row
 
 
-def rindex(lst: list, value) -> int:
+def rindex(lst: list, value, pos: int | None = None) -> int:
     """Return the last index of value in a list. Return -1 if not found.
 
     Searches through the list in reverse order to find the last occurrence
@@ -237,9 +237,12 @@ def rindex(lst: list, value) -> int:
     Returns:
         The index (0-based) of the last occurrence, or -1 if not found.
     """
+    n = len(lst)
     for i, item in enumerate(reversed(lst)):
+        if pos is not None and (n - 1 - i) > pos:
+            continue
         if item == value:
-            return len(lst) - 1 - i
+            return n - 1 - i
     return -1
 
 
