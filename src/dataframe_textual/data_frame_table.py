@@ -39,7 +39,6 @@ from .common import (
     format_row,
     get_next_item,
     parse_placeholders,
-    rindex,
     round_to_nearest_hundreds,
     sleep_async,
     tentative_expr,
@@ -687,20 +686,11 @@ class DataFrameTable(DataTable):
 
     def action_jump_bottom(self) -> None:
         """Jump to the bottom of the table."""
-        stop = rindex(self.visible_rows, True) + 1
-
-        visible_count = 0
-        for i, visible in enumerate(reversed(self.visible_rows)):
-            if visible:
-                visible_count += 1
-            if visible_count >= self.BATCH_SIZE:
-                start = len(self.visible_rows) - 1 - i
-                break
-        else:
-            start = 0
+        stop = len(self.df)
+        start = max(0, stop - self.BATCH_SIZE)
 
         if start % self.BATCH_SIZE != 0:
-            start = (start // self.BATCH_SIZE) * self.BATCH_SIZE
+            start = (start // self.BATCH_SIZE + 1) * self.BATCH_SIZE
 
         self.load_rows_range(start, stop)
         self.move_cursor(row=self.row_count - 1)
@@ -1068,7 +1058,7 @@ class DataFrameTable(DataTable):
                 stop = row_idx
                 break
         else:
-            stop = row_idx
+            stop = row_idx + 1
 
         # Round up to next hundreds
         if stop % self.BATCH_SIZE != 0:
@@ -1992,6 +1982,16 @@ class DataFrameTable(DataTable):
                 .otherwise(pl.col(col_name))
                 .alias(col_name)
             )
+
+            # Also update the view if applicable
+            if self.df_view is not None:
+                ridx_view = self.df[RIDX][ridx]
+                self.df_view = self.df_view.with_columns(
+                    pl.when(pl.arange(0, len(self.df_view)) == ridx_view)
+                    .then(pl.lit(new_value))
+                    .otherwise(pl.col(col_name))
+                    .alias(col_name)
+                )
 
             # Update the display
             cell_value = self.df.item(ridx, cidx)
