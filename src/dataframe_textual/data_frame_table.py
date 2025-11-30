@@ -2576,19 +2576,29 @@ class DataFrameTable(DataTable):
     def do_duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""
         ridx = self.cursor_row_idx
+        ridx_view = self.df[RIDX][ridx]
+
+        lf = self.df.lazy()
 
         # Get the row to duplicate
-        row_to_duplicate = self.df.slice(ridx, 1).lazy()
+        row_to_duplicate = lf.slice(ridx, 1).with_columns(pl.lit(ridx_view + 1).cast(pl.UInt32).alias(RIDX))
 
         # Add to history
         self.add_history(f"Duplicated row [$success]{ridx + 1}[/]", dirty=True)
 
         # Concatenate: rows before + duplicated row + rows after
-        df_before = self.df.slice(0, ridx + 1).lazy()
-        df_after = self.df.slice(ridx + 1).lazy()
+        lf_before = lf.slice(0, ridx + 1)
+        lf_after = lf.slice(ridx + 1).with_columns(pl.col(RIDX) + 1)
 
         # Combine the parts
-        self.df = pl.concat([df_before, row_to_duplicate, df_after]).collect()
+        self.df = pl.concat([lf_before, row_to_duplicate, lf_after]).collect()
+
+        # Also update the view if applicable
+        if self.df_view is not None:
+            lf_view = self.df_view.lazy()
+            lf_view_before = lf_view.slice(0, ridx_view + 1)
+            lf_view_after = lf_view.slice(ridx_view + 1).with_columns(pl.col(RIDX) + 1)
+            self.df_view = pl.concat([lf_view_before, row_to_duplicate, lf_view_after]).collect()
 
         # Update selected and visible rows tracking to account for new row
         new_selected_rows = self.selected_rows[: ridx + 1] + [self.selected_rows[ridx]] + self.selected_rows[ridx + 1 :]
@@ -2669,6 +2679,10 @@ class DataFrameTable(DataTable):
         cols[cidx], cols[swap_cidx] = cols[swap_cidx], cols[cidx]
         self.df = self.df.select(cols)
 
+        # Also update the view if applicable
+        if self.df_view is not None:
+            self.df_view = self.df_view.select(cols)
+
         # self.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move")
 
     def do_move_row(self, direction: str) -> None:
@@ -2724,6 +2738,7 @@ class DataFrameTable(DataTable):
         ridx = int(row_key.value)  # 0-based
         swap_ridx = int(swap_key.value)  # 0-based
         first, second = sorted([ridx, swap_ridx])
+        first_view, second_view = self.df[RIDX][first], self.df[RIDX][second]
 
         self.df = pl.concat(
             [
@@ -2734,6 +2749,18 @@ class DataFrameTable(DataTable):
                 self.df.slice(second + 1).lazy(),
             ]
         ).collect()
+
+        # Also update the view if applicable
+        if self.df_view is not None:
+            self.df_view = pl.concat(
+                [
+                    self.df_view.slice(0, first_view).lazy(),
+                    self.df_view.slice(second_view, 1).lazy(),
+                    self.df_view.slice(first_view + 1, second_view - first_view - 1).lazy(),
+                    self.df_view.slice(first_view, 1).lazy(),
+                    self.df_view.slice(second_view + 1).lazy(),
+                ]
+            ).collect()
 
         # self.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move")
 
@@ -2771,6 +2798,10 @@ class DataFrameTable(DataTable):
         try:
             # Cast the column using Polars
             self.df = self.df.with_columns(pl.col(col_name).cast(target_dtype))
+
+            # Also update the view if applicable
+            if self.df_view is not None:
+                self.df_view = self.df_view.with_columns(pl.col(col_name).cast(target_dtype))
 
             # Recreate table for display
             self.setup_table()
@@ -3783,7 +3814,8 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(f"Saved dataframe to [$success]{filename}[/]")
 
-        df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RIDX))
+        # df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RIDX))
+        df = self.df if self.df_view is None else self.df_view
         try:
             if fmt == "csv":
                 df.write_csv(filename)
