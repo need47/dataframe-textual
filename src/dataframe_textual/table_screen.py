@@ -495,6 +495,7 @@ class MetaShape(TableScreen):
 
         # Get shape information
         num_rows, num_cols = self.df.shape
+        num_cols -= 1  # Exclude RIDX column
         dc_int = DtypeConfig(pl.Int64)
 
         # Add rows to the table
@@ -531,6 +532,8 @@ class MetaColumnScreen(TableScreen):
 
         # Add a row for each column
         for idx, (col_name, col_type) in enumerate(schema.items(), 1):
+            if col_name == RIDX:
+                continue  # Skip RIDX column
             dc = DtypeConfig(col_type)
             self.table.add_row(
                 dc_int.format(idx, thousand_separator=self.thousand_separator),
