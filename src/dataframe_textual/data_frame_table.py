@@ -156,7 +156,7 @@ class DataFrameTable(DataTable):
         - *(Multi-column sort supported)*
 
         ## ✅ Row Selection
-        - **\\\\** - ✅ Select rows in current column using cursor value
+        - **\\\\** - ✅ Select rows with cell matches or those matching cursor value in current column
         - **|** - ✅ Select rows with expression
         - **'** - ✅ Select/deselect current row
         - **t** - 💡 Toggle row selection (invert all)
@@ -178,8 +178,8 @@ class DataFrameTable(DataTable):
 
         ## 👁️ View & Filter
         - **"** - 📍 Filter selected rows (removes others)
-        - **v** - 👁️ View rows that are selected or contain matching cells (hide others)
-        - **V** - 🔧 View rows by expression (hides others)
+        - **v** - 👁️ View selected rows (hides others)
+        - **V** - 🔧 View selected rows matching expression (hides others)
 
         ## 🔍 SQL Interface
         - **l** - 💬 Open simple SQL interface (select columns & where clause)
@@ -256,11 +256,11 @@ class DataFrameTable(DataTable):
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
         # View & Filter
-        ("v", "view_rows", "View rows"),
-        ("V", "view_rows_expr", "View rows by expression"),
-        ("quotation_mark", "filter_rows", "Filter selected"),  # `"`
+        ("v", "view_rows", "View selected rows"),
+        ("V", "view_rows_expr", "View selected rows matching expression"),
+        ("quotation_mark", "filter_rows", "Filter selected rows"),  # `"`
         # Row Selection
-        ("backslash", "select_row_cursor_value", "Select rows with cursor value in current column"),  # `\`
+        ("backslash", "select_row", "Select rows with cell matches or those matching cursor value in current column"),  # `\`
         ("vertical_line", "select_row_expr", "Select rows with expression"),  # `|`
         ("right_curly_bracket", "next_selected_row", "Go to next selected row"),  # `}`
         ("left_curly_bracket", "previous_selected_row", "Go to previous selected row"),  # `{`
@@ -819,9 +819,9 @@ class DataFrameTable(DataTable):
         """Clear the current cell (set to None)."""
         self.do_clear_cell()
 
-    def action_select_row_cursor_value(self) -> None:
+    def action_select_row(self) -> None:
         """Select rows with cursor value in the current column."""
-        self.do_select_row_cursor_value()
+        self.do_select_row()
 
     def action_select_row_expr(self) -> None:
         """Select rows by expression."""
@@ -2578,8 +2578,38 @@ class DataFrameTable(DataTable):
         # Update the dataframe
         self.df = df_filtered
 
-        # Clear all matches since row indices have changed
-        self.matches = defaultdict(set)
+        # Update matches since row indices have changed
+        if self.matches:
+            matches = defaultdict(set)
+            for ridx, old_ridx in enumerate(self.df[RIDX]):
+                if old_ridx in self.matches:
+                    matches[ridx] = self.matches[old_ridx]
+            self.matches = matches
+
+        # Also update the view if applicable
+        if self.df_view is not None:
+            # Rebuild RIDX column in self.df_view for remaining rows
+            RIDX_NEW = f"{RIDX}_new"
+            lf_view = (
+                self.df_view.lazy()
+                .filter(pl.col(RIDX).is_in(old_row_indices))
+                .with_columns(pl.arange(0, len(self.df_view), dtype=pl.UInt32).alias(RIDX_NEW))
+            )
+
+            # Rebuild RIDX column in self.df
+            self.df = (
+                self.df.lazy()
+                .join(lf_view.select(RIDX, RIDX_NEW), on=RIDX, how="left")
+                .with_columns(pl.col(RIDX_NEW).alias(RIDX))
+                .drop(RIDX_NEW)
+                .collect()
+            )
+
+            # Update df_view
+            self.df_view = lf_view.with_columns(pl.col(RIDX_NEW).alias(RIDX)).drop(RIDX_NEW).collect()
+        else:
+            # Rebuild RIDX column to be sequential
+            self.df = self.df.lazy().with_columns(pl.arange(0, len(self.df), dtype=pl.UInt32).alias(RIDX)).collect()
 
         # Recreate table for display
         self.setup_table()
@@ -2832,17 +2862,26 @@ class DataFrameTable(DataTable):
             self.log(f"Error casting column `{col_name}`: {str(e)}")
 
     # Row selection
-    def do_select_row_cursor_value(self) -> None:
-        """Search with cursor value in current column."""
-        cidx = self.cursor_col_idx
-        col_name = self.cursor_col_name
+    def do_select_row(self) -> None:
+        """Select rows.
 
-        # Get the value of the currently selected cell
-        term = NULL if self.cursor_value is None else str(self.cursor_value)
-        if self.cursor_value is None:
-            term = pl.col(col_name).is_null()
+        If there are existing cell matches, use those to select rows.
+        Otherwise, use the current cell value as the search term and select rows matching that value.
+        """
+        cidx = self.cursor_col_idx
+
+        # Use existing cell matches if present
+        if self.matches:
+            term = [True if ridx in self.matches else False for ridx in range(len(self.df))]
         else:
-            term = pl.col(col_name) == self.cursor_value
+            col_name = self.cursor_col_name
+
+            # Get the value of the currently selected cell
+            term = NULL if self.cursor_value is None else str(self.cursor_value)
+            if self.cursor_value is None:
+                term = pl.col(col_name).is_null()
+            else:
+                term = pl.col(col_name) == self.cursor_value
 
         self.select_row((term, cidx, False, True))
 
@@ -2865,10 +2904,14 @@ class DataFrameTable(DataTable):
             return
 
         term, cidx, match_nocase, match_whole = result
-        col_name = self.df.columns[cidx]
+        col_name = "all columns" if cidx is None else self.df.columns[cidx]
 
         # Already a Polars expression
         if isinstance(term, pl.Expr):
+            expr = term
+
+        # bool list or Series
+        elif isinstance(term, (list, pl.Series)):
             expr = term
 
         # Null case
@@ -2935,7 +2978,7 @@ class DataFrameTable(DataTable):
             )
             return
 
-        message = f"Found [$success]{match_count}[/] matching row(s) for `[$accent]{term}[/]`"
+        message = f"Found [$success]{match_count}[/] matching row(s)`"
 
         # Add to history
         self.add_history(message)
@@ -3572,18 +3615,16 @@ class DataFrameTable(DataTable):
     def do_view_rows(self) -> None:
         """View rows.
 
-        If there are selected rows or matches, view those rows.
+        If there are selected rows, view those.
         Otherwise, view based on the value of the currently selected cell.
         """
 
         cidx = self.cursor_col_idx
-        col_name = self.df.columns[cidx]
+        col_name = self.cursor_col_name
 
-        # If there are rows with selections or matches, use those
-        if any(self.selected_rows) or self.matches:
-            term = [
-                True if (selected or idx in self.matches) else False for idx, selected in enumerate(self.selected_rows)
-            ]
+        # If there are rows with selections, use those
+        if any(self.selected_rows):
+            term = self.selected_rows
         # Otherwise, use the current cell value
         else:
             ridx = self.cursor_row_idx
@@ -3615,13 +3656,17 @@ class DataFrameTable(DataTable):
         # Support for polars expression
         if isinstance(term, pl.Expr):
             expr = term
+
         # Support for list of booleans (selected rows)
         elif isinstance(term, (list, pl.Series)):
             expr = term
+
+        # Null case
         elif term == NULL:
             expr = pl.col(col_name).is_null()
+
+        # Support for polars expression in string form
         elif tentative_expr(term):
-            # Support for polars expression in string form
             try:
                 expr = validate_expr(term, self.df.columns, cidx)
             except Exception as e:
@@ -3630,6 +3675,8 @@ class DataFrameTable(DataTable):
                 )
                 self.log(f"Error validating expression `{term}`: {str(e)}")
                 return
+
+        # Type-aware search based on column dtype
         else:
             dtype = self.df.dtypes[cidx]
             if dtype == pl.String:
@@ -3682,7 +3729,10 @@ class DataFrameTable(DataTable):
         if self.df_view is None:
             self.df_view = self.df
 
+        # Update dataframe
         self.df = df_filtered
+
+        # Update visible rows
         self.visible_rows = [True] * len(self.df)
 
         # Update selected rows
@@ -3697,13 +3747,13 @@ class DataFrameTable(DataTable):
         self.notify(f"Filtered to [$success]{matched_count}[/] matching rows", title="Filter")
 
     def do_filter_rows(self) -> None:
-        """Keep only the rows with selections and cell matches, and remove others."""
-        if any(self.selected_rows) or self.matches:
-            message = "Filtered to rows with selection and cell matches (other rows removed)"
-            filter_expr = [
-                True if (selected or ridx in self.matches) else False
-                for ridx, selected in enumerate(self.selected_rows)
-            ]
+        """Filter rows.
+
+        If there are selected rows, use those. Otherwise, filter based on the value of the currently selected cell.
+        """
+        if any(self.selected_rows):
+            message = "Filtered to selected rows (other rows removed)"
+            filter_expr = self.selected_rows
         else:  # Search cursor value in current column
             message = "Filtered to rows matching cursor value (other rows removed)"
             cidx = self.cursor_col_idx

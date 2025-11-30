@@ -286,7 +286,7 @@ zcat compressed_data.csv.gz | dv -f csv
 
 | Key | Action |
 |-----|--------|
-| `\` | Select rows that matches cursor value in current column |
+| `\` | Select rows wth cell matches or those matching cursor value in current column |
 | `\|` (pipe) | Select rows by expression |
 | `{` | Go to previous selected row |
 | `}` | Go to next selected row |
@@ -310,9 +310,9 @@ zcat compressed_data.csv.gz | dv -f csv
 #### View & Filter
 | Key | Action |
 |-----|--------|
-| `"` (quote) | Filter to rows that are selected or contain matching cells (and remove others) |
-| `v` | View rows (and hide others) by row selections and cell matches or cursor value |
-| `V` | View rows (and hide others) by expression |
+| `"` (quote) | Filter selected rows (others removed) |
+| `v` | View selected rows (others hidden) |
+| `V` | View selected by expression (others hidden) |
 
 #### SQL Interface
 
@@ -372,8 +372,8 @@ Press `Enter` on any row to open a modal showing all column values for that row.
 Useful for examining wide datasets where columns don't fit well on screen.
 
 **In the Row Detail Modal**:
-- Press `v` to **view** all rows containing the selected column value (and hide others)
-- Press `"` to **filter** all rows containing the selected column value (and remove others)
+- Press `v` to **view** all rows containing the selected column value (others hidden but preserved)
+- Press `"` to **filter** all rows containing the selected column value (others removed)
 - Press `{` to move to the **previous row** (respects hidden rows)
 - Press `}` to move to the **next row** (respects hidden rows)
 - Press `q` or `Escape` to close the modal
@@ -382,7 +382,7 @@ Useful for examining wide datasets where columns don't fit well on screen.
 
 The application provides multiple modes for selecting rows (marks it for filtering or viewing):
 
-- `\` - Select rows that match cursor value in current column (respects data type)
+- `\` - Select rows with cell matches or those matching cursor value in current column (respects data type)
 - `|` - Opens dialog to select rows with custom expression
 - `'` - Select/deselect current row
 - `t` - Flip selections of all rows
@@ -552,8 +552,8 @@ Press `F` to see value distributions of the current column. The modal shows:
 
 **In the Frequency Table**:
 - Press `[` and `]` to sort by any column (value, count, or percentage)
-- Press `v` to **filter** all rows with the selected value (others hidden but preserved)
-- Press `"` to **exclude** all rows containing the selected value (others removed)
+- Press `v` to **view** all rows containing the selected value (others hidden but preserved)
+- Press `"` to **filter** all rows containing the selected value (others removed)
 - Press `q` or `Escape` to close the frequency table
 
 This is useful for:
