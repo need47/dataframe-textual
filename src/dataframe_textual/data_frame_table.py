@@ -222,10 +222,8 @@ class DataFrameTable(DataTable):
         # Navigation
         ("g", "jump_top", "Jump to top"),
         ("G", "jump_bottom", "Jump to bottom"),
-        ("ctrl+f", "forward_page", "Page down"),
-        ("ctrl+b", "backward_page", "Page up"),
-        ("pageup", "page_up", "Page up"),
-        ("pagedown", "page_down", "Page down"),
+        ("pageup,ctrl+b", "page_up", "Page up"),
+        ("pagedown,ctrl+f", "page_down", "Page down"),
         # Undo/Redo/Reset
         ("u", "undo", "Undo"),
         ("U", "redo", "Redo"),
@@ -686,46 +684,19 @@ class DataFrameTable(DataTable):
     # Action handlers for BINDINGS
     def action_jump_top(self) -> None:
         """Jump to the top of the table."""
-        self.move_cursor(row=0)
+        self.do_jump_top()
 
     def action_jump_bottom(self) -> None:
         """Jump to the bottom of the table."""
-        stop = len(self.df)
-        start = max(0, stop - self.BATCH_SIZE)
-
-        if start % self.BATCH_SIZE != 0:
-            start = (start // self.BATCH_SIZE + 1) * self.BATCH_SIZE
-
-        self.load_rows_range(start, stop)
-        self.move_cursor(row=self.row_count - 1)
+        self.do_jump_bottom()
 
     def action_page_up(self) -> None:
         """Move the cursor one page up."""
-        self._set_hover_cursor(False)
-        if self.show_cursor and self.cursor_type in ("cell", "row"):
-            height = self.scrollable_content_region.height - (self.header_height if self.show_header else 0)
-
-            col_idx = self.cursor_column
-            ridx = self.cursor_row_idx
-            next_ridx = max(0, ridx - height - BUFFER_SIZE)
-            start, stop = self._round_to_nearest_hundreds(next_ridx)
-            self.load_rows_range(start, stop)
-
-            self.move_cursor(row=self.get_row_idx(str(next_ridx)), column=col_idx)
-        else:
-            super().action_page_up()
+        self.do_page_up()
 
     def action_page_down(self) -> None:
-        super().action_page_down()
-        self.load_rows_down()
-
-    def action_backward_page(self) -> None:
-        """Scroll up one page."""
-        self.action_page_up()
-
-    def action_forward_page(self) -> None:
-        """Scroll down one page."""
-        self.action_page_down()
+        """Move the cursor one page down."""
+        self.do_page_down()
 
     def action_view_row_detail(self) -> None:
         """View details of the current row."""
@@ -1624,6 +1595,43 @@ class DataFrameTable(DataTable):
         self._update_count += 1
         self.check_idle()
         return row_key
+
+    # Navigation
+    def do_jump_top(self) -> None:
+        """Jump to the top of the table."""
+        self.move_cursor(row=0)
+
+    def do_jump_bottom(self) -> None:
+        """Jump to the bottom of the table."""
+        stop = len(self.df)
+        start = max(0, stop - self.BATCH_SIZE)
+
+        if start % self.BATCH_SIZE != 0:
+            start = (start // self.BATCH_SIZE + 1) * self.BATCH_SIZE
+
+        self.load_rows_range(start, stop)
+        self.move_cursor(row=self.row_count - 1)
+
+    def do_page_up(self) -> None:
+        """Move the cursor one page up."""
+        self._set_hover_cursor(False)
+        if self.show_cursor and self.cursor_type in ("cell", "row"):
+            height = self.scrollable_content_region.height - (self.header_height if self.show_header else 0)
+
+            col_idx = self.cursor_column
+            ridx = self.cursor_row_idx
+            next_ridx = max(0, ridx - height - BUFFER_SIZE)
+            start, stop = self._round_to_nearest_hundreds(next_ridx)
+            self.load_rows_range(start, stop)
+
+            self.move_cursor(row=self.get_row_idx(str(next_ridx)), column=col_idx)
+        else:
+            super().action_page_up()
+
+    def do_page_down(self) -> None:
+        """Move the cursor one page down."""
+        super().action_page_down()
+        self.load_rows_down()
 
     # History & Undo
     def create_history(self, description: str) -> None:
