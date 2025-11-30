@@ -2114,9 +2114,19 @@ class DataFrameTable(DataTable):
         # Rename the column in the dataframe
         self.df = self.df.rename({col_name: new_name})
 
-        # Update sorted_columns if this column was sorted
+        # Also update the view if applicable
+        if self.df_view is not None:
+            self.df_view = self.df_view.rename({col_name: new_name})
+
+        # Update sorted_columns if this column was sorted and maintain order
         if col_name in self.sorted_columns:
-            self.sorted_columns[new_name] = self.sorted_columns.pop(col_name)
+            sorted_columns = {}
+            for col, order in self.sorted_columns.items():
+                if col == col_name:
+                    sorted_columns[new_name] = order
+                else:
+                    sorted_columns[col] = order
+            self.sorted_columns = sorted_columns
 
         # Update hidden_columns if this column was hidden
         if col_name in self.hidden_columns:
