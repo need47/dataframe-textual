@@ -1867,6 +1867,15 @@ class DataFrameTable(DataTable):
 
         # If in a filtered view, restore the full dataframe
         if self.df_view is not None:
+            # Restore all selected rows from self.df
+            selected_rows = [False] * len(self.df_view)
+            for ridx, is_selected in enumerate(self.selected_rows):
+                if is_selected:
+                    # Get the RIDX value for this row in df_view
+                    ridx_view = self.df[RIDX][ridx]
+                    selected_rows[ridx_view] = True
+            self.selected_rows = selected_rows
+
             self.df = self.df_view
             self.df_view = None
 
@@ -1936,7 +1945,7 @@ class DataFrameTable(DataTable):
             }
 
         # Update the dataframe
-        self.df = df_sorted.drop(RIDX)
+        self.df = df_sorted
 
         # Recreate table for display
         self.setup_table()
@@ -2200,30 +2209,27 @@ class DataFrameTable(DataTable):
             self.log(f"Error clearing cell ({ridx}, {col_name}): {str(e)}")
             raise e
 
-    def do_add_column(self, col_name: str = None, col_value: pl.Expr = None) -> None:
+    def do_add_column(self, col_name: str = None) -> None:
         """Add acolumn after the current column."""
         cidx = self.cursor_col_idx
 
         if not col_name:
             # Generate a unique column name
             base_name = "new_col"
-            new_name = base_name
+            new_col_name = base_name
             counter = 1
-            while new_name in self.df.columns:
-                new_name = f"{base_name}_{counter}"
+            while new_col_name in self.df.columns:
+                new_col_name = f"{base_name}_{counter}"
                 counter += 1
         else:
-            new_name = col_name
+            new_col_name = col_name
 
         # Add to history
-        self.add_history(f"Added column [$success]{new_name}[/] after column [$accent]{cidx + 1}[/]", dirty=True)
+        self.add_history(f"Added column [$success]{new_col_name}[/] after column [$accent]{cidx + 1}[/]", dirty=True)
 
         try:
             # Create an empty column (all None values)
-            if isinstance(col_value, pl.Expr):
-                new_col = col_value.alias(new_name)
-            else:
-                new_col = pl.lit(col_value).alias(new_name)
+            new_col_name = pl.lit(None).alias(new_col_name)
 
             # Get columns up to current, the new column, then remaining columns
             cols = self.df.columns
@@ -2231,8 +2237,12 @@ class DataFrameTable(DataTable):
             cols_after = cols[cidx + 1 :]
 
             # Build the new dataframe with columns reordered
-            select_cols = cols_before + [new_name] + cols_after
-            self.df = self.df.with_columns(new_col).select(select_cols)
+            select_cols = cols_before + [new_col_name] + cols_after
+            self.df = self.df.lazy().with_columns(new_col_name).select(select_cols).collect()
+
+            # Also update the view if applicable
+            if self.df_view is not None:
+                self.df_view = self.df_view.lazy().with_columns(new_col_name).select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -2242,8 +2252,10 @@ class DataFrameTable(DataTable):
 
             # self.notify(f"Added column [$success]{new_name}[/]", title="Add Column")
         except Exception as e:
-            self.notify(f"Error adding column [$error]{new_name}[/]", title="Add Column", severity="error", timeout=10)
-            self.log(f"Error adding column `{new_name}`: {str(e)}")
+            self.notify(
+                f"Error adding column [$error]{new_col_name}[/]", title="Add Column", severity="error", timeout=10
+            )
+            self.log(f"Error adding column `{new_col_name}`: {str(e)}")
             raise e
 
     def do_add_column_expr(self) -> None:
@@ -2276,6 +2288,13 @@ class DataFrameTable(DataTable):
             # Build the new dataframe with columns reordered
             select_cols = cols_before + [new_col_name] + cols_after
             self.df = self.df.lazy().with_columns(new_col).select(select_cols).collect()
+
+            # Also update the view if applicable
+            if self.df_view is not None:
+                # Get updated column from df for rows that exist in df_view
+                df_updated = self.df.lazy().select(RIDX, pl.col(new_col_name))
+                # Join and use coalesce to prefer updated value or keep original
+                self.df_view = self.df_view.lazy().join(df_updated, on=RIDX, how="left").select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -3637,7 +3656,7 @@ class DataFrameTable(DataTable):
         matches = {ridx: self.matches[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))}
 
         # Update dataframe
-        self.reset_df(df_filtered.drop(RIDX))
+        self.reset_df(df_filtered)
 
         # Restore selected rows and matches
         self.selected_rows = selected_rows
@@ -3879,7 +3898,7 @@ class DataFrameTable(DataTable):
                 matches = {ridx: self.matches[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))}
 
                 # Update dataframe
-                self.reset_df(df_filtered.drop(RIDX))
+                self.reset_df(df_filtered)
 
                 # Restore selected rows and matches
                 self.selected_rows = selected_rows
