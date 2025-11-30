@@ -2492,18 +2492,19 @@ class DataFrameTable(DataTable):
 
         # Apply the filter to remove rows
         try:
-            df = self.df.lazy().filter(predicates).collect()
+            df_filtered = self.df.lazy().filter(predicates).collect()
         except Exception as e:
             self.notify(f"Error deleting row(s): {e}", title="Delete", severity="error", timeout=10)
             self.histories.pop()  # Remove last history entry
             return
 
-        self.df = df.drop(RIDX)
-
         # Update selected and visible rows tracking
-        old_row_indices = set(df[RIDX].to_list())
-        self.selected_rows = [selected for i, selected in enumerate(self.selected_rows) if i in old_row_indices]
-        self.visible_rows = [visible for i, visible in enumerate(self.visible_rows) if i in old_row_indices]
+        old_row_indices = set(df_filtered[RIDX].to_list())
+        self.selected_rows = [self.selected_rows[i] for i in range(len(self.selected_rows)) if i in old_row_indices]
+        self.visible_rows = [self.visible_rows[i] for i in range(len(self.visible_rows)) if i in old_row_indices]
+
+        # Rebuild RIDX
+        self.df = df_filtered.lazy().drop(RIDX).with_row_index(RIDX).select(pl.exclude(RIDX), RIDX).collect()
 
         # Clear all matches since row indices have changed
         self.matches = defaultdict(set)
