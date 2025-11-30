@@ -32,6 +32,7 @@ from .common import (
     CURSOR_TYPES,
     NULL,
     NULL_DISPLAY,
+    RID,
     RIDX,
     SUBSCRIPT_DIGITS,
     SUPPORTED_FORMATS,
@@ -2110,13 +2111,14 @@ class DataFrameTable(DataTable):
             # Update the value of col_name in df_view using the value of col_name from df based on RIDX mapping between them
             if self.df_view is not None:
                 # Get updated column from df for rows that exist in df_view
-                df_updated = self.df.lazy().select(RIDX, pl.col(col_name).alias(f"{col_name}_updated"))
+                col_updated = f"^_{col_name}_^"
+                lf_updated = self.df.lazy().select(RIDX, pl.col(col_name).alias(col_updated))
                 # Join and use coalesce to prefer updated value or keep original
                 self.df_view = (
                     self.df_view.lazy()
-                    .join(df_updated, on=RIDX, how="left")
-                    .with_columns(pl.coalesce(pl.col(f"{col_name}_updated"), pl.col(col_name)).alias(col_name))
-                    .drop(f"{col_name}_updated")
+                    .join(lf_updated, on=RIDX, how="left")
+                    .with_columns(pl.coalesce(pl.col(col_updated), pl.col(col_name)).alias(col_name))
+                    .drop(col_updated)
                     .collect()
                 )
         except Exception as e:
@@ -2318,9 +2320,9 @@ class DataFrameTable(DataTable):
             # Also update the view if applicable
             if self.df_view is not None:
                 # Get updated column from df for rows that exist in df_view
-                df_updated = self.df.lazy().select(RIDX, pl.col(new_col_name))
+                lf_updated = self.df.lazy().select(RIDX, pl.col(new_col_name))
                 # Join and use coalesce to prefer updated value or keep original
-                self.df_view = self.df_view.lazy().join(df_updated, on=RIDX, how="left").select(select_cols).collect()
+                self.df_view = self.df_view.lazy().join(lf_updated, on=RIDX, how="left").select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -2391,9 +2393,9 @@ class DataFrameTable(DataTable):
             # Also update the view if applicable
             if self.df_view is not None:
                 # Get updated column from df for rows that exist in df_view
-                df_updated = self.df.lazy().select(RIDX, pl.col(new_col_name))
+                lf_updated = self.df.lazy().select(RIDX, pl.col(new_col_name))
                 # Join and use coalesce to prefer updated value or keep original
-                self.df_view = self.df_view.lazy().join(df_updated, on=RIDX, how="left").select(select_cols).collect()
+                self.df_view = self.df_view.lazy().join(lf_updated, on=RIDX, how="left").select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -2969,13 +2971,14 @@ class DataFrameTable(DataTable):
                     )
 
         # Lazyframe for filtering
-        lf = self.df.lazy()
+        lf = self.df.lazy().drop(RIDX).with_row_index(RIDX)
         if self.has_hidden_rows:
             lf = lf.filter(self.visible_rows)
 
         # Apply filter to get matched row indices
         try:
-            matches = set(lf.filter(expr).select(RIDX).collect().to_series().to_list())
+            matches = set(lf.filter(expr).collect()[RIDX].to_list())
+            self.log(f"Matches: {matches} for term `{term}` in column `{col_name}`")
         except Exception as e:
             self.notify(
                 f"Error applying search filter `[$error]{term}[/]`", title="Search", severity="error", timeout=10
@@ -3100,7 +3103,7 @@ class DataFrameTable(DataTable):
         matches: dict[int, set[int]] = defaultdict(set)
 
         # Lazyframe for filtering
-        lf = self.df.lazy()
+        lf = self.df.lazy().drop(RIDX).with_row_index(RIDX)
         if self.has_hidden_rows:
             lf = lf.filter(self.visible_rows)
 
@@ -3133,7 +3136,7 @@ class DataFrameTable(DataTable):
 
             # Get matched row indices
             try:
-                matched_ridxs = lf.filter(expr).select(RIDX).collect().to_series().to_list()
+                matched_ridxs = lf.filter(expr).collect()[RIDX].to_list()
             except Exception as e:
                 self.notify(f"Error applying filter: [$error]{expr}[/]", title="Find", severity="error", timeout=10)
                 self.log(f"Error applying filter: {str(e)}")
@@ -3497,6 +3500,18 @@ class DataFrameTable(DataTable):
                     pl.when(mask).then(pl.lit(value)).otherwise(pl.col(col_name)).alias(col_name)
                 )
 
+            # Also update the view if applicable
+            if self.df_view is not None:
+                col_updated = f"^_{col_name}_^"
+                lf_updated = self.df.lazy().filter(mask).select(pl.col(col_name).alias(col_updated), pl.col(RIDX))
+                self.df_view = (
+                    self.df_view.lazy()
+                    .join(lf_updated, on=RIDX, how="left")
+                    .with_columns(pl.coalesce(pl.col(col_updated), pl.col(col_name)).alias(col_name))
+                    .drop(col_updated)
+                    .collect()
+                )
+
             state.replaced_occurrence += len(ridxs)
 
         # Recreate table for display
@@ -3714,7 +3729,7 @@ class DataFrameTable(DataTable):
                     )
 
         # Lazyframe with row indices
-        lf = self.df.lazy()
+        lf = self.df.lazy().with_row_index(RID)
 
         # Apply existing visibility filter first
         if self.has_hidden_rows:
@@ -3744,16 +3759,22 @@ class DataFrameTable(DataTable):
             self.df_view = self.df
 
         # Update dataframe
-        self.df = df_filtered
+        self.df = df_filtered.drop(RID)
 
         # Update visible rows
         self.visible_rows = [True] * len(self.df)
 
         # Update selected rows
-        self.selected_rows = [self.selected_rows[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))]
+        self.selected_rows = [self.selected_rows[df_filtered[RID][ridx]] for ridx in range(len(df_filtered))]
 
         # Update matches
-        self.matches = {ridx: self.matches[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))}
+        if self.matches:
+            matches = defaultdict(set)
+            ridx_mapping = {ridx_old: ridx for ridx, ridx_old in enumerate(df_filtered[RID])}
+            for ridx_old, col_indices in self.matches.items():
+                if (ridx := ridx_mapping.get(ridx_old)) is not None:
+                    matches[ridx] = col_indices
+            self.matches = matches
 
         # Recreate table for display
         self.setup_table()
@@ -3783,16 +3804,21 @@ class DataFrameTable(DataTable):
         self.add_history(message, dirty=True)
 
         # Apply filter to dataframe with row indices
-        df_filtered = self.df.lazy().filter(filter_expr).collect()
+        df_filtered = self.df.lazy().with_row_index(RID).filter(filter_expr).collect()
 
         # Update selected rows
-        selected_rows = [self.selected_rows[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))]
+        selected_rows = [self.selected_rows[df_filtered[RID][ridx]] for ridx in range(len(df_filtered))]
 
         # Update matches
-        matches = {ridx: self.matches[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))}
+        matches = defaultdict(set)
+        if self.matches:
+            ridx_mapping = {ridx_old: ridx for ridx, ridx_old in enumerate(df_filtered[RID])}
+            for ridx_old, col_indices in self.matches.items():
+                if (ridx := ridx_mapping.get(ridx_old)) is not None:
+                    matches[ridx] = col_indices
 
         # Update dataframe
-        self.reset_df(df_filtered)
+        self.reset_df(df_filtered.drop(RID))
 
         # Restore selected rows and matches
         self.selected_rows = selected_rows

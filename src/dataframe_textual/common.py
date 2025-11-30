@@ -152,8 +152,11 @@ SUBSCRIPT_DIGITS = {
 # Cursor types ("none" removed)
 CURSOR_TYPES = ["row", "column", "cell"]
 
-# For row index column
+# Row index mapping between filtered and original dataframe
 RIDX = "^_ridx_^"
+
+# Internal row index
+RID = "^__rid__^"
 
 
 @dataclass

@@ -171,7 +171,7 @@ wheels = [
 
 [[package]]
 name = "dataframe-textual"
-version = "1.16.11"
+version = "1.16.13"
 source = { editable = "." }
 dependencies = [
     { name = "polars" },
