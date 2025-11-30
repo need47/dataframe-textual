@@ -238,6 +238,7 @@ class DataFrameTable(DataTable):
         ("z", "freeze_row_column", "Freeze rows/columns"),
         ("comma", "show_thousand_separator", "Toggle thousand separator"),  # `,`
         ("underscore", "expand_column", "Expand column to full width"),  # `_`
+        ("ampersand", "toggle_ridx", "Toggle internal row index"),  # `&`
         # Copy
         ("c", "copy_cell", "Copy cell to clipboard"),
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
@@ -356,6 +357,9 @@ class DataFrameTable(DataTable):
 
         # Whether to use thousand separator for numeric display
         self.thousand_separator = False
+
+        # Whether to show internal row index column
+        self.show_ridx = False
 
     @property
     def cursor_key(self) -> CellKey:
@@ -738,6 +742,10 @@ class DataFrameTable(DataTable):
     def action_expand_column(self) -> None:
         """Expand the current column to its full width."""
         self.do_expand_column()
+
+    def action_toggle_ridx(self) -> None:
+        """Toggle the internal row index column visibility."""
+        self.do_toggle_ridx()
 
     def action_show_hidden_rows_columns(self) -> None:
         """Show all hidden rows/columns."""
@@ -1153,7 +1161,7 @@ class DataFrameTable(DataTable):
 
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
-            if col in self.hidden_columns or col == RIDX:
+            if col in self.hidden_columns or (col == RIDX and not self.show_ridx):
                 continue  # Skip hidden columns and internal RIDX
             for idx, c in enumerate(self.sorted_columns, 1):
                 if c == col:
@@ -1374,7 +1382,7 @@ class DataFrameTable(DataTable):
 
             vals, dtypes, styles = [], [], []
             for cidx, (val, col, dtype) in enumerate(zip(row, self.df.columns, self.df.dtypes)):
-                if col in self.hidden_columns or col == RIDX:
+                if col in self.hidden_columns or (col == RIDX and not self.show_ridx):
                     continue  # Skip hidden columns and internal RIDX
 
                 vals.append(val)
@@ -1852,6 +1860,13 @@ class DataFrameTable(DataTable):
                 f"Error expanding column [$error]{col_name}[/]", title="Expand Column", severity="error", timeout=10
             )
             self.log(f"Error expanding column `{col_name}`: {str(e)}")
+
+    def do_toggle_ridx(self) -> None:
+        """Toggle display of the internal RIDX column."""
+        self.show_ridx = not self.show_ridx
+
+        # Recreate table for display
+        self.setup_table()
 
     def do_show_hidden_rows_columns(self) -> None:
         """Show all hidden rows/columns by recreating the table."""
