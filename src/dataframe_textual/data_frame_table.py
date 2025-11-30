@@ -2445,6 +2445,10 @@ class DataFrameTable(DataTable):
         # Remove from dataframe
         self.df = self.df.drop(col_names_to_remove)
 
+        # Also update the view if applicable
+        if self.df_view is not None:
+            self.df_view = self.df_view.drop(col_names_to_remove)
+
         self.notify(message, title="Delete")
 
     def do_duplicate_column(self) -> None:
