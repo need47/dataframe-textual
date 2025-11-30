@@ -325,8 +325,8 @@ class DataFrameTable(DataTable):
         super().__init__(**kwargs)
 
         # DataFrame state
-        self.dataframe = df  # Original dataframe
-        self.df = df.lazy().with_row_index(RIDX).select(pl.exclude(RIDX), RIDX).collect()  # Internal/working dataframe
+        self.dataframe = df.lazy().with_row_index(RIDX).select(pl.exclude(RIDX), RIDX).collect()  # Original dataframe
+        self.df = self.dataframe  # Internal/working dataframe
         self.filename = filename or "untitled.csv"  # Current filename
         self.tabname = tabname or Path(filename).stem  # Tab name
 
@@ -1034,7 +1034,7 @@ class DataFrameTable(DataTable):
         # self.history = None
         self.dirty = dirty  # Mark as dirty since data changed
 
-    def setup_table(self, reset: bool = False) -> None:
+    def setup_table(self) -> None:
         """Setup the table for display.
 
         Row keys are 0-based indices, which map directly to dataframe row indices.
@@ -1043,10 +1043,6 @@ class DataFrameTable(DataTable):
         self.loaded_rows = 0
         self.loaded_ranges.clear()
         self.show_row_labels = True
-
-        # Reset to original dataframe
-        if reset:
-            self.reset_df(self.dataframe, dirty=False)
 
         # Lazy load up to BATCH_SIZE visible rows
         stop, visible_count, row_idx = self.BATCH_SIZE, 0, 0
@@ -1716,7 +1712,8 @@ class DataFrameTable(DataTable):
 
     def do_reset(self) -> None:
         """Reset the table to the initial state."""
-        self.setup_table(reset=True)
+        self.reset_df(self.dataframe, dirty=False)
+        self.setup_table()
         self.notify("Restored initial state", title="Reset")
 
     def restore_dirty(self, default: bool | None = None) -> None:
@@ -2467,9 +2464,21 @@ class DataFrameTable(DataTable):
         cols_after = self.df.columns[cidx + 1 :]
 
         # Add the new column and reorder columns for insertion after current column
-        self.df = self.df.with_columns(pl.col(col_name).alias(new_col_name)).select(
-            list(cols_before) + [new_col_name] + list(cols_after)
+        self.df = (
+            self.df.lazy()
+            .with_columns(pl.col(col_name).alias(new_col_name))
+            .select(cols_before + [new_col_name] + cols_after)
+            .collect()
         )
+
+        # Also update the view if applicable
+        if self.df_view is not None:
+            self.df_view = (
+                self.df_view.lazy()
+                .with_columns(pl.col(col_name).alias(new_col_name))
+                .select(cols_before + [new_col_name] + cols_after)
+                .collect()
+            )
 
         # Update matches to account for new column
         new_matches = defaultdict(set)
@@ -2542,11 +2551,17 @@ class DataFrameTable(DataTable):
 
         # Update selected and visible rows tracking
         old_row_indices = set(df_filtered[RIDX].to_list())
-        self.selected_rows = [self.selected_rows[i] for i in range(len(self.selected_rows)) if i in old_row_indices]
-        self.visible_rows = [self.visible_rows[i] for i in range(len(self.visible_rows)) if i in old_row_indices]
+        selected_rows, visible_rows = [], []
+        for selected, visible, old_ridx in zip(self.selected_rows, self.visible_rows, self.df[RIDX], strict=True):
+            if old_ridx not in old_row_indices:
+                continue
+            selected_rows.append(selected)
+            visible_rows.append(visible)
+        self.selected_rows = selected_rows
+        self.visible_rows = visible_rows
 
-        # Rebuild RIDX
-        self.df = df_filtered.lazy().drop(RIDX).with_row_index(RIDX).select(pl.exclude(RIDX), RIDX).collect()
+        # Update the dataframe
+        self.df = df_filtered
 
         # Clear all matches since row indices have changed
         self.matches = defaultdict(set)
