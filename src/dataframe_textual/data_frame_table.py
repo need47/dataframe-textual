@@ -2160,6 +2160,16 @@ class DataFrameTable(DataTable):
                 .alias(col_name)
             )
 
+            # Also update the view if applicable
+            if self.df_view is not None:
+                ridx_view = self.df[RIDX][ridx]
+                self.df_view = self.df_view.with_columns(
+                    pl.when(pl.arange(0, len(self.df_view)) == ridx_view)
+                    .then(pl.lit(None))
+                    .otherwise(pl.col(col_name))
+                    .alias(col_name)
+                )
+
             # Update the display
             dtype = self.df.dtypes[cidx]
             dc = DtypeConfig(dtype)
