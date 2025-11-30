@@ -2360,7 +2360,14 @@ class DataFrameTable(DataTable):
 
             # Build the new dataframe with columns reordered
             select_cols = cols_before + [new_col_name] + cols_after
-            self.df = self.df.with_columns(new_col).select(select_cols)
+            self.df = self.df.lazy().with_columns(new_col).select(select_cols).collect()
+
+            # Also update the view if applicable
+            if self.df_view is not None:
+                # Get updated column from df for rows that exist in df_view
+                df_updated = self.df.lazy().select(RIDX, pl.col(new_col_name))
+                # Join and use coalesce to prefer updated value or keep original
+                self.df_view = self.df_view.lazy().join(df_updated, on=RIDX, how="left").select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
