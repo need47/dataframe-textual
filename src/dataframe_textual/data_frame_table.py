@@ -1932,16 +1932,22 @@ class DataFrameTable(DataTable):
             self.sorted_columns[col_name] = descending
 
         lf = self.df.lazy()
+        sort_by = {}
 
         # Apply multi-column sort
         if sort_cols := list(self.sorted_columns.keys()):
             descending_flags = list(self.sorted_columns.values())
-            lf = lf.sort(sort_cols, descending=descending_flags, nulls_last=True)
+            sort_by = {"by": sort_cols, "descending": descending_flags, "nulls_last": True}
         else:
             # No sort - restore original order by adding a temporary index column
-            lf = lf.sort(RIDX)
+            sort_by = {"by": RIDX}
 
-        df_sorted = lf.collect()
+        # Perform the sort
+        df_sorted = lf.sort(**sort_by).collect()
+
+        # Also update df_view if applicable
+        if self.df_view is not None:
+            self.df_view = self.df_view.lazy().sort(**sort_by).collect()
 
         # Updated visible rows, selected rows, and cell matches to match new order
         old_row_indices = df_sorted[RIDX].to_list()
@@ -1949,7 +1955,7 @@ class DataFrameTable(DataTable):
             self.visible_rows = [self.visible_rows[old_ridx] for old_ridx in old_row_indices]
         if any(self.selected_rows):
             self.selected_rows = [self.selected_rows[old_ridx] for old_ridx in old_row_indices]
-        if any(self.matches):
+        if self.matches:
             self.matches = {
                 new_ridx: self.matches[old_ridx]
                 for new_ridx, old_ridx in enumerate(old_row_indices)
@@ -3879,8 +3885,7 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(f"Saved dataframe to [$success]{filename}[/]")
 
-        # df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RIDX))
-        df = self.df if self.df_view is None else self.df_view
+        df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RIDX))
         try:
             if fmt == "csv":
                 df.write_csv(filename)
