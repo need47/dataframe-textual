@@ -1985,9 +1985,10 @@ class DataFrameTable(DataTable):
 
             # Also update the view if applicable
             if self.df_view is not None:
-                ridx_view = self.df[RIDX][ridx]
+                # Get the RIDX value for this row in df_view
+                ridx_view = self.df.item(ridx, self.df.columns.index(RIDX))
                 self.df_view = self.df_view.with_columns(
-                    pl.when(pl.arange(0, len(self.df_view)) == ridx_view)
+                    pl.when(pl.col(RIDX) == ridx_view)
                     .then(pl.lit(new_value))
                     .otherwise(pl.col(col_name))
                     .alias(col_name)
@@ -2068,11 +2069,25 @@ class DataFrameTable(DataTable):
 
         try:
             # Apply the expression to the column
-            self.df = self.df.with_columns(expr.alias(col_name))
+            self.df = self.df.lazy().with_columns(expr.alias(col_name)).collect()
+
+            # Also update the view if applicable
+            # Update the value of col_name in df_view using the value of col_name from df based on RIDX mapping between them
+            if self.df_view is not None:
+                # Get updated column from df for rows that exist in df_view
+                df_updated = self.df.lazy().select(RIDX, pl.col(col_name).alias(f"{col_name}_updated"))
+                # Join and use coalesce to prefer updated value or keep original
+                self.df_view = (
+                    self.df_view.lazy()
+                    .join(df_updated, on=RIDX, how="left")
+                    .with_columns(pl.coalesce(pl.col(f"{col_name}_updated"), pl.col(col_name)).alias(col_name))
+                    .drop(f"{col_name}_updated")
+                    .collect()
+                )
         except Exception as e:
             self.notify(
                 f"Error applying expression: [$error]{term}[/] to column [$accent]{col_name}[/]",
-                title="Edit",
+                title="Edit Column",
                 severity="error",
                 timeout=10,
             )
@@ -2162,12 +2177,9 @@ class DataFrameTable(DataTable):
 
             # Also update the view if applicable
             if self.df_view is not None:
-                ridx_view = self.df[RIDX][ridx]
+                ridx_view = self.df.item(ridx, self.df.columns.index(RIDX))
                 self.df_view = self.df_view.with_columns(
-                    pl.when(pl.arange(0, len(self.df_view)) == ridx_view)
-                    .then(pl.lit(None))
-                    .otherwise(pl.col(col_name))
-                    .alias(col_name)
+                    pl.when(pl.col(RIDX) == ridx_view).then(pl.lit(None)).otherwise(pl.col(col_name)).alias(col_name)
                 )
 
             # Update the display
