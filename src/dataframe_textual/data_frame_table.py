@@ -3677,7 +3677,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        self.notify(f"{message}. Now showing [$success]{len(self.df)}[/] rows", title="Filter")
+        self.notify(f"{message}. Now showing [$success]{len(self.df)}[/] rows.", title="Filter")
 
     # Copy & Save
     def do_copy_to_clipboard(self, content: str, message: str) -> None:
