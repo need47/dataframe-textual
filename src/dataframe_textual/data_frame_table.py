@@ -2761,7 +2761,7 @@ class DataFrameTable(DataTable):
 
         # Push the search modal screen
         self.app.push_screen(
-            SearchScreen("Search", term, self.df, cidx),
+            SearchScreen("Select", term, self.df, cidx),
             callback=self.select_row,
         )
 
