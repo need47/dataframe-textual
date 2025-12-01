@@ -521,7 +521,7 @@ class MetaColumnScreen(TableScreen):
             self.table.add_row(
                 dc_int.format(idx, thousand_separator=self.thousand_separator),
                 col_name,
-                dc_str.format(col_type, style=dc.style),
+                dc_str.format("Datetime" if str(col_type).startswith("Datetime") else col_type, style=dc.style),
             )
 
         self.table.cursor_type = "none"
