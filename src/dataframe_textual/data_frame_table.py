@@ -1828,14 +1828,16 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(f"Sorted on column [$success]{col_name}[/]", dirty=True)
 
+        # Add new column to sort
         if old_desc is None:
-            # Add new column to sort
             self.sorted_columns[col_name] = descending
+
+        # Same direction - remove from sort
         elif old_desc == descending:
-            # Same direction - remove from sort
             del self.sorted_columns[col_name]
+
+        # Move to end of sort order
         else:
-            # Move to end of sort order
             del self.sorted_columns[col_name]
             self.sorted_columns[col_name] = descending
 
@@ -2066,13 +2068,8 @@ class DataFrameTable(DataTable):
                     sorted_columns[col] = order
             self.sorted_columns = sorted_columns
 
-        # Update hidden_columns if this column was hidden
-        if col_name in self.hidden_columns:
-            self.hidden_columns.remove(col_name)
-            self.hidden_columns.add(new_name)
-
-        # Update matches if this column had search matches
-        for rid, cols in self.matches.items():
+        # Update matches if this column had cell matches
+        for cols in self.matches.values():
             if col_name in cols:
                 cols.remove(col_name)
                 cols.add(new_name)
@@ -2742,7 +2739,7 @@ class DataFrameTable(DataTable):
 
         # Use existing cell matches if present
         if self.matches:
-            term = [True if rid in self.matches else False for rid in self.df[RID]]
+            term = pl.col(RID).is_in(self.matches)
         else:
             col_name = self.cursor_col_name
 
@@ -2852,7 +2849,7 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(message)
 
-        # Update selected rows to include new matches
+        # Update selected rows to include new selections
         self.selected_rows.update(ok_rids)
 
         # Show notification immediately, then start highlighting
@@ -2896,9 +2893,10 @@ class DataFrameTable(DataTable):
 
         for col_idx, col in enumerate(self.ordered_columns):
             col_key = col.key
+            col_name = col_key.value
             cell_text: Text = self.get_cell(row_key, col_key)
 
-            if is_selected or (col_idx in match_cols):
+            if is_selected or (col_name in match_cols):
                 cell_text.style = HIGHLIGHT_COLOR
             else:
                 # Reset to default style based on dtype
@@ -3520,13 +3518,13 @@ class DataFrameTable(DataTable):
         """View rows.
 
         If there are selected rows, view those.
-        Otherwise, view based on the value of the currently selected cell.
+        Otherwise, view based on the cursor value.
         """
 
         cidx = self.cursor_col_idx
         col_name = self.cursor_col_name
 
-        # If there are rows with selections, use those
+        # If there are selected rows, use those
         if self.selected_rows:
             term = pl.col(RID).is_in(self.selected_rows)
         # Otherwise, use the current cell value
@@ -3550,7 +3548,7 @@ class DataFrameTable(DataTable):
         )
 
     def view_rows(self, result) -> None:
-        """Show only rows with selections or matches, and do hide others. Do not modify the dataframe."""
+        """View selected rows and hide others. Do not modify the dataframe."""
         if result is None:
             return
         term, cidx, match_nocase, match_whole = result
@@ -3650,7 +3648,8 @@ class DataFrameTable(DataTable):
     def do_filter_rows(self) -> None:
         """Filter rows.
 
-        If there are selected rows, use those. Otherwise, filter based on the value of the currently selected cell.
+        If there are selected rows, use those.
+        Otherwise, filter based on the cursor value.
         """
         if self.selected_rows:
             message = "Filtered to selected rows (other rows removed)"
