@@ -2360,13 +2360,16 @@ class DataFrameTable(DataTable):
             if col_name in self.sorted_columns:
                 del self.sorted_columns[col_name]
 
+        # Remove from hidden columns if present
+        for col_name in col_names_to_remove:
+            self.hidden_columns.discard(col_name)
+
         # Remove from matches
-        col_indices_to_remove = set(self.df.columns.index(name) for name in col_names_to_remove)
-        for row_idx in list(self.matches.keys()):
-            self.matches[row_idx].difference_update(col_indices_to_remove)
+        for rid in list(self.matches.keys()):
+            self.matches[rid].difference_update(col_names_to_remove)
             # Remove empty entries
-            if not self.matches[row_idx]:
-                del self.matches[row_idx]
+            if not self.matches[rid]:
+                del self.matches[rid]
 
         # Remove from dataframe
         self.df = self.df.drop(col_names_to_remove)
@@ -2385,41 +2388,28 @@ class DataFrameTable(DataTable):
         col_idx = self.cursor_column
         new_col_name = f"{col_name}_copy"
 
+        # Ensure new column name is unique
+        counter = 1
+        while new_col_name in self.df.columns:
+            new_col_name = f"{new_col_name}{counter}"
+            counter += 1
+
         # Add to history
         self.add_history(f"Duplicated column [$success]{col_name}[/]", dirty=True)
 
         # Create new column and reorder columns to insert after current column
         cols_before = self.df.columns[: cidx + 1]
         cols_after = self.df.columns[cidx + 1 :]
+        cols_new = cols_before + [new_col_name] + cols_after
 
         # Add the new column and reorder columns for insertion after current column
-        self.df = (
-            self.df.lazy()
-            .with_columns(pl.col(col_name).alias(new_col_name))
-            .select(cols_before + [new_col_name] + cols_after)
-            .collect()
-        )
+        self.df = self.df.lazy().with_columns(pl.col(col_name).alias(new_col_name)).select(cols_new).collect()
 
         # Also update the view if applicable
         if self.df_view is not None:
             self.df_view = (
-                self.df_view.lazy()
-                .with_columns(pl.col(col_name).alias(new_col_name))
-                .select(cols_before + [new_col_name] + cols_after)
-                .collect()
+                self.df_view.lazy().with_columns(pl.col(col_name).alias(new_col_name)).select(cols_new).collect()
             )
-
-        # Update matches to account for new column
-        new_matches = defaultdict(set)
-        for row_idx, cols in self.matches.items():
-            new_cols = set()
-            for col_idx_in_set in cols:
-                if col_idx_in_set <= cidx:
-                    new_cols.add(col_idx_in_set)
-                else:
-                    new_cols.add(col_idx_in_set + 1)
-            new_matches[row_idx] = new_cols
-        self.matches = new_matches
 
         # Recreate table for display
         self.setup_table()
