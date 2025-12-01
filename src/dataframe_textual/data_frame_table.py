@@ -397,15 +397,6 @@ class DataFrameTable(DataTable):
         return ridx
 
     @property
-    def cursor_row_rid(self) -> int:
-        """Get the current cursor row RID (internal row index).
-
-        Returns:
-            int: The internal row index (RID) of the cursor position.
-        """
-        return self.df[RID][self.cursor_row_idx]
-
-    @property
     def cursor_col_idx(self) -> int:
         """Get the current cursor column index (0-based) as in dataframe.
 
@@ -418,15 +409,6 @@ class DataFrameTable(DataTable):
         cidx = self.df.columns.index(self.cursor_col_key.value)
         assert 0 <= cidx < len(self.df.columns), "Cursor column index is out of bounds"
         return cidx
-
-    @property
-    def cursor_rid(self) -> int:
-        """Get the current cursor row RID (internal row index).
-
-        Returns:
-            int: The internal row index (RID) of the cursor position.
-        """
-        return self.df[RID][self.cursor_row_idx]
 
     @property
     def cursor_col_name(self) -> str:
@@ -2521,16 +2503,15 @@ class DataFrameTable(DataTable):
         if deleted_count > 0:
             self.notify(f"Deleted [$success]{deleted_count}[/] row(s)", title="Delete")
 
-    # TODO
     def do_duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""
         ridx = self.cursor_row_idx
-        ridx_view = self.df[RID][ridx]
+        rid = self.df[RID][ridx]
 
         lf = self.df.lazy()
 
         # Get the row to duplicate
-        row_to_duplicate = lf.slice(ridx, 1).with_columns(pl.lit(ridx_view + 1).cast(pl.UInt32).alias(RID))
+        row_to_duplicate = lf.slice(ridx, 1).with_columns(pl.col(RID) + 1)
 
         # Add to history
         self.add_history(f"Duplicated row [$success]{ridx + 1}[/]", dirty=True)
@@ -2545,8 +2526,8 @@ class DataFrameTable(DataTable):
         # Also update the view if applicable
         if self.df_view is not None:
             lf_view = self.df_view.lazy()
-            lf_view_before = lf_view.slice(0, ridx_view + 1)
-            lf_view_after = lf_view.slice(ridx_view + 1).with_columns(pl.col(RID) + 1)
+            lf_view_before = lf_view.slice(0, rid + 1)
+            lf_view_after = lf_view.slice(rid + 1).with_columns(pl.col(RID) + 1)
             self.df_view = pl.concat([lf_view_before, row_to_duplicate, lf_view_after]).collect()
 
         # Recreate table for display
@@ -2900,7 +2881,10 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history("Toggled row selection")
 
-        rid = self.cursor_row_rid
+        # Get current row RID
+        ridx = self.cursor_row_idx
+        rid = self.df[RID][ridx]
+
         if rid in self.selected_rows:
             self.selected_rows.discard(rid)
         else:
@@ -3261,25 +3245,34 @@ class DataFrameTable(DataTable):
         )
 
         # Update matches
-        self.matches = {ridx: col_idxs.copy() for ridx, col_idxs in matches.items()}
+        self.matches = matches
 
         # Recreate table for display
         self.setup_table()
 
         # Store state for interactive replacement using dataclass
-        sorted_rows = sorted(self.matches.keys())
+        rid2ridx = {rid: ridx for ridx, rid in enumerate(self.df[RID]) if rid in self.matches}
+
+        # Unique columns to replace
+        cols_to_replace = set()
+        for cols in self.matches.values():
+            cols_to_replace.update(cols)
+
+        # Sorted column indices to replace
+        cidx2col = {cidx: col for cidx, col in enumerate(self.df.columns) if col in cols_to_replace}
+
         self.replace_state = ReplaceState(
             term_find=term_find,
             term_replace=term_replace,
             match_nocase=match_nocase,
             match_whole=match_whole,
             cidx=cidx,
-            rows=sorted_rows,
-            cols_per_row=[sorted(self.matches[ridx]) for ridx in sorted_rows],
+            rows=list(rid2ridx.values()),
+            cols_per_row=[[cidx for cidx, col in cidx2col.items() if col in self.matches[rid]] for rid in rid2ridx],
             current_rpos=0,
             current_cpos=0,
             current_occurrence=0,
-            total_occurrence=sum(len(col_idxs) for col_idxs in self.matches.values()),
+            total_occurrence=sum(len(cols) for cols in self.matches.values()),
             replaced_occurrence=0,
             skipped_occurrence=0,
             done=False,
@@ -3386,7 +3379,7 @@ class DataFrameTable(DataTable):
 
         col_name = "all columns" if state.cidx is None else self.df.columns[state.cidx]
         self.notify(
-            f"Replaced [$success]{state.replaced_occurrence}[/] of [$accent]{state.total_occurrence}[/] in [$s]{col_name}[/]",
+            f"Replaced [$success]{state.replaced_occurrence}[/] of [$success]{state.total_occurrence}[/] in [$accent]{col_name}[/]",
             title="Replace",
         )
 
@@ -3410,7 +3403,7 @@ class DataFrameTable(DataTable):
         if state.done:
             # All done - show final notification
             col_name = "all columns" if state.cidx is None else self.df.columns[state.cidx]
-            msg = f"Replaced [$success]{state.replaced_occurrence}[/] of [$accent]{state.total_occurrence}[/] in [$success]{col_name}[/]"
+            msg = f"Replaced [$success]{state.replaced_occurrence}[/] of [$success]{state.total_occurrence}[/] in [$accent]{col_name}[/]"
             if state.skipped_occurrence > 0:
                 msg += f", [$warning]{state.skipped_occurrence}[/] skipped"
             self.notify(msg, title="Replace")
@@ -3421,6 +3414,9 @@ class DataFrameTable(DataTable):
             return
 
         # Move cursor to next match
+        self.log(f"{state.current_rpos=}, {state.current_cpos=}")
+        self.log(f"{state.rows=}")
+        self.log(f"{state.cols_per_row=}")
         ridx = state.rows[state.current_rpos]
         cidx = state.cols_per_row[state.current_rpos][state.current_cpos]
         self.move_cursor_to(ridx, cidx)
@@ -3445,6 +3441,7 @@ class DataFrameTable(DataTable):
         cidx = state.cols_per_row[state.current_rpos][state.current_cpos]
         col_name = self.df.columns[cidx]
         dtype = self.df.dtypes[cidx]
+        rid = self.df[RID][ridx]
 
         # Replace
         if result is True:
@@ -3457,6 +3454,15 @@ class DataFrameTable(DataTable):
                     .otherwise(pl.col(col_name))
                     .alias(col_name)
                 )
+
+                # Also update the view if applicable
+                if self.df_view is not None:
+                    self.df_view = self.df_view.with_columns(
+                        pl.when(pl.col(RID) == rid)
+                        .then(pl.col(col_name).str.replace_all(term_find, state.term_replace))
+                        .otherwise(pl.col(col_name))
+                        .alias(col_name)
+                    )
             else:
                 # try to convert replacement value to column dtype
                 try:
@@ -3470,6 +3476,12 @@ class DataFrameTable(DataTable):
                     .otherwise(pl.col(col_name))
                     .alias(col_name)
                 )
+
+                # Also update the view if applicable
+                if self.df_view is not None:
+                    self.df_view = self.df_view.with_columns(
+                        pl.when(pl.col(RID) == rid).then(pl.lit(value)).otherwise(pl.col(col_name)).alias(col_name)
+                    )
 
             state.replaced_occurrence += 1
 
