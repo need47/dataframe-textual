@@ -439,7 +439,7 @@ class DataFrameTable(DataTable):
 
     @property
     def cursor_value(self) -> Any:
-        """Get the current cursor cell value.
+        """Get the current cursor cell value in the dataframe.
 
         Returns:
             Any: The value of the cell at the cursor position.
@@ -3058,9 +3058,9 @@ class DataFrameTable(DataTable):
         self.add_history(f"Found `[$success]{term}[/]` in column [$accent]{col_name}[/]")
 
         # Add to matches and count total
-        match_count = sum(len(col_idxs) for col_idxs in matches.values())
-        for ridx, col_idxs in matches.items():
-            self.matches[ridx].update(col_idxs)
+        match_count = sum(len(cols) for cols in matches.values())
+        for rid, cols in matches.items():
+            self.matches[rid].update(cols)
 
         self.notify(f"Found [$success]{match_count}[/] matches for `[$accent]{term}[/]`", title="Find")
 
@@ -3092,9 +3092,9 @@ class DataFrameTable(DataTable):
         self.add_history(f"Found `[$success]{term}[/]` across all columns")
 
         # Add to matches and count total
-        match_count = sum(len(col_idxs) for col_idxs in matches.values())
-        for ridx, col_idxs in matches.items():
-            self.matches[ridx].update(col_idxs)
+        match_count = sum(len(cols) for cols in matches.values())
+        for rid, cols in matches.items():
+            self.matches[rid].update(cols)
 
         self.notify(
             f"Found [$success]{match_count}[/] matches for `[$accent]{term}[/]` across all columns",
@@ -3104,6 +3104,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
+    # TODO
     def do_next_match(self) -> None:
         """Move cursor to the next match."""
         if not self.matches:
@@ -3126,6 +3127,7 @@ class DataFrameTable(DataTable):
         first_ridx, first_cidx = ordered_matches[0]
         self.move_cursor_to(first_ridx, first_cidx)
 
+    # TODO
     def do_previous_match(self) -> None:
         """Move cursor to the previous match."""
         if not self.matches:
@@ -3154,6 +3156,7 @@ class DataFrameTable(DataTable):
         row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
         self.move_cursor(row=row_idx, column=col_idx)
 
+    # TODO
     def do_next_selected_row(self) -> None:
         """Move cursor to the next selected row."""
         if not self.selected_rows:
@@ -3176,6 +3179,7 @@ class DataFrameTable(DataTable):
         first_ridx = selected_row_indices[0]
         self.move_cursor_to(first_ridx, self.cursor_col_idx)
 
+    # TODO
     def do_previous_selected_row(self) -> None:
         """Move cursor to the previous selected row."""
         if not self.selected_rows:
@@ -3198,6 +3202,7 @@ class DataFrameTable(DataTable):
         last_ridx = selected_row_indices[-1]
         self.move_cursor_to(last_ridx, self.cursor_col_idx)
 
+    # TODO
     def do_replace(self) -> None:
         """Open replace screen for current column."""
         # Push the replace modal screen
@@ -3618,12 +3623,12 @@ class DataFrameTable(DataTable):
 
         # Update matches
         if self.matches:
-            self.matches = {ridx: col_indices for ridx, col_indices in self.matches.items() if ridx in ok_rids}
+            self.matches = {rid: cols for rid, cols in self.matches.items() if rid in ok_rids}
 
         # Recreate table for display
         self.setup_table()
 
-        self.notify(f"Filtered to [$success]{matched_count}[/] matching rows", title="Filter")
+        self.notify(f"Filtered to [$success]{matched_count}[/] matching row(s)", title="Filter")
 
     def do_filter_rows(self) -> None:
         """Filter rows.
@@ -3653,7 +3658,7 @@ class DataFrameTable(DataTable):
 
         # Update selected rows
         if self.selected_rows:
-            selected_rows = {ridx for ridx in self.selected_rows if ridx in ok_rids}
+            selected_rows = {rid for rid in self.selected_rows if rid in ok_rids}
         else:
             selected_rows = set()
 
@@ -3869,13 +3874,18 @@ class DataFrameTable(DataTable):
         """
 
         sql = sql.replace("$#", f"(`{RID}` + 1)")
+        if RID not in sql and "*" not in sql:
+            # Ensure RID is selected
+            import re
+
+            RE_FROM_SELF = re.compile(r"\bFROM\s+self\b", re.IGNORECASE)
+            sql = RE_FROM_SELF.sub(f", `{RID}` FROM self", sql)
 
         # Execute the SQL query
         try:
             df_filtered = self.df.lazy().sql(sql).collect()
-            ok_rids = set(df_filtered[RID])
 
-            if not ok_rids:
+            if not len(df_filtered):
                 self.notify(
                     f"SQL query returned no results for [$warning]{sql}[/]", title="SQL Query", severity="warning"
                 )
@@ -3894,6 +3904,7 @@ class DataFrameTable(DataTable):
 
         # Update dataframe
         self.df = df_filtered
+        ok_rids = set(df_filtered[RID])
 
         # Update selected rows
         if self.selected_rows:

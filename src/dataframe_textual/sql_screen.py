@@ -169,7 +169,7 @@ class SimpleSqlScreen(SqlScreen):
                 *[
                     Selection(col, col)
                     for col in self.df.columns
-                    if col not in self.dftable.hidden_columns and not col.startswith(RID)
+                    if col not in self.dftable.hidden_columns and col != RID
                 ],
                 id="column-selection",
             )
@@ -181,9 +181,7 @@ class SimpleSqlScreen(SqlScreen):
         """Handle Yes button/Enter key press."""
         selections = self.query_one(SelectionList).selected
         if not selections:
-            selections = [
-                col for col in self.df.columns if col not in self.dftable.hidden_columns and not col.startswith(RID)
-            ]
+            selections = [col for col in self.df.columns if col not in self.dftable.hidden_columns and col != RID]
 
         columns = ", ".join(f"`{s}`" for s in selections)
         where = self.query_one(Input).value.strip()
