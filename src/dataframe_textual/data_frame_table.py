@@ -233,7 +233,7 @@ class DataFrameTable(DataTable):
         ("z", "freeze_row_column", "Freeze rows/columns"),
         ("comma", "show_thousand_separator", "Toggle thousand separator"),  # `,`
         ("underscore", "expand_column", "Expand column to full width"),  # `_`
-        ("circumflex_accent", "toggle_ridx", "Toggle internal row index"),  # `^`
+        ("circumflex_accent", "toggle_rid", "Toggle internal row index"),  # `^`
         # Copy
         ("c", "copy_cell", "Copy cell to clipboard"),
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
@@ -719,9 +719,9 @@ class DataFrameTable(DataTable):
         """Expand the current column to its full width."""
         self.do_expand_column()
 
-    def action_toggle_ridx(self) -> None:
+    def action_toggle_rid(self) -> None:
         """Toggle the internal row index column visibility."""
-        self.do_toggle_ridx()
+        self.do_toggle_rid()
 
     def action_show_hidden_rows_columns(self) -> None:
         """Show all hidden rows/columns."""
@@ -1785,7 +1785,7 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error expanding column `{col_name}`: {str(e)}")
 
-    def do_toggle_ridx(self) -> None:
+    def do_toggle_rid(self) -> None:
         """Toggle display of the internal RIDX column."""
         self.show_rid = not self.show_rid
 
@@ -2076,6 +2076,12 @@ class DataFrameTable(DataTable):
         if col_name in self.hidden_columns:
             self.hidden_columns.remove(col_name)
             self.hidden_columns.add(new_name)
+
+        # Update matches if this column had search matches
+        for rid, cols in self.matches.items():
+            if col_name in cols:
+                cols.remove(col_name)
+                cols.add(new_name)
 
         # Recreate table for display
         self.setup_table()
@@ -2942,7 +2948,7 @@ class DataFrameTable(DataTable):
     # Find & Replace
     def find_matches(
         self, term: str, cidx: int | None = None, match_nocase: bool = False, match_whole: bool = False
-    ) -> dict[int, set[int]]:
+    ) -> dict[int, set[str]]:
         """Find matches for a term in the dataframe.
 
         Args:
@@ -2959,7 +2965,7 @@ class DataFrameTable(DataTable):
         Raises:
             Exception: If expression validation or filtering fails.
         """
-        matches: dict[int, set[int]] = defaultdict(set)
+        matches: dict[int, set[str]] = defaultdict(set)
 
         # Lazyframe for filtering
         lf = self.df.lazy()
@@ -2993,14 +2999,14 @@ class DataFrameTable(DataTable):
 
             # Get matched row indices
             try:
-                matched_ridxs = lf.filter(expr).collect()[RID].to_list()
+                matched_ridxs = lf.filter(expr).collect()[RID]
             except Exception as e:
                 self.notify(f"Error applying filter: [$error]{expr}[/]", title="Find", severity="error", timeout=10)
                 self.log(f"Error applying filter: {str(e)}")
                 return matches
 
             for ridx in matched_ridxs:
-                matches[ridx].add(col_idx)
+                matches[ridx].add(col_name)
 
         return matches
 
