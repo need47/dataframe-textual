@@ -1882,19 +1882,6 @@ class DataFrameTable(DataTable):
         if self.df_view is not None:
             self.df_view = self.df_view.lazy().sort(**sort_by).collect()
 
-        # Updated visible rows, selected rows, and cell matches to match new order
-        old_row_indices = df_sorted[RID].to_list()
-        if self.hidden_rows:
-            self.visible_rows = [self.visible_rows[old_ridx] for old_ridx in old_row_indices]
-        if any(self.selected_rows):
-            self.selected_rows = [self.selected_rows[old_ridx] for old_ridx in old_row_indices]
-        if self.matches:
-            self.matches = {
-                new_ridx: self.matches[old_ridx]
-                for new_ridx, old_ridx in enumerate(old_row_indices)
-                if old_ridx in self.matches
-            }
-
         # Update the dataframe
         self.df = df_sorted
 
