@@ -13,7 +13,7 @@ from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
-from .common import NULL, NULL_DISPLAY, RIDX, DtypeConfig, format_float
+from .common import NULL, NULL_DISPLAY, RID, DtypeConfig, format_float
 
 
 class TableScreen(ModalScreen):
@@ -117,7 +117,7 @@ class TableScreen(ModalScreen):
         df_filtered = self.dftable.df.lazy().filter(expr).collect()
         self.log(f"Filtered dataframe has {len(df_filtered)} rows")
 
-        matched_indices = set(df_filtered[RIDX].to_list())
+        matched_indices = set(df_filtered[RID].to_list())
         if not matched_indices:
             self.notify(
                 f"No matches found for [$warning]{col_name}[/] == {value_display}",
@@ -532,7 +532,7 @@ class MetaColumnScreen(TableScreen):
 
         # Add a row for each column
         for idx, (col_name, col_type) in enumerate(schema.items(), 1):
-            if col_name == RIDX:
+            if col_name == RID:
                 continue  # Skip RIDX column
             dc = DtypeConfig(col_type)
             self.table.add_row(

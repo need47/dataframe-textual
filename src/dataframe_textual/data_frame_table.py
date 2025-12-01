@@ -10,7 +10,6 @@ from typing import Any
 
 import polars as pl
 from rich.text import Text, TextType
-from textual import work
 from textual._two_way_dict import TwoWayDict
 from textual.coordinate import Coordinate
 from textual.events import Click
@@ -33,7 +32,6 @@ from .common import (
     NULL,
     NULL_DISPLAY,
     RID,
-    RIDX,
     SUBSCRIPT_DIGITS,
     SUPPORTED_FORMATS,
     DtypeConfig,
@@ -41,7 +39,6 @@ from .common import (
     get_next_item,
     parse_placeholders,
     round_to_nearest_hundreds,
-    sleep_async,
     tentative_expr,
     validate_expr,
 )
@@ -83,10 +80,10 @@ class History:
     df_view: pl.DataFrame | None
     filename: str
     loaded_rows: int
-    sorted_columns: dict[str, bool]
+    hidden_rows: set[int]
     hidden_columns: set[str]
-    selected_rows: list[bool]
-    visible_rows: list[bool]
+    selected_rows: set[int]
+    sorted_columns: dict[str, bool]
     fixed_rows: int
     fixed_columns: int
     cursor_coordinate: Coordinate
@@ -325,7 +322,7 @@ class DataFrameTable(DataTable):
         super().__init__(**kwargs)
 
         # DataFrame state
-        self.dataframe = df.lazy().with_row_index(RIDX).select(pl.exclude(RIDX), RIDX).collect()  # Original dataframe
+        self.dataframe = df.lazy().with_row_index(RID).select(pl.exclude(RID), RID).collect()  # Original dataframe
         self.df = self.dataframe  # Internal/working dataframe
         self.filename = filename or "untitled.csv"  # Current filename
         self.tabname = tabname or Path(filename).stem  # Tab name
@@ -339,10 +336,10 @@ class DataFrameTable(DataTable):
         self.loaded_ranges: list[tuple[int, int]] = []  # List of (start, end) row indices that are loaded
 
         # State tracking (all 0-based indexing)
-        self.sorted_columns: dict[str, bool] = {}  # col_name -> descending
+        self.hidden_rows: set[int] = set()  # Track hidden rows
         self.hidden_columns: set[str] = set()  # Set of hidden column names
-        self.selected_rows: list[bool] = [False] * len(self.df)  # Track selected rows
-        self.visible_rows: list[bool] = [True] * len(self.df)  # Track visible rows (for filtering)
+        self.selected_rows: set[int] = set()  # Track selected rows
+        self.sorted_columns: dict[str, bool] = {}  # col_name -> descending
         self.matches: dict[int, set[int]] = defaultdict(set)  # Track search matches: row_idx -> set of col_idx
 
         # Freezing
@@ -358,7 +355,7 @@ class DataFrameTable(DataTable):
         self.thousand_separator = False
 
         # Whether to show internal row index column
-        self.show_ridx = False
+        self.show_rid = False
 
     @property
     def cursor_key(self) -> CellKey:
@@ -402,6 +399,15 @@ class DataFrameTable(DataTable):
         return ridx
 
     @property
+    def cursor_row_rid(self) -> int:
+        """Get the current cursor row RID (internal row index).
+
+        Returns:
+            int: The internal row index (RID) of the cursor position.
+        """
+        return self.df[RID][self.cursor_row_idx]
+
+    @property
     def cursor_col_idx(self) -> int:
         """Get the current cursor column index (0-based) as in dataframe.
 
@@ -434,22 +440,13 @@ class DataFrameTable(DataTable):
         return self.df.item(self.cursor_row_idx, self.cursor_col_idx)
 
     @property
-    def has_hidden_rows(self) -> bool:
-        """Check if there are any hidden rows.
-
-        Returns:
-            bool: True if there are hidden rows, False otherwise.
-        """
-        return any(1 for v in self.visible_rows if v is False)
-
-    @property
     def ordered_selected_rows(self) -> list[int]:
         """Get the list of selected row indices in order.
 
         Returns:
             list[int]: A list of 0-based row indices that are currently selected.
         """
-        return [ridx for ridx, selected in enumerate(self.selected_rows) if selected]
+        return [ridx for ridx, rid in enumerate(self.df[RID]) if rid in self.selected_rows]
 
     @property
     def ordered_matches(self) -> list[tuple[int, int]]:
@@ -1003,10 +1000,10 @@ class DataFrameTable(DataTable):
         # Set new dataframe and reset table
         self.df = new_df
         self.loaded_rows = 0
-        self.sorted_columns = {}
+        self.hidden_rows = set()
         self.hidden_columns = set()
-        self.selected_rows = [False] * len(self.df)
-        self.visible_rows = [True] * len(self.df)
+        self.selected_rows = set()
+        self.sorted_columns = {}
         self.fixed_rows = 0
         self.fixed_columns = 0
         self.matches = defaultdict(set)
@@ -1025,16 +1022,17 @@ class DataFrameTable(DataTable):
         self.show_row_labels = True
 
         # Lazy load up to BATCH_SIZE visible rows
-        stop, visible_count, row_idx = self.BATCH_SIZE, 0, 0
-        for row_idx, visible in enumerate(self.visible_rows):
-            if not visible:
+        stop, visible_count, rid = self.BATCH_SIZE, 0, 0
+        for rid in self.df[RID]:
+            if rid in self.hidden_rows:
                 continue
+
             visible_count += 1
             if visible_count > self.BATCH_SIZE:
-                stop = row_idx
+                stop = rid
                 break
         else:
-            stop = row_idx + 1
+            stop = rid + 1
 
         # Round up to next hundreds
         if stop % self.BATCH_SIZE != 0:
@@ -1133,7 +1131,7 @@ class DataFrameTable(DataTable):
 
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
-            if col in self.hidden_columns or (col == RIDX and not self.show_ridx):
+            if col in self.hidden_columns or (col == RID and not self.show_rid):
                 continue  # Skip hidden columns and internal RIDX
             for idx, c in enumerate(self.sorted_columns, 1):
                 if c == col:
@@ -1151,71 +1149,6 @@ class DataFrameTable(DataTable):
             width = column_widths.get(col)
 
             self.add_column(Text(cell_value, justify=DtypeConfig(dtype).justify), key=col, width=width)
-
-    def load_rows(self, stop: int | None = None, move_to_end: bool = False) -> None:
-        """Load a batch of rows into the table (synchronous wrapper).
-
-        Args:
-            stop: Stop loading rows when this index is reached.
-                  If None, load until the end of the dataframe.
-        """
-        if stop is None or stop > len(self.df):
-            stop = len(self.df)
-
-        # If already loaded enough rows, just move cursor if needed
-        if stop <= self.loaded_rows:
-            if move_to_end:
-                self.move_cursor(row=self.row_count - 1)
-
-            return
-
-        # Warn user if loading a large number of rows
-        elif (nrows := stop - self.loaded_rows) >= WARN_ROWS_THRESHOLD:
-
-            def _continue(result: bool) -> None:
-                if result:
-                    self.load_rows_async(stop, move_to_end=move_to_end)
-
-            self.app.push_screen(
-                ConfirmScreen(
-                    f"Load {nrows} Rows",
-                    label="Loading a large number of rows may cause the application to become unresponsive. Do you want to continue?",
-                ),
-                callback=_continue,
-            )
-
-            return
-
-        # Load rows asynchronously
-        self.load_rows_async(stop, move_to_end=move_to_end)
-
-    @work(exclusive=True, description="Loading rows...")
-    async def load_rows_async(self, stop: int, move_to_end: bool = False) -> None:
-        """Perform loading with async to avoid blocking.
-
-        Args:
-            stop: Stop loading rows when this index is reached.
-            move_to_end: If True, move cursor to the last loaded row after loading completes.
-        """
-        # Load rows in smaller chunks to avoid blocking
-        if stop > self.loaded_rows:
-            self.log(f"Async loading up to row {self.loaded_rows = }, {stop = }")
-            # Load incrementally to avoid one big block
-            # Load max BATCH_SIZE rows at a time
-            chunk_size = min(self.BATCH_SIZE, stop - self.loaded_rows)
-            next_stop = min(self.loaded_rows + chunk_size, stop)
-            self.load_rows_range(self.loaded_rows, next_stop)
-            self.loaded_rows = next_stop
-
-            # If there's more to load, yield to event loop with delay
-            if next_stop < stop:
-                await sleep_async(0.05)  # 50ms delay to allow UI updates
-                self.load_rows_async(stop, move_to_end=move_to_end)
-                return
-
-        # After loading completes, move cursor to end if requested
-        if move_to_end:
-            self.call_after_refresh(lambda: self.move_cursor(row=self.row_count - 1))
 
     def _calculate_load_range(self, start: int, stop: int) -> list[tuple[int, int]]:
         """Calculate the actual ranges to load, accounting for already-loaded ranges.
@@ -1345,16 +1278,16 @@ class DataFrameTable(DataTable):
         df_slice = self.df.slice(segment_start, segment_stop - segment_start)
 
         # Load each row at the correct position
-        for ridx, row in enumerate(df_slice.rows(), segment_start):
-            if not self.visible_rows[ridx]:
+        for (ridx, row), rid in zip(enumerate(df_slice.rows(), segment_start), df_slice[RID]):
+            if rid in self.hidden_rows:
                 continue  # Skip hidden rows
 
-            is_selected = self.selected_rows[ridx]
-            match_cols = self.matches.get(ridx, set())
+            is_selected = rid in self.selected_rows
+            match_cols = self.matches.get(rid, set())
 
             vals, dtypes, styles = [], [], []
             for cidx, (val, col, dtype) in enumerate(zip(row, self.df.columns, self.df.dtypes)):
-                if col in self.hidden_columns or (col == RIDX and not self.show_ridx):
+                if col in self.hidden_columns or (col == RID and not self.show_rid):
                     continue  # Skip hidden columns and internal RIDX
 
                 vals.append(val)
@@ -1643,10 +1576,10 @@ class DataFrameTable(DataTable):
             df_view=self.df_view,
             filename=self.filename,
             loaded_rows=self.loaded_rows,
-            sorted_columns=self.sorted_columns.copy(),
+            hidden_rows=self.hidden_rows.copy(),
             hidden_columns=self.hidden_columns.copy(),
             selected_rows=self.selected_rows.copy(),
-            visible_rows=self.visible_rows.copy(),
+            sorted_columns=self.sorted_columns.copy(),
             fixed_rows=self.fixed_rows,
             fixed_columns=self.fixed_columns,
             cursor_coordinate=self.cursor_coordinate,
@@ -1664,10 +1597,10 @@ class DataFrameTable(DataTable):
         self.df_view = history.df_view
         self.filename = history.filename
         self.loaded_rows = history.loaded_rows
-        self.sorted_columns = history.sorted_columns.copy()
+        self.hidden_rows = history.hidden_rows.copy()
         self.hidden_columns = history.hidden_columns.copy()
         self.selected_rows = history.selected_rows.copy()
-        self.visible_rows = history.visible_rows.copy()
+        self.sorted_columns = history.sorted_columns.copy()
         self.fixed_rows = history.fixed_rows
         self.fixed_columns = history.fixed_columns
         self.cursor_coordinate = history.cursor_coordinate
@@ -1872,14 +1805,14 @@ class DataFrameTable(DataTable):
 
     def do_toggle_ridx(self) -> None:
         """Toggle display of the internal RIDX column."""
-        self.show_ridx = not self.show_ridx
+        self.show_rid = not self.show_rid
 
         # Recreate table for display
         self.setup_table()
 
     def do_show_hidden_rows_columns(self) -> None:
         """Show all hidden rows/columns by recreating the table."""
-        if not self.has_hidden_rows and not self.hidden_columns and self.df_view is None:
+        if not self.hidden_rows and not self.hidden_columns and self.df_view is None:
             self.notify("No hidden rows or columns to show", title="Show", severity="warning")
             return
 
@@ -1888,20 +1821,11 @@ class DataFrameTable(DataTable):
 
         # If in a filtered view, restore the full dataframe
         if self.df_view is not None:
-            # Restore all selected rows from self.df
-            selected_rows = [False] * len(self.df_view)
-            for ridx, is_selected in enumerate(self.selected_rows):
-                if is_selected:
-                    # Get the RIDX value for this row in df_view
-                    ridx_view = self.df[RIDX][ridx]
-                    selected_rows[ridx_view] = True
-            self.selected_rows = selected_rows
-
             self.df = self.df_view
             self.df_view = None
 
         # Clear hidden rows/columns tracking
-        self.visible_rows = [True] * len(self.df)
+        self.hidden_rows.clear()
         self.hidden_columns.clear()
 
         # Recreate table for display
@@ -1949,7 +1873,7 @@ class DataFrameTable(DataTable):
             sort_by = {"by": sort_cols, "descending": descending_flags, "nulls_last": True}
         else:
             # No sort - restore original order by adding a temporary index column
-            sort_by = {"by": RIDX}
+            sort_by = {"by": RID}
 
         # Perform the sort
         df_sorted = lf.sort(**sort_by).collect()
@@ -1959,8 +1883,8 @@ class DataFrameTable(DataTable):
             self.df_view = self.df_view.lazy().sort(**sort_by).collect()
 
         # Updated visible rows, selected rows, and cell matches to match new order
-        old_row_indices = df_sorted[RIDX].to_list()
-        if self.has_hidden_rows:
+        old_row_indices = df_sorted[RID].to_list()
+        if self.hidden_rows:
             self.visible_rows = [self.visible_rows[old_ridx] for old_ridx in old_row_indices]
         if any(self.selected_rows):
             self.selected_rows = [self.selected_rows[old_ridx] for old_ridx in old_row_indices]
@@ -2022,9 +1946,9 @@ class DataFrameTable(DataTable):
             # Also update the view if applicable
             if self.df_view is not None:
                 # Get the RIDX value for this row in df_view
-                ridx_view = self.df.item(ridx, self.df.columns.index(RIDX))
+                ridx_view = self.df.item(ridx, self.df.columns.index(RID))
                 self.df_view = self.df_view.with_columns(
-                    pl.when(pl.col(RIDX) == ridx_view)
+                    pl.when(pl.col(RID) == ridx_view)
                     .then(pl.lit(new_value))
                     .otherwise(pl.col(col_name))
                     .alias(col_name)
@@ -2112,11 +2036,11 @@ class DataFrameTable(DataTable):
             if self.df_view is not None:
                 # Get updated column from df for rows that exist in df_view
                 col_updated = f"^_{col_name}_^"
-                lf_updated = self.df.lazy().select(RIDX, pl.col(col_name).alias(col_updated))
+                lf_updated = self.df.lazy().select(RID, pl.col(col_name).alias(col_updated))
                 # Join and use coalesce to prefer updated value or keep original
                 self.df_view = (
                     self.df_view.lazy()
-                    .join(lf_updated, on=RIDX, how="left")
+                    .join(lf_updated, on=RID, how="left")
                     .with_columns(pl.coalesce(pl.col(col_updated), pl.col(col_name)).alias(col_name))
                     .drop(col_updated)
                     .collect()
@@ -2214,9 +2138,9 @@ class DataFrameTable(DataTable):
 
             # Also update the view if applicable
             if self.df_view is not None:
-                ridx_view = self.df.item(ridx, self.df.columns.index(RIDX))
+                ridx_view = self.df.item(ridx, self.df.columns.index(RID))
                 self.df_view = self.df_view.with_columns(
-                    pl.when(pl.col(RIDX) == ridx_view).then(pl.lit(None)).otherwise(pl.col(col_name)).alias(col_name)
+                    pl.when(pl.col(RID) == ridx_view).then(pl.lit(None)).otherwise(pl.col(col_name)).alias(col_name)
                 )
 
             # Update the display
@@ -2320,9 +2244,9 @@ class DataFrameTable(DataTable):
             # Also update the view if applicable
             if self.df_view is not None:
                 # Get updated column from df for rows that exist in df_view
-                lf_updated = self.df.lazy().select(RIDX, pl.col(new_col_name))
+                lf_updated = self.df.lazy().select(RID, pl.col(new_col_name))
                 # Join and use coalesce to prefer updated value or keep original
-                self.df_view = self.df_view.lazy().join(lf_updated, on=RIDX, how="left").select(select_cols).collect()
+                self.df_view = self.df_view.lazy().join(lf_updated, on=RID, how="left").select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -2393,9 +2317,9 @@ class DataFrameTable(DataTable):
             # Also update the view if applicable
             if self.df_view is not None:
                 # Get updated column from df for rows that exist in df_view
-                lf_updated = self.df.lazy().select(RIDX, pl.col(new_col_name))
+                lf_updated = self.df.lazy().select(RID, pl.col(new_col_name))
                 # Join and use coalesce to prefer updated value or keep original
-                self.df_view = self.df_view.lazy().join(lf_updated, on=RIDX, how="left").select(select_cols).collect()
+                self.df_view = self.df_view.lazy().join(lf_updated, on=RID, how="left").select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -2581,9 +2505,9 @@ class DataFrameTable(DataTable):
             return
 
         # Update selected and visible rows tracking
-        old_row_indices = set(df_filtered[RIDX].to_list())
+        old_row_indices = set(df_filtered[RID].to_list())
         selected_rows, visible_rows = [], []
-        for selected, visible, old_ridx in zip(self.selected_rows, self.visible_rows, self.df[RIDX], strict=True):
+        for selected, visible, old_ridx in zip(self.selected_rows, self.visible_rows, self.df[RID], strict=True):
             if old_ridx not in old_row_indices:
                 continue
             selected_rows.append(selected)
@@ -2597,7 +2521,7 @@ class DataFrameTable(DataTable):
         # Update matches since row indices have changed
         if self.matches:
             matches = defaultdict(set)
-            for ridx, old_ridx in enumerate(self.df[RIDX]):
+            for ridx, old_ridx in enumerate(self.df[RID]):
                 if old_ridx in self.matches:
                     matches[ridx] = self.matches[old_ridx]
             self.matches = matches
@@ -2605,27 +2529,27 @@ class DataFrameTable(DataTable):
         # Also update the view if applicable
         if self.df_view is not None:
             # Rebuild RIDX column in self.df_view for remaining rows
-            RIDX_NEW = f"{RIDX}_new"
+            RIDX_NEW = f"{RID}_new"
             lf_view = (
                 self.df_view.lazy()
-                .filter(pl.col(RIDX).is_in(old_row_indices))
+                .filter(pl.col(RID).is_in(old_row_indices))
                 .with_columns(pl.arange(0, len(self.df_view), dtype=pl.UInt32).alias(RIDX_NEW))
             )
 
             # Rebuild RIDX column in self.df
             self.df = (
                 self.df.lazy()
-                .join(lf_view.select(RIDX, RIDX_NEW), on=RIDX, how="left")
-                .with_columns(pl.col(RIDX_NEW).alias(RIDX))
+                .join(lf_view.select(RID, RIDX_NEW), on=RID, how="left")
+                .with_columns(pl.col(RIDX_NEW).alias(RID))
                 .drop(RIDX_NEW)
                 .collect()
             )
 
             # Update df_view
-            self.df_view = lf_view.with_columns(pl.col(RIDX_NEW).alias(RIDX)).drop(RIDX_NEW).collect()
+            self.df_view = lf_view.with_columns(pl.col(RIDX_NEW).alias(RID)).drop(RIDX_NEW).collect()
         else:
             # Rebuild RIDX column to be sequential
-            self.df = self.df.lazy().with_columns(pl.arange(0, len(self.df), dtype=pl.UInt32).alias(RIDX)).collect()
+            self.df = self.df.lazy().with_columns(pl.arange(0, len(self.df), dtype=pl.UInt32).alias(RID)).collect()
 
         # Recreate table for display
         self.setup_table()
@@ -2637,19 +2561,19 @@ class DataFrameTable(DataTable):
     def do_duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""
         ridx = self.cursor_row_idx
-        ridx_view = self.df[RIDX][ridx]
+        ridx_view = self.df[RID][ridx]
 
         lf = self.df.lazy()
 
         # Get the row to duplicate
-        row_to_duplicate = lf.slice(ridx, 1).with_columns(pl.lit(ridx_view + 1).cast(pl.UInt32).alias(RIDX))
+        row_to_duplicate = lf.slice(ridx, 1).with_columns(pl.lit(ridx_view + 1).cast(pl.UInt32).alias(RID))
 
         # Add to history
         self.add_history(f"Duplicated row [$success]{ridx + 1}[/]", dirty=True)
 
         # Concatenate: rows before + duplicated row + rows after
         lf_before = lf.slice(0, ridx + 1)
-        lf_after = lf.slice(ridx + 1).with_columns(pl.col(RIDX) + 1)
+        lf_after = lf.slice(ridx + 1).with_columns(pl.col(RID) + 1)
 
         # Combine the parts
         self.df = pl.concat([lf_before, row_to_duplicate, lf_after]).collect()
@@ -2658,7 +2582,7 @@ class DataFrameTable(DataTable):
         if self.df_view is not None:
             lf_view = self.df_view.lazy()
             lf_view_before = lf_view.slice(0, ridx_view + 1)
-            lf_view_after = lf_view.slice(ridx_view + 1).with_columns(pl.col(RIDX) + 1)
+            lf_view_after = lf_view.slice(ridx_view + 1).with_columns(pl.col(RID) + 1)
             self.df_view = pl.concat([lf_view_before, row_to_duplicate, lf_view_after]).collect()
 
         # Update selected and visible rows tracking to account for new row
@@ -2799,7 +2723,7 @@ class DataFrameTable(DataTable):
         ridx = int(row_key.value)  # 0-based
         swap_ridx = int(swap_key.value)  # 0-based
         first, second = sorted([ridx, swap_ridx])
-        first_view, second_view = self.df[RIDX][first], self.df[RIDX][second]
+        first_view, second_view = self.df[RID][first], self.df[RID][second]
 
         self.df = pl.concat(
             [
@@ -2888,7 +2812,7 @@ class DataFrameTable(DataTable):
 
         # Use existing cell matches if present
         if self.matches:
-            term = [True if ridx in self.matches else False for ridx in range(len(self.df))]
+            term = [True if rid in self.matches else False for rid in self.df[RID]]
         else:
             col_name = self.cursor_col_name
 
@@ -2971,13 +2895,13 @@ class DataFrameTable(DataTable):
                     )
 
         # Lazyframe for filtering
-        lf = self.df.lazy().drop(RIDX).with_row_index(RIDX)
-        if self.has_hidden_rows:
-            lf = lf.filter(self.visible_rows)
+        lf = self.df.lazy()
+        if self.hidden_rows:
+            lf = lf.filter(~pl.col(RID).is_in(self.hidden_rows))
 
         # Apply filter to get matched row indices
         try:
-            matches = set(lf.filter(expr).collect()[RIDX].to_list())
+            matches = set(lf.filter(expr).collect()[RID])
             self.log(f"Matches: {matches} for term `{term}` in column `{col_name}`")
         except Exception as e:
             self.notify(
@@ -2995,14 +2919,13 @@ class DataFrameTable(DataTable):
             )
             return
 
-        message = f"Found [$success]{match_count}[/] matching row(s)`"
+        message = f"Found [$success]{match_count}[/] matching row(s)"
 
         # Add to history
         self.add_history(message)
 
         # Update selected rows to include new matches
-        for m in matches:
-            self.selected_rows[m] = True
+        self.selected_rows.update(matches)
 
         # Show notification immediately, then start highlighting
         self.notify(message, title="Select Row")
@@ -3015,19 +2938,21 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history("Toggled row selection")
 
-        if self.has_hidden_rows:
-            # Some rows are hidden - invert only selected visible rows and clear selections for hidden rows
-            for i in range(len(self.selected_rows)):
-                if self.visible_rows[i]:
-                    self.selected_rows[i] = not self.selected_rows[i]
+        # Some rows are hidden - invert only selected visible rows and clear selections for hidden rows
+        if self.hidden_rows:
+            for rid in self.df[RID]:
+                if rid in self.hidden_rows:
+                    self.selected_rows.discard(rid)
+                elif rid in self.selected_rows:
+                    self.selected_rows.discard(rid)
                 else:
-                    self.selected_rows[i] = False
+                    self.selected_rows.add(rid)
         else:
             # Invert all selected rows
-            self.selected_rows = [not selected for selected in self.selected_rows]
+            self.selected_rows = {rid for rid in self.df[RID] if rid not in self.selected_rows}
 
         # Check if we're highlighting or un-highlighting
-        if new_selected_count := self.selected_rows.count(True):
+        if new_selected_count := len(self.selected_rows):
             self.notify(f"Toggled selection for [$success]{new_selected_count}[/] rows", title="Toggle")
 
         # Recreate table for display
@@ -3038,16 +2963,20 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history("Toggled row selection")
 
-        ridx = self.cursor_row_idx
-        self.selected_rows[ridx] = not self.selected_rows[ridx]
+        rid = self.cursor_row_rid
+        if rid in self.selected_rows:
+            self.selected_rows.discard(rid)
+        else:
+            self.selected_rows.add(rid)
 
-        row_key = str(ridx)
-        match_cols = self.matches.get(ridx, set())
+        row_key = self.cursor_row_key
+        match_cols = self.matches.get(rid, set())
+
         for col_idx, col in enumerate(self.ordered_columns):
             col_key = col.key
             cell_text: Text = self.get_cell(row_key, col_key)
 
-            if self.selected_rows[ridx] or (col_idx in match_cols):
+            if rid in self.selected_rows or (col_idx in match_cols):
                 cell_text.style = HIGHLIGHT_COLOR
             else:
                 # Reset to default style based on dtype
@@ -3060,19 +2989,17 @@ class DataFrameTable(DataTable):
     def do_clear_selections_and_matches(self) -> None:
         """Clear all selected rows and matches without removing them from the dataframe."""
         # Check if any selected rows or matches
-        if not any(self.selected_rows) and not self.matches:
+        if not self.selected_rows and not self.matches:
             self.notify("No selections to clear", title="Clear", severity="warning")
             return
 
-        row_count = sum(
-            1 if (selected or idx in self.matches) else 0 for idx, selected in enumerate(self.selected_rows)
-        )
+        row_count = len(self.selected_rows | set(self.matches.keys()))
 
         # Add to history
         self.add_history("Cleared all selected rows")
 
         # Clear all selections
-        self.selected_rows = [False] * len(self.df)
+        self.selected_rows = set()
         self.matches = defaultdict(set)
 
         # Recreate table for display
@@ -3103,9 +3030,9 @@ class DataFrameTable(DataTable):
         matches: dict[int, set[int]] = defaultdict(set)
 
         # Lazyframe for filtering
-        lf = self.df.lazy().drop(RIDX).with_row_index(RIDX)
-        if self.has_hidden_rows:
-            lf = lf.filter(self.visible_rows)
+        lf = self.df.lazy()
+        if self.hidden_rows:
+            lf = lf.filter(~pl.col(RID).is_in(self.hidden_rows))
 
         # Determine which columns to search: single column or all columns
         if cidx is not None:
@@ -3136,7 +3063,7 @@ class DataFrameTable(DataTable):
 
             # Get matched row indices
             try:
-                matched_ridxs = lf.filter(expr).collect()[RIDX].to_list()
+                matched_ridxs = lf.filter(expr).collect()[RID].to_list()
             except Exception as e:
                 self.notify(f"Error applying filter: [$error]{expr}[/]", title="Find", severity="error", timeout=10)
                 self.log(f"Error applying filter: {str(e)}")
@@ -3503,10 +3430,10 @@ class DataFrameTable(DataTable):
             # Also update the view if applicable
             if self.df_view is not None:
                 col_updated = f"^_{col_name}_^"
-                lf_updated = self.df.lazy().filter(mask).select(pl.col(col_name).alias(col_updated), pl.col(RIDX))
+                lf_updated = self.df.lazy().filter(mask).select(pl.col(col_name).alias(col_updated), pl.col(RID))
                 self.df_view = (
                     self.df_view.lazy()
-                    .join(lf_updated, on=RIDX, how="left")
+                    .join(lf_updated, on=RID, how="left")
                     .with_columns(pl.coalesce(pl.col(col_updated), pl.col(col_name)).alias(col_name))
                     .drop(col_updated)
                     .collect()
@@ -3729,11 +3656,11 @@ class DataFrameTable(DataTable):
                     )
 
         # Lazyframe with row indices
-        lf = self.df.lazy().with_row_index(RID)
+        lf = self.df.lazy()
 
         # Apply existing visibility filter first
-        if self.has_hidden_rows:
-            lf = lf.filter(self.visible_rows)
+        if self.hidden_rows:
+            lf = lf.filter(~pl.col(RID).is_in(self.hidden_rows))
 
         expr_str = "boolean list or series" if isinstance(expr, (list, pl.Series)) else str(expr)
 
@@ -3754,27 +3681,25 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(f"Filtered by expression [$success]{expr_str}[/]")
 
+        ok_rids = set(df_filtered[RID])
+
         # Create a view of self.df as a copy
         if self.df_view is None:
             self.df_view = self.df
 
         # Update dataframe
-        self.df = df_filtered.drop(RID)
+        self.df = df_filtered
 
-        # Update visible rows
-        self.visible_rows = [True] * len(self.df)
+        # Update hidden rows
+        self.hidden_rows = set()
 
         # Update selected rows
-        self.selected_rows = [self.selected_rows[df_filtered[RID][ridx]] for ridx in range(len(df_filtered))]
+        if self.selected_rows:
+            self.selected_rows = {rid for rid in self.selected_rows if rid in ok_rids}
 
         # Update matches
         if self.matches:
-            matches = defaultdict(set)
-            ridx_mapping = {ridx_old: ridx for ridx, ridx_old in enumerate(df_filtered[RID])}
-            for ridx_old, col_indices in self.matches.items():
-                if (ridx := ridx_mapping.get(ridx_old)) is not None:
-                    matches[ridx] = col_indices
-            self.matches = matches
+            self.matches = {ridx: col_indices for ridx, col_indices in self.matches.items() if ridx in ok_rids}
 
         # Recreate table for display
         self.setup_table()
@@ -3919,7 +3844,7 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(f"Saved dataframe to [$success]{filename}[/]")
 
-        df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RIDX))
+        df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RID))
         try:
             if fmt == "csv":
                 df.write_csv(filename)
@@ -3969,7 +3894,7 @@ class DataFrameTable(DataTable):
 
         if not self._all_tabs or len(self.app.tabs) == 1:
             # Single tab - save directly
-            df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RIDX))
+            df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RID))
             df.write_excel(filename)
         else:
             # Multiple tabs - use xlsxwriter to create multiple sheets
@@ -3977,7 +3902,7 @@ class DataFrameTable(DataTable):
                 tabs: dict[TabPane, DataFrameTable] = self.app.tabs
                 for table in tabs.values():
                     worksheet = wb.add_worksheet(table.tabname)
-                    df = (table.df if table.df_view is None else table.df_view).select(pl.exclude(RIDX))
+                    df = (table.df if table.df_view is None else table.df_view).select(pl.exclude(RID))
                     df.write_excel(workbook=wb, worksheet=worksheet)
 
     # SQL Interface
@@ -4022,13 +3947,13 @@ class DataFrameTable(DataTable):
             sql: The SQL query string to execute.
         """
 
-        sql = sql.replace("$#", f"(`{RIDX}` + 1)")
+        sql = sql.replace("$#", f"(`{RID}` + 1)")
 
         # Execute the SQL query
         try:
             lf = self.df.lazy()
-            if self.has_hidden_rows:
-                lf = lf.filter(self.visible_rows)
+            if self.hidden_rows:
+                lf = lf.filter(~pl.col(RID).is_in(self.hidden_rows))
 
             df_filtered = lf.sql(sql).collect()
 
@@ -4043,7 +3968,7 @@ class DataFrameTable(DataTable):
 
             if view:
                 # Just view - do not modify the dataframe
-                filtered_row_indices = set(df_filtered[RIDX].to_list())
+                filtered_row_indices = set(df_filtered[RID].to_list())
                 if filtered_row_indices:
                     self.visible_rows = [ridx in filtered_row_indices for ridx in range(len(self.visible_rows))]
 
@@ -4054,10 +3979,10 @@ class DataFrameTable(DataTable):
                     }
             else:  # filter - modify the dataframe
                 # Update selected rows
-                selected_rows = [self.selected_rows[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))]
+                selected_rows = [self.selected_rows[df_filtered[RID][ridx]] for ridx in range(len(df_filtered))]
 
                 # Update matches
-                matches = {ridx: self.matches[df_filtered[RIDX][ridx]] for ridx in range(len(df_filtered))}
+                matches = {ridx: self.matches[df_filtered[RID][ridx]] for ridx in range(len(df_filtered))}
 
                 # Update dataframe
                 self.reset_df(df_filtered)

@@ -13,7 +13,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, SelectionList, TextArea
 from textual.widgets.selection_list import Selection
 
-from .common import RIDX
+from .common import RID
 
 
 class SqlScreen(ModalScreen):
@@ -169,7 +169,7 @@ class SimpleSqlScreen(SqlScreen):
                 *[
                     Selection(col, col)
                     for col in self.df.columns
-                    if col not in self.dftable.hidden_columns and not col.startswith(RIDX)
+                    if col not in self.dftable.hidden_columns and not col.startswith(RID)
                 ],
                 id="column-selection",
             )
@@ -182,7 +182,7 @@ class SimpleSqlScreen(SqlScreen):
         selections = self.query_one(SelectionList).selected
         if not selections:
             selections = [
-                col for col in self.df.columns if col not in self.dftable.hidden_columns and not col.startswith(RIDX)
+                col for col in self.df.columns if col not in self.dftable.hidden_columns and not col.startswith(RID)
             ]
 
         columns = ", ".join(f"`{s}`" for s in selections)

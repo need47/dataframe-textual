@@ -153,10 +153,7 @@ SUBSCRIPT_DIGITS = {
 CURSOR_TYPES = ["row", "column", "cell"]
 
 # Row index mapping between filtered and original dataframe
-RIDX = "^_ridx_^"
-
-# Internal row index
-RID = "^__rid__^"
+RID = "^_rid_^"
 
 
 @dataclass
@@ -329,7 +326,7 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
             parts.append(pl.col(col_name))
         elif placeholder == "#":
             # $# refers to row index (1-based)
-            parts.append(pl.col(RIDX))
+            parts.append(pl.col(RID))
         elif placeholder.isdigit():
             # $1, $2, etc. refer to columns by 1-based position index
             col_idx = int(placeholder) - 1  # Convert to 0-based
@@ -410,7 +407,7 @@ def parse_polars_expression(expression: str, columns: list[str], current_cidx: i
         if isinstance(part, pl.Expr):
             col = part.meta.output_name()
 
-            if col == RIDX:  # Convert to 1-based
+            if col == RID:  # Convert to 1-based
                 result.append(f"(pl.col('{col}') + 1)")
             else:
                 result.append(f"pl.col('{col}')")
