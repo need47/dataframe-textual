@@ -463,9 +463,21 @@ class DataFrameTable(DataTable):
             list[tuple[int, int]]: A list of (row_idx, col_idx) tuples for matched cells.
         """
         matches = []
-        for ridx in sorted(self.matches.keys()):
-            for cidx in sorted(self.matches[ridx]):
-                matches.append((ridx, cidx))
+
+        # Uniq columns
+        cols_to_check = set()
+        for cols in self.matches.values():
+            cols_to_check.update(cols)
+
+        # Ordered columns
+        cidx2col = {cidx: col for cidx, col in enumerate(self.df.columns) if col in cols_to_check}
+
+        for ridx, rid in enumerate(self.df[RID]):
+            if cols := self.matches.get(rid):
+                for cidx, col in cidx2col.items():
+                    if col in cols:
+                        matches.append((ridx, cidx))
+
         return matches
 
     @property
@@ -2419,14 +2431,12 @@ class DataFrameTable(DataTable):
 
         # self.notify(f"Duplicated column [$success]{col_name}[/] as [$accent]{new_col_name}[/]", title="Duplicate")
 
-    # TODO
     def do_delete_row(self, more: str = None) -> None:
         """Delete rows from the table and dataframe.
 
         Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.
         """
         old_count = len(self.df)
-        predicates = [True] * len(self.df)
         rids_to_delete = set()
 
         # Delete all selected rows
@@ -2452,7 +2462,7 @@ class DataFrameTable(DataTable):
         else:
             ridx = self.cursor_row_idx
             history_desc = f"Deleted row [$success]{ridx + 1}[/]"
-            predicates[ridx] = False
+            rids_to_delete.add(self.df[RID][ridx])
 
         # Add to history
         self.add_history(history_desc, dirty=True)
@@ -3104,7 +3114,6 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-    # TODO
     def do_next_match(self) -> None:
         """Move cursor to the next match."""
         if not self.matches:
@@ -3127,7 +3136,6 @@ class DataFrameTable(DataTable):
         first_ridx, first_cidx = ordered_matches[0]
         self.move_cursor_to(first_ridx, first_cidx)
 
-    # TODO
     def do_previous_match(self) -> None:
         """Move cursor to the previous match."""
         if not self.matches:
@@ -3156,7 +3164,6 @@ class DataFrameTable(DataTable):
         row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
         self.move_cursor(row=row_idx, column=col_idx)
 
-    # TODO
     def do_next_selected_row(self) -> None:
         """Move cursor to the next selected row."""
         if not self.selected_rows:
@@ -3179,7 +3186,6 @@ class DataFrameTable(DataTable):
         first_ridx = selected_row_indices[0]
         self.move_cursor_to(first_ridx, self.cursor_col_idx)
 
-    # TODO
     def do_previous_selected_row(self) -> None:
         """Move cursor to the previous selected row."""
         if not self.selected_rows:
@@ -3202,7 +3208,6 @@ class DataFrameTable(DataTable):
         last_ridx = selected_row_indices[-1]
         self.move_cursor_to(last_ridx, self.cursor_col_idx)
 
-    # TODO
     def do_replace(self) -> None:
         """Open replace screen for current column."""
         # Push the replace modal screen
