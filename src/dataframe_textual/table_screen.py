@@ -102,7 +102,7 @@ class TableScreen(ModalScreen):
         if cidx_name_value is None:
             return
         cidx, col_name, col_value = cidx_name_value
-        self.log(f"Filtering or viewing by {col_name} == {col_value}")
+        self.log(f"Filtering or viewing by `{col_name} == {col_value}`")
 
         # Handle NULL values
         if col_value == NULL:
@@ -117,8 +117,8 @@ class TableScreen(ModalScreen):
         df_filtered = self.dftable.df.lazy().filter(expr).collect()
         self.log(f"Filtered dataframe has {len(df_filtered)} rows")
 
-        matched_indices = set(df_filtered[RID].to_list())
-        if not matched_indices:
+        ok_rids = set(df_filtered[RID].to_list())
+        if not ok_rids:
             self.notify(
                 f"No matches found for [$warning]{col_name}[/] == {value_display}",
                 title="No Matches",
@@ -126,18 +126,12 @@ class TableScreen(ModalScreen):
             )
             return
 
-        # Apply the action
+        # Action filter
         if action == "filter":
-            # Update selections
-            for i in range(len(self.dftable.selected_rows)):
-                self.dftable.selected_rows[i] = i in matched_indices
-
-            # Update main table display
             self.dftable.do_filter_rows()
 
-        else:  # action == "view"
-            # Update visible rows
-            expr = [i in matched_indices for i in range(len(self.dftable.df))]
+        # Action view
+        else:
             self.dftable.view_rows((expr, cidx, False, True))
 
         # Dismiss the frequency screen
@@ -169,6 +163,8 @@ class RowDetailScreen(TableScreen):
 
         # Get all columns and values from the dataframe row
         for col, val, dtype in zip(self.df.columns, self.df.row(self.ridx), self.df.dtypes):
+            if col == RID:
+                continue  # Skip RID column
             formatted_row = []
             formatted_row.append(col)
 
@@ -196,20 +192,16 @@ class RowDetailScreen(TableScreen):
             self.filter_or_view_selected_value(self.get_cidx_name_value(), action="filter")
             event.stop()
         elif event.key == "right_curly_bracket":  # '}'
-            # Move to the next visible row
+            # Move to the next row
             ridx = self.ridx + 1
-            while ridx < len(self.df) and not self.dftable.visible_rows[ridx]:
-                ridx += 1
             if ridx < len(self.df):
                 self.ridx = ridx
                 self.dftable.move_cursor_to(self.ridx)
                 self.build_table()
             event.stop()
         elif event.key == "left_curly_bracket":  # '{'
-            # Move to the previous visible row
+            # Move to the previous row
             ridx = self.ridx - 1
-            while ridx >= 0 and not self.dftable.visible_rows[ridx]:
-                ridx -= 1
             if ridx >= 0:
                 self.ridx = ridx
                 self.dftable.move_cursor_to(self.ridx)
@@ -258,10 +250,6 @@ class StatisticsScreen(TableScreen):
         col_name = self.df.columns[self.col_idx]
         lf = self.df.lazy()
 
-        # Apply only to visible rows
-        if False in self.dftable.visible_rows:
-            lf = lf.filter(self.dftable.visible_rows)
-
         # Get column statistics
         stats_df = lf.select(pl.col(col_name)).collect().describe()
         if len(stats_df) == 0:
@@ -287,10 +275,6 @@ class StatisticsScreen(TableScreen):
     def build_dataframe_stats(self) -> None:
         """Build statistics for the entire dataframe."""
         lf = self.df.lazy()
-
-        # Apply only to visible rows
-        if False in self.dftable.visible_rows:
-            lf = lf.filter(self.dftable.visible_rows)
 
         # Apply only to non-hidden columns
         if self.dftable.hidden_columns:
@@ -336,13 +320,11 @@ class FrequencyScreen(TableScreen):
     def __init__(self, cidx: int, dftable: "DataFrameTable") -> None:
         super().__init__(dftable)
         self.cidx = cidx
-        self.sorted_columns = {
-            1: True,  # Count
-        }
+        self.sorted_columns = {1: True}  # Count sort by default
+        self.total_count = len(dftable.df)
 
-        df = dftable.df.filter(dftable.visible_rows) if False in dftable.visible_rows else dftable.df
-        self.total_count = len(df)
-        self.df: pl.DataFrame = df[df.columns[self.cidx]].value_counts(sort=True).sort("count", descending=True)
+        col = dftable.df.columns[self.cidx]
+        self.df: pl.DataFrame = dftable.df.lazy().select(pl.col(col).value_counts(sort=True)).unnest(col).collect()
 
     def on_mount(self) -> None:
         """Create the frequency table."""
