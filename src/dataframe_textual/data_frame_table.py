@@ -1108,7 +1108,7 @@ class DataFrameTable(DataTable):
         # Add columns with justified headers
         for col, dtype in zip(self.df.columns, self.df.dtypes):
             if col in self.hidden_columns or (col == RID and not self.show_rid):
-                continue  # Skip hidden columns and internal RIDX
+                continue  # Skip hidden columns and internal RID
             for idx, c in enumerate(self.sorted_columns, 1):
                 if c == col:
                     # Add sort indicator to column header
@@ -1261,7 +1261,7 @@ class DataFrameTable(DataTable):
             vals, dtypes, styles = [], [], []
             for val, col, dtype in zip(row, self.df.columns, self.df.dtypes, strict=True):
                 if col in self.hidden_columns or (col == RID and not self.show_rid):
-                    continue  # Skip hidden columns and internal RIDX
+                    continue  # Skip hidden columns and internal RID
 
                 vals.append(val)
                 dtypes.append(dtype)
@@ -1308,8 +1308,7 @@ class DataFrameTable(DataTable):
 
             # If nothing needs loading, return early
             if not ranges_to_load:
-                # self.log(f"Range {start}-{stop} already loaded, skipping")
-                return 0
+                return 0  # Already loaded
 
             # Track the number of loaded rows in this range
             range_count = 0
@@ -1341,25 +1340,11 @@ class DataFrameTable(DataTable):
         if top_row_key:
             top_ridx = int(top_row_key.value)
         else:
-            top_ridx = 0
-            self.log(f"No top row key at index {top_row_index}, defaulting to 0")
+            top_ridx = 0  # No top row key at index, default to 0
 
         # Load upward
         start, stop = self._round_to_nearest_hundreds(top_ridx - BUFFER_SIZE * 2)
         range_count = self.load_rows_range(start, stop)
-
-        # self.log(
-        #     "========",
-        #     f"{self.scrollable_content_region.height = },",
-        #     f"{self.header_height = },",
-        #     f"{self.scroll_y = },",
-        #     f"{top_row_index = },",
-        #     f"{top_ridx = },",
-        #     f"{start = },",
-        #     f"{stop = },",
-        #     f"{range_count = },",
-        #     f"{self.loaded_ranges = }",
-        # )
 
         # Adjust scroll to maintain position if rows were loaded above
         if range_count > 0:
@@ -1379,25 +1364,11 @@ class DataFrameTable(DataTable):
         if bottom_row_key:
             bottom_ridx = int(bottom_row_key.value)
         else:
-            bottom_ridx = 0
-            self.log(f"No bottom row key at index {bottom_row_index}, defaulting to 0")
+            bottom_ridx = 0  # No bottom row key at index, default to 0
 
         # Load downward
         start, stop = self._round_to_nearest_hundreds(bottom_ridx + BUFFER_SIZE * 2)
         range_count = self.load_rows_range(start, stop)
-
-        # self.log(
-        #     "========",
-        #     f"{self.scrollable_content_region.height = },",
-        #     f"{self.header_height = },",
-        #     f"{self.scroll_y = },",
-        #     f"{bottom_row_index = },",
-        #     f"{bottom_ridx = },",
-        #     f"{start = },",
-        #     f"{stop = },",
-        #     f"{range_count = },",
-        #     f"{self.loaded_ranges = }",
-        # )
 
         if range_count > 0:
             self.log(f"Loaded down: {range_count} rows in range {start}-{stop}/{len(self.df)}")
@@ -1629,7 +1600,7 @@ class DataFrameTable(DataTable):
         # Restore state
         self.apply_history(history)
 
-        self.notify(f"Reapplied: [$success]{description}[/]", title="Redo")
+        self.notify(f"Reapplied: {description}", title="Redo")
 
     def do_reset(self) -> None:
         """Reset the table to the initial state."""
@@ -1774,7 +1745,7 @@ class DataFrameTable(DataTable):
             self.log(f"Error expanding column `{col_name}`: {str(e)}")
 
     def do_toggle_rid(self) -> None:
-        """Toggle display of the internal RIDX column."""
+        """Toggle display of the internal RID column."""
         self.show_rid = not self.show_rid
 
         # Recreate table for display
@@ -1822,15 +1793,15 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(f"Sorted on column [$success]{col_name}[/]", dirty=True)
 
-        # Add new column to sort
+        # New column - add to sort
         if old_desc is None:
             self.sorted_columns[col_name] = descending
 
-        # Same direction - remove from sort
+        # Old column, same direction - remove from sort
         elif old_desc == descending:
             del self.sorted_columns[col_name]
 
-        # Move to end of sort order
+        # Old column, different direction - add to sort at end
         else:
             del self.sorted_columns[col_name]
             self.sorted_columns[col_name] = descending
@@ -1903,7 +1874,7 @@ class DataFrameTable(DataTable):
 
             # Also update the view if applicable
             if self.df_view is not None:
-                # Get the RIDX value for this row in df_view
+                # Get the RID value for this row in df_view
                 ridx_view = self.df.item(ridx, self.df.columns.index(RID))
                 self.df_view = self.df_view.with_columns(
                     pl.when(pl.col(RID) == ridx_view)
@@ -1990,7 +1961,7 @@ class DataFrameTable(DataTable):
             self.df = self.df.lazy().with_columns(expr.alias(col_name)).collect()
 
             # Also update the view if applicable
-            # Update the value of col_name in df_view using the value of col_name from df based on RIDX mapping between them
+            # Update the value of col_name in df_view using the value of col_name from df based on RID mapping between them
             if self.df_view is not None:
                 # Get updated column from df for rows that exist in df_view
                 col_updated = f"^_{col_name}_^"
@@ -2576,55 +2547,55 @@ class DataFrameTable(DataTable):
         Args:
             direction: "up" to move up, "down" to move down.
         """
-        row_idx, col_idx = self.cursor_coordinate
+        curr_row_idx, col_idx = self.cursor_coordinate
 
         # Validate move is possible
         if direction == "up":
-            if row_idx <= 0:
+            if curr_row_idx <= 0:
                 self.notify("Cannot move row up", title="Move", severity="warning")
                 return
-            swap_idx = row_idx - 1
+            swap_row_idx = curr_row_idx - 1
         elif direction == "down":
-            if row_idx >= len(self.rows) - 1:
+            if curr_row_idx >= len(self.rows) - 1:
                 self.notify("Cannot move row down", title="Move", severity="warning")
                 return
-            swap_idx = row_idx + 1
+            swap_row_idx = curr_row_idx + 1
         else:
             # Invalid direction
             return
 
-        row_key = self.coordinate_to_cell_key((row_idx, 0)).row_key
-        swap_key = self.coordinate_to_cell_key((swap_idx, 0)).row_key
-
         # Add to history
         self.add_history(
-            f"Moved row [$success]{row_key.value}[/] [$accent]{direction}[/] (swapped with row [$success]{swap_key.value}[/])",
+            f"Moved row [$success]{curr_row_idx}[/] [$accent]{direction}[/] (swapped with row [$success]{swap_row_idx}[/])",
             dirty=True,
         )
 
         # Swap rows in the table's internal row locations
+        curr_key = self.coordinate_to_cell_key((curr_row_idx, 0)).row_key
+        swap_key = self.coordinate_to_cell_key((swap_row_idx, 0)).row_key
+
         self.check_idle()
 
         (
-            self._row_locations[row_key],
+            self._row_locations[curr_key],
             self._row_locations[swap_key],
         ) = (
             self.get_row_idx(swap_key),
-            self.get_row_idx(row_key),
+            self.get_row_idx(curr_key),
         )
 
         self._update_count += 1
         self.refresh()
 
         # Restore cursor position on the moved row
-        self.move_cursor(row=swap_idx, column=col_idx)
+        self.move_cursor(row=swap_row_idx, column=col_idx)
 
-        # Swap rows in the dataframe
-        ridx = int(row_key.value)  # 0-based
-        swap_ridx = int(swap_key.value)  # 0-based
-        first, second = sorted([ridx, swap_ridx])
-        first_view, second_view = self.df[RID][first], self.df[RID][second]
+        # Locate the rows to swap
+        curr_ridx = curr_row_idx
+        swap_ridx = swap_row_idx
+        first, second = sorted([curr_ridx, swap_ridx])
 
+        # Swap the rows in the dataframe
         self.df = pl.concat(
             [
                 self.df.slice(0, first).lazy(),
@@ -2637,17 +2608,27 @@ class DataFrameTable(DataTable):
 
         # Also update the view if applicable
         if self.df_view is not None:
+            # Find RID values
+            curr_rid = self.df[RID][curr_row_idx]
+            swap_rid = self.df[RID][swap_row_idx]
+
+            # Locate the rows by RID in the view
+            curr_ridx = self.df_view[RID].index_of(curr_rid)
+            swap_ridx = self.df_view[RID].index_of(swap_rid)
+            first, second = sorted([curr_ridx, swap_ridx])
+
+            # Swap the rows in the view
             self.df_view = pl.concat(
                 [
-                    self.df_view.slice(0, first_view).lazy(),
-                    self.df_view.slice(second_view, 1).lazy(),
-                    self.df_view.slice(first_view + 1, second_view - first_view - 1).lazy(),
-                    self.df_view.slice(first_view, 1).lazy(),
-                    self.df_view.slice(second_view + 1).lazy(),
+                    self.df_view.slice(0, first).lazy(),
+                    self.df_view.slice(second, 1).lazy(),
+                    self.df_view.slice(first + 1, second - first - 1).lazy(),
+                    self.df_view.slice(first, 1).lazy(),
+                    self.df_view.slice(second + 1).lazy(),
                 ]
             ).collect()
 
-        # self.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move")
+        # self.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move Row")
 
     # Type casting
     def do_cast_column_dtype(self, dtype: str) -> None:
@@ -2800,7 +2781,6 @@ class DataFrameTable(DataTable):
         # Apply filter to get matched row indices
         try:
             ok_rids = set(lf.filter(expr).collect()[RID])
-            self.log(f"Matches: {ok_rids} for term `{term}` in column `{col_name}`")
         except Exception as e:
             self.notify(
                 f"Error applying search filter `[$error]{term}[/]`", title="Search", severity="error", timeout=10
@@ -3385,9 +3365,6 @@ class DataFrameTable(DataTable):
             return
 
         # Move cursor to next match
-        self.log(f"{state.current_rpos=}, {state.current_cpos=}")
-        self.log(f"{state.rows=}")
-        self.log(f"{state.cols_per_row=}")
         ridx = state.rows[state.current_rpos]
         cidx = state.cols_per_row[state.current_rpos][state.current_cpos]
         self.move_cursor_to(ridx, cidx)
@@ -3660,6 +3637,9 @@ class DataFrameTable(DataTable):
         # Update dataframe
         self.reset_df(df_filtered)
 
+        # Clear view for filter mode
+        self.df_view = None
+
         # Restore selected rows and matches
         self.selected_rows = selected_rows
         self.matches = matches
@@ -3693,20 +3673,24 @@ class DataFrameTable(DataTable):
         except FileNotFoundError:
             self.notify("Error copying to clipboard", title="Clipboard", severity="error", timeout=10)
 
-    def do_save_to_file(
-        self, title: str = "Save to File", all_tabs: bool | None = None, task_after_save: str | None = None
-    ) -> None:
+    def do_save_to_file(self, all_tabs: bool | None = None, task_after_save: str | None = None) -> None:
         """Open screen to save file."""
         self._task_after_save = task_after_save
+        tab_count = len(self.app.tabs)
+        save_all = tab_count > 1 and all_tabs is not False
 
-        multi_tab = len(self.app.tabs) > 1
-        filename = (
-            "all-tabs.xlsx"
-            if all_tabs or (all_tabs is None and multi_tab)
-            else str(Path(self.filename).with_stem(self.tabname))
-        )
+        filepath = Path(self.filename)
+        if save_all:
+            ext = filepath.suffix.lower()
+            if ext in (".xlsx", ".xls"):
+                filename = self.filename
+            else:
+                filename = "all-tabs.xlsx"
+        else:
+            filename = str(filepath.with_stem(self.tabname))
+
         self.app.push_screen(
-            SaveFileScreen(filename, title=title, all_tabs=all_tabs, multi_tab=multi_tab),
+            SaveFileScreen(filename, save_all=save_all, tab_count=tab_count),
             callback=self.save_to_file,
         )
 
@@ -3714,10 +3698,8 @@ class DataFrameTable(DataTable):
         """Handle result from SaveFileScreen."""
         if result is None:
             return
-        filename, all_tabs, overwrite_prompt = result
-
-        # Whether to save all tabs (for Excel files)
-        self._all_tabs = all_tabs
+        filename, save_all, overwrite_prompt = result
+        self._save_all = save_all
 
         # Check if file exists
         if overwrite_prompt and Path(filename).exists():
@@ -3736,7 +3718,7 @@ class DataFrameTable(DataTable):
         else:
             # Go back to SaveFileScreen to allow user to enter a different name
             self.app.push_screen(
-                SaveFileScreen(self._pending_filename),
+                SaveFileScreen(self._pending_filename, save_all=self._save_all),
                 callback=self.save_to_file,
             )
 
@@ -3744,7 +3726,7 @@ class DataFrameTable(DataTable):
         """Actually save the dataframe to a file."""
         filepath = Path(filename)
         ext = filepath.suffix.lower()
-        if ext.endswith(".gz"):
+        if ext == ".gz":
             ext = Path(filename).with_suffix("").suffix.lower()
 
         fmt = ext.removeprefix(".")
@@ -3755,9 +3737,6 @@ class DataFrameTable(DataTable):
                 severity="warning",
             )
             fmt = "csv"
-
-        # Add to history
-        self.add_history(f"Saved dataframe to [$success]{filename}[/]")
 
         df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RID))
         try:
@@ -3780,7 +3759,7 @@ class DataFrameTable(DataTable):
             self.filename = filename
 
             # Reset dirty flag after save
-            if self._all_tabs:
+            if self._save_all:
                 tabs: dict[TabPane, DataFrameTable] = self.app.tabs
                 for table in tabs.values():
                     table.dirty = False
@@ -3794,7 +3773,7 @@ class DataFrameTable(DataTable):
                     self.app.exit()
 
             # From ConfirmScreen callback, so notify accordingly
-            if self._all_tabs:
+            if self._save_all:
                 self.notify(f"Saved all tabs to [$success]{filename}[/]", title="Save to File")
             else:
                 self.notify(f"Saved current tab to [$success]{filename}[/]", title="Save to File")
@@ -3807,10 +3786,10 @@ class DataFrameTable(DataTable):
         """Save to an Excel file."""
         import xlsxwriter
 
-        if not self._all_tabs or len(self.app.tabs) == 1:
+        if not self._save_all or len(self.app.tabs) == 1:
             # Single tab - save directly
             df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RID))
-            df.write_excel(filename)
+            df.write_excel(filename, worksheet=self.tabname)
         else:
             # Multiple tabs - use xlsxwriter to create multiple sheets
             with xlsxwriter.Workbook(filename) as wb:
@@ -3880,16 +3859,21 @@ class DataFrameTable(DataTable):
                 )
                 return
 
-            # Add to history
-            self.add_history(f"SQL Query:\n[$success]{sql}[/]", dirty=not view)
-
-            # Create a view of self.df as a copy
-            if view and self.df_view is None:
-                self.df_view = self.df
         except Exception as e:
             self.notify(f"Error executing SQL query [$error]{sql}[/]", title="SQL Query", severity="error", timeout=10)
             self.log(f"Error executing SQL query `{sql}`: {str(e)}")
             return
+
+        # Add to history
+        self.add_history(f"SQL Query:\n[$success]{sql}[/]", dirty=not view)
+
+        # Create a view of self.df as a copy
+        if view and self.df_view is None:
+            self.df_view = self.df
+
+        # Clear view for filter mode
+        if not view:
+            self.df_view = None
 
         # Update dataframe
         self.df = df_filtered

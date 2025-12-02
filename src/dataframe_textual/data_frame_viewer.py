@@ -248,12 +248,7 @@ class DataFrameViewer(App):
         Opens the save dialog for the active tab's DataFrameTable to save its data.
         """
         if table := self.get_active_table():
-            table.do_save_to_file(title="Save Current Tab", all_tabs=False)
-
-    def action_save_current_tab_overwrite(self) -> None:
-        """Save the currently active tab to file, overwriting if it exists."""
-        if table := self.get_active_table():
-            table.save_to_file((table.filename, False, False))
+            table.do_save_to_file(all_tabs=False)
 
     def action_save_all_tabs(self) -> None:
         """Save all open tabs to their respective files.
@@ -261,12 +256,25 @@ class DataFrameViewer(App):
         Iterates through all DataFrameTable widgets and opens the save dialog for each.
         """
         if table := self.get_active_table():
-            table.do_save_to_file(title="Save All Tabs", all_tabs=True)
+            table.do_save_to_file(all_tabs=True)
+
+    def action_save_current_tab_overwrite(self) -> None:
+        """Save the currently active tab to file, overwriting if it exists."""
+        if table := self.get_active_table():
+            filepath = Path(table.filename)
+            filename = filepath.with_stem(table.tabname)
+            table.save_to_file((filename, False, False))
 
     def action_save_all_tabs_overwrite(self) -> None:
         """Save all open tabs to their respective files, overwriting if they exist."""
         if table := self.get_active_table():
-            table.save_to_file((table.filename, True, False))
+            filepath = Path(table.filename)
+            if filepath.suffix.lower() in [".xlsx", ".xls"]:
+                filename = table.filename
+            else:
+                filename = "all-tabs.xlsx"
+
+            table.save_to_file((filename, True, False))
 
     def action_duplicate_tab(self) -> None:
         """Duplicate the currently active tab.

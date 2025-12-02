@@ -292,31 +292,25 @@ class SaveFileScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SaveFileScreen")
 
-    def __init__(
-        self, filename: str, title: str = "Save to File", all_tabs: bool | None = None, multi_tab: bool = False
-    ):
-        self.all_tabs = all_tabs or (all_tabs is None and multi_tab)
+    def __init__(self, filename: str, save_all: bool = False, tab_count: int = 1):
+        self.save_all = save_all
         super().__init__(
-            title=title,
-            label="Enter filename",
+            title="Save to File",
+            label="Filename",
             input=filename,
-            yes="Save",
-            maybe="Save All Tabs" if self.all_tabs else None,
+            yes=f"Save {tab_count} Tabs" if self.save_all else "Save Current Tab" if tab_count > 1 else "Save",
             no="Cancel",
             on_yes_callback=self.handle_save,
-            on_maybe_callback=self.handle_save,
         )
 
     def handle_save(self):
         if self.input:
             input_filename = self.input.value.strip()
             if input_filename:
-                return input_filename, self.all_tabs, True  # Overwrite prompt
+                return input_filename, self.save_all, True  # Overwrite prompt
             else:
                 self.notify("Filename cannot be empty", title="Save", severity="error")
                 return None
-
-        return None
 
 
 class ConfirmScreen(YesNoScreen):
@@ -604,7 +598,7 @@ class AddColumnScreen(YesNoScreen):
         super().__init__(
             title="Add Column",
             label="Column name",
-            input="Link" if link else "Name",
+            input="Link" if link else "New column",
             label2="Link template, e.g., https://example.com/$1/id/$_, PC/compound/$cid"
             if link
             else "Value or Polars expression, e.g., abc, pl.lit(123), NULL, $_ * 2, $1 + $total, $_ + '_suffix', $_.str.to_uppercase()",
