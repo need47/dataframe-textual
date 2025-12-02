@@ -345,9 +345,9 @@ class DataFrameTable(DataTable):
         self.fixed_columns = 0  # Number of fixed columns
 
         # History stack for undo
-        self.histories: deque[History] = deque()
-        # Current history state for redo
-        self.history: History = None
+        self.histories_undo: deque[History] = deque()
+        # History stack for redo
+        self.histories_redo: deque[History] = deque()
 
         # Whether to use thousand separator for numeric display
         self.thousand_separator = False
@@ -461,15 +461,6 @@ class DataFrameTable(DataTable):
                         matches.append((ridx, cidx))
 
         return matches
-
-    @property
-    def last_history(self) -> History:
-        """Get the last history state.
-
-        Returns:
-            History: The most recent History object from the histories deque.
-        """
-        return self.histories[-1] if self.histories else None
 
     def _round_to_nearest_hundreds(self, num: int):
         """Round a number to the nearest hundreds.
@@ -1008,7 +999,7 @@ class DataFrameTable(DataTable):
         self.fixed_columns = 0
         self.matches = defaultdict(set)
         # self.histories.clear()
-        # self.history = None
+        # self.histories2.clear()
         self.dirty = dirty  # Mark as dirty since data changed
 
     def setup_table(self) -> None:
@@ -1069,28 +1060,30 @@ class DataFrameTable(DataTable):
             # Get column label width
             # Add padding for sort indicators if any
             label_width = measure(self.app.console, col, 1) + 2
+            if dtype != pl.String:
+                available_width -= label_width
+                continue
 
             try:
                 # Get sample values from the column
-                sample_values = sample_lf.select(col).collect().get_column(col).to_list()
+                sample_values = sample_lf.select(col).collect().get_column(col).drop_nulls().to_list()
                 if any(val.startswith(("https://", "http://")) for val in sample_values):
                     continue  # Skip link columns so they can auto-size and be clickable
 
                 # Find maximum width in sample
                 max_cell_width = max(
-                    (measure(self.app.console, str(val), 1) for val in sample_values if val),
+                    (measure(self.app.console, val, 1) for val in sample_values),
                     default=label_width,
                 )
 
                 # Set column width to max of label and sampled data (capped at reasonable max)
                 max_width = max(label_width, max_cell_width)
-            except Exception:
+            except Exception as e:
                 # If any error, let Textual auto-size
                 max_width = label_width
+                self.log(f"Error determining width for column '{col}': {e}")
 
-            if dtype == pl.String:
-                column_widths[col] = max_width
-
+            column_widths[col] = max_width
             available_width -= max_width
 
         # If there's no more available width, auto-size remaining columns
@@ -1588,15 +1581,18 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-    def add_history(self, description: str, dirty: bool = False) -> None:
+    def add_history(self, description: str, dirty: bool = False, clear_redo: bool = True) -> None:
         """Add the current state to the history stack.
 
         Args:
             description: Description of the action for this history entry.
             dirty: Whether this operation modifies the data (True) or just display state (False).
         """
-        history = self.create_history(description)
-        self.histories.append(history)
+        self.histories_undo.append(self.create_history(description))
+
+        # Clear redo stack when a new action is performed
+        if clear_redo:
+            self.histories_redo.clear()
 
         # Mark table as dirty if this operation modifies data
         if dirty:
@@ -1604,37 +1600,34 @@ class DataFrameTable(DataTable):
 
     def do_undo(self) -> None:
         """Undo the last action."""
-        if not self.histories:
+        if not self.histories_undo:
             self.notify("No actions to undo", title="Undo", severity="warning")
             return
 
-        # Pop the last history state for undo
-        history = self.histories.pop()
-
-        # Save current state for redo
-        self.history = self.create_history(history.description)
+        # Pop the last history state for undo and save to redo stack
+        history = self.histories_undo.pop()
+        self.histories_redo.append(self.create_history(history.description))
 
         # Restore state
         self.apply_history(history)
 
-        self.notify(f"Reverted: [$success]{history.description}[/]", title="Undo")
+        self.notify(f"Reverted: {history.description}", title="Undo")
 
     def do_redo(self) -> None:
         """Redo the last undone action."""
-        if self.history is None:
+        if not self.histories_redo:
             self.notify("No actions to redo", title="Redo", severity="warning")
             return
 
-        description = self.history.description
+        # Pop the last undone state from redo stack
+        history = self.histories_redo.pop()
+        description = history.description
 
         # Save current state for undo
-        self.add_history(description)
+        self.add_history(description, clear_redo=False)
 
         # Restore state
-        self.apply_history(self.history)
-
-        # Clear redo state
-        self.history = None
+        self.apply_history(history)
 
         self.notify(f"Reapplied: [$success]{description}[/]", title="Redo")
 
@@ -1643,13 +1636,6 @@ class DataFrameTable(DataTable):
         self.reset_df(self.dataframe, dirty=False)
         self.setup_table()
         self.notify("Restored initial state", title="Reset")
-
-    def restore_dirty(self, default: bool | None = None) -> None:
-        """Restore the dirty state from the last history entry."""
-        if self.last_history:
-            self.dirty = self.last_history.dirty
-        elif default is not None:
-            self.dirty = default
 
     # Display
     def do_cycle_cursor_type(self) -> None:
@@ -1757,11 +1743,19 @@ class DataFrameTable(DataTable):
         max_width = len(col_name) + 2  # Start with column name width + padding
 
         try:
+            need_expand = False
+
             # Scan through all loaded rows that are visible to find max width
             for row_idx in range(self.loaded_rows):
                 cell_value = str(self.df.item(row_idx, col_idx))
                 cell_width = measure(self.app.console, cell_value, 1)
+
+                if cell_width > max_width:
+                    need_expand = True
                 max_width = max(max_width, cell_width)
+
+            if not need_expand:
+                return
 
             # Update the column width
             col = self.columns[col_key]
@@ -2451,7 +2445,7 @@ class DataFrameTable(DataTable):
             df_filtered = self.df.lazy().filter(~pl.col(RID).is_in(rids_to_delete)).collect()
         except Exception as e:
             self.notify(f"Error deleting row(s): {e}", title="Delete", severity="error", timeout=10)
-            self.histories.pop()  # Remove last history entry
+            self.histories_undo.pop()  # Remove last history entry
             return
 
         # RIDs of remaining rows
@@ -2470,28 +2464,7 @@ class DataFrameTable(DataTable):
 
         # Also update the view if applicable
         if self.df_view is not None:
-            # Rebuild RIDX column in self.df_view for remaining rows
-            RIDX_NEW = f"{RID}_new"
-            lf_view = (
-                self.df_view.lazy()
-                .filter(pl.col(RID).is_in(ok_rids))
-                .with_columns(pl.arange(0, len(self.df_view), dtype=pl.UInt32).alias(RIDX_NEW))
-            )
-
-            # Rebuild RIDX column in self.df
-            self.df = (
-                self.df.lazy()
-                .join(lf_view.select(RID, RIDX_NEW), on=RID, how="left")
-                .with_columns(pl.col(RIDX_NEW).alias(RID))
-                .drop(RIDX_NEW)
-                .collect()
-            )
-
-            # Update df_view
-            self.df_view = lf_view.with_columns(pl.col(RIDX_NEW).alias(RID)).drop(RIDX_NEW).collect()
-        else:
-            # Rebuild RIDX column to be sequential
-            self.df = self.df.lazy().with_columns(pl.arange(0, len(self.df), dtype=pl.UInt32).alias(RID)).collect()
+            self.df_view = self.df_view.lazy().filter(~pl.col(RID).is_in(rids_to_delete)).collect()
 
         # Recreate table for display
         self.setup_table()
@@ -3610,7 +3583,7 @@ class DataFrameTable(DataTable):
         try:
             df_filtered = lf.filter(expr).collect()
         except Exception as e:
-            self.histories.pop()  # Remove last history entry
+            self.histories_undo.pop()  # Remove last history entry
             self.notify(f"Error applying filter [$error]{expr_str}[/]", title="Filter", severity="error", timeout=10)
             self.log(f"Error applying filter `{expr_str}`: {str(e)}")
             return

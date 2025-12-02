@@ -580,7 +580,7 @@ class EditColumnScreen(YesNoScreen):
         self.df = df
         super().__init__(
             title="Edit Column",
-            label=f"by value or Polars expression, e.g., abc, pl.lit(7), {NULL}, $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.arange(0, pl.len())",
+            label=f"By value or Polars expression, e.g., abc, pl.lit(7), {NULL}, $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.arange(0, pl.len())",
             input="$_",
             on_yes_callback=self._get_input,
         )

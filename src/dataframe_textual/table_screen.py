@@ -251,7 +251,7 @@ class StatisticsScreen(TableScreen):
         lf = self.df.lazy()
 
         # Get column statistics
-        stats_df = lf.select(pl.col(col_name)).collect().describe()
+        stats_df = lf.select(pl.col(col_name)).describe()
         if len(stats_df) == 0:
             return
 
@@ -274,14 +274,14 @@ class StatisticsScreen(TableScreen):
 
     def build_dataframe_stats(self) -> None:
         """Build statistics for the entire dataframe."""
-        lf = self.df.lazy()
+        lf = self.df.lazy().select(pl.exclude(RID))
 
         # Apply only to non-hidden columns
         if self.dftable.hidden_columns:
             lf = lf.select(pl.exclude(self.dftable.hidden_columns))
 
         # Get dataframe statistics
-        stats_df = lf.collect().describe()
+        stats_df = lf.describe()
 
         # Add columns for each dataframe column with appropriate styling
         for idx, (col_name, col_dtype) in enumerate(zip(stats_df.columns, stats_df.dtypes), 0):
@@ -477,7 +477,7 @@ class MetaShape(TableScreen):
 
         # Get shape information
         num_rows, num_cols = self.df.shape if self.dftable.df_view is None else self.dftable.df_view.shape
-        num_cols -= 1  # Exclude RIDX column
+        num_cols -= 1  # Exclude RID column
         dc_int = DtypeConfig(pl.Int64)
 
         # Add rows to the table

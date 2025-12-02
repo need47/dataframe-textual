@@ -153,7 +153,7 @@ SUBSCRIPT_DIGITS = {
 CURSOR_TYPES = ["row", "column", "cell"]
 
 # Row index mapping between filtered and original dataframe
-RID = "^_rid_^"
+RID = "^_RID_^"
 
 
 @dataclass
@@ -275,7 +275,7 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
 
     Supports multiple placeholder types:
     - `$_` - Current column (based on current_cidx parameter)
-    - `$#` - Row index (1-based, requires '^__ridx__^' column to be present)
+    - `$#` - Row index (1-based)
     - `$1`, `$2`, etc. - Column index (1-based)
     - `$name` - Column name (e.g., `$product_id`)
     - `` $`col name` `` - Column name with spaces (e.g., `` $`product id` ``)
@@ -374,7 +374,7 @@ def parse_polars_expression(expression: str, columns: list[str], current_cidx: i
 
     Examples:
     - "$_ > 50" -> "pl.col('current_col') > 50"
-    - "$# > 10" -> "pl.col('^__ridx__^') > 10"
+    - "$# > 10" -> "pl.col('^_RID_^') > 10"
     - "$1 > 50" -> "pl.col('col0') > 50"
     - "$name == 'Alex'" -> "pl.col('name') == 'Alex'"
     - "$age < $salary" -> "pl.col('age') < pl.col('salary')"
