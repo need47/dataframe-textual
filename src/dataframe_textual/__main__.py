@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from . import __version__
 from .common import SUPPORTED_FORMATS, load_dataframe
 from .data_frame_viewer import DataFrameViewer
 
@@ -24,6 +25,12 @@ def cli() -> argparse.Namespace:
         "  cat data.csv | %(prog)s --format csv\n",
     )
     parser.add_argument("files", nargs="*", help="Files to view (or read from stdin)")
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
     parser.add_argument(
         "-f",
         "--format",
