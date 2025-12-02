@@ -1487,6 +1487,9 @@ class DataFrameTable(DataTable):
         if start % self.BATCH_SIZE != 0:
             start = (start // self.BATCH_SIZE + 1) * self.BATCH_SIZE
 
+        if stop - start < self.BATCH_SIZE:
+            start -= self.BATCH_SIZE
+
         self.load_rows_range(start, stop)
         self.move_cursor(row=self.row_count - 1)
 
