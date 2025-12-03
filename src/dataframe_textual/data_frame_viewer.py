@@ -549,7 +549,7 @@ class DataFrameViewer(App):
             )
             self.push_screen(
                 ConfirmScreen(
-                    "Close All Tabs",
+                    "Close All Tabs" if len(self.tabs) > 1 else "Close Tab",
                     label=label,
                     yes="Save",
                     maybe="Discard",
