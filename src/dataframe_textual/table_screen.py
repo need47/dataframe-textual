@@ -163,7 +163,7 @@ class RowDetailScreen(TableScreen):
 
         # Get all columns and values from the dataframe row
         for col, val, dtype in zip(self.df.columns, self.df.row(self.ridx), self.df.dtypes):
-            if col == RID:
+            if col in self.dftable.hidden_columns or col == RID:
                 continue  # Skip RID column
             formatted_row = []
             formatted_row.append(col)
