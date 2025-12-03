@@ -256,6 +256,8 @@ zcat compressed_data.csv.gz | dv -f csv
 | `F` | Show frequency distribution for current column |
 | `s` | Show statistics for current column |
 | `S` | Show statistics for entire dataframe |
+| `m` | Show metadata for row count and column count |
+| `M` | Show metadata for current column |
 | `K` | Cycle cursor types: cell → row → column → cell |
 | `~` | Toggle row labels |
 | `_` (underscore) | Expand column to full width |
