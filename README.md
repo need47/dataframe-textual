@@ -208,8 +208,8 @@ zcat compressed_data.csv.gz | dv -f csv
 | `Q` | Close all tabs and app (prompts to save unsaved changes) |
 | `Ctrl+Q` | Force to quit app (regardless of unsaved changes) |
 | `Ctrl+T` | Save current tab to file |
+| `Ctrl+A` | Save all tabs to a Excel file |
 | `w` | Save current tab to file (overwrite without prompt) |
-| `Ctrl+A` | Save all tabs to file |
 | `W` | Save all tabs to file (overwrite without prompt) |
 | `Ctrl+D` | Duplicate current tab |
 | `Ctrl+O` | Open file in a new tab |
@@ -232,7 +232,7 @@ zcat compressed_data.csv.gz | dv -f csv
 | Key | Action |
 |-----|--------|
 | `g` | Jump to first row |
-| `G` | Jump to last row (loads all remaining rows) |
+| `G` | Jump to last row |
 | `↑` / `↓` | Move up/down one row |
 | `←` / `→` | Move left/right one column |
 | `Home` / `End` | Jump to first/last column |
@@ -281,7 +281,7 @@ zcat compressed_data.csv.gz | dv -f csv
 | `x` | Delete current row |
 | `X` | Delete current row and all those below |
 | `Ctrl+X` | Delete current row and all those above |
-| `d` | Duplicate current column (appends '_copy' suffix) |
+| `d` | Duplicate current column |
 | `D` | Duplicate current row |
 
 #### Row Selection
@@ -355,7 +355,7 @@ zcat compressed_data.csv.gz | dv -f csv
 | `c` | Copy current cell to clipboard |
 | `Ctrl+C` | Copy column to clipboard |
 | `Ctrl+R` | Copy row to clipboard (tab-separated) |
-| `Ctrl+S` | Save current tab to file |
+| `Ctrl+S` | Save to file |
 
 ## Features in Detail
 
@@ -376,8 +376,8 @@ Useful for examining wide datasets where columns don't fit well on screen.
 **In the Row Detail Modal**:
 - Press `v` to **view** all rows containing the selected column value (others hidden but preserved)
 - Press `"` to **filter** all rows containing the selected column value (others removed)
-- Press `{` to move to the **previous row** (respects hidden rows)
-- Press `}` to move to the **next row** (respects hidden rows)
+- Press `{` to move to the previous row
+- Press `}` to move to the next row
 - Press `q` or `Escape` to close the modal
 
 ### 3. Row Selection
@@ -392,7 +392,7 @@ The application provides multiple modes for selecting rows (marks it for filteri
 - `{` - Go to previous selected row
 - `}` - Go to next selected row
 
-**Advanced Matching Options**:
+**Advanced Options**:
 
 When searching or finding, you can use checkboxes in the dialog to enable:
 - **Match Nocase**: Ignore case differences
@@ -408,7 +408,7 @@ These options work with plain text searches. Use Polars regex patterns in expres
 - Use `u` to undo any search or filter
 
 ### 4. Find & Replace
-**Find Operations** - Find by value/expression and highlight matching cells:
+Find by value/expression and highlight matching cells:
 - `/` - Find cursor value within current column (respects data type)
 - `?` - Open dialog to search current column with expression
 - `;` - Find cursor value across all columns
@@ -432,10 +432,10 @@ When you press `r` or `R`, enter:
 
 **Replace Interactive**:
 - Review each match one at a time (confirm, skip, or cancel)
-- Shows progress: `X of Y`
+- Shows progress
 
 **Tips:**
-- Search are done by string value (i.e. ignoring data type)
+- Search are done by string value (i.e., ignoring data type)
 - Type `NULL` to replace null/missing values
 - Use `Match Nocase` for case-insensitive matching
 - Use `Match Whole` to avoid partial replacements
@@ -443,7 +443,7 @@ When you press `r` or `R`, enter:
 
 ### 5. Filter vs. View
 
-Both operations show rows that are selected or contain matching cells, but with fundamentally different effects:
+Both operations show selected rows but with fundamentally different effects:
 
 | Operation | Keyboard | Effect | Data Preserved |
 |-----------|----------|--------|-----------------|
@@ -534,8 +534,8 @@ View quick metadata about your dataframe and columns to understand their structu
 
 **Dataframe Metadata** (`m`):
 - Press `m` to open a modal displaying:
-  - **Rows** - Total number of rows in the dataframe
-  - **Columns** - Total number of columns in the dataframe
+  - **Row** - Total number of rows in the dataframe
+  - **Column** - Total number of columns in the dataframe
 
 **Column Metadata** (`M`):
 - Press `M` to open a modal displaying details for all columns:
@@ -714,7 +714,6 @@ SELECT specific columns and apply WHERE conditions without writing full SQL:
 #### Advanced SQL Interface (`L`)
 Execute complete SQL queries for advanced data manipulation:
 - Write full SQL queries with standard [SQL syntax](https://docs.pola.rs/api/python/stable/reference/sql/index.html)
-- Support for JOINs, GROUP BY, aggregations, and more
 - Access to all SQL capabilities for complex transformations
 - Always use `self` as the table name
 - Syntax highlighted
@@ -736,7 +735,7 @@ WHERE `product id` = 7
 
 Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 
-**Note** May require a X server to work.
+**Note**: may require a X server to work.
 
 - Press `c` to copy cursor value
 - Press `Ctrl+C` to copy column values
@@ -778,8 +777,8 @@ Manage multiple files and dataframes simultaneously with tabs.
 - **`Double-click`** - Rename the tab
 - **`Ctrl+D`** - Duplicate current tab (creates a copy with same data and state)
 - **`Ctrl+T`** - Save current tab to file
-- **`w`** - Save current tab to file (overwrite without prompt)
 - **`Ctrl+A`** - Save all tabs in a single Excel file
+- **`w`** - Save current tab to file (overwrite without prompt)
 - **`W`** - Save all tabs to file (overwrite without prompt)
 - **`q`** - Close current tab (closes tab, prompts to save if unsaved changes)
 - **`Q`** - Close all tabs and exit app (prompts to save tabs with unsaved changes)
