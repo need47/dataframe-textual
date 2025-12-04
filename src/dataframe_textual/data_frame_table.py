@@ -1036,7 +1036,7 @@ class DataFrameTable(DataTable):
         Returns:
             dict[str, int]: Mapping of column name to width (None for auto-sizing columns).
         """
-        column_widths = {}
+        col_widths, col_label_widths = {}, {}
 
         # Get available width for the table (with some padding for borders/scrollbar)
         available_width = self.scrollable_content_region.width
@@ -1046,7 +1046,7 @@ class DataFrameTable(DataTable):
 
         # No string columns, let TextualDataTable auto-size all columns
         if not string_cols:
-            return column_widths
+            return col_widths
 
         # Sample a reasonable number of rows to calculate widths (don't scan entire dataframe)
         sample_size = min(self.BATCH_SIZE, len(self.df))
@@ -1060,6 +1060,9 @@ class DataFrameTable(DataTable):
             # Get column label width
             # Add padding for sort indicators if any
             label_width = measure(self.app.console, col, 1) + 2
+            col_label_widths[col] = label_width
+
+            # Let Textual auto-size for non-string columns:
             if dtype != pl.String:
                 available_width -= label_width
                 continue
@@ -1083,16 +1086,16 @@ class DataFrameTable(DataTable):
                 max_width = label_width
                 self.log(f"Error determining width for column '{col}': {e}")
 
-            column_widths[col] = max_width
+            col_widths[col] = max_width
             available_width -= max_width
 
         # If there's no more available width, auto-size remaining columns
         if available_width < 0:
-            for col in column_widths:
-                if column_widths[col] > STRING_WIDTH_CAP:
-                    column_widths[col] = STRING_WIDTH_CAP  # Cap string columns
+            for col in col_widths:
+                if col_widths[col] > STRING_WIDTH_CAP and col_label_widths[col] < STRING_WIDTH_CAP:
+                    col_widths[col] = STRING_WIDTH_CAP  # Cap string columns
 
-        return column_widths
+        return col_widths
 
     def setup_columns(self) -> None:
         """Clear table and setup columns.
