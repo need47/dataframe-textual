@@ -20,6 +20,7 @@ from textual.widgets._data_table import (
     CellDoesNotExist,
     CellKey,
     CellType,
+    Column,
     ColumnKey,
     CursorType,
     DuplicateKey,
@@ -351,6 +352,9 @@ class DataFrameTable(DataTable):
 
         # Whether to use thousand separator for numeric display
         self.thousand_separator = False
+
+        # Set of columns expanded to full width
+        self.expanded_columns: set[str] = set()
 
         # Whether to show internal row index column
         self.show_rid = False
@@ -1716,11 +1720,15 @@ class DataFrameTable(DataTable):
         if dtype != pl.String:
             return
 
+        # The column to expand/shrink
+        col: Column = self.columns[col_key]
+
         # Calculate the maximum width across all loaded rows
-        max_width = len(col_name) + 2  # Start with column name width + padding
+        label_width = len(col_name) + 2  # Start with column name width + padding
 
         try:
             need_expand = False
+            max_width = label_width
 
             # Scan through all loaded rows that are visible to find max width
             for row_idx in range(self.loaded_rows):
@@ -1734,21 +1742,27 @@ class DataFrameTable(DataTable):
             if not need_expand:
                 return
 
-            # Update the column width
-            col = self.columns[col_key]
-            col.width = max_width
+            if col_name in self.expanded_columns:
+                col.width = max(label_width, STRING_WIDTH_CAP)
+                self.expanded_columns.remove(col_name)
+            else:
+                self.expanded_columns.add(col_name)
 
-            # Force a refresh
-            self._update_count += 1
-            self._require_update_dimensions = True
-            self.refresh(layout=True)
+                # Update the column width
+                col.width = max_width
 
-            # self.notify(f"Expanded column [$success]{col_name}[/] to width [$accent]{max_width}[/]", title="Expand")
         except Exception as e:
             self.notify(
                 f"Error expanding column [$error]{col_name}[/]", title="Expand Column", severity="error", timeout=10
             )
             self.log(f"Error expanding column `{col_name}`: {str(e)}")
+
+        # Force a refresh
+        self._update_count += 1
+        self._require_update_dimensions = True
+        self.refresh(layout=True)
+
+        # self.notify(f"Expanded column [$success]{col_name}[/] to width [$accent]{max_width}[/]", title="Expand")
 
     def do_toggle_rid(self) -> None:
         """Toggle display of the internal RID column."""
