@@ -2397,7 +2397,7 @@ class DataFrameTable(DataTable):
         # Delete all selected rows
         if selected_count := len(self.selected_rows):
             history_desc = f"Deleted {selected_count} selected row(s)"
-            rids_to_delete = self.selected_rows
+            rids_to_delete.update(self.selected_rows)
 
         # Delete current row and those above
         elif more == "above":
