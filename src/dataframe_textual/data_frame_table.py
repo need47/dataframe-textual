@@ -2275,7 +2275,12 @@ class DataFrameTable(DataTable):
         """Remove the currently selected column from the table."""
         # Get the column to remove
         col_idx = self.cursor_column
-        col_name = self.cursor_col_name
+        try:
+            col_name = self.cursor_col_name
+        except CellDoesNotExist:
+            self.notify("No column to delete at the current cursor position", title="Delete Column", severity="warning")
+            return
+
         col_key = self.cursor_col_key
 
         col_names_to_remove = []
@@ -2340,7 +2345,7 @@ class DataFrameTable(DataTable):
         if self.df_view is not None:
             self.df_view = self.df_view.drop(col_names_to_remove)
 
-        self.notify(message, title="Delete")
+        self.notify(message, title="Delete Column")
 
     def do_duplicate_column(self) -> None:
         """Duplicate the currently selected column, inserting it right after the current column."""
