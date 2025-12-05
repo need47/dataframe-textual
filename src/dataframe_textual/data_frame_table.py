@@ -1971,13 +1971,21 @@ class DataFrameTable(DataTable):
             if self.df_view is not None:
                 # Get updated column from df for rows that exist in df_view
                 col_updated = f"^_{col_name}_^"
-                lf_updated = self.df.lazy().select(RID, pl.col(col_name).alias(col_updated))
-                # Join and use coalesce to prefer updated value or keep original
+                col_exists = "^_exists_^"
+                lf_updated = self.df.lazy().select(
+                    RID, pl.col(col_name).alias(col_updated), pl.lit(True).alias(col_exists)
+                )
+                # Join and use when/then/otherwise to handle all updates including NULLs
                 self.df_view = (
                     self.df_view.lazy()
                     .join(lf_updated, on=RID, how="left")
-                    .with_columns(pl.coalesce(pl.col(col_updated), pl.col(col_name)).alias(col_name))
-                    .drop(col_updated)
+                    .with_columns(
+                        pl.when(pl.col(col_exists))
+                        .then(pl.col(col_updated))
+                        .otherwise(pl.col(col_name))
+                        .alias(col_name)
+                    )
+                    .drop(col_updated, col_exists)
                     .collect()
                 )
         except Exception as e:
