@@ -110,6 +110,20 @@ class ReplaceState:
     done: bool = False  # Whether the replace operation is complete
 
 
+def add_rid_column(df: pl.DataFrame) -> pl.DataFrame:
+    """Add internal row index as last column to the dataframe if not already present.
+
+    Args:
+        df: The Polars DataFrame to modify.
+
+    Returns:
+        The modified DataFrame with the internal row index column added.
+    """
+    if RID not in df.columns:
+        df = df.lazy().with_row_index(RID).select(pl.exclude(RID), RID).collect()
+    return df
+
+
 class DataFrameTable(DataTable):
     """Custom DataTable to highlight row/column labels based on cursor position."""
 
@@ -321,7 +335,7 @@ class DataFrameTable(DataTable):
         super().__init__(**kwargs)
 
         # DataFrame state
-        self.dataframe = df.lazy().with_row_index(RID).select(pl.exclude(RID), RID).collect()  # Original dataframe
+        self.dataframe = add_rid_column(df)  # Original dataframe
         self.df = self.dataframe  # Internal/working dataframe
         self.filename = filename or "untitled.csv"  # Current filename
         self.tabname = tabname or Path(filename).stem  # Tab name

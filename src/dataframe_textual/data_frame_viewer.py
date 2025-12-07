@@ -282,6 +282,14 @@ class DataFrameViewer(App):
         Creates a copy of the current tab with the same data and filename.
         The new tab is named with '_copy' suffix and inserted after the current tab.
         """
+        self.do_duplicate_tab()
+
+    def do_duplicate_tab(self) -> None:
+        """Duplicate the currently active tab.
+
+        Creates a copy of the current tab with the same data and filename.
+        The new tab is named with '_copy' suffix and inserted after the current tab.
+        """
         if not (table := self.get_active_table()):
             return
 
@@ -315,6 +323,17 @@ class DataFrameViewer(App):
         new_table.dirty = True  # Mark as dirty since it's a new unsaved tab
 
     def action_next_tab(self, offset: int = 1) -> None:
+        """Switch to the next tab or previous tab.
+
+        Cycles through tabs by the specified offset. With offset=1, moves to next tab.
+        With offset=-1, moves to previous tab. Wraps around when reaching edges.
+
+        Args:
+            offset: Number of tabs to advance (+1 for next, -1 for previous). Defaults to 1.
+        """
+        self.do_next_tab(offset)
+
+    def do_next_tab(self, offset: int = 1) -> None:
         """Switch to the next tab or previous tab.
 
         Cycles through tabs by the specified offset. With offset=1, moves to next tab.
