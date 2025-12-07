@@ -80,14 +80,13 @@ class History:
     df: pl.DataFrame
     df_view: pl.DataFrame | None
     filename: str
-    loaded_rows: int
     hidden_columns: set[str]
     selected_rows: set[int]
     sorted_columns: dict[str, bool]  # col_name -> descending
+    matches: dict[int, set[str]]  # RID -> set of col names
     fixed_rows: int
     fixed_columns: int
     cursor_coordinate: Coordinate
-    matches: dict[int, set[str]]  # RID -> set of col names
     dirty: bool = False  # Whether this history state has unsaved changes
 
 
@@ -142,7 +141,7 @@ class DataFrameTable(DataTable):
         - **M** - 📋 Show column metadata (ID, name, type)
         - **h** - 👁️ Hide current column
         - **H** - 👀 Show all hidden rows/columns
-        - **_** - 📏 Expand column to full width
+        - **_** - 📏 Toggle column full width
         - **z** - 📌 Freeze rows and columns
         - **~** - 🏷️ Toggle row labels
         - **,** - 🔢 Toggle thousand separator for numeric display
@@ -1066,8 +1065,8 @@ class DataFrameTable(DataTable):
             label_width = measure(self.app.console, col, 1) + 2
             col_label_widths[col] = label_width
 
-            # Let Textual auto-size for non-string columns:
-            if dtype != pl.String:
+            # Let Textual auto-size for non-string columns and already expanded columns
+            if dtype != pl.String or col in self.expanded_columns:
                 available_width -= label_width
                 continue
 
@@ -1529,14 +1528,13 @@ class DataFrameTable(DataTable):
             df=self.df,
             df_view=self.df_view,
             filename=self.filename,
-            loaded_rows=self.loaded_rows,
             hidden_columns=self.hidden_columns.copy(),
             selected_rows=self.selected_rows.copy(),
             sorted_columns=self.sorted_columns.copy(),
+            matches={k: v.copy() for k, v in self.matches.items()},
             fixed_rows=self.fixed_rows,
             fixed_columns=self.fixed_columns,
             cursor_coordinate=self.cursor_coordinate,
-            matches={k: v.copy() for k, v in self.matches.items()},
             dirty=self.dirty,
         )
 
@@ -1549,14 +1547,13 @@ class DataFrameTable(DataTable):
         self.df = history.df
         self.df_view = history.df_view
         self.filename = history.filename
-        self.loaded_rows = history.loaded_rows
         self.hidden_columns = history.hidden_columns.copy()
         self.selected_rows = history.selected_rows.copy()
         self.sorted_columns = history.sorted_columns.copy()
+        self.matches = {k: v.copy() for k, v in history.matches.items()} if history.matches else defaultdict(set)
         self.fixed_rows = history.fixed_rows
         self.fixed_columns = history.fixed_columns
         self.cursor_coordinate = history.cursor_coordinate
-        self.matches = {k: v.copy() for k, v in history.matches.items()} if history.matches else defaultdict(set)
         self.dirty = history.dirty
 
         # Recreate table for display

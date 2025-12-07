@@ -260,7 +260,7 @@ zcat compressed_data.csv.gz | dv -f csv
 | `M` | Show metadata for current column |
 | `K` | Cycle cursor types: cell → row → column → cell |
 | `~` | Toggle row labels |
-| `_` (underscore) | Expand column to full width |
+| `_` (underscore) | Toggle column full width |
 | `z` | Freeze rows and columns |
 | `,` | Toggle thousand separator for numeric display |
 | `h` | Hide current column |
