@@ -46,6 +46,9 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "-I", "--no-inference", action="store_true", help="Do not infer data types when reading CSV/TSV"
     )
+    parser.add_argument(
+        "-t", "--truncate-ragged-lines", action="store_true", help="Truncate ragged lines when reading CSV/TSV"
+    )
     parser.add_argument("-E", "--ignore-errors", action="store_true", help="Ignore errors when reading CSV/TSV")
     parser.add_argument(
         "-c", "--comment-prefix", nargs="?", const="#", help="Comment lines are skipped when reading CSV/TSV"
@@ -94,6 +97,7 @@ def main() -> None:
         skip_rows_after_header=args.skip_rows_after_header,
         null_values=args.null,
         ignore_errors=args.ignore_errors,
+        truncate_ragged_lines=args.truncate_ragged_lines,
     )
     app = DataFrameViewer(*sources)
     app.run()

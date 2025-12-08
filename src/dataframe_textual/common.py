@@ -484,6 +484,7 @@ def load_dataframe(
     skip_rows_after_header: int = 0,
     null_values: list[str] | None = None,
     ignore_errors: bool = False,
+    truncate_ragged_lines: bool = False,
 ) -> list[Source]:
     """Load DataFrames from file specifications.
 
@@ -548,6 +549,7 @@ def load_dataframe(
                 skip_rows_after_header=skip_rows_after_header,
                 null_values=null_values,
                 ignore_errors=ignore_errors,
+                truncate_ragged_lines=truncate_ragged_lines,
             )
         )
 
@@ -624,6 +626,7 @@ def load_file(
     schema_overrides: dict[str, pl.DataType] | None = None,
     null_values: list[str] | None = None,
     ignore_errors: bool = False,
+    truncate_ragged_lines: bool = False,
 ) -> list[Source]:
     """Load a single file.
 
@@ -678,6 +681,7 @@ def load_file(
             schema_overrides=schema_overrides,
             null_values=null_values,
             ignore_errors=ignore_errors,
+            truncate_ragged_lines=truncate_ragged_lines,
         )
         data.append(Source(lf, filename, filepath.stem))
     elif file_format in ("xlsx", "xls", "excel"):
