@@ -497,7 +497,7 @@ class DataFrameViewer(App):
                 """Handle the "save before closing?" confirmation."""
                 if result:
                     # User wants to save - close after save dialog opens
-                    active_table.do_save_to_file(title="Save Current Tab", task_after_save="close_tab")
+                    active_table.do_save_to_file(task_after_save="close_tab")
                 elif result is None:
                     # User cancelled - do nothing
                     return
