@@ -596,7 +596,14 @@ def handle_compute_error(
 
     # Schema mismatch error
     if "found more fields than defined in 'Schema'" in err_msg:
-        print(f"Input might be malformed:\n{err_msg}.\nTry again with `-t` to truncate ragged lines", file=sys.stderr)
+        print(f"{err_msg}.\n\nInput might be malformed. Try again with `-t` to truncate ragged lines", file=sys.stderr)
+        sys.exit(1)
+
+    # Field ... is not properly escaped
+    if "is not properly escaped" in err_msg:
+        print(
+            f"{err_msg}\n\nQuoting might be causing the issue. Try again with `-q` to disable quoting", file=sys.stderr
+        )
         sys.exit(1)
 
     # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
