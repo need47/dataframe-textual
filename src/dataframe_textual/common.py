@@ -717,6 +717,14 @@ def load_file(
     # Attempt to collect, handling ComputeError for schema inference issues
     try:
         data = [Source(src.frame.collect(), src.filename, src.tabname) for src in data]
+    except pl.exceptions.NoDataError:
+        print(
+            "Warning: No data from stdin."
+            if isinstance(source, StringIO)
+            else f"Warning: No data found in file `{filename}`.",
+            file=sys.stderr,
+        )
+        sys.exit()
     except pl.exceptions.ComputeError as ce:
         # Handle the error and determine retry strategy
         infer_schema, schema_overrides = handle_compute_error(str(ce), file_format, infer_schema, schema_overrides)
