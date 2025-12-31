@@ -137,7 +137,9 @@ class DataFrameViewer(App):
                 except Exception as e:
                     self.notify(
                         f"Error loading [$error]{filename}[/]: Try [$accent]-I[/] to disable schema inference",
+                        title="Load File",
                         severity="error",
+                        timeout=10,
                     )
                     self.log(f"Error loading `{filename}`: {str(e)}")
 
@@ -166,7 +168,7 @@ class DataFrameViewer(App):
         """
         if event.key == "k":
             self.theme = get_next_item(list(BUILTIN_THEMES.keys()), self.theme)
-            self.notify(f"Switched to theme: [$success]{self.theme}[/]", title="Theme")
+            self.notify(f"Switched to theme: [$success]{self.theme}[/]", title="SwitchTheme")
 
     def on_click(self, event: Click) -> None:
         """Handle mouse click events on tabs.
@@ -360,7 +362,7 @@ class DataFrameViewer(App):
         tabs = self.query_one(ContentTabs)
         tabs.display = not tabs.display
         # status = "shown" if tabs.display else "hidden"
-        # self.notify(f"Tab bar [$success]{status}[/]", title="Toggle")
+        # self.notify(f"Tab bar [$success]{status}[/]", title="Toggle Tab Bar")
 
     def get_active_table(self) -> DataFrameTable | None:
         """Get the currently active DataFrameTable widget.
@@ -376,7 +378,8 @@ class DataFrameViewer(App):
             if active_pane := tabbed.active_pane:
                 return active_pane.query_one(DataFrameTable)
         except (NoMatches, AttributeError):
-            self.notify("No active table found", title="Locate", severity="error")
+            self.notify("No active table found", title="Locate Table", severity="error", timeout=10)
+
         return None
 
     def get_unique_tabname(self, tab_name: str) -> str:
@@ -414,11 +417,13 @@ class DataFrameViewer(App):
                 for source in load_file(filename, prefix_sheet=True):
                     self.add_tab(source.frame, filename, source.tabname, after=self.tabbed.active_pane)
                     n_tab += 1
-                # self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open")
+                # self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open File")
             except Exception as e:
-                self.notify(f"Error loading [$error]{filename}[/]: {str(e)}", title="Open", severity="error")
+                self.notify(
+                    f"Error loading [$error]{filename}[/]: {str(e)}", title="Open File", severity="error", timeout=10
+                )
         else:
-            self.notify(f"File does not exist: [$warning]{filename}[/]", title="Open", severity="warning")
+            self.notify(f"File does not exist: [$warning]{filename}[/]", title="Open File", severity="warning")
 
     def add_tab(
         self,
@@ -610,7 +615,7 @@ class DataFrameViewer(App):
         content_tab, new_name = result
 
         # Update the tab name
-        old_name = content_tab.label_text
+        # old_name = content_tab.label_text
         content_tab.label = new_name
 
         # Mark tab as dirty to indicate name change
@@ -622,4 +627,4 @@ class DataFrameViewer(App):
                 table.focus()
                 break
 
-        self.notify(f"Renamed tab [$accent]{old_name}[/] to [$success]{new_name}[/]", title="Rename")
+        # self.notify(f"Renamed tab [$accent]{old_name}[/] to [$success]{new_name}[/]", title="Rename Tab")
