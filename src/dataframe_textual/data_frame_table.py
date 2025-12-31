@@ -1593,7 +1593,7 @@ class DataFrameTable(DataTable):
     def do_undo(self) -> None:
         """Undo the last action."""
         if not self.histories_undo:
-            self.notify("No actions to undo", title="Undo", severity="warning")
+            # self.notify("No actions to undo", title="Undo", severity="warning")
             return
 
         # Pop the last history state for undo and save to redo stack
@@ -1608,7 +1608,7 @@ class DataFrameTable(DataTable):
     def do_redo(self) -> None:
         """Redo the last undone action."""
         if not self.histories_redo:
-            self.notify("No actions to redo", title="Redo", severity="warning")
+            # self.notify("No actions to redo", title="Redo", severity="warning")
             return
 
         # Pop the last undone state from redo stack
@@ -1785,7 +1785,7 @@ class DataFrameTable(DataTable):
     def do_show_hidden_rows_columns(self) -> None:
         """Show all hidden rows/columns by recreating the table."""
         if not self.hidden_columns and self.df_view is None:
-            self.notify("No hidden rows or columns to show", title="Show", severity="warning")
+            # self.notify("No hidden rows or columns to show", title="Show", severity="warning")
             return
 
         # Add to history
@@ -1802,7 +1802,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        self.notify("Showed hidden row(s) and/or hidden column(s)", title="Show")
+        # self.notify("Showed hidden row(s) and/or hidden column(s)", title="Show")
 
     # Sort
     def do_sort_by_column(self, descending: bool = False) -> None:
@@ -2296,7 +2296,7 @@ class DataFrameTable(DataTable):
             # Move cursor to the new column
             self.move_cursor(column=cidx + 1)
 
-            self.notify(f"Added link column [$success]{new_col_name}[/]. Use Ctrl/Cmd click to open.", title="Add Link")
+            # self.notify(f"Added link column [$success]{new_col_name}[/]. Use Ctrl/Cmd click to open.", title="Add Link")
 
         except Exception as e:
             self.notify(
@@ -2311,7 +2311,7 @@ class DataFrameTable(DataTable):
         try:
             col_name = self.cursor_col_name
         except CellDoesNotExist:
-            self.notify("No column to delete at the current cursor position", title="Delete Column", severity="warning")
+            # self.notify("No column to delete at the current cursor position", title="Delete Column", severity="warning")
             return
 
         col_key = self.cursor_col_key
@@ -2378,7 +2378,7 @@ class DataFrameTable(DataTable):
         if self.df_view is not None:
             self.df_view = self.df_view.drop(col_names_to_remove)
 
-        self.notify(message, title="Delete Column")
+        # self.notify(message, title="Delete Column")
 
     def do_duplicate_column(self) -> None:
         """Duplicate the currently selected column, inserting it right after the current column."""
@@ -2537,12 +2537,12 @@ class DataFrameTable(DataTable):
         # Validate move is possible
         if direction == "left":
             if col_idx <= 0:
-                self.notify("Cannot move column left", title="Move", severity="warning")
+                # self.notify("Cannot move column left", title="Move", severity="warning")
                 return
             swap_idx = col_idx - 1
         elif direction == "right":
             if col_idx >= len(self.columns) - 1:
-                self.notify("Cannot move column right", title="Move", severity="warning")
+                # self.notify("Cannot move column right", title="Move", severity="warning")
                 return
             swap_idx = col_idx + 1
 
@@ -2596,12 +2596,12 @@ class DataFrameTable(DataTable):
         # Validate move is possible
         if direction == "up":
             if curr_row_idx <= 0:
-                self.notify("Cannot move row up", title="Move", severity="warning")
+                # self.notify("Cannot move row up", title="Move", severity="warning")
                 return
             swap_row_idx = curr_row_idx - 1
         elif direction == "down":
             if curr_row_idx >= len(self.rows) - 1:
-                self.notify("Cannot move row down", title="Move", severity="warning")
+                # self.notify("Cannot move row down", title="Move", severity="warning")
                 return
             swap_row_idx = curr_row_idx + 1
         else:
@@ -2692,11 +2692,11 @@ class DataFrameTable(DataTable):
             return
 
         if current_dtype == target_dtype:
-            self.notify(
-                f"Column [$warning]{col_name}[/] is already of type [$accent]{target_dtype}[/]",
-                title="Cast",
-                severity="warning",
-            )
+            # self.notify(
+            #     f"Column [$warning]{col_name}[/] is already of type [$accent]{target_dtype}[/]",
+            #     title="Cast",
+            #     severity="warning",
+            # )
             return  # No change needed
 
         # Add to history
@@ -2716,7 +2716,7 @@ class DataFrameTable(DataTable):
             # Recreate table for display
             self.setup_table()
 
-            self.notify(f"Cast column [$success]{col_name}[/] to [$accent]{target_dtype}[/]", title="Cast")
+            # self.notify(f"Cast column [$success]{col_name}[/] to [$accent]{target_dtype}[/]", title="Cast")
         except Exception as e:
             self.notify(
                 f"Error casting column [$error]{col_name}[/] to [$accent]{target_dtype}[/]",
@@ -2907,7 +2907,7 @@ class DataFrameTable(DataTable):
         """Clear all selected rows and matches without removing them from the dataframe."""
         # Check if any selected rows or matches
         if not self.selected_rows and not self.matches:
-            self.notify("No selections to clear", title="Clear", severity="warning")
+            # self.notify("No selections to clear", title="Clear", severity="warning")
             return
 
         row_count = len(self.selected_rows | set(self.matches.keys()))
@@ -3096,7 +3096,7 @@ class DataFrameTable(DataTable):
     def do_next_match(self) -> None:
         """Move cursor to the next match."""
         if not self.matches:
-            self.notify("No matches to navigate", title="Next Match", severity="warning")
+            # self.notify("No matches to navigate", title="Next Match", severity="warning")
             return
 
         # Get sorted list of matched coordinates
@@ -3118,7 +3118,7 @@ class DataFrameTable(DataTable):
     def do_previous_match(self) -> None:
         """Move cursor to the previous match."""
         if not self.matches:
-            self.notify("No matches to navigate", title="Previous Match", severity="warning")
+            # self.notify("No matches to navigate", title="Previous Match", severity="warning")
             return
 
         # Get sorted list of matched coordinates
@@ -3146,7 +3146,7 @@ class DataFrameTable(DataTable):
     def do_next_selected_row(self) -> None:
         """Move cursor to the next selected row."""
         if not self.selected_rows:
-            self.notify("No selected rows to navigate", title="Next Selected Row", severity="warning")
+            # self.notify("No selected rows to navigate", title="Next Selected Row", severity="warning")
             return
 
         # Get list of selected row indices in order
@@ -3168,7 +3168,7 @@ class DataFrameTable(DataTable):
     def do_previous_selected_row(self) -> None:
         """Move cursor to the previous selected row."""
         if not self.selected_rows:
-            self.notify("No selected rows to navigate", title="Previous Selected Row", severity="warning")
+            # self.notify("No selected rows to navigate", title="Previous Selected Row", severity="warning")
             return
 
         # Get list of selected row indices in order
