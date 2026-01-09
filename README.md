@@ -263,6 +263,7 @@ zcat compressed_data.csv.gz | dv -f csv
 | `_` (underscore) | Toggle column full width |
 | `z` | Freeze rows and columns |
 | `,` | Toggle thousand separator for numeric display |
+| `&` | Set current row as the new header row | 
 | `h` | Hide current column |
 | `H` | Show all hidden rows/columns |
 
@@ -657,7 +658,7 @@ Press `,` to toggle thousand separator formatting for numeric data:
 
 ### 15. Save File
 
-Press `Ctrl+S` to save filtered, edited, or sorted data back to file
+Press `Ctrl+S` to save filtered, edited, or sorted data back to file. The output format is automatically determined by the file extension, making it easy to convert between different formats (e.g., CSV to TSV).
 
 ### 16. Undo/Redo/Reset
 

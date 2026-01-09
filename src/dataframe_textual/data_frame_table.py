@@ -1,5 +1,6 @@
 """DataFrameTable widget for displaying and interacting with Polars DataFrames."""
 
+import io
 import sys
 from collections import defaultdict, deque
 from dataclasses import dataclass
@@ -140,6 +141,7 @@ class DataFrameTable(DataTable):
         - **Ctrl+F** - 📜 Page down
         - **Ctrl+B** - 📜 Page up
         - **PgUp/PgDn** - 📜 Page up/down
+        - **&** - 📌 Mark current row as header
 
         ## ♻️ Undo/Redo/Reset
         - **u** - ↩️ Undo last action
@@ -248,6 +250,7 @@ class DataFrameTable(DataTable):
         ("comma", "toggle_thousand_separator", "Toggle thousand separator"),  # `,`
         ("underscore", "expand_column", "Expand column to full width"),  # `_`
         ("circumflex_accent", "toggle_rid", "Toggle internal row index"),  # `^`
+        ("ampersand", "set_cursor_row_as_header", "Set cursor row as the new header row"),  # `&`
         # Copy
         ("c", "copy_cell", "Copy cell to clipboard"),
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
@@ -724,6 +727,10 @@ class DataFrameTable(DataTable):
     def action_toggle_rid(self) -> None:
         """Toggle the internal row index column visibility."""
         self.do_toggle_rid()
+
+    def action_set_cursor_row_as_header(self) -> None:
+        """Set cursor row as the new header row."""
+        self.do_set_cursor_row_as_header()
 
     def action_show_hidden_rows_columns(self) -> None:
         """Show all hidden rows/columns."""
@@ -1790,6 +1797,48 @@ class DataFrameTable(DataTable):
 
         # Recreate table for display
         self.setup_table()
+
+    def do_set_cursor_row_as_header(self) -> None:
+        """Set cursor row as the new header row."""
+        ridx = self.cursor_row_idx
+
+        # Get the new header values
+        new_header = list(self.df.row(ridx))
+        new_header[-1] = RID  # Ensure last column remains RID
+
+        # Handle duplicate column names by appending suffixes
+        seen = {}
+        for i, col in enumerate(new_header):
+            if col in seen:
+                seen[col] += 1
+                new_header[i] = f"{col}_{seen[col]}"
+            else:
+                seen[col] = 0
+
+        # Create a mapping of old column names to new column names
+        col_rename_map = {old_col: str(new_col) for old_col, new_col in zip(self.df.columns, new_header)}
+
+        # Add to history
+        self.add_history(f"Set row [$success]{ridx + 1}[/] as header", dirty=False)
+
+        # Rename columns in the dataframe
+        self.df = self.df.slice(ridx + 1).rename(col_rename_map)
+
+        # Write to string buffer
+        buffer = io.StringIO()
+        self.df.write_csv(buffer)
+
+        # Re-read with inferred schema to reset dtypes
+        buffer.seek(0)
+        self.df = pl.read_csv(buffer)
+
+        # Recreate table for display
+        self.setup_table()
+
+        # Move cursor to first column
+        self.move_cursor(row=ridx, column=0)
+
+        # self.notify(f"Set row [$success]{ridx + 1}[/] as header", title="Set Row as Header")
 
     def do_show_hidden_rows_columns(self) -> None:
         """Show all hidden rows/columns by recreating the table."""
