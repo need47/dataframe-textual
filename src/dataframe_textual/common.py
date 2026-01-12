@@ -529,7 +529,10 @@ def load_dataframe(
             ext = Path(filename).suffix.lower()
             if ext == ".gz":
                 ext = Path(filename).with_suffix("").suffix.lower()
+
             fmt = ext.removeprefix(".")
+            if fmt in ("xls", "xlsx"):
+                fmt = "excel"
 
             # Default to TSV
             if not fmt or fmt not in SUPPORTED_FORMATS:
@@ -668,12 +671,6 @@ def load_file(
     filename = f"stdin.{file_format}" if isinstance(source, StringIO) else source
     filepath = Path(filename)
 
-    if not file_format:
-        ext = filepath.suffix.lower()
-        if ext == ".gz":
-            ext = Path(filename).with_suffix("").suffix.lower()
-        file_format = ext.removeprefix(".")
-
     # Load based on file format
     if file_format in ("csv", "tsv", "psv"):
         lf = pl.scan_csv(
@@ -691,7 +688,7 @@ def load_file(
             truncate_ragged_lines=truncate_ragged_lines,
         )
         data.append(Source(lf, filename, filepath.stem))
-    elif file_format in ("xlsx", "xls", "excel"):
+    elif file_format == "excel":
         if first_sheet:
             # Read only the first sheet for multiple files
             lf = pl.read_excel(source).lazy()
