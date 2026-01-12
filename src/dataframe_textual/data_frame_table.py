@@ -3783,7 +3783,7 @@ class DataFrameTable(DataTable):
         """Open screen to save file."""
         self._task_after_save = task_after_save
         tab_count = len(self.app.tabs)
-        save_all = tab_count > 1 and all_tabs is not False
+        save_all = all_tabs is not False
 
         filepath = Path(self.filename)
         if save_all:
