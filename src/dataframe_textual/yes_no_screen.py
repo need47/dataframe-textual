@@ -298,7 +298,7 @@ class SaveFileScreen(YesNoScreen):
             title="Save to File",
             label="Filename",
             input=filename,
-            yes=f"Save {tab_count} Tabs" if self.save_all else "Save Current Tab" if tab_count > 1 else "Save",
+            yes=f"Save {tab_count} Tab(s)" if self.save_all else "Save Current Tab" if tab_count > 1 else "Save",
             no="Cancel",
             on_yes_callback=self.handle_save,
         )

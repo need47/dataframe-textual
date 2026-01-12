@@ -12,7 +12,7 @@ import polars as pl
 from rich.text import Text
 
 # Supported file formats
-SUPPORTED_FORMATS = ["tsv", "csv", "psv", "excel", "parquet", "json", "ndjson"]
+SUPPORTED_FORMATS = ["tsv", "csv", "psv", "xlsx", "xls", "parquet", "json", "ndjson"]
 
 
 # Boolean string mappings
@@ -531,8 +531,6 @@ def load_dataframe(
                 ext = Path(filename).with_suffix("").suffix.lower()
 
             fmt = ext.removeprefix(".")
-            if fmt in ("xls", "xlsx"):
-                fmt = "excel"
 
             # Default to TSV
             if not fmt or fmt not in SUPPORTED_FORMATS:
@@ -688,7 +686,7 @@ def load_file(
             truncate_ragged_lines=truncate_ragged_lines,
         )
         data.append(Source(lf, filename, filepath.stem))
-    elif file_format == "excel":
+    elif file_format in ("xlsx", "xls"):
         if first_sheet:
             # Read only the first sheet for multiple files
             lf = pl.read_excel(source).lazy()

@@ -128,7 +128,7 @@ When multiple files are opened:
 ## Command Line Options
 
 ```
-usage: dv [-h] [-V] [-f {csv,json,excel,ndjson,psv,parquet,tsv}] [-H] [-I] [-t] [-E] [-c [COMMENT_PREFIX]] [-q [QUOTE_CHAR]] [-l SKIP_LINES] [-a SKIP_ROWS_AFTER_HEADER] [-n NULL [NULL ...]] [files ...]
+usage: dv [-h] [-V] [-f {csv,json,xlsx,xls,ndjson,psv,parquet,tsv}] [-H] [-I] [-t] [-E] [-c [COMMENT_PREFIX]] [-q [QUOTE_CHAR]] [-l SKIP_LINES] [-a SKIP_ROWS_AFTER_HEADER] [-n NULL [NULL ...]] [files ...]
 
 Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).
 
@@ -138,8 +138,8 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   -V, --version         show program's version number and exit
-  -f, --format {csv,json,excel,ndjson,psv,parquet,tsv}
-                        Specify the format of the input files (csv, excel, tsv etc.)
+  -f, --format {csv,json,xlsx,xls,ndjson,psv,parquet,tsv}
+                        Specify the format of the input files (csv, tsv etc.)
   -H, --no-header       Specify that input files have no header row when reading CSV/TSV
   -I, --no-inference    Do not infer data types when reading CSV/TSV
   -t, --truncate-ragged-lines

@@ -263,8 +263,11 @@ class DataFrameViewer(App):
     def action_save_current_tab_overwrite(self) -> None:
         """Save the currently active tab to file, overwriting if it exists."""
         if table := self.get_active_table():
-            filepath = Path(table.filename)
-            filename = filepath.with_stem(table.tabname)
+            if len(self.tabs) > 1:
+                filepath = Path(table.filename)
+                filename = filepath.with_stem(table.tabname)
+            else:
+                filename = table.filename
             table.save_to_file((filename, False, False))
 
     def action_save_all_tabs_overwrite(self) -> None:
