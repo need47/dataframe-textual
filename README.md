@@ -1,6 +1,6 @@
 # DataFrame Textual
 
-A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/Parquet/JSON/NDJSON built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in terminal with multi-tab support for multiple files!
+A powerful, interactive terminal-based viewer/editor for CSV/TSV/PSV/Excel/Parquet/JSON/NDJSON built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in terminal with multi-tab support for multiple files!
 
 ![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshot.png)
 
@@ -128,28 +128,31 @@ When multiple files are opened:
 ## Command Line Options
 
 ```
-usage: dv [-h] [-f {csv,excel,tsv,parquet,json,ndjson}] [-H] [-I] [-E] [-c COMMENT_PREFIX] [-q QUOTE_CHAR] [-l SKIP_LINES] [-a SKIP_ROWS_AFTER_HEADER] [-n NULL [NULL ...]] [files ...]
+usage: dv [-h] [-V] [-f {csv,json,excel,ndjson,psv,parquet,tsv}] [-H] [-I] [-t] [-E] [-c [COMMENT_PREFIX]] [-q [QUOTE_CHAR]] [-l SKIP_LINES] [-a SKIP_ROWS_AFTER_HEADER] [-n NULL [NULL ...]] [files ...]
 
-Interactive terminal based viewer/editor for tabular data (e.g., CSV/TSV/Excel).
+Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).
 
 positional arguments:
-  files                 Input files (or read from stdin)
+  files                 Files to view (or read from stdin)
 
 options:
   -h, --help            show this help message and exit
-  -f, --format {csv,excel,tsv,parquet,json,ndjson}
-                        Specify the format of the input files
-  -H, --no-header       Specify that input files have no header row
-  -I, --no-inference   Do not infer data types when reading CSV/TSV
+  -V, --version         show program's version number and exit
+  -f, --format {csv,json,excel,ndjson,psv,parquet,tsv}
+                        Specify the format of the input files (csv, excel, tsv etc.)
+  -H, --no-header       Specify that input files have no header row when reading CSV/TSV
+  -I, --no-inference    Do not infer data types when reading CSV/TSV
+  -t, --truncate-ragged-lines
+                        Truncate ragged lines when reading CSV/TSV
   -E, --ignore-errors   Ignore errors when reading CSV/TSV
-  -c, --comment-prefix COMMENT_PREFIX
-                        Comment lines are skipped when reading CSV/TSV (default: skip none)
-  -q, --quote-char QUOTE_CHAR
-                        Quote character for reading CSV/TSV (default: "; use -q without argument value to disable)
+  -c, --comment-prefix [COMMENT_PREFIX]
+                        Comment lines are skipped when reading CSV/TSV
+  -q, --quote-char [QUOTE_CHAR]
+                        Quote character for reading CSV/TSV
   -l, --skip-lines SKIP_LINES
-                        Skip lines when reading CSV/TSV (default: 0)
+                        Skip lines when reading CSV/TSV
   -a, --skip-rows-after-header SKIP_ROWS_AFTER_HEADER
-                        Skip rows after header when reading CSV/TSV (default: 0)
+                        Skip rows after header when reading CSV/TSV
   -n, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
 ```

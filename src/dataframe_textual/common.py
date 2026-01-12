@@ -12,7 +12,7 @@ import polars as pl
 from rich.text import Text
 
 # Supported file formats
-SUPPORTED_FORMATS = {"tsv", "tab", "csv", "excel", "xlsx", "xls", "parquet", "json", "ndjson"}
+SUPPORTED_FORMATS = ["tsv", "csv", "psv", "excel", "parquet", "json", "ndjson"]
 
 
 # Boolean string mappings
@@ -675,10 +675,10 @@ def load_file(
         file_format = ext.removeprefix(".")
 
     # Load based on file format
-    if file_format in ("csv", "tsv"):
+    if file_format in ("csv", "tsv", "psv"):
         lf = pl.scan_csv(
             source,
-            separator="\t" if file_format == "tsv" else ",",
+            separator="\t" if file_format == "tsv" else ("|" if file_format == "psv" else ","),
             has_header=has_header,
             infer_schema=infer_schema,
             comment_prefix=comment_prefix,
