@@ -16,7 +16,7 @@ from textual.coordinate import Coordinate
 from textual.events import Click
 from textual.reactive import reactive
 from textual.render import measure
-from textual.widgets import DataTable, TabPane
+from textual.widgets import DataTable
 from textual.widgets._data_table import (
     CellDoesNotExist,
     CellKey,
@@ -35,7 +35,6 @@ from .common import (
     NULL_DISPLAY,
     RID,
     SUBSCRIPT_DIGITS,
-    SUPPORTED_FORMATS,
     DtypeConfig,
     format_row,
     get_next_item,
@@ -56,7 +55,6 @@ from .yes_no_screen import (
     FindReplaceScreen,
     FreezeScreen,
     RenameColumnScreen,
-    SaveFileScreen,
     SearchScreen,
 )
 
@@ -223,11 +221,10 @@ class DataFrameTable(DataTable):
         - **!** - ✅ Cast column to boolean
         - **$** - 📝 Cast column to string
 
-        ## 💾 Copy & Save
+        ## 💾 Copy
         - **c** - 📋 Copy cell to clipboard
         - **Ctrl+c** - 📊 Copy column to clipboard
         - **Ctrl+r** - 📝 Copy row to clipboard (tab-separated)
-        - **Ctrl+s** - 💾 Save current tab to file
     """).strip()
 
     # fmt: off
@@ -255,8 +252,6 @@ class DataFrameTable(DataTable):
         ("c", "copy_cell", "Copy cell to clipboard"),
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
         ("ctrl+r", "copy_row", "Copy row to clipboard"),
-        # Save
-        ("ctrl+s", "save_to_file", "Save to file"),
         # Metadata, Detail, Frequency, and Statistics
         ("m", "metadata_shape", "Show metadata for row count and column count"),
         ("M", "metadata_column", "Show metadata for column"),
@@ -743,10 +738,6 @@ class DataFrameTable(DataTable):
     def action_sort_descending(self) -> None:
         """Sort by current column in descending order."""
         self.do_sort_by_column(descending=True)
-
-    def action_save_to_file(self) -> None:
-        """Save the current dataframe to a file."""
-        self.do_save_to_file()
 
     def action_show_frequency(self) -> None:
         """Show frequency distribution for the current column."""
@@ -3755,7 +3746,7 @@ class DataFrameTable(DataTable):
 
         self.notify(f"{message}. Now showing [$success]{len(self.df)}[/] rows.", title="Filter Rows")
 
-    # Copy & Save
+    # Copy
     def do_copy_to_clipboard(self, content: str, message: str) -> None:
         """Copy content to clipboard using pbcopy (macOS) or xclip (Linux).
 
@@ -3778,132 +3769,6 @@ class DataFrameTable(DataTable):
             self.notify(message, title="Copy to Clipboard")
         except FileNotFoundError:
             self.notify("Error copying to clipboard", title="Copy to Clipboard", severity="error", timeout=10)
-
-    def do_save_to_file(self, all_tabs: bool | None = None, task_after_save: str | None = None) -> None:
-        """Open screen to save file."""
-        self._task_after_save = task_after_save
-        tab_count = len(self.app.tabs)
-        save_all = all_tabs is not False
-
-        filepath = Path(self.filename)
-        if save_all:
-            ext = filepath.suffix.lower()
-            if ext in (".xlsx", ".xls"):
-                filename = self.filename
-            else:
-                filename = "all-tabs.xlsx"
-        else:
-            filename = str(filepath.with_stem(self.tabname))
-
-        self.app.push_screen(
-            SaveFileScreen(filename, save_all=save_all, tab_count=tab_count),
-            callback=self.save_to_file,
-        )
-
-    def save_to_file(self, result) -> None:
-        """Handle result from SaveFileScreen."""
-        if result is None:
-            return
-        filename, save_all, overwrite_prompt = result
-        self._save_all = save_all
-
-        # Check if file exists
-        if overwrite_prompt and Path(filename).exists():
-            self._pending_filename = filename
-            self.app.push_screen(
-                ConfirmScreen("File already exists. Overwrite?"),
-                callback=self.confirm_overwrite,
-            )
-        else:
-            self.save_file(filename)
-
-    def confirm_overwrite(self, should_overwrite: bool) -> None:
-        """Handle result from ConfirmScreen."""
-        if should_overwrite:
-            self.save_file(self._pending_filename)
-        else:
-            # Go back to SaveFileScreen to allow user to enter a different name
-            self.app.push_screen(
-                SaveFileScreen(self._pending_filename, save_all=self._save_all),
-                callback=self.save_to_file,
-            )
-
-    def save_file(self, filename: str) -> None:
-        """Actually save the dataframe to a file."""
-        filepath = Path(filename)
-        ext = filepath.suffix.lower()
-        if ext == ".gz":
-            ext = Path(filename).with_suffix("").suffix.lower()
-
-        fmt = ext.removeprefix(".")
-        if fmt not in SUPPORTED_FORMATS:
-            self.notify(
-                f"Unsupported file format [$success]{fmt}[/]. Use [$accent]CSV[/] as fallback. Supported formats: {', '.join(SUPPORTED_FORMATS)}",
-                title="Save to File",
-                severity="warning",
-            )
-            fmt = "csv"
-
-        df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RID))
-        try:
-            if fmt == "csv":
-                df.write_csv(filename)
-            elif fmt in ("tsv", "tab"):
-                df.write_csv(filename, separator="\t")
-            elif fmt in ("xlsx", "xls"):
-                self.save_excel(filename)
-            elif fmt == "json":
-                df.write_json(filename)
-            elif fmt == "ndjson":
-                df.write_ndjson(filename)
-            elif fmt == "parquet":
-                df.write_parquet(filename)
-            else:  # Fallback to CSV
-                df.write_csv(filename)
-
-            # Update current filename
-            self.filename = filename
-
-            # Reset dirty flag after save
-            if self._save_all:
-                tabs: dict[TabPane, DataFrameTable] = self.app.tabs
-                for table in tabs.values():
-                    table.dirty = False
-            else:
-                self.dirty = False
-
-            if hasattr(self, "_task_after_save"):
-                if self._task_after_save == "close_tab":
-                    self.app.do_close_tab()
-                elif self._task_after_save == "quit_app":
-                    self.app.exit()
-
-            # From ConfirmScreen callback, so notify accordingly
-            if self._save_all:
-                self.notify(f"Saved all tabs to [$success]{filename}[/]", title="Save to File")
-            else:
-                self.notify(f"Saved current tab to [$success]{filename}[/]", title="Save to File")
-
-        except Exception as e:
-            self.notify(f"Error saving [$error]{filename}[/]", title="Save to File", severity="error", timeout=10)
-            self.log(f"Error saving file `{filename}`: {str(e)}")
-
-    def save_excel(self, filename: str) -> None:
-        """Save to an Excel file."""
-        import xlsxwriter
-
-        if not self._save_all or len(self.app.tabs) == 1:
-            # Single tab - save directly
-            df = (self.df if self.df_view is None else self.df_view).select(pl.exclude(RID))
-            df.write_excel(filename, worksheet=self.tabname)
-        else:
-            # Multiple tabs - use xlsxwriter to create multiple sheets
-            with xlsxwriter.Workbook(filename) as wb:
-                tabs: dict[TabPane, DataFrameTable] = self.app.tabs
-                for table in tabs.values():
-                    worksheet = wb.add_worksheet(table.tabname)
-                    df = (table.df if table.df_view is None else table.df_view).select(pl.exclude(RID))
-                    df.write_excel(workbook=wb, worksheet=worksheet)
 
     # SQL Interface
     def do_simple_sql(self) -> None:

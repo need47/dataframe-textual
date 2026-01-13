@@ -12,10 +12,10 @@ from textual.theme import BUILTIN_THEMES
 from textual.widgets import TabbedContent, TabPane
 from textual.widgets.tabbed_content import ContentTab, ContentTabs
 
-from .common import Source, get_next_item, load_file
+from .common import RID, SUPPORTED_FORMATS, Source, get_next_item, load_file
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
-from .yes_no_screen import ConfirmScreen, OpenFileScreen, RenameTabScreen
+from .yes_no_screen import ConfirmScreen, OpenFileScreen, RenameTabScreen, SaveFileScreen
 
 
 class DataFrameViewer(App):
@@ -34,7 +34,7 @@ class DataFrameViewer(App):
         - **Ctrl+Q** - 🚪 Force to quit app (discards unsaved changes)
         - **Ctrl+T** - 💾 Save current tab to file
         - **w** - 💾 Save current tab to file (overwrite without prompt)
-        - **Ctrl+A** - 💾 Save all tabs to file
+        - **Ctrl+S** - 💾 Save all tabs to file
         - **W** - 💾 Save all tabs to file (overwrite without prompt)
         - **Ctrl+D** - 📋 Duplicate current tab
         - **Ctrl+O** - 📁 Open a file
@@ -64,7 +64,7 @@ class DataFrameViewer(App):
         ("f1", "toggle_help_panel", "Help"),
         ("ctrl+o", "open_file", "Open File"),
         ("ctrl+t", "save_current_tab", "Save Current Tab"),
-        ("ctrl+a", "save_all_tabs", "Save All Tabs"),
+        ("ctrl+s", "save_all_tabs", "Save All Tabs"),
         ("w", "save_current_tab_overwrite", "Save Current Tab (overwrite)"),
         ("W", "save_all_tabs_overwrite", "Save All Tabs (overwrite)"),
         ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
@@ -101,6 +101,22 @@ class DataFrameViewer(App):
         self.sources = sources
         self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel = None
+
+    @property
+    def active_table(self) -> DataFrameTable | None:
+        """Get the currently active DataFrameTable widget.
+
+        Returns:
+            The active DataFrameTable widget, or None if not found.
+        """
+        try:
+            tabbed: TabbedContent = self.query_one(TabbedContent)
+            if active_pane := tabbed.active_pane:
+                return active_pane.query_one(DataFrameTable)
+        except (NoMatches, AttributeError):
+            self.notify("No active table found", title="Locate Table", severity="error", timeout=10)
+
+        return None
 
     def compose(self) -> ComposeResult:
         """Compose the application widget structure.
@@ -151,7 +167,7 @@ class DataFrameViewer(App):
         """
         if len(self.tabs) == 1:
             self.query_one(ContentTabs).display = False
-            self.get_active_table().focus()
+            self.active_table.focus()
 
     def on_ready(self) -> None:
         """Called when the app is ready."""
@@ -201,13 +217,11 @@ class DataFrameViewer(App):
             event: The tab activated event containing the activated tab pane.
         """
         # Focus the table in the newly activated tab
-        if table := self.get_active_table():
+        if table := self.active_table:
             table.focus()
-        else:
-            return
 
-        if table.loaded_rows == 0:
-            table.setup_table()
+            if table.loaded_rows == 0:
+                table.setup_table()
 
     def action_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.
@@ -245,41 +259,43 @@ class DataFrameViewer(App):
         self.do_close_all_tabs()
 
     def action_save_current_tab(self) -> None:
-        """Save the currently active tab to file.
-
-        Opens the save dialog for the active tab's DataFrameTable to save its data.
-        """
-        if table := self.get_active_table():
-            table.do_save_to_file(all_tabs=False)
+        """Open a save dialog to save current tab to file."""
+        self.do_save_to_file(all_tabs=False)
 
     def action_save_all_tabs(self) -> None:
-        """Save all open tabs to their respective files.
-
-        Iterates through all DataFrameTable widgets and opens the save dialog for each.
-        """
-        if table := self.get_active_table():
-            table.do_save_to_file(all_tabs=True)
+        """Open a save dialog to save all tabs to file."""
+        self.do_save_to_file(all_tabs=True)
 
     def action_save_current_tab_overwrite(self) -> None:
-        """Save the currently active tab to file, overwriting if it exists."""
-        if table := self.get_active_table():
+        """Save current tab to file, overwrite if exists."""
+        if table := self.active_table:
             if len(self.tabs) > 1:
-                filepath = Path(table.filename)
-                filename = filepath.with_stem(table.tabname)
+                filenames = {t.filename for t in self.tabs.values()}
+                if len(filenames) > 1:
+                    # Different filenames across tabs
+                    filepath = Path(table.filename)
+                    filename = filepath.with_stem(table.tabname)
+                else:
+                    filename = table.filename
             else:
                 filename = table.filename
-            table.save_to_file((filename, False, False))
+
+            self.save_to_file((filename, False, False))
 
     def action_save_all_tabs_overwrite(self) -> None:
-        """Save all open tabs to their respective files, overwriting if they exist."""
-        if table := self.get_active_table():
-            filepath = Path(table.filename)
-            if filepath.suffix.lower() in [".xlsx", ".xls"]:
-                filename = table.filename
+        """Save all tabs to file, overwrite if exists."""
+        if table := self.active_table:
+            if len(self.tabs) > 1:
+                filenames = {t.filename for t in self.tabs.values()}
+                if len(filenames) > 1:
+                    # Different filenames across tabs - use generic name
+                    filename = "all-tabs.xlsx"
+                else:
+                    filename = table.filename
             else:
-                filename = "all-tabs.xlsx"
+                filename = table.filename
 
-            table.save_to_file((filename, True, False))
+            self.save_to_file((filename, True, False))
 
     def action_duplicate_tab(self) -> None:
         """Duplicate the currently active tab.
@@ -295,7 +311,7 @@ class DataFrameViewer(App):
         Creates a copy of the current tab with the same data and filename.
         The new tab is named with '_copy' suffix and inserted after the current tab.
         """
-        if not (table := self.get_active_table()):
+        if not (table := self.active_table):
             return
 
         # Get current tab info
@@ -366,24 +382,6 @@ class DataFrameViewer(App):
         tabs.display = not tabs.display
         # status = "shown" if tabs.display else "hidden"
         # self.notify(f"Tab bar [$success]{status}[/]", title="Toggle Tab Bar")
-
-    def get_active_table(self) -> DataFrameTable | None:
-        """Get the currently active DataFrameTable widget.
-
-        Retrieves the table from the currently active tab. Returns None if no
-        table is found or an error occurs.
-
-        Returns:
-            The active DataFrameTable widget, or None if not found.
-        """
-        try:
-            tabbed: TabbedContent = self.query_one(TabbedContent)
-            if active_pane := tabbed.active_pane:
-                return active_pane.query_one(DataFrameTable)
-        except (NoMatches, AttributeError):
-            self.notify("No active table found", title="Locate Table", severity="error", timeout=10)
-
-        return None
 
     def get_unique_tabname(self, tab_name: str) -> str:
         """Generate a unique tab name based on the given base name.
@@ -495,17 +493,14 @@ class DataFrameViewer(App):
         can be closed, the application exits instead.
         """
         try:
-            if not (active_pane := self.tabbed.active_pane):
-                return
-
-            if not (active_table := self.tabs.get(active_pane)):
+            if not (table := self.active_table):
                 return
 
             def _on_save_confirm(result: bool) -> None:
                 """Handle the "save before closing?" confirmation."""
                 if result:
                     # User wants to save - close after save dialog opens
-                    active_table.do_save_to_file(task_after_save="close_tab")
+                    self.do_save_to_file(all_tabs=False, task_after_save="close_tab")
                 elif result is None:
                     # User cancelled - do nothing
                     return
@@ -513,7 +508,7 @@ class DataFrameViewer(App):
                     # User wants to discard - close immediately
                     self.close_tab()
 
-            if active_table.dirty:
+            if table.dirty:
                 self.push_screen(
                     ConfirmScreen(
                         "Close Tab",
@@ -560,7 +555,7 @@ class DataFrameViewer(App):
 
             def _save_and_quit(result: bool) -> None:
                 if result:
-                    self.get_active_table()._save_to_file(task_after_save="quit_app")
+                    self.do_save_to_file(all_tabs=True, task_after_save="quit_app")
                 elif result is None:
                     # User cancelled - do nothing
                     return
@@ -568,15 +563,17 @@ class DataFrameViewer(App):
                     # User wants to discard - quit immediately
                     self.exit()
 
+            tab_count = len(self.tabs)
             tab_list = "\n".join(f"  - [$warning]{name}[/]" for name in dirty_tabnames)
             label = (
                 f"The following tabs have unsaved changes:\n\n{tab_list}\n\nSave all changes?"
                 if len(dirty_tabnames) > 1
                 else f"The tab [$warning]{dirty_tabnames[0]}[/] has unsaved changes.\n\nSave changes?"
             )
+
             self.push_screen(
                 ConfirmScreen(
-                    "Close All Tabs" if len(self.tabs) > 1 else "Close Tab",
+                    f"Close {tab_count} Tabs" if tab_count > 1 else "Close Tab",
                     label=label,
                     yes="Save",
                     maybe="Discard",
@@ -631,3 +628,141 @@ class DataFrameViewer(App):
                 break
 
         # self.notify(f"Renamed tab [$accent]{old_name}[/] to [$success]{new_name}[/]", title="Rename Tab")
+
+    def do_save_to_file(self, all_tabs: bool = True, task_after_save: str | None = None) -> None:
+        """Open screen to save file."""
+        if not (table := self.active_table):
+            return
+
+        self._task_after_save = task_after_save
+        tab_count = len(self.tabs)
+        save_all = all_tabs is True and tab_count > 1
+
+        if save_all:
+            filenames = {t.filename for t in self.tabs.values()}
+            if len(filenames) > 1:
+                # Different filenames across tabs - use generic name
+                filename = "all-tabs.xlsx"
+            else:
+                filename = table.filename
+        elif tab_count == 1:
+            filename = table.filename
+        else:
+            filepath = Path(table.filename)
+            filename = str(filepath.with_stem(table.tabname))
+
+        self.push_screen(
+            SaveFileScreen(filename, save_all=save_all, tab_count=tab_count),
+            callback=self.save_to_file,
+        )
+
+    def save_to_file(self, result) -> None:
+        """Handle result from SaveFileScreen."""
+        if result is None:
+            return
+        filename, save_all, overwrite_prompt = result
+        self._save_all = save_all
+
+        # Check if file exists
+        if overwrite_prompt and Path(filename).exists():
+            self._pending_filename = filename
+            self.push_screen(
+                ConfirmScreen("File already exists. Overwrite?"),
+                callback=self.confirm_overwrite,
+            )
+        else:
+            self.save_file(filename)
+
+    def confirm_overwrite(self, should_overwrite: bool) -> None:
+        """Handle result from ConfirmScreen."""
+        if should_overwrite:
+            self.save_file(self._pending_filename)
+        else:
+            # Go back to SaveFileScreen to allow user to enter a different name
+            self.push_screen(
+                SaveFileScreen(self._pending_filename, save_all=self._save_all),
+                callback=self.save_to_file,
+            )
+
+    def save_file(self, filename: str) -> None:
+        """Actually save to a file."""
+        if not (table := self.active_table):
+            return
+
+        filepath = Path(filename)
+        ext = filepath.suffix.lower()
+        if ext == ".gz":
+            ext = Path(filename).with_suffix("").suffix.lower()
+
+        fmt = ext.removeprefix(".")
+        if fmt not in SUPPORTED_FORMATS:
+            self.notify(
+                f"Unsupported file format [$success]{fmt}[/]. Use [$accent]CSV[/] as fallback. Supported formats: {', '.join(SUPPORTED_FORMATS)}",
+                title="Save to File",
+                severity="warning",
+            )
+            fmt = "csv"
+
+        df = (table.df if table.df_view is None else table.df_view).select(pl.exclude(RID))
+        try:
+            if fmt == "csv":
+                df.write_csv(filename)
+            elif fmt in ("tsv", "tab"):
+                df.write_csv(filename, separator="\t")
+            elif fmt == "psv":
+                df.write_csv(filename, separator="|")
+            elif fmt in ("xlsx", "xls"):
+                self.save_excel(filename)
+            elif fmt == "json":
+                df.write_json(filename)
+            elif fmt == "ndjson":
+                df.write_ndjson(filename)
+            elif fmt == "parquet":
+                df.write_parquet(filename)
+            else:  # Fallback to CSV
+                df.write_csv(filename)
+
+            # Reset dirty flag and update filename after save
+            if self._save_all:
+                for table in self.tabs.values():
+                    table.dirty = False
+                    table.filename = filename
+            else:
+                table.dirty = False
+                table.filename = filename
+
+            # From ConfirmScreen callback, so notify accordingly
+            if self._save_all:
+                self.notify(f"Saved all tabs to [$success]{filename}[/]", title="Save to File")
+            else:
+                self.notify(f"Saved current tab to [$success]{filename}[/]", title="Save to File")
+
+            if hasattr(self, "_task_after_save"):
+                if self._task_after_save == "close_tab":
+                    self.do_close_tab()
+                elif self._task_after_save == "quit_app":
+                    self.exit()
+
+        except Exception as e:
+            self.notify(f"Error saving [$error]{filename}[/]", title="Save to File", severity="error", timeout=10)
+            self.log(f"Error saving file `{filename}`: {str(e)}")
+
+    def save_excel(self, filename: str) -> None:
+        """Save to an Excel file."""
+        import xlsxwriter
+
+        if not self._save_all or len(self.tabs) == 1:
+            # Single tab - save directly
+            if not (table := self.active_table):
+                return
+
+            df = (table.df if table.df_view is None else table.df_view).select(pl.exclude(RID))
+            df.write_excel(filename, worksheet=table.tabname)
+        else:
+            # Multiple tabs - use xlsxwriter to create multiple sheets
+            with xlsxwriter.Workbook(filename) as wb:
+                tabs: dict[TabPane, DataFrameTable] = self.tabs
+                for table in tabs.values():
+                    worksheet = wb.add_worksheet(table.tabname)
+                    df = (table.df if table.df_view is None else table.df_view).select(pl.exclude(RID))
+                    df.write_excel(workbook=wb, worksheet=worksheet)
