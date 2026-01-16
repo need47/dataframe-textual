@@ -2198,9 +2198,8 @@ class DataFrameTable(DataTable):
 
             # Also update the view if applicable
             if self.df_view is not None:
-                self.df_view = self.df_view.with_columns(
-                    pl.when(pl.col(col_name) == value).then(pl.lit(None)).otherwise(pl.col(col_name)).alias(col_name)
-                )
+                lf_updated = self.df.lazy().select(RID, pl.col(col_name))
+                self.df_view = self.df_view.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
 
             # Recreate table for display
             self.setup_table()
