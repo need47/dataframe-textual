@@ -207,6 +207,7 @@ class DataFrameTable(DataTable):
         - **X** - ❌ Delete row and those below
         - **Ctrl+X** - ❌ Delete row and those above
         - **delete** - ❌ Clear current cell (set to NULL)
+        - **Shift+Delete** - ❌ Clear current column (set matching cells to NULL)
         - **-** - ❌ Delete current column
         - **d** - 📋 Duplicate current column
         - **D** - 📋 Duplicate current row
@@ -285,6 +286,7 @@ class DataFrameTable(DataTable):
         ("R", "replace_global", "Replace global"),  # `Shift+R`
         # Delete
         ("delete", "clear_cell", "Clear cell"),
+        ("shift+delete", "clear_column", "Clear cells in current column that match cursor value"),  # `Shift+Delete`
         ("minus", "delete_column", "Delete column"),  # `-`
         ("x", "delete_row", "Delete row"),
         ("X", "delete_row_and_below", "Delete row and those below"),
@@ -794,6 +796,10 @@ class DataFrameTable(DataTable):
     def action_clear_cell(self) -> None:
         """Clear the current cell (set to None)."""
         self.do_clear_cell()
+
+    def action_clear_column(self) -> None:
+        """Clear cells in the current column that match the cursor value."""
+        self.do_clear_column()
 
     def action_select_row(self) -> None:
         """Select rows with cursor value in the current column."""
@@ -2043,25 +2049,10 @@ class DataFrameTable(DataTable):
             # Also update the view if applicable
             # Update the value of col_name in df_view using the value of col_name from df based on RID mapping between them
             if self.df_view is not None:
-                # Get updated column from df for rows that exist in df_view
-                col_updated = f"^_{col_name}_^"
-                col_exists = "^_exists_^"
-                lf_updated = self.df.lazy().select(
-                    RID, pl.col(col_name).alias(col_updated), pl.lit(True).alias(col_exists)
-                )
-                # Join and use when/then/otherwise to handle all updates including NULLs
-                self.df_view = (
-                    self.df_view.lazy()
-                    .join(lf_updated, on=RID, how="left")
-                    .with_columns(
-                        pl.when(pl.col(col_exists))
-                        .then(pl.col(col_updated))
-                        .otherwise(pl.col(col_name))
-                        .alias(col_name)
-                    )
-                    .drop(col_updated, col_exists)
-                    .collect()
-                )
+                # Get updated column from df
+                lf_updated = self.df.lazy().select(RID, pl.col(col_name))
+                # Update df_view by joining on RID
+                self.df_view = self.df_view.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
         except Exception as e:
             self.notify(
                 f"Error applying expression: [$error]{term}[/] to column [$accent]{col_name}[/]",
@@ -2147,18 +2138,26 @@ class DataFrameTable(DataTable):
 
         # Update the cell to None in the dataframe
         try:
-            self.df = self.df.with_columns(
-                pl.when(pl.arange(0, len(self.df)) == ridx)
-                .then(pl.lit(None))
-                .otherwise(pl.col(col_name))
-                .alias(col_name)
+            self.df = (
+                self.df.lazy()
+                .with_columns(
+                    pl.when(pl.arange(0, len(self.df)) == ridx)
+                    .then(pl.lit(None))
+                    .otherwise(pl.col(col_name))
+                    .alias(col_name)
+                )
+                .collect()
             )
 
             # Also update the view if applicable
             if self.df_view is not None:
                 ridx_view = self.df.item(ridx, self.df.columns.index(RID))
-                self.df_view = self.df_view.with_columns(
-                    pl.when(pl.col(RID) == ridx_view).then(pl.lit(None)).otherwise(pl.col(col_name)).alias(col_name)
+                self.df_view = (
+                    self.df_view.lazy()
+                    .with_columns(
+                        pl.when(pl.col(RID) == ridx_view).then(pl.lit(None)).otherwise(pl.col(col_name)).alias(col_name)
+                    )
+                    .collect()
                 )
 
             # Update the display
@@ -2177,7 +2176,44 @@ class DataFrameTable(DataTable):
                 timeout=10,
             )
             self.log(f"Error clearing cell ({ridx}, {col_name}): {str(e)}")
-            raise e
+
+    def do_clear_column(self) -> None:
+        """Clear the current column by setting all its values to None."""
+        col_idx = self.cursor_column
+        col_name = self.cursor_col_name
+        value = self.cursor_value
+
+        # Add to history
+        self.add_history(f"Cleared column [$success]{col_name}[/]", dirty=True)
+
+        try:
+            # Update the entire column to None in the dataframe
+            self.df = (
+                self.df.lazy()
+                .with_columns(
+                    pl.when(pl.col(col_name) == value).then(pl.lit(None)).otherwise(pl.col(col_name)).alias(col_name)
+                )
+                .collect()
+            )
+
+            # Also update the view if applicable
+            if self.df_view is not None:
+                self.df_view = self.df_view.with_columns(
+                    pl.when(pl.col(col_name) == value).then(pl.lit(None)).otherwise(pl.col(col_name)).alias(col_name)
+                )
+
+            # Recreate table for display
+            self.setup_table()
+
+            # Move cursor to the cleared column
+            self.move_cursor(column=col_idx)
+
+            # self.notify(f"Cleared column [$success]{col_name}[/]", title="Clear Column")
+        except Exception as e:
+            self.notify(
+                f"Error clearing column [$error]{col_name}[/]", title="Clear Column", severity="error", timeout=10
+            )
+            self.log(f"Error clearing column `{col_name}`: {str(e)}")
 
     def do_add_column(self, col_name: str = None) -> None:
         """Add acolumn after the current column."""
@@ -3385,18 +3421,23 @@ class DataFrameTable(DataTable):
             # Only applicable to string columns for substring matches
             if dtype == pl.String and not state.match_whole:
                 term_find = f"(?i){state.term_find}" if state.match_nocase else state.term_find
+                new_value = (
+                    pl.lit(None)
+                    if state.term_replace == NULL
+                    else pl.col(col_name).str.replace_all(term_find, state.term_replace)
+                )
                 self.df = self.df.with_columns(
-                    pl.when(mask)
-                    .then(pl.col(col_name).str.replace_all(term_find, state.term_replace))
-                    .otherwise(pl.col(col_name))
-                    .alias(col_name)
+                    pl.when(mask).then(new_value).otherwise(pl.col(col_name)).alias(col_name)
                 )
             else:
-                # Try to convert replacement value to column dtype
-                try:
-                    value = DtypeConfig(dtype).convert(state.term_replace)
-                except Exception:
-                    value = state.term_replace
+                if state.term_replace == NULL:
+                    value = None
+                else:
+                    # Try to convert replacement value to column dtype
+                    try:
+                        value = DtypeConfig(dtype).convert(state.term_replace)
+                    except Exception:
+                        value = state.term_replace
 
                 self.df = self.df.with_columns(
                     pl.when(mask).then(pl.lit(value)).otherwise(pl.col(col_name)).alias(col_name)
@@ -3404,15 +3445,8 @@ class DataFrameTable(DataTable):
 
             # Also update the view if applicable
             if self.df_view is not None:
-                col_updated = f"^_{col_name}_^"
-                lf_updated = self.df.lazy().filter(mask).select(pl.col(col_name).alias(col_updated), pl.col(RID))
-                self.df_view = (
-                    self.df_view.lazy()
-                    .join(lf_updated, on=RID, how="left")
-                    .with_columns(pl.coalesce(pl.col(col_updated), pl.col(col_name)).alias(col_name))
-                    .drop(col_updated)
-                    .collect()
-                )
+                lf_updated = self.df.lazy().filter(mask).select(pl.col(RID), pl.col(col_name))
+                self.df_view = self.df_view.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
 
             state.replaced_occurrence += len(ridxs)
 
@@ -3491,9 +3525,14 @@ class DataFrameTable(DataTable):
             # Only applicable to string columns for substring matches
             if dtype == pl.String and not state.match_whole:
                 term_find = f"(?i){state.term_find}" if state.match_nocase else state.term_find
+                new_value = (
+                    pl.lit(None)
+                    if state.term_replace == NULL
+                    else pl.col(col_name).str.replace_all(term_find, state.term_replace)
+                )
                 self.df = self.df.with_columns(
                     pl.when(pl.arange(0, len(self.df)) == ridx)
-                    .then(pl.col(col_name).str.replace_all(term_find, state.term_replace))
+                    .then(new_value)
                     .otherwise(pl.col(col_name))
                     .alias(col_name)
                 )
@@ -3507,11 +3546,14 @@ class DataFrameTable(DataTable):
                         .alias(col_name)
                     )
             else:
-                # try to convert replacement value to column dtype
-                try:
-                    value = DtypeConfig(dtype).convert(state.term_replace)
-                except Exception:
-                    value = state.term_replace
+                if state.term_replace == NULL:
+                    value = None
+                else:
+                    # try to convert replacement value to column dtype
+                    try:
+                        value = DtypeConfig(dtype).convert(state.term_replace)
+                    except Exception:
+                        value = state.term_replace
 
                 self.df = self.df.with_columns(
                     pl.when(pl.arange(0, len(self.df)) == ridx)
@@ -3539,6 +3581,8 @@ class DataFrameTable(DataTable):
         if not state.done:
             # Get the new value of the current cell after replacement
             new_cell_value = self.df.item(ridx, cidx)
+            if new_cell_value is None:
+                new_cell_value = NULL_DISPLAY
             row_key = str(ridx)
             col_key = col_name
             self.update_cell(

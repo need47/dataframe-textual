@@ -275,7 +275,8 @@ zcat compressed_data.csv.gz | dv -f csv
 | Key | Action |
 |-----|--------|
 | `Double-click` | Edit cell or rename column header |
-| `delete` | Clear current cell (set to NULL) |
+| `Delete` | Clear current cell (set to NULL) |
+| `Shift+Delete` | Clear current column (set matching cells to NULL) |
 | `e` | Edit current cell (respects data type) |
 | `E` | Edit entire column with value/expression |
 | `a` | Add empty column after current |
