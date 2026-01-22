@@ -145,14 +145,15 @@ options:
   -t, --truncate-ragged-lines
                         Truncate ragged lines when reading CSV/TSV
   -E, --ignore-errors   Ignore errors when reading CSV/TSV
-  -c, --comment-prefix [COMMENT_PREFIX]
-                        Comment lines are skipped when reading CSV/TSV
-  -q, --quote-char [QUOTE_CHAR]
-                        Quote character for reading CSV/TSV
-  -l, --skip-lines SKIP_LINES
-                        Skip lines when reading CSV/TSV
-  -a, --skip-rows-after-header SKIP_ROWS_AFTER_HEADER
-                        Skip rows after header when reading CSV/TSV
+  -c, --comment-prefix [PREFIX]
+                        Comment lines starting with `PREFIX` are skipped when reading CSV/TSV
+  -q, --quote-char [C]
+                        Use `C` as quote character for reading CSV/TSV
+  -L, --skip-lines N
+                        Skip first N lines when reading CSV/TSV
+  -A, --skip-rows-after-header N
+                        Skip N rows after header when reading CSV/TSV
+  -N, --n-rows N        Stop after reading N rows from CSV/TSV
   -n, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
 ```

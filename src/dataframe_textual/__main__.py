@@ -51,15 +51,34 @@ def cli() -> argparse.Namespace:
     )
     parser.add_argument("-E", "--ignore-errors", action="store_true", help="Ignore errors when reading CSV/TSV")
     parser.add_argument(
-        "-c", "--comment-prefix", nargs="?", const="#", help="Comment lines are skipped when reading CSV/TSV"
+        "-c",
+        "--comment-prefix",
+        metavar="PREFIX",
+        nargs="?",
+        const="#",
+        help="Comment lines starting with `PREFIX` are skipped when reading CSV/TSV",
     )
     parser.add_argument(
-        "-q", "--quote-char", nargs="?", const=None, default='"', help="Quote character for reading CSV/TSV"
+        "-q",
+        "--quote-char",
+        metavar="C",
+        nargs="?",
+        const=None,
+        default='"',
+        help="Use `C` as quote character for reading CSV/TSV",
     )
-    parser.add_argument("-l", "--skip-lines", type=int, default=0, help="Skip lines when reading CSV/TSV")
     parser.add_argument(
-        "-a", "--skip-rows-after-header", type=int, default=0, help="Skip rows after header when reading CSV/TSV"
+        "-L", "--skip-lines", metavar="N", type=int, default=0, help="Skip first N lines when reading CSV/TSV"
     )
+    parser.add_argument(
+        "-A",
+        "--skip-rows-after-header",
+        metavar="N",
+        type=int,
+        default=0,
+        help="Skip N rows after header when reading CSV/TSV",
+    )
+    parser.add_argument("-N", "--n-rows", metavar="N", type=int, help="Stop after reading N rows from CSV/TSV")
     parser.add_argument("-n", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
 
     args = parser.parse_args()
@@ -98,6 +117,7 @@ def main() -> None:
         null_values=args.null,
         ignore_errors=args.ignore_errors,
         truncate_ragged_lines=args.truncate_ragged_lines,
+        n_rows=args.n_rows,
     )
     app = DataFrameViewer(*sources)
     app.run()

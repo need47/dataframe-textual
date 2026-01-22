@@ -485,6 +485,7 @@ def load_dataframe(
     null_values: list[str] | None = None,
     ignore_errors: bool = False,
     truncate_ragged_lines: bool = False,
+    n_rows: int | None = None,
 ) -> list[Source]:
     """Load DataFrames from file specifications.
 
@@ -502,6 +503,8 @@ def load_dataframe(
         skip_rows_after_header: Number of rows to skip after header. Defaults to 0.
         null_values: List of values to interpret as null when reading CSV/TSV files. Defaults to None.
         ignore_errors: Whether to ignore errors when reading CSV/TSV files. Defaults to False.
+        truncate_ragged_lines: Whether to truncate ragged lines when reading CSV/TSV files. Defaults to False.
+        n_rows: Number of rows to read from CSV/TSV files. Defaults to None (read all rows).
 
     Returns:
         List of `Source` objects.
@@ -551,6 +554,7 @@ def load_dataframe(
                 null_values=null_values,
                 ignore_errors=ignore_errors,
                 truncate_ragged_lines=truncate_ragged_lines,
+                n_rows=n_rows,
             )
         )
 
@@ -635,6 +639,7 @@ def load_file(
     null_values: list[str] | None = None,
     ignore_errors: bool = False,
     truncate_ragged_lines: bool = False,
+    n_rows: int | None = None,
 ) -> list[Source]:
     """Load a single file.
 
@@ -660,6 +665,8 @@ def load_file(
         schema_overrides: Optional dictionary of column name to Polars data type to override inferred schema.
         null_values: List of values to interpret as null when reading CSV/TSV files. Defaults to None.
         ignore_errors: Whether to ignore errors when reading CSV/TSV files.
+        truncate_ragged_lines: Whether to truncate ragged lines when reading CSV/TSV files. Defaults to False.
+        n_rows: Number of rows to read from CSV/TSV files. Defaults to None (read all rows).
 
     Returns:
         List of `Source` objects.
@@ -684,6 +691,7 @@ def load_file(
             null_values=null_values,
             ignore_errors=ignore_errors,
             truncate_ragged_lines=truncate_ragged_lines,
+            n_rows=n_rows,
         )
         data.append(Source(lf, filename, filepath.stem))
     elif file_format in ("xlsx", "xls"):
@@ -740,6 +748,8 @@ def load_file(
             schema_overrides=schema_overrides,
             null_values=null_values,
             ignore_errors=ignore_errors,
+            truncate_ragged_lines=truncate_ragged_lines,
+            n_rows=n_rows,
         )
 
     return data
