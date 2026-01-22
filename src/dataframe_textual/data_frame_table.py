@@ -2997,7 +2997,7 @@ class DataFrameTable(DataTable):
             # self.notify("No selections to clear", title="Clear Selections and Matches", severity="warning")
             return
 
-        row_count = len(self.selected_rows | set(self.matches.keys()))
+        # row_count = len(self.selected_rows | set(self.matches.keys()))
 
         # Add to history
         self.add_history("Cleared all selections and matches")
