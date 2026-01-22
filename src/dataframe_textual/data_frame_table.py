@@ -1755,13 +1755,14 @@ class DataFrameTable(DataTable):
             max_width = label_width
 
             # Scan through all loaded rows that are visible to find max width
-            for row_idx in range(self.loaded_rows):
-                cell_value = str(self.df.item(row_idx, col_idx))
-                cell_width = measure(self.app.console, cell_value, 1)
+            for row_start, row_end in self.loaded_ranges:
+                for row_idx in range(row_start, row_end):
+                    cell_value = str(self.df.item(row_idx, col_idx))
+                    cell_width = measure(self.app.console, cell_value, 1)
 
-                if cell_width > max_width:
-                    need_expand = True
-                max_width = max(max_width, cell_width)
+                    if cell_width > max_width:
+                        need_expand = True
+                        max_width = cell_width
 
             if not need_expand:
                 return
@@ -2999,7 +3000,7 @@ class DataFrameTable(DataTable):
         row_count = len(self.selected_rows | set(self.matches.keys()))
 
         # Add to history
-        self.add_history("Cleared all selected rows")
+        self.add_history("Cleared all selections and matches")
 
         # Clear all selections
         self.selected_rows = set()
@@ -3008,7 +3009,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        self.notify(f"Cleared selections for [$success]{row_count}[/] rows", title="Clear Selections and Matches")
+        # self.notify(f"Cleared selections for [$success]{row_count}[/] rows", title="Clear Selections and Matches")
 
     # Find & Replace
     def find_matches(
