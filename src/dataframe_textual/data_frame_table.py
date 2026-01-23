@@ -188,9 +188,10 @@ class DataFrameTable(DataTable):
         - *(Supports case-insensitive & whole-word matching)*
 
         ## 👁️ View & Filter
-        - **"** - 📍 Filter selected rows (removes others)
-        - **v** - 👁️ View selected rows (hides others)
-        - **V** - 🔧 View selected rows matching expression (hides others)
+        - **"** - 📍 Filter selected rows (others removed)
+        - **.** - 👁️ View rows with non-null values in current column (others hidden)
+        - **v** - 👁️ View selected rows (others hidden)
+        - **V** - 🔧 View selected rows matching expression (others hidden)
 
         ## 🔍 SQL Interface
         - **l** - 💬 Open simple SQL interface (select columns & where clause)
@@ -264,6 +265,7 @@ class DataFrameTable(DataTable):
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
         # View & Filter
+        ("full_stop", "view_rows_non_null", "View rows with non-null values in current column"),
         ("v", "view_rows", "View selected rows"),
         ("V", "view_rows_expr", "View selected rows matching expression"),
         ("quotation_mark", "filter_rows", "Filter selected rows"),  # `"`
@@ -760,6 +762,10 @@ class DataFrameTable(DataTable):
     def action_metadata_column(self) -> None:
         """Show metadata for the current column."""
         self.do_metadata_column()
+
+    def action_view_rows_non_null(self) -> None:
+        """View rows with non-null values in the current column."""
+        self.do_view_rows_non_null()
 
     def action_view_rows(self) -> None:
         """View rows by current cell value."""
@@ -3603,6 +3609,15 @@ class DataFrameTable(DataTable):
         self.show_next_replace_confirmation()
 
     # View & Filter
+    def do_view_rows_non_null(self) -> None:
+        """View non-null rows based on the cursor column."""
+        cidx = self.cursor_col_idx
+        col_name = self.cursor_col_name
+
+        term = pl.col(col_name).is_not_null()
+
+        self.view_rows((term, cidx, False, True))
+
     def do_view_rows(self) -> None:
         """View rows.
 
@@ -3712,7 +3727,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self.add_history(f"Filtered by expression [$success]{expr_str}[/]")
+        self.add_history(f"Viewed rows by expression [$success]{expr_str}[/]")
 
         ok_rids = set(df_filtered[RID])
 
@@ -3734,7 +3749,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        self.notify(f"Filtered to [$success]{matched_count}[/] matching row(s)", title="View Rows")
+        self.notify(f"Showing [$success]{matched_count}[/] matching row(s)", title="View Rows")
 
     def do_filter_rows(self) -> None:
         """Filter rows.

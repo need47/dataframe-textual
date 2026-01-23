@@ -319,6 +319,7 @@ zcat compressed_data.csv.gz | dv -f csv
 | Key | Action |
 |-----|--------|
 | `"` (quote) | Filter selected rows (others removed) |
+| `.` | View rows with non-null values in current column (others hidden) |
 | `v` | View selected rows (others hidden) |
 | `V` | View selected by expression (others hidden) |
 
