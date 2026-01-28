@@ -161,10 +161,21 @@ class DataFrameTable(DataTable):
         - **,** - 🔢 Toggle thousand separator for numeric display
         - **K** - 🔄 Cycle cursor (cell → row → column → cell)
 
-        ## ↕️ Sorting
-        - **[** - 🔼 Sort column ascending
-        - **]** - 🔽 Sort column descending
-        - *(Multi-column sort supported)*
+        ## ✏️ Editing
+        - **Double-click** - ✍️ Edit cell or rename column header
+        - **e** - ✍️ Edit current cell
+        - **E** - 📊 Edit entire column with expression
+        - **a** - ➕ Add empty column after current
+        - **A** - ➕ Add column with name and optional expression
+        - **@** - 🔗 Add a new link column from template
+        - **x** - ❌ Delete current row
+        - **X** - ❌ Delete row and those below
+        - **Ctrl+X** - ❌ Delete row and those above
+        - **delete** - ❌ Clear current cell (set to NULL)
+        - **Shift+Delete** - ❌ Clear current column (set matching cells to NULL)
+        - **-** - ❌ Delete current column
+        - **d** - 📋 Duplicate current column
+        - **D** - 📋 Duplicate current row
 
         ## ✅ Row Selection
         - **\\\\** - ✅ Select rows with cell matches or those matching cursor value in current column
@@ -193,25 +204,10 @@ class DataFrameTable(DataTable):
         - **v** - 👁️ View selected rows (others hidden)
         - **V** - 🔧 View selected rows matching expression (others hidden)
 
-        ## 🔍 SQL Interface
-        - **l** - 💬 Open simple SQL interface (select columns & where clause)
-        - **L** - 🔎 Open advanced SQL interface (full SQL queries)
-
-        ## ✏️ Editing
-        - **Double-click** - ✍️ Edit cell or rename column header
-        - **e** - ✍️ Edit current cell
-        - **E** - 📊 Edit entire column with expression
-        - **a** - ➕ Add empty column after current
-        - **A** - ➕ Add column with name and optional expression
-        - **@** - 🔗 Add a new link column from template
-        - **x** - ❌ Delete current row
-        - **X** - ❌ Delete row and those below
-        - **Ctrl+X** - ❌ Delete row and those above
-        - **delete** - ❌ Clear current cell (set to NULL)
-        - **Shift+Delete** - ❌ Clear current column (set matching cells to NULL)
-        - **-** - ❌ Delete current column
-        - **d** - 📋 Duplicate current column
-        - **D** - 📋 Duplicate current row
+        ## ↕️ Sorting
+        - **[** - 🔼 Sort column ascending
+        - **]** - 🔽 Sort column descending
+        - *(Multi-column sort supported)*
 
         ## 🎯 Reorder
         - **Shift+↑↓** - ⬆️⬇️ Move row up/down
@@ -227,6 +223,10 @@ class DataFrameTable(DataTable):
         - **c** - 📋 Copy cell to clipboard
         - **Ctrl+c** - 📊 Copy column to clipboard
         - **Ctrl+r** - 📝 Copy row to clipboard (tab-separated)
+
+        ## 🔍 SQL Interface
+        - **l** - 💬 Open simple SQL interface (select columns & where clause)
+        - **L** - 🔎 Open advanced SQL interface (full SQL queries)
     """).strip()
 
     # fmt: off

@@ -271,7 +271,7 @@ zcat compressed_data.csv.gz | dv -f csv
 | `h` | Hide current column |
 | `H` | Show all hidden rows/columns |
 
-#### Data Editing
+#### Editing
 
 | Key | Action |
 |-----|--------|
@@ -323,13 +323,6 @@ zcat compressed_data.csv.gz | dv -f csv
 | `v` | View selected rows (others hidden) |
 | `V` | View selected by expression (others hidden) |
 
-#### SQL Interface
-
-| Key | Action |
-|-----|--------|
-| `l` | Simple SQL interface (select columns & where clause) |
-| `L` | Advanced SQL interface (full SQL query with syntax highlight) |
-
 #### Sorting (supporting multiple columns)
 
 | Key | Action |
@@ -362,6 +355,13 @@ zcat compressed_data.csv.gz | dv -f csv
 | `c` | Copy current cell to clipboard |
 | `Ctrl+C` | Copy column to clipboard |
 | `Ctrl+R` | Copy row to clipboard (tab-separated) |
+
+#### SQL Interface
+
+| Key | Action |
+|-----|--------|
+| `l` | Simple SQL interface (select columns & where clause) |
+| `L` | Advanced SQL interface (full SQL query with syntax highlight) |
 
 ## Features in Detail
 
@@ -588,7 +588,7 @@ This is useful for:
 - Quick statistical summaries without external tools
 - Comparing statistics across columns
 
-### 11. Data Editing
+### 11. Editing
 
 **Edit Cell** (`e` or **Double-click**):
 - Opens modal for editing current cell
