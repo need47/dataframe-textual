@@ -409,7 +409,6 @@ These options work with plain text searches. Use Polars regex patterns in expres
 **Quick Tips:**
 - Search results highlight matching rows in **red**
 - Use expression for advanced selection (e.g., $attack > $defense)
-- Multiple searches **accumulate** - each new search adds to the selections or matches
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 - Use `u` to undo any search or filter
 
