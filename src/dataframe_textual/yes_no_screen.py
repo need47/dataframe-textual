@@ -449,13 +449,7 @@ class SearchScreen(YesNoScreen):
         self.cidx = cidx
 
         EXPR = f"ABC, (?i)abc, ^abc$, {NULL}, $_ > 50, $1 < $HP, $_.str.contains('sub')"
-
-        if "Search" in title:
-            col_name = df.columns[cidx]
-            col_dtype = df.dtypes[cidx]
-            label = f"{title} in [$success]{col_name}[/] ([$warning]{col_dtype}[/]) with value or Polars expression, e.g., {EXPR}"
-        else:
-            label = f"{title} by value or Polars expression, e.g., {EXPR}"
+        label = f"By value or Polars expression, e.g., {EXPR}"
 
         super().__init__(
             title=title,

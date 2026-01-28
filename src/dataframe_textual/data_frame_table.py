@@ -2882,7 +2882,7 @@ class DataFrameTable(DataTable):
                 expr = validate_expr(term, self.df.columns, cidx)
             except Exception as e:
                 self.notify(
-                    f"Error validating expression [$error]{term}[/]", title="Search", severity="error", timeout=10
+                    f"Error validating expression [$error]{term}[/]", title="Select Row", severity="error", timeout=10
                 )
                 self.log(f"Error validating expression `{term}`: {str(e)}")
                 return
@@ -2908,7 +2908,7 @@ class DataFrameTable(DataTable):
                     expr = pl.col(col_name).cast(pl.String).str.contains(term)
                     self.notify(
                         f"Error converting [$error]{term}[/] to [$accent]{dtype}[/]. Cast to string.",
-                        title="Search",
+                        title="Select Row",
                         severity="warning",
                     )
 
@@ -2920,7 +2920,7 @@ class DataFrameTable(DataTable):
             ok_rids = set(lf.filter(expr).collect()[RID])
         except Exception as e:
             self.notify(
-                f"Error applying search filter `[$error]{term}[/]`", title="Search", severity="error", timeout=10
+                f"Error applying search filter `[$error]{term}[/]`", title="Select Row", severity="error", timeout=10
             )
             self.log(f"Error applying search filter `{term}`: {str(e)}")
             return
@@ -2929,7 +2929,7 @@ class DataFrameTable(DataTable):
         if match_count == 0:
             self.notify(
                 f"No matches found for `[$warning]{term}[/]`. Try [$accent](?i)abc[/] for case-insensitive search.",
-                title="Search",
+                title="Select Row",
                 severity="warning",
             )
             return
@@ -2939,8 +2939,8 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(message)
 
-        # Update selected rows to include new selections
-        self.selected_rows.update(ok_rids)
+        # Update selected rows
+        self.selected_rows = ok_rids
 
         # Show notification immediately, then start highlighting
         self.notify(message, title="Select Row")
@@ -3048,7 +3048,7 @@ class DataFrameTable(DataTable):
         else:
             columns_to_search = list(enumerate(self.df.columns))
 
-        # Search each column consistently
+        # Handle each column consistently
         for col_idx, col_name in columns_to_search:
             # Build expression based on term type
             if term == NULL:
@@ -3108,8 +3108,9 @@ class DataFrameTable(DataTable):
         cidx = self.cursor_col_idx if scope == "column" else None
 
         # Push the search modal screen
+
         self.app.push_screen(
-            SearchScreen("Find", term, self.df, cidx),
+            SearchScreen("Find" if scope == "column" else "Global Find", term, self.df, cidx),
             callback=self.find if scope == "column" else self.find_global,
         )
 
@@ -3139,10 +3140,9 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(f"Found `[$success]{term}[/]` in column [$accent]{col_name}[/]")
 
-        # Add to matches and count total
+        # Update matches and count total
         match_count = sum(len(cols) for cols in matches.values())
-        for rid, cols in matches.items():
-            self.matches[rid].update(cols)
+        self.matches = matches
 
         self.notify(f"Found [$success]{match_count}[/] matches for `[$accent]{term}[/]`", title="Find")
 
@@ -3173,10 +3173,9 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(f"Found `[$success]{term}[/]` across all columns")
 
-        # Add to matches and count total
+        # Update matches and count total
         match_count = sum(len(cols) for cols in matches.values())
-        for rid, cols in matches.items():
-            self.matches[rid].update(cols)
+        self.matches = matches
 
         self.notify(
             f"Found [$success]{match_count}[/] matches for `[$accent]{term}[/]` across all columns",
@@ -3284,7 +3283,7 @@ class DataFrameTable(DataTable):
         """Open replace screen for current column."""
         # Push the replace modal screen
         self.app.push_screen(
-            FindReplaceScreen(self, title="Find and Replace in Current Column"),
+            FindReplaceScreen(self, title="Find and Replace"),
             callback=self.replace,
         )
 
