@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dataframe-textual"
-version = "2.10.0"
+version = "2.10.1"
 description = "Interactive terminal viewer/editor for tabular data"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -56,11 +56,13 @@ dev = [
 packages = ["src/dataframe_textual"]
 exclude = [
     "*.png",
+    "*.gz",
 ]
 
 [tool.hatch.build.targets.sdist]
 exclude = [
     "*.png",
+    "*.gz",
 ]
 
 [dependency-groups]
