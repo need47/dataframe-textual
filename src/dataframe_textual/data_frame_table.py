@@ -3711,6 +3711,9 @@ class DataFrameTable(DataTable):
 
         expr_str = "boolean list or series" if isinstance(expr, (list, pl.Series)) else str(expr)
 
+        # Add to history
+        self.add_history(f"Viewed rows by expression [$success]{expr_str}[/]")
+
         # Apply the filter expression
         try:
             df_filtered = lf.filter(expr).collect()
@@ -3722,11 +3725,9 @@ class DataFrameTable(DataTable):
 
         matched_count = len(df_filtered)
         if not matched_count:
+            self.histories_undo.pop()  # Remove last history entry
             self.notify(f"No rows match the expression: [$success]{expr}[/]", title="View Rows", severity="warning")
             return
-
-        # Add to history
-        self.add_history(f"Viewed rows by expression [$success]{expr_str}[/]")
 
         ok_rids = set(df_filtered[RID])
 
