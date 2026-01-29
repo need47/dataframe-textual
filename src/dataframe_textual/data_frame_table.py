@@ -260,7 +260,7 @@ class DataFrameTable(DataTable):
         ("enter", "view_row_detail", "View row details"),
         ("F", "show_frequency", "Show frequency"),
         ("s", "show_statistics", "Show statistics for column"),
-        ("S", "show_statistics('dataframe')", "Show statistics for dataframe"),
+        ("S", "show_statistics(-1)", "Show statistics for dataframe"),
         # Sort
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
@@ -747,13 +747,16 @@ class DataFrameTable(DataTable):
         """Show frequency distribution for the current column."""
         self.do_show_frequency()
 
-    def action_show_statistics(self, scope: str = "column") -> None:
+    def action_show_statistics(self, cidx: int | None = None) -> None:
         """Show statistics for the current column or entire dataframe.
 
         Args:
-            scope: Either "column" for current column stats or "dataframe" for all columns.
+            cidx: Column index
+                If -1, show statistics for entire dataframe.
+                If None, show statistics for current column, otherwise for specified column.
+
         """
-        self.do_show_statistics(scope)
+        self.do_show_statistics(cidx)
 
     def action_metadata_shape(self) -> None:
         """Show metadata about the dataframe (row and column counts)."""
@@ -1661,26 +1664,26 @@ class DataFrameTable(DataTable):
         # Push the modal screen
         self.app.push_screen(RowDetailScreen(ridx, self))
 
-    def do_show_frequency(self) -> None:
-        """Show frequency distribution for the current column."""
-        cidx = self.cursor_col_idx
+    def do_show_frequency(self, cidx=None) -> None:
+        """Show frequency distribution for a given columnn."""
+        cidx = cidx or self.cursor_col_idx
 
         # Push the frequency modal screen
         self.app.push_screen(FrequencyScreen(cidx, self))
 
-    def do_show_statistics(self, scope: str = "column") -> None:
+    def do_show_statistics(self, cidx: int | None = None) -> None:
         """Show statistics for the current column or entire dataframe.
 
         Args:
-            scope: Either "column" for current column stats or "dataframe" for all columns.
+            cidx: Column index to show statistics for. If None, show for entire dataframe.
         """
-        if scope == "dataframe":
+        if cidx == -1:
             # Show statistics for entire dataframe
-            self.app.push_screen(StatisticsScreen(self, col_idx=None))
+            self.app.push_screen(StatisticsScreen(self, cidx=None))
         else:
-            # Show statistics for current column
-            cidx = self.cursor_col_idx
-            self.app.push_screen(StatisticsScreen(self, col_idx=cidx))
+            # Show statistics for current column or specified column
+            cidx = self.cursor_col_idx if cidx is None else cidx
+            self.app.push_screen(StatisticsScreen(self, cidx=cidx))
 
     def do_metadata_shape(self) -> None:
         """Show metadata about the dataframe (row and column counts)."""

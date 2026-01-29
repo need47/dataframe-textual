@@ -102,7 +102,7 @@ class TableScreen(ModalScreen):
         if cidx_name_value is None:
             return
         cidx, col_name, col_value = cidx_name_value
-        self.log(f"Filtering or viewing by `{col_name} == {col_value}`")
+        # self.log(f"Filtering or viewing by `{col_name} == {col_value}`")
 
         # Handle NULL values
         if col_value == NULL:
@@ -115,7 +115,7 @@ class TableScreen(ModalScreen):
             value_display = f"[$success]{col_value}[/]"
 
         df_filtered = self.dftable.df.lazy().filter(expr).collect()
-        self.log(f"Filtered dataframe has {len(df_filtered)} rows")
+        # self.log(f"Filtered dataframe has {len(df_filtered)} rows")
 
         ok_rids = set(df_filtered[RID].to_list())
         if not ok_rids:
@@ -134,8 +134,44 @@ class TableScreen(ModalScreen):
         else:
             self.dftable.view_rows((expr, cidx, False, True))
 
-        # Dismiss the frequency screen
+        # Dismiss the current modal screen
         self.app.pop_screen()
+
+    def show_frequency(self, cidx_name_value: tuple[int, str, Any] | None) -> None:
+        """Show frequency by the selected value.
+
+        Args:
+            col_name_value: Tuple of (column_name, column_value) to filter/view by, or None.
+        """
+        if cidx_name_value is None:
+            return
+        cidx, col_name, col_value = cidx_name_value
+        # self.log(f"Showing frequency for `{col_name} == {col_value}`")
+
+        # Do not dismiss the current modal screen so it can be returned to
+        # when frequency screen is closed.
+        # self.app.pop_screen()
+
+        # Show frequency screen
+        self.dftable.do_show_frequency(cidx)
+
+    def show_statistics(self, cidx_name_value: tuple[int, str, Any] | None) -> None:
+        """Show frequency by the selected value.
+
+        Args:
+            col_name_value: Tuple of (column_name, column_value) to filter/view by, or None.
+        """
+        if cidx_name_value is None:
+            return
+        cidx, col_name, col_value = cidx_name_value
+        # self.log(f"Showing statistics for `{col_name} == {col_value}`")
+
+        # Do not dismiss the current modal screen so it can be returned to
+        # when frequency screen is closed.
+        # self.app.pop_screen()
+
+        # Show statistics screen
+        self.dftable.do_show_statistics(cidx)
 
 
 class RowDetailScreen(TableScreen):
@@ -175,10 +211,15 @@ class RowDetailScreen(TableScreen):
         self.table.cursor_type = "row"
 
     def on_key(self, event) -> None:
-        """Handle key press events in the row detail screen.
+        """Handle key press events on the row detail screen.
 
-        Supports 'v' for filtering and '"' for highlighting the main table
-        by the value in the selected row.
+        Supported keys:
+          - 'v': View the main table by the selected value.
+          - '"': Filter the main table by the selected value.
+          - '{': Move to the previous row.
+          - '}': Move to the next row.
+          - 'F': Show frequency for the selected value.
+          - 's': Show statistics for the selected value.
 
         Args:
             event: The key event object.
@@ -207,8 +248,17 @@ class RowDetailScreen(TableScreen):
                 self.dftable.move_cursor_to(self.ridx)
                 self.build_table()
             event.stop()
+        elif event.key == "F":
+            # Show frequency for the selected value
+            self.show_frequency(self.get_cidx_name_value())
+            event.stop()
+        elif event.key == "s":
+            # Show statistics for the selected value
+            self.show_statistics(self.get_cidx_name_value())
+            event.stop()
 
     def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
+        """Get the current column info."""
         cidx = self.table.cursor_row
         if cidx >= len(self.df.columns):
             return None  # Invalid row
@@ -224,9 +274,9 @@ class StatisticsScreen(TableScreen):
 
     CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "StatisticsScreen")
 
-    def __init__(self, dftable: "DataFrameTable", col_idx: int | None = None):
+    def __init__(self, dftable: "DataFrameTable", cidx: int | None = None):
         super().__init__(dftable)
-        self.col_idx = col_idx  # None for dataframe statistics, otherwise column index
+        self.cidx = cidx  # None for dataframe statistics, otherwise column index
 
     def on_mount(self) -> None:
         """Create the statistics table."""
@@ -236,7 +286,7 @@ class StatisticsScreen(TableScreen):
         """Build the statistics table."""
         self.table.clear(columns=True)
 
-        if self.col_idx is None:
+        if self.cidx is None:
             # Dataframe statistics
             self.build_dataframe_stats()
             self.table.cursor_type = "column"
@@ -247,7 +297,7 @@ class StatisticsScreen(TableScreen):
 
     def build_column_stats(self) -> None:
         """Build statistics for a single column."""
-        col_name = self.df.columns[self.col_idx]
+        col_name = self.df.columns[self.cidx]
         lf = self.df.lazy()
 
         # Get column statistics
@@ -500,6 +550,25 @@ class MetaColumnScreen(TableScreen):
         """
         self.build_table()
 
+    def on_key(self, event) -> None:
+        """Handle key press events on the column metadata screen.
+
+        Supports keys:
+          - 'F': Show frequency for the selected value.
+          - 's': Show statistics for the selected value.
+
+        Args:
+            event: The key event object.
+        """
+        if event.key == "F":
+            # Show frequency for the selected value
+            self.show_frequency(self.get_cidx_name_value())
+            event.stop()
+        elif event.key == "s":
+            # Show statistics for the selected value
+            self.show_statistics(self.get_cidx_name_value())
+            event.stop()
+
     def build_table(self) -> None:
         """Build the column metadata table."""
         self.table.clear(columns=True)
@@ -524,4 +593,15 @@ class MetaColumnScreen(TableScreen):
                 dc_str.format("Datetime" if str(col_type).startswith("Datetime") else col_type, style=dc.style),
             )
 
-        self.table.cursor_type = "none"
+        self.table.cursor_type = "row"
+
+    def get_cidx_name_value(self) -> int | None:
+        """Get the current column info."""
+        cidx = self.table.cursor_row
+        if cidx >= len(self.df.columns):
+            return None  # Invalid row
+
+        col_name = self.df.columns[cidx]
+        col_value = None
+
+        return cidx, col_name, col_value

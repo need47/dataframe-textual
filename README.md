@@ -384,6 +384,8 @@ Useful for examining wide datasets where columns don't fit well on screen.
 - Press `"` to **filter** all rows containing the selected column value (others removed)
 - Press `{` to move to the previous row
 - Press `}` to move to the next row
+- Press `F` to show the frequency table for the selected column
+- Press `s` to show the statistics table for the selected column
 - Press `q` or `Escape` to close the modal
 
 ### 3. Row Selection
@@ -547,6 +549,10 @@ View quick metadata about your dataframe and columns to understand their structu
   - **ID** - 1-based column index
   - **Name** - Column name
   - **Type** - Data type (e.g., Int64, String, Float64, Boolean)
+
+**In the Column Metadata Table**
+- Press `F` to show the frequency table for the selected column
+- Press `s` to show the statistics table for the selected column
 
 **In Metadata Modals**:
 - Press `q` or `Escape` to close
