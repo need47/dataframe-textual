@@ -4,6 +4,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from textual.theme import BUILTIN_THEMES
+
 from . import __version__
 from .common import SUPPORTED_FORMATS, load_dataframe
 from .data_frame_viewer import DataFrameViewer
@@ -81,7 +83,23 @@ def cli() -> argparse.Namespace:
     parser.add_argument("-N", "--n-rows", metavar="N", type=int, help="Stop after reading N rows from CSV/TSV")
     parser.add_argument("-n", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
 
+    parser.add_argument(
+        "--theme",
+        nargs="?",
+        const="list",
+        help="Set the theme for the application (use 'list' to see available themes)",
+    )
+
     args = parser.parse_args()
+
+    # List available themes and exit
+    if args.theme == "list":
+        print("Available themes:")
+        for theme in BUILTIN_THEMES:
+            print(f"  - {theme}")
+        sys.exit(0)
+
+    # Handle files
     if args.files is None:
         args.files = []
 
@@ -119,7 +137,7 @@ def main() -> None:
         truncate_ragged_lines=args.truncate_ragged_lines,
         n_rows=args.n_rows,
     )
-    app = DataFrameViewer(*sources)
+    app = DataFrameViewer(*sources, theme=args.theme)
     app.run()
 
 

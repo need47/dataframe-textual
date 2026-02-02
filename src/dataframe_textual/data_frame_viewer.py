@@ -88,7 +88,7 @@ class DataFrameViewer(App):
         }
     """
 
-    def __init__(self, *sources: Source) -> None:
+    def __init__(self, *sources: Source, theme: str | None = None) -> None:
         """Initialize the DataFrame Viewer application.
 
         Loads data from provided sources and prepares the tabbed interface.
@@ -96,9 +96,11 @@ class DataFrameViewer(App):
         Args:
             sources: sources to load dataframes from, each as a tuple of
                      (DataFrame, filename, tabname).
+            theme: Optional; The theme to use for the application.
         """
         super().__init__()
         self.sources = sources
+        self.theme = theme
         self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel = None
 

@@ -156,6 +156,7 @@ options:
   -N, --n-rows N        Stop after reading N rows from CSV/TSV
   -n, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
+  --theme [THEME]       Set the theme for the application (use 'list' to see available themes)
 ```
 
 ### CLI Examples
@@ -194,6 +195,9 @@ dv -l 3 -a 1 -I messy_scientific_data.csv
 # Process compressed data
 dv data.csv.gz
 zcat compressed_data.csv.gz | dv -f csv
+
+# Choose the `monokai` theme
+dv --theme monokai data.csv
 ```
 
 ## Keyboard Shortcuts
@@ -267,7 +271,7 @@ zcat compressed_data.csv.gz | dv -f csv
 | `_` (underscore) | Toggle column full width |
 | `z` | Freeze rows and columns |
 | `,` | Toggle thousand separator for numeric display |
-| `&` | Set current row as the new header row | 
+| `&` | Set current row as the new header row |
 | `h` | Hide current column |
 | `H` | Show all hidden columns |
 
