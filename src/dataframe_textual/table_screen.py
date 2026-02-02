@@ -134,8 +134,10 @@ class TableScreen(ModalScreen):
         else:
             self.dftable.view_rows((expr, cidx, False, True))
 
-        # Dismiss the current modal screen
-        self.app.pop_screen()
+        # Dismiss modal screen(s) to return to main table
+        while len(self.app._screen_stack) > 1:
+            self.app.pop_screen()
+            break
 
     def show_frequency(self, cidx_name_value: tuple[int, str, Any] | None) -> None:
         """Show frequency by the selected value.

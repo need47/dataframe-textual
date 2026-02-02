@@ -242,7 +242,7 @@ class DataFrameTable(DataTable):
         ("ctrl+u", "reset", "Reset to initial state"),
         # Display
         ("h", "hide_column", "Hide column"),
-        ("H", "show_hidden_rows_columns", "Show hidden rows/columns"),
+        ("H", "show_hidden_columns", "Show hidden column(s)"),
         ("tilde", "toggle_row_labels", "Toggle row labels"),  # `~`
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
         ("z", "freeze_row_column", "Freeze rows/columns"),
@@ -731,9 +731,9 @@ class DataFrameTable(DataTable):
         """Set cursor row as the new header row."""
         self.do_set_cursor_row_as_header()
 
-    def action_show_hidden_rows_columns(self) -> None:
-        """Show all hidden rows/columns."""
-        self.do_show_hidden_rows_columns()
+    def action_show_hidden_columns(self) -> None:
+        """Show all hidden columns."""
+        self.do_show_hidden_columns()
 
     def action_sort_ascending(self) -> None:
         """Sort by current column in ascending order."""
@@ -1847,27 +1847,22 @@ class DataFrameTable(DataTable):
 
         # self.notify(f"Set row [$success]{ridx + 1}[/] as header", title="Set Row as Header")
 
-    def do_show_hidden_rows_columns(self) -> None:
-        """Show all hidden rows/columns by recreating the table."""
-        if not self.hidden_columns and self.df_view is None:
-            # self.notify("No hidden rows or columns to show", title="Show Hidden Rows/Columns", severity="warning")
+    def do_show_hidden_columns(self) -> None:
+        """Show all hidden columns by recreating the table."""
+        if not self.hidden_columns:
+            # self.notify("No hidden columns to show", title="Show Hidden Column(s)", severity="warning")
             return
 
         # Add to history
-        self.add_history("Showed hidden rows/columns")
+        self.add_history("Showed hidden column(s)")
 
-        # If in a filtered view, restore the full dataframe
-        if self.df_view is not None:
-            self.df = self.df_view
-            self.df_view = None
-
-        # Clear hidden rows/columns tracking
+        # Clear hidden columns tracking
         self.hidden_columns.clear()
 
         # Recreate table for display
         self.setup_table()
 
-        # self.notify("Showed hidden row(s) and/or hidden column(s)", title="Show Hidden Rows/Columns")
+        # self.notify("Showed hidden column(s)", title="Show Hidden Column(s)")
 
     # Sort
     def do_sort_by_column(self, descending: bool = False) -> None:

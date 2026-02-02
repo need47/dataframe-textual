@@ -58,8 +58,8 @@ class DataFrameViewer(App):
     """).strip()
 
     BINDINGS = [
-        ("q", "close_tab", "Close current tab"),
-        ("Q", "close_all_tabs", "Close all tabs and quit app"),
+        ("q", "quit", "Quit from view or close current tab"),
+        ("Q", "quit_all", "Quit app after closing all tabs"),
         ("B", "toggle_tab_bar", "Toggle Tab Bar"),
         ("f1", "toggle_help_panel", "Help"),
         ("ctrl+o", "open_file", "Open File"),
@@ -242,21 +242,21 @@ class DataFrameViewer(App):
         """
         self.push_screen(OpenFileScreen(), self.do_open_file)
 
-    def action_close_tab(self) -> None:
-        """Close the current tab.
+    def action_quit(self) -> None:
+        """Quit from the view or the current tab.
 
         Checks for unsaved changes and prompts the user to save if needed.
         If this is the last tab, exits the app.
         """
-        self.do_close_tab()
+        self.do_quit()
 
-    def action_close_all_tabs(self) -> None:
-        """Close all tabs and exit the app.
+    def action_quit_all(self) -> None:
+        """Quit app after closing all tabs.
 
         Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.
         Otherwise, quits immediately.
         """
-        self.do_close_all_tabs()
+        self.do_quit_all()
 
     def action_save_current_tab(self) -> None:
         """Open a save dialog to save current tab to file."""
@@ -486,14 +486,31 @@ class DataFrameViewer(App):
         self.tabbed.active = tab.id
         table.focus()
 
-    def do_close_tab(self) -> None:
-        """Close the currently active tab.
+    def do_quit(self) -> None:
+        """Quit from the view or the current tab.
 
-        Removes the active tab from the interface. If only one tab remains and no more
-        can be closed, the application exits instead.
+        When in a view, return to main table. Otherwise, close the active tab.
+        If only one tab remains and no more tabs can be closed, exits the application.
         """
         try:
             if not (table := self.active_table):
+                return
+
+            # In a view - return to main table
+            if table.df_view is not None:
+                # Remove from history
+                while table.histories_undo:
+                    h = table.histories_undo[-1]
+                    if h.description.startswith("Viewed rows by expression"):
+                        table.histories_undo.pop()
+                    else:
+                        break
+
+                table.add_history("Return to main table")
+                table.df = table.df_view
+                table.df_view = None
+                table.setup_table()
+
                 return
 
             def _on_save_confirm(result: bool) -> None:
@@ -540,7 +557,7 @@ class DataFrameViewer(App):
         except Exception:
             pass
 
-    def do_close_all_tabs(self) -> None:
+    def do_quit_all(self) -> None:
         """Close all tabs and quit the app.
 
         Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.

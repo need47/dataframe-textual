@@ -208,8 +208,8 @@ zcat compressed_data.csv.gz | dv -f csv
 | `<` | Move to previous tab |
 | `b` | Cycle through tabs |
 | `B` | Toggle tab bar visibility |
-| `q` | Close current tab (prompts to save unsaved changes) |
-| `Q` | Close all tabs and app (prompts to save unsaved changes) |
+| `q` | Quit current tab (prompts to save unsaved changes) |
+| `Q` | Quit all tabs and app (prompts to save unsaved changes) |
 | `Ctrl+Q` | Force to quit app (regardless of unsaved changes) |
 | `Ctrl+T` | Save current tab to file |
 | `Ctrl+S` | Save all tabs to file |
@@ -269,7 +269,7 @@ zcat compressed_data.csv.gz | dv -f csv
 | `,` | Toggle thousand separator for numeric display |
 | `&` | Set current row as the new header row | 
 | `h` | Hide current column |
-| `H` | Show all hidden rows/columns |
+| `H` | Show all hidden columns |
 
 #### Editing
 
@@ -460,7 +460,7 @@ Both operations show selected rows but with fundamentally different effects:
 **When to use View** (`v` or `V`):
 - Exploring or analyzing data safely
 - Switching between different perspectives
-- Press `H` to restore hidden rows (and hidden columns)
+- Press `q` to return to main table
 
 **When to use Filter** (`"`):
 - Cleaning data (removing unwanted rows)
@@ -639,7 +639,7 @@ This is useful for:
 
 **Hide/Show Columns** (`h` / `H`):
 - `h` - Temporarily hide current column (data preserved)
-- `H` - Restore all hidden columns and rows
+- `H` - Restore all hidden columns
 
 ### 12. Column & Row Reordering
 
