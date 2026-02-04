@@ -86,6 +86,7 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "--theme",
         nargs="?",
+        default="textual-dark",
         const="list",
         help="Set the theme for the application (use 'list' to see available themes)",
     )
