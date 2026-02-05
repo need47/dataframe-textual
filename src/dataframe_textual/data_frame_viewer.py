@@ -58,8 +58,8 @@ class DataFrameViewer(App):
     """).strip()
 
     BINDINGS = [
-        ("q", "quit", "Quit from view or close current tab"),
-        ("Q", "quit_all", "Quit app after closing all tabs"),
+        ("q", "close", "Close current tab or view"),
+        ("Q", "close_all", "Close all tabs and quit"),
         ("B", "toggle_tab_bar", "Toggle Tab Bar"),
         ("f1", "toggle_help_panel", "Help"),
         ("ctrl+o", "open_file", "Open File"),
@@ -244,21 +244,21 @@ class DataFrameViewer(App):
         """
         self.push_screen(OpenFileScreen(), self.do_open_file)
 
-    def action_quit(self) -> None:
-        """Quit from the view or the current tab.
+    def action_close(self) -> None:
+        """Close current tab or view.
 
         Checks for unsaved changes and prompts the user to save if needed.
         If this is the last tab, exits the app.
         """
-        self.do_quit()
+        self.do_close()
 
-    def action_quit_all(self) -> None:
-        """Quit app after closing all tabs.
+    def action_close_all(self) -> None:
+        """Close all tabs and quit.
 
         Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.
         Otherwise, quits immediately.
         """
-        self.do_quit_all()
+        self.do_close_all()
 
     def action_save_current_tab(self) -> None:
         """Open a save dialog to save current tab to file."""
@@ -488,8 +488,8 @@ class DataFrameViewer(App):
         self.tabbed.active = tab.id
         table.focus()
 
-    def do_quit(self) -> None:
-        """Quit from the view or the current tab.
+    def do_close(self) -> None:
+        """Close current tab or view.
 
         When in a view, return to main table. Otherwise, close the active tab.
         If only one tab remains and no more tabs can be closed, exits the application.
@@ -559,7 +559,7 @@ class DataFrameViewer(App):
         except Exception:
             pass
 
-    def do_quit_all(self) -> None:
+    def do_close_all(self) -> None:
         """Close all tabs and quit the app.
 
         Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.

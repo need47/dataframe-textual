@@ -212,8 +212,8 @@ dv --theme monokai data.csv
 | `<` | Move to previous tab |
 | `b` | Cycle through tabs |
 | `B` | Toggle tab bar visibility |
-| `q` | Quit current tab (prompts to save unsaved changes) |
-| `Q` | Quit all tabs and app (prompts to save unsaved changes) |
+| `q` | Close current tab (prompts to save unsaved changes) |
+| `Q` | Close all tabs and quit app (prompts to save unsaved changes) |
 | `Ctrl+Q` | Force to quit app (regardless of unsaved changes) |
 | `Ctrl+T` | Save current tab to file |
 | `Ctrl+S` | Save all tabs to file |
