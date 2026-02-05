@@ -292,13 +292,13 @@ class SaveFileScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SaveFileScreen")
 
-    def __init__(self, filename: str, save_all: bool = False, tab_count: int = 1):
-        self.save_all = save_all
+    def __init__(self, filename: str, all_tabs: bool = False, tab_count: int = 1):
+        self.all_tabs = all_tabs
         super().__init__(
             title="Save to File",
             label="Filename",
             input=filename,
-            yes=f"Save {tab_count} Tabs" if self.save_all else "Save Current Tab" if tab_count > 1 else "Save",
+            yes=f"Save {tab_count} Tabs" if self.all_tabs else "Save Current Tab" if tab_count > 1 else "Save",
             no="Cancel",
             on_yes_callback=self.handle_save,
         )
@@ -307,7 +307,7 @@ class SaveFileScreen(YesNoScreen):
         if self.input:
             input_filename = self.input.value.strip()
             if input_filename:
-                return input_filename, self.save_all, True  # Overwrite prompt
+                return input_filename, self.all_tabs, True  # Overwrite prompt
             else:
                 self.notify("Filename cannot be empty", title="Save", severity="error")
                 return None

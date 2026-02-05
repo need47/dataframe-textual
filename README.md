@@ -215,6 +215,7 @@ dv --theme monokai data.csv
 | `q` | Close current tab (prompts to save unsaved changes) |
 | `Q` | Close all tabs and quit app (prompts to save unsaved changes) |
 | `Ctrl+Q` | Force to quit app (regardless of unsaved changes) |
+| `Ctrl+V` | Save current view to file |
 | `Ctrl+T` | Save current tab to file |
 | `Ctrl+S` | Save all tabs to file |
 | `w` | Save current tab to file (overwrite without prompt) |
@@ -465,6 +466,7 @@ Both operations show selected rows but with fundamentally different effects:
 - Exploring or analyzing data safely
 - Switching between different perspectives
 - Press `q` to return to main table
+- Press `Ctrl+V` to save current view to a file. This does not affect the main table.
 
 **When to use Filter** (`"`):
 - Cleaning data (removing unwanted rows)

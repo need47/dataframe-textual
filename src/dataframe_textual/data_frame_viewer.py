@@ -1,6 +1,7 @@
 """DataFrame Viewer application and utilities."""
 
 import os
+from functools import partial
 from pathlib import Path
 from textwrap import dedent
 
@@ -32,6 +33,7 @@ class DataFrameViewer(App):
         - **q** - ❌ Close current tab (prompts to save unsaved changes)
         - **Q** - ❌ Close all tabs (prompts to save unsaved changes)
         - **Ctrl+Q** - 🚪 Force to quit app (discards unsaved changes)
+        - **Ctrl+V** - 💾 Save current view to file
         - **Ctrl+T** - 💾 Save current tab to file
         - **w** - 💾 Save current tab to file (overwrite without prompt)
         - **Ctrl+S** - 💾 Save all tabs to file
@@ -63,6 +65,7 @@ class DataFrameViewer(App):
         ("B", "toggle_tab_bar", "Toggle Tab Bar"),
         ("f1", "toggle_help_panel", "Help"),
         ("ctrl+o", "open_file", "Open File"),
+        ("ctrl+v", "save_current_view", "Save Current View"),
         ("ctrl+t", "save_current_tab", "Save Current Tab"),
         ("ctrl+s", "save_all_tabs", "Save All Tabs"),
         ("w", "save_current_tab_overwrite", "Save Current Tab (overwrite)"),
@@ -259,6 +262,10 @@ class DataFrameViewer(App):
         Otherwise, quits immediately.
         """
         self.do_close_all()
+
+    def action_save_current_view(self) -> None:
+        """Open a save dialog to save current view to file."""
+        self.do_save_view_to_file()
 
     def action_save_current_tab(self) -> None:
         """Open a save dialog to save current tab to file."""
@@ -655,9 +662,9 @@ class DataFrameViewer(App):
 
         self._task_after_save = task_after_save
         tab_count = len(self.tabs)
-        save_all = all_tabs is True and tab_count > 1
+        all_tabs = all_tabs is True and tab_count > 1
 
-        if save_all:
+        if all_tabs:
             filenames = {t.filename for t in self.tabs.values()}
             if len(filenames) > 1:
                 # Different filenames across tabs - use generic name
@@ -671,39 +678,55 @@ class DataFrameViewer(App):
             filename = str(filepath.with_stem(table.tabname))
 
         self.push_screen(
-            SaveFileScreen(filename, save_all=save_all, tab_count=tab_count),
+            SaveFileScreen(filename, all_tabs=all_tabs, tab_count=tab_count),
             callback=self.save_to_file,
         )
 
-    def save_to_file(self, result) -> None:
+    def do_save_view_to_file(self) -> None:
+        """Open screen to save current view to file."""
+        if not (table := self.active_table):
+            return
+
+        if table.df_view is None:
+            self.notify("No active view to save", title="Save View", severity="warning")
+            return
+
+        filepath = Path(table.filename)
+        filename = str(filepath.with_stem(f"{table.tabname}_view"))
+
+        self.push_screen(
+            SaveFileScreen(filename, all_tabs=False),
+            callback=partial(self.save_to_file, use_view=True),
+        )
+
+    def save_to_file(self, result, use_view=False) -> None:
         """Handle result from SaveFileScreen."""
         if result is None:
             return
-        filename, save_all, overwrite_prompt = result
-        self._save_all = save_all
+        filename, all_tabs, overwrite_prompt = result
+        self._all_tabs = all_tabs
 
         # Check if file exists
         if overwrite_prompt and Path(filename).exists():
-            self._pending_filename = filename
             self.push_screen(
                 ConfirmScreen("File already exists. Overwrite?"),
-                callback=self.confirm_overwrite,
+                callback=partial(self.confirm_overwrite, filename=filename, use_view=use_view),
             )
         else:
-            self.save_file(filename)
+            self.save_file(filename, use_view=use_view)
 
-    def confirm_overwrite(self, should_overwrite: bool) -> None:
+    def confirm_overwrite(self, should_overwrite: bool, filename: str, use_view: bool = False) -> None:
         """Handle result from ConfirmScreen."""
         if should_overwrite:
-            self.save_file(self._pending_filename)
+            self.save_file(filename, use_view=use_view)
         else:
             # Go back to SaveFileScreen to allow user to enter a different name
             self.push_screen(
-                SaveFileScreen(self._pending_filename, save_all=self._save_all),
-                callback=self.save_to_file,
+                SaveFileScreen(filename, all_tabs=self._all_tabs),
+                callback=partial(self.save_to_file, use_view=use_view),
             )
 
-    def save_file(self, filename: str) -> None:
+    def save_file(self, filename: str, use_view: bool = False) -> None:
         """Actually save to a file."""
         if not (table := self.active_table):
             return
@@ -722,7 +745,7 @@ class DataFrameViewer(App):
             )
             fmt = "csv"
 
-        df = (table.df if table.df_view is None else table.df_view).select(pl.exclude(RID))
+        df = (table.df if table.df_view is None else table.df if use_view else table.df_view).select(pl.exclude(RID))
         try:
             if fmt == "csv":
                 df.write_csv(filename)
@@ -731,7 +754,7 @@ class DataFrameViewer(App):
             elif fmt == "psv":
                 df.write_csv(filename, separator="|")
             elif fmt in ("xlsx", "xls"):
-                self.save_excel(filename)
+                self.save_excel(filename, use_view=use_view)
             elif fmt == "json":
                 df.write_json(filename)
             elif fmt == "ndjson":
@@ -741,41 +764,48 @@ class DataFrameViewer(App):
             else:  # Fallback to CSV
                 df.write_csv(filename)
 
-            # Reset dirty flag and update filename after save
-            if self._save_all:
-                for table in self.tabs.values():
+            if use_view:
+                self.notify(f"Saved current view to [$success]{filename}[/]", title="Save to File")
+            else:
+                # Reset dirty flag and update filename after save
+                if self._all_tabs:
+                    for table in self.tabs.values():
+                        table.dirty = False
+                        table.filename = filename
+                else:
                     table.dirty = False
                     table.filename = filename
-            else:
-                table.dirty = False
-                table.filename = filename
 
-            # From ConfirmScreen callback, so notify accordingly
-            if self._save_all:
-                self.notify(f"Saved all tabs to [$success]{filename}[/]", title="Save to File")
-            else:
-                self.notify(f"Saved current tab to [$success]{filename}[/]", title="Save to File")
+                # From ConfirmScreen callback, so notify accordingly
+                if self._all_tabs:
+                    self.notify(f"Saved all tabs to [$success]{filename}[/]", title="Save to File")
+                elif len(self.tabs) > 1:
+                    self.notify(f"Saved current tab to [$success]{filename}[/]", title="Save to File")
+                else:
+                    self.notify(f"Saved to [$success]{filename}[/]", title="Save to File")
 
-            if hasattr(self, "_task_after_save"):
-                if self._task_after_save == "close_tab":
-                    self.do_close_tab()
-                elif self._task_after_save == "quit_app":
-                    self.exit()
+                if hasattr(self, "_task_after_save"):
+                    if self._task_after_save == "close_tab":
+                        self.do_close_tab()
+                    elif self._task_after_save == "quit_app":
+                        self.exit()
 
         except Exception as e:
             self.notify(f"Error saving [$error]{filename}[/]", title="Save to File", severity="error", timeout=10)
             self.log(f"Error saving file `{filename}`: {str(e)}")
 
-    def save_excel(self, filename: str) -> None:
+    def save_excel(self, filename: str, use_view: bool = False) -> None:
         """Save to an Excel file."""
         import xlsxwriter
 
-        if not self._save_all or len(self.tabs) == 1:
+        if not self._all_tabs or len(self.tabs) == 1:
             # Single tab - save directly
             if not (table := self.active_table):
                 return
 
-            df = (table.df if table.df_view is None else table.df_view).select(pl.exclude(RID))
+            df = (table.df if table.df_view is None else table.df if use_view else table.df_view).select(
+                pl.exclude(RID)
+            )
             df.write_excel(filename, worksheet=table.tabname)
         else:
             # Multiple tabs - use xlsxwriter to create multiple sheets
@@ -783,5 +813,7 @@ class DataFrameViewer(App):
                 tabs: dict[TabPane, DataFrameTable] = self.tabs
                 for table in tabs.values():
                     worksheet = wb.add_worksheet(table.tabname)
-                    df = (table.df if table.df_view is None else table.df_view).select(pl.exclude(RID))
+                    df = (table.df if table.df_view is None else table.df if use_view else table.df_view).select(
+                        pl.exclude(RID)
+                    )
                     df.write_excel(workbook=wb, worksheet=worksheet)
