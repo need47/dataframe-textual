@@ -528,7 +528,7 @@ class MetaShape(TableScreen):
         self.table.add_column(Text("Count", justify="right"))
 
         # Get shape information
-        num_rows, num_cols = self.df.shape if self.dftable.df_view is None else self.dftable.df_view.shape
+        num_rows, num_cols = self.df.shape
         num_cols -= 1  # Exclude RID column
         dc_int = DtypeConfig(pl.Int64)
 
