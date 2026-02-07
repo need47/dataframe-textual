@@ -306,6 +306,11 @@ class StatisticsScreen(TableScreen):
         if len(stats_df) == 0:
             return
 
+        # Append unique count
+        n_unique = lf.select(pl.col(col_name)).collect().n_unique()
+        new_row = pl.DataFrame({"statistic": ["n_unique"], col_name: n_unique}, schema=stats_df.schema)
+        stats_df = stats_df.vstack(new_row)
+
         col_dtype = stats_df.dtypes[1]  # 'value' column
         dc = DtypeConfig(col_dtype)
 
@@ -333,6 +338,12 @@ class StatisticsScreen(TableScreen):
 
         # Get dataframe statistics
         stats_df = lf.describe()
+
+        # Append unique count for each column
+        df_n_unique = lf.select(pl.all().n_unique()).collect()
+        df_n_unique.insert_column(0, pl.Series("statistic", ["n_unique"]))
+        df_n_unique = df_n_unique.cast(stats_df.schema)
+        stats_df = stats_df.vstack(df_n_unique)
 
         # Add columns for each dataframe column with appropriate styling
         for idx, (col_name, col_dtype) in enumerate(zip(stats_df.columns, stats_df.dtypes), 0):
