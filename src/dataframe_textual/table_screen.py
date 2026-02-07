@@ -48,7 +48,7 @@ class TableScreen(ModalScreen):
         """
         super().__init__()
         self.dftable = dftable  # DataFrameTable
-        self.df: pl.DataFrame = dftable.df  # Polars DataFrame
+        self.df: pl.DataFrame = None  # DataFrame for this screen, to be set by subclasses
         self.thousand_separator = False  # Whether to use thousand separators in numbers
 
     def compose(self) -> ComposeResult:
@@ -200,7 +200,7 @@ class RowDetailScreen(TableScreen):
         self.table.add_column("Value")
 
         # Get all columns and values from the dataframe row
-        for col, val, dtype in zip(self.df.columns, self.df.row(self.ridx), self.df.dtypes):
+        for col, val, dtype in zip(self.dftable.df.columns, self.dftable.df.row(self.ridx), self.dftable.df.dtypes):
             if col in self.dftable.hidden_columns or col == RID:
                 continue  # Skip RID column
             formatted_row = []
@@ -262,12 +262,11 @@ class RowDetailScreen(TableScreen):
     def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
         """Get the current column info."""
         cidx = self.table.cursor_row
-        if cidx >= len(self.df.columns):
+        if cidx >= len(self.dftable.df.columns):
             return None  # Invalid row
 
-        col_name = self.df.columns[cidx]
-        col_value = self.df.item(self.ridx, cidx)
-
+        col_name = self.dftable.df.columns[cidx]
+        col_value = self.dftable.df.item(self.ridx, cidx)
         return cidx, col_name, col_value
 
 
@@ -299,8 +298,8 @@ class StatisticsScreen(TableScreen):
 
     def build_column_stats(self) -> None:
         """Build statistics for a single column."""
-        col_name = self.df.columns[self.cidx]
-        lf = self.df.lazy()
+        col_name = self.dftable.df.columns[self.cidx]
+        lf = self.dftable.df.lazy()
 
         # Get column statistics
         stats_df = lf.select(pl.col(col_name)).describe()
@@ -326,7 +325,7 @@ class StatisticsScreen(TableScreen):
 
     def build_dataframe_stats(self) -> None:
         """Build statistics for the entire dataframe."""
-        lf = self.df.lazy().select(pl.exclude(RID))
+        lf = self.dftable.df.lazy().select(pl.exclude(RID))
 
         # Apply only to non-hidden columns
         if self.dftable.hidden_columns:
@@ -472,17 +471,17 @@ class FrequencyScreen(TableScreen):
     def sort_by_column(self, descending: bool) -> None:
         """Sort the dataframe by the selected column and refresh the main table."""
         row_idx, col_idx = self.table.cursor_coordinate
-        col_sort = col_idx if col_idx == 0 else 1
+        col_sort = col_idx
 
         if self.sorted_columns.get(col_sort) == descending:
-            # If already sorted in the same direction, do nothing
             # self.notify("Already sorted in that order", title="Sort", severity="warning")
             return
 
         self.sorted_columns.clear()
         self.sorted_columns[col_sort] = descending
 
-        col_name = self.df.columns[col_sort]
+        # Percentage and Histogram use Count for sorting
+        col_name = self.df.columns[col_sort if col_sort in (0, 1) else 1]
         self.df = self.df.sort(col_name, descending=descending, nulls_last=True)
 
         # Rebuild the frequency table
@@ -528,7 +527,7 @@ class MetaShape(TableScreen):
         self.table.add_column(Text("Count", justify="right"))
 
         # Get shape information
-        num_rows, num_cols = self.df.shape
+        num_rows, num_cols = self.dftable.df.shape
         num_cols -= 1  # Exclude RID column
         dc_int = DtypeConfig(pl.Int64)
 
@@ -579,7 +578,7 @@ class MetaColumnScreen(TableScreen):
         self.table.add_column("Type")
 
         # Get schema information
-        schema = self.df.schema
+        schema = self.dftable.df.schema
         dc_int = DtypeConfig(pl.Int64)
         dc_str = DtypeConfig(pl.String)
 
@@ -600,10 +599,10 @@ class MetaColumnScreen(TableScreen):
     def get_cidx_name_value(self) -> int | None:
         """Get the current column info."""
         cidx = self.table.cursor_row
-        if cidx >= len(self.df.columns):
+        if cidx >= len(self.dftable.df.columns):
             return None  # Invalid row
 
-        col_name = self.df.columns[cidx]
+        col_name = self.dftable.df.columns[cidx]
         col_value = None
 
         return cidx, col_name, col_value

@@ -486,6 +486,7 @@ def load_dataframe(
     ignore_errors: bool = False,
     truncate_ragged_lines: bool = False,
     n_rows: int | None = None,
+    columns: list[str] | None = None,
 ) -> list[Source]:
     """Load DataFrames from file specifications.
 
@@ -555,6 +556,7 @@ def load_dataframe(
                 ignore_errors=ignore_errors,
                 truncate_ragged_lines=truncate_ragged_lines,
                 n_rows=n_rows,
+                columns=columns,
             )
         )
 
@@ -640,6 +642,7 @@ def load_file(
     ignore_errors: bool = False,
     truncate_ragged_lines: bool = False,
     n_rows: int | None = None,
+    columns: list[str] | None = None,
 ) -> list[Source]:
     """Load a single file.
 
@@ -719,7 +722,10 @@ def load_file(
 
     # Attempt to collect, handling ComputeError for schema inference issues
     try:
-        data = [Source(src.frame.collect(), src.filename, src.tabname) for src in data]
+        data = [
+            Source((src.frame.select(columns) if columns else src.frame).collect(), src.filename, src.tabname)
+            for src in data
+        ]
     except pl.exceptions.NoDataError:
         print(
             "Warning: No data from stdin."
@@ -750,6 +756,7 @@ def load_file(
             ignore_errors=ignore_errors,
             truncate_ragged_lines=truncate_ragged_lines,
             n_rows=n_rows,
+            columns=columns,
         )
 
     return data

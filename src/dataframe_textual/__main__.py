@@ -46,6 +46,13 @@ def cli() -> argparse.Namespace:
         help="Specify that input files have no header row when reading CSV/TSV",
     )
     parser.add_argument(
+        "-F",
+        "--fields",
+        nargs="?",
+        const="list",
+        help="Read only specified fields (comma separated). Use 'list' to show available fields.",
+    )
+    parser.add_argument(
         "-I", "--no-inference", action="store_true", help="Do not infer data types when reading CSV/TSV"
     )
     parser.add_argument(
@@ -88,7 +95,7 @@ def cli() -> argparse.Namespace:
         nargs="?",
         default="textual-dark",
         const="list",
-        help="Set the theme for the application (use 'list' to see available themes)",
+        help="Set the theme for the application. Use 'list' to show available themes.",
     )
 
     args = parser.parse_args()
@@ -111,7 +118,7 @@ def cli() -> argparse.Namespace:
         # Validate all files exist
         for filename in args.files:
             if not Path(filename).exists():
-                print(f"File not found: {filename}")
+                print(f"File not found: {filename}", file=sys.stderr)
                 sys.exit(1)
 
     if not args.files:
@@ -122,8 +129,8 @@ def cli() -> argparse.Namespace:
 
 
 def main() -> None:
-    """Run the DataFrame Viewer application."""
     args = cli()
+
     sources = load_dataframe(
         args.files,
         file_format=args.format,
@@ -136,8 +143,20 @@ def main() -> None:
         null_values=args.null,
         ignore_errors=args.ignore_errors,
         truncate_ragged_lines=args.truncate_ragged_lines,
-        n_rows=args.n_rows,
+        n_rows=100 if args.fields == "list" else args.n_rows,
+        columns=args.fields.split(",") if args.fields and args.fields != "list" else None,
     )
+
+    # List available fields and exit
+    if args.fields == "list":
+        for source in sources:
+            for idx, field in enumerate(source.frame.columns):
+                print(idx + 1, field, sep="\t")
+            break  # Only list fields for the first source
+
+        return
+
+    # Run the DataFrame Viewer application
     app = DataFrameViewer(*sources, theme=args.theme)
     app.run()
 

@@ -402,7 +402,16 @@ class DataFrameTable(DataTable):
         return self.cursor_key.column_key
 
     @property
-    def cursor_row_idx(self) -> int:
+    def cursor_col_name(self) -> str:
+        """Get the current cursor column name as in dataframe.
+
+        Returns:
+            str: The name of the column containing the cursor.
+        """
+        return self.cursor_col_key.value
+
+    @property
+    def cursor_ridx(self) -> int:
         """Get the current cursor row index (0-based) as in dataframe.
 
         Returns:
@@ -416,7 +425,7 @@ class DataFrameTable(DataTable):
         return ridx
 
     @property
-    def cursor_col_idx(self) -> int:
+    def cursor_cidx(self) -> int:
         """Get the current cursor column index (0-based) as in dataframe.
 
         Returns:
@@ -430,22 +439,13 @@ class DataFrameTable(DataTable):
         return cidx
 
     @property
-    def cursor_col_name(self) -> str:
-        """Get the current cursor column name as in dataframe.
-
-        Returns:
-            str: The name of the column containing the cursor.
-        """
-        return self.cursor_col_key.value
-
-    @property
     def cursor_value(self) -> Any:
         """Get the current cursor cell value in the dataframe.
 
         Returns:
             Any: The value of the cell at the cursor position.
         """
-        return self.df.item(self.cursor_row_idx, self.cursor_col_idx)
+        return self.df.item(self.cursor_ridx, self.cursor_cidx)
 
     @property
     def ordered_selected_rows(self) -> list[int]:
@@ -926,8 +926,8 @@ class DataFrameTable(DataTable):
 
     def action_copy_cell(self) -> None:
         """Copy the current cell to clipboard."""
-        ridx = self.cursor_row_idx
-        cidx = self.cursor_col_idx
+        ridx = self.cursor_ridx
+        cidx = self.cursor_cidx
 
         try:
             cell_str = str(self.df.item(ridx, cidx))
@@ -963,7 +963,7 @@ class DataFrameTable(DataTable):
 
     def action_copy_row(self) -> None:
         """Copy the current row to clipboard (values separated by tabs)."""
-        ridx = self.cursor_row_idx
+        ridx = self.cursor_ridx
 
         try:
             # Get all values in the row and join with tabs
@@ -1540,7 +1540,7 @@ class DataFrameTable(DataTable):
             height = self.scrollable_content_region.height - (self.header_height if self.show_header else 0)
 
             col_idx = self.cursor_column
-            ridx = self.cursor_row_idx
+            ridx = self.cursor_ridx
             next_ridx = max(0, ridx - height - BUFFER_SIZE)
             start, stop = self._round_to_nearest_hundreds(next_ridx)
             self.load_rows_range(start, stop)
@@ -1659,14 +1659,14 @@ class DataFrameTable(DataTable):
 
     def do_view_row_detail(self) -> None:
         """Open a modal screen to view the selected row's details."""
-        ridx = self.cursor_row_idx
+        ridx = self.cursor_ridx
 
         # Push the modal screen
         self.app.push_screen(RowDetailScreen(ridx, self))
 
     def do_show_frequency(self, cidx=None) -> None:
         """Show frequency distribution for a given columnn."""
-        cidx = cidx or self.cursor_col_idx
+        cidx = self.cursor_cidx if cidx is None else cidx
 
         # Push the frequency modal screen
         self.app.push_screen(FrequencyScreen(cidx, self))
@@ -1682,7 +1682,7 @@ class DataFrameTable(DataTable):
             self.app.push_screen(StatisticsScreen(self, cidx=None))
         else:
             # Show statistics for current column or specified column
-            cidx = self.cursor_col_idx if cidx is None else cidx
+            cidx = self.cursor_cidx if cidx is None else cidx
             self.app.push_screen(StatisticsScreen(self, cidx=cidx))
 
     def do_metadata_shape(self) -> None:
@@ -1744,10 +1744,10 @@ class DataFrameTable(DataTable):
 
     def do_expand_column(self) -> None:
         """Expand the current column to show the widest cell in the loaded data."""
-        col_idx = self.cursor_col_idx
+        cidx = self.cursor_cidx
         col_key = self.cursor_col_key
         col_name = col_key.value
-        dtype = self.df.dtypes[col_idx]
+        dtype = self.df.dtypes[cidx]
 
         # Only expand string columns
         if dtype != pl.String:
@@ -1765,8 +1765,8 @@ class DataFrameTable(DataTable):
 
             # Scan through all loaded rows that are visible to find max width
             for row_start, row_end in self.loaded_ranges:
-                for row_idx in range(row_start, row_end):
-                    cell_value = str(self.df.item(row_idx, col_idx))
+                for ridx in range(row_start, row_end):
+                    cell_value = str(self.df.item(ridx, cidx))
                     cell_width = measure(self.app.console, cell_value, 1)
 
                     if cell_width > max_width:
@@ -1807,7 +1807,7 @@ class DataFrameTable(DataTable):
 
     def do_set_cursor_row_as_header(self) -> None:
         """Set cursor row as the new header row."""
-        ridx = self.cursor_row_idx
+        ridx = self.cursor_ridx
 
         # Get the new header values
         new_header = list(self.df.row(ridx))
@@ -1927,8 +1927,8 @@ class DataFrameTable(DataTable):
     # Edit
     def do_edit_cell(self, ridx: int = None, cidx: int = None) -> None:
         """Open modal to edit the selected cell."""
-        ridx = self.cursor_row_idx if ridx is None else ridx
-        cidx = self.cursor_col_idx if cidx is None else cidx
+        ridx = self.cursor_ridx if ridx is None else ridx
+        cidx = self.cursor_cidx if cidx is None else cidx
 
         # Push the edit modal screen
         self.app.push_screen(
@@ -1999,7 +1999,7 @@ class DataFrameTable(DataTable):
 
     def do_edit_column(self) -> None:
         """Open modal to edit the entire column with an expression."""
-        cidx = self.cursor_col_idx
+        cidx = self.cursor_cidx
 
         # Push the edit column modal screen
         self.app.push_screen(
@@ -2134,8 +2134,8 @@ class DataFrameTable(DataTable):
     def do_clear_cell(self) -> None:
         """Clear the current cell by setting its value to None."""
         row_key, col_key = self.cursor_key
-        ridx = self.cursor_row_idx
-        cidx = self.cursor_col_idx
+        ridx = self.cursor_ridx
+        cidx = self.cursor_cidx
         col_name = self.cursor_col_name
 
         # Add to history
@@ -2221,7 +2221,7 @@ class DataFrameTable(DataTable):
 
     def do_add_column(self, col_name: str = None) -> None:
         """Add acolumn after the current column."""
-        cidx = self.cursor_col_idx
+        cidx = self.cursor_cidx
 
         if not col_name:
             # Generate a unique column name
@@ -2270,7 +2270,7 @@ class DataFrameTable(DataTable):
 
     def do_add_column_expr(self) -> None:
         """Open screen to add a new column with optional expression."""
-        cidx = self.cursor_col_idx
+        cidx = self.cursor_cidx
         self.app.push_screen(
             AddColumnScreen(cidx, self.df),
             self.add_column_expr,
@@ -2321,7 +2321,7 @@ class DataFrameTable(DataTable):
 
     def do_add_link_column(self) -> None:
         self.app.push_screen(
-            AddLinkScreen(self.cursor_col_idx, self.df),
+            AddLinkScreen(self.cursor_cidx, self.df),
             callback=self.add_link_column,
         )
 
@@ -2471,7 +2471,7 @@ class DataFrameTable(DataTable):
 
     def do_duplicate_column(self) -> None:
         """Duplicate the currently selected column, inserting it right after the current column."""
-        cidx = self.cursor_col_idx
+        cidx = self.cursor_cidx
         col_name = self.cursor_col_name
 
         col_idx = self.cursor_column
@@ -2523,21 +2523,21 @@ class DataFrameTable(DataTable):
 
         # Delete current row and those above
         elif more == "above":
-            ridx = self.cursor_row_idx
+            ridx = self.cursor_ridx
             history_desc = f"Deleted current row [$success]{ridx + 1}[/] and those above"
             for rid in self.df[RID][: ridx + 1]:
                 rids_to_delete.add(rid)
 
         # Delete current row and those below
         elif more == "below":
-            ridx = self.cursor_row_idx
+            ridx = self.cursor_ridx
             history_desc = f"Deleted current row [$success]{ridx + 1}[/] and those below"
             for rid in self.df[RID][ridx:]:
                 rids_to_delete.add(rid)
 
         # Delete the row at the cursor
         else:
-            ridx = self.cursor_row_idx
+            ridx = self.cursor_ridx
             history_desc = f"Deleted row [$success]{ridx + 1}[/]"
             rids_to_delete.add(self.df[RID][ridx])
 
@@ -2579,7 +2579,7 @@ class DataFrameTable(DataTable):
 
     def do_duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""
-        ridx = self.cursor_row_idx
+        ridx = self.cursor_ridx
         rid = self.df[RID][ridx]
 
         lf = self.df.lazy()
@@ -2621,7 +2621,7 @@ class DataFrameTable(DataTable):
         row_idx, col_idx = self.cursor_coordinate
         col_key = self.cursor_col_key
         col_name = col_key.value
-        cidx = self.cursor_col_idx
+        cidx = self.cursor_cidx
 
         # Validate move is possible
         if direction == "left":
@@ -2770,7 +2770,7 @@ class DataFrameTable(DataTable):
         Args:
             dtype: Target data type (string representation, e.g., "pl.String", "pl.Int64")
         """
-        cidx = self.cursor_col_idx
+        cidx = self.cursor_cidx
         col_name = self.cursor_col_name
         current_dtype = self.df.dtypes[cidx]
 
@@ -2824,7 +2824,7 @@ class DataFrameTable(DataTable):
         If there are existing cell matches, use those to select rows.
         Otherwise, use the current cell value as the search term and select rows matching that value.
         """
-        cidx = self.cursor_col_idx
+        cidx = self.cursor_cidx
 
         # Use existing cell matches if present
         if self.matches:
@@ -2843,7 +2843,7 @@ class DataFrameTable(DataTable):
 
     def do_select_row_expr(self) -> None:
         """Select rows by expression."""
-        cidx = self.cursor_col_idx
+        cidx = self.cursor_cidx
 
         # Use current cell value as default search term
         term = NULL if self.cursor_value is None else str(self.cursor_value)
@@ -2967,7 +2967,7 @@ class DataFrameTable(DataTable):
         self.add_history("Toggled row selection")
 
         # Get current row RID
-        ridx = self.cursor_row_idx
+        ridx = self.cursor_ridx
         rid = self.df[RID][ridx]
 
         if rid in self.selected_rows:
@@ -3090,7 +3090,7 @@ class DataFrameTable(DataTable):
         term = NULL if self.cursor_value is None else str(self.cursor_value)
 
         if scope == "column":
-            cidx = self.cursor_col_idx
+            cidx = self.cursor_cidx
             self.find((term, cidx, False, True))
         else:
             self.find_global((term, None, False, True))
@@ -3103,7 +3103,7 @@ class DataFrameTable(DataTable):
         """
         # Use current cell value as default search term
         term = NULL if self.cursor_value is None else str(self.cursor_value)
-        cidx = self.cursor_col_idx if scope == "column" else None
+        cidx = self.cursor_cidx if scope == "column" else None
 
         # Push the search modal screen
 
@@ -3193,7 +3193,7 @@ class DataFrameTable(DataTable):
         ordered_matches = self.ordered_matches
 
         # Current cursor position
-        current_pos = (self.cursor_row_idx, self.cursor_col_idx)
+        current_pos = (self.cursor_ridx, self.cursor_cidx)
 
         # Find the next match after current position
         for ridx, cidx in ordered_matches:
@@ -3215,7 +3215,7 @@ class DataFrameTable(DataTable):
         ordered_matches = self.ordered_matches
 
         # Current cursor position
-        current_pos = (self.cursor_row_idx, self.cursor_col_idx)
+        current_pos = (self.cursor_ridx, self.cursor_cidx)
 
         # Find the previous match before current position
         for ridx, cidx in reversed(ordered_matches):
@@ -3243,17 +3243,17 @@ class DataFrameTable(DataTable):
         selected_row_indices = self.ordered_selected_rows
 
         # Current cursor row
-        current_ridx = self.cursor_row_idx
+        current_ridx = self.cursor_ridx
 
         # Find the next selected row after current position
         for ridx in selected_row_indices:
             if ridx > current_ridx:
-                self.move_cursor_to(ridx, self.cursor_col_idx)
+                self.move_cursor_to(ridx, self.cursor_cidx)
                 return
 
         # If no next selected row, wrap around to the first selected row
         first_ridx = selected_row_indices[0]
-        self.move_cursor_to(first_ridx, self.cursor_col_idx)
+        self.move_cursor_to(first_ridx, self.cursor_cidx)
 
     def do_previous_selected_row(self) -> None:
         """Move cursor to the previous selected row."""
@@ -3265,17 +3265,17 @@ class DataFrameTable(DataTable):
         selected_row_indices = self.ordered_selected_rows
 
         # Current cursor row
-        current_ridx = self.cursor_row_idx
+        current_ridx = self.cursor_ridx
 
         # Find the previous selected row before current position
         for ridx in reversed(selected_row_indices):
             if ridx < current_ridx:
-                self.move_cursor_to(ridx, self.cursor_col_idx)
+                self.move_cursor_to(ridx, self.cursor_cidx)
                 return
 
         # If no previous selected row, wrap around to the last selected row
         last_ridx = selected_row_indices[-1]
-        self.move_cursor_to(last_ridx, self.cursor_col_idx)
+        self.move_cursor_to(last_ridx, self.cursor_cidx)
 
     def do_replace(self) -> None:
         """Open replace screen for current column."""
@@ -3287,7 +3287,7 @@ class DataFrameTable(DataTable):
 
     def replace(self, result) -> None:
         """Handle replace in current column."""
-        self.handle_replace(result, self.cursor_col_idx)
+        self.handle_replace(result, self.cursor_cidx)
 
     def do_replace_global(self) -> None:
         """Open replace screen for all columns."""
@@ -3608,7 +3608,7 @@ class DataFrameTable(DataTable):
     # View & Filter
     def do_view_rows_non_null(self) -> None:
         """View non-null rows based on the cursor column."""
-        cidx = self.cursor_col_idx
+        cidx = self.cursor_cidx
         col_name = self.cursor_col_name
 
         term = pl.col(col_name).is_not_null()
@@ -3622,7 +3622,7 @@ class DataFrameTable(DataTable):
         Otherwise, view based on the cursor value.
         """
 
-        cidx = self.cursor_col_idx
+        cidx = self.cursor_cidx
         col_name = self.cursor_col_name
 
         # If there are selected rows, use those
@@ -3630,7 +3630,7 @@ class DataFrameTable(DataTable):
             term = pl.col(RID).is_in(self.selected_rows)
         # Otherwise, use the current cell value
         else:
-            ridx = self.cursor_row_idx
+            ridx = self.cursor_ridx
             value = self.df.item(ridx, cidx)
             term = pl.col(col_name).is_null() if value is None else pl.col(col_name) == value
 
@@ -3638,8 +3638,8 @@ class DataFrameTable(DataTable):
 
     def do_view_rows_expr(self) -> None:
         """Open the filter screen to enter an expression."""
-        ridx = self.cursor_row_idx
-        cidx = self.cursor_col_idx
+        ridx = self.cursor_ridx
+        cidx = self.cursor_cidx
         cursor_value = self.df.item(ridx, cidx)
         term = NULL if cursor_value is None else str(cursor_value)
 
@@ -3760,7 +3760,7 @@ class DataFrameTable(DataTable):
             filter_expr = pl.col(RID).is_in(self.selected_rows)
         else:  # Search cursor value in current column
             message = "Filtered to rows matching cursor value (other rows removed)"
-            cidx = self.cursor_col_idx
+            cidx = self.cursor_cidx
             col_name = self.df.columns[cidx]
             value = self.cursor_value
 
