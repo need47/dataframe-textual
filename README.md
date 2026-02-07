@@ -141,7 +141,7 @@ options:
   -f, --format {csv,json,xlsx,xls,ndjson,psv,parquet,tsv}
                         Specify the format of the input files (csv, tsv etc.)
   -H, --no-header       Specify that input files have no header row when reading CSV/TSV
-  -F, --fields [FIELDS]
+  -F, --fields [FIELDS ...]
                         Read only specified fields (comma separated). Use 'list' to show available fields.
   -I, --no-inference    Do not infer data types when reading CSV/TSV
   -t, --truncate-ragged-lines

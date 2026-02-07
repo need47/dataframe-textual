@@ -11,6 +11,36 @@ from .common import SUPPORTED_FORMATS, load_dataframe
 from .data_frame_viewer import DataFrameViewer
 
 
+class ConstWithMultiArgs(argparse.Action):
+    """
+    An `argparse` action class that allows handling arguments with multiple values in different scenarios.
+
+    This class extends the base `argparse.Action` to properly handle three cases:
+      1. When values are explicitly provided with the argument (e.g., `--arg value1 value2`)
+      2. When the flag is used without values (e.g., `--arg`), returning the const value
+      3. When the argument is not used at all, returning the default value
+
+    Args:
+        parser (argparse.ArgumentParser): The parser object that uses this action.
+        namespace (argparse.Namespace): The namespace to store the argument values.
+        values (any): The argument values provided by the user.
+        option_string (str, optional): The option string used to invoke this action.
+
+    Example:
+        parser.add_argument('--arg', nargs='*', action=ConstWithMultiArgs, const=DEFAULT_VALUE)
+    """
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        obj = (
+            values
+            if values  # if values are provided (e.g., `--arg value1 value2`)
+            else self.const
+            if option_string  # if `--arg` is used without values
+            else self.default  # if `--arg` is not used at all
+        )
+        setattr(namespace, self.dest, obj)
+
+
 def cli() -> argparse.Namespace:
     """Parse command-line arguments.
 
@@ -48,9 +78,10 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "-F",
         "--fields",
-        nargs="?",
+        nargs="*",
+        action=ConstWithMultiArgs,
         const="list",
-        help="Read only specified fields (comma separated). Use 'list' to show available fields.",
+        help="Read only specified fields. Use 'list' to show available fields.",
     )
     parser.add_argument(
         "-I", "--no-inference", action="store_true", help="Do not infer data types when reading CSV/TSV"
@@ -106,6 +137,9 @@ def cli() -> argparse.Namespace:
         for theme in BUILTIN_THEMES:
             print(f"  - {theme}")
         sys.exit(0)
+    elif args.theme and args.theme not in BUILTIN_THEMES:
+        print(f"Theme '{args.theme}' not found. Use '--theme list' to show available themes.", file=sys.stderr)
+        sys.exit(1)
 
     # Handle files
     if args.files is None:
@@ -143,8 +177,8 @@ def main() -> None:
         null_values=args.null,
         ignore_errors=args.ignore_errors,
         truncate_ragged_lines=args.truncate_ragged_lines,
-        n_rows=100 if args.fields == "list" else args.n_rows,
-        columns=args.fields.split(",") if args.fields and args.fields != "list" else None,
+        n_rows=20 if args.fields == "list" else args.n_rows,
+        columns=args.fields if args.fields and args.fields != "list" else None,
     )
 
     # List available fields and exit
