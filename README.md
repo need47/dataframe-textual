@@ -128,7 +128,8 @@ When multiple files are opened:
 ## Command Line Options
 
 ```
-usage: dv [-h] [-V] [-f {csv,json,xlsx,xls,ndjson,psv,parquet,tsv}] [-H] [-I] [-t] [-E] [-c [COMMENT_PREFIX]] [-q [QUOTE_CHAR]] [-l SKIP_LINES] [-a SKIP_ROWS_AFTER_HEADER] [-n NULL [NULL ...]] [files ...]
+usage: dv [-h] [-V] [-f {tsv,csv,psv,xlsx,xls,parquet,json,ndjson}] [-H [HEADER ...]] [-F [FIELDS ...]] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M N] [-N NULL [NULL ...]] [--theme [THEME]]
+          [files ...]
 
 Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).
 
@@ -138,27 +139,26 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   -V, --version         show program's version number and exit
-  -f, --format {csv,json,xlsx,xls,ndjson,psv,parquet,tsv}
-                        Specify the format of the input files (csv, tsv etc.)
-  -H, --no-header       Specify that input files have no header row when reading CSV/TSV
+  -f, --format {tsv,csv,psv,xlsx,xls,parquet,json,ndjson}
+                        Specify the format of the input files (csv, excel, tsv etc.)
+  -H, --header [HEADER ...]
+                        Specify header info. when reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column names (e.g., `-H col1 col2 col3`).
   -F, --fields [FIELDS ...]
-                        Read only specified fields (comma separated). Use 'list' to show available fields.
+                        When used without values, list available fields. Otherwise, read only specified fields.
   -I, --no-inference    Do not infer data types when reading CSV/TSV
-  -t, --truncate-ragged-lines
+  -T, --truncate-ragged-lines
                         Truncate ragged lines when reading CSV/TSV
   -E, --ignore-errors   Ignore errors when reading CSV/TSV
-  -c, --comment-prefix [PREFIX]
+  -C, --comment-prefix [PREFIX]
                         Comment lines starting with `PREFIX` are skipped when reading CSV/TSV
-  -q, --quote-char [C]
-                        Use `C` as quote character for reading CSV/TSV
-  -L, --skip-lines N
-                        Skip first N lines when reading CSV/TSV
+  -Q, --quote-char [C]  Use `C` as quote character for reading CSV/TSV. When used without value, disables special handling of quote characters.
+  -K, --skip-lines N    Skip first N lines when reading CSV/TSV
   -A, --skip-rows-after-header N
                         Skip N rows after header when reading CSV/TSV
-  -N, --n-rows N        Stop after reading N rows from CSV/TSV
-  -n, --null NULL [NULL ...]
+  -M, --n-rows N        Read maximum rows from CSV/TSV
+  -N, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
-  --theme [THEME]       Set the theme for the application (use 'list' to see available themes)
+  --theme [THEME]       Set the theme for the application. Use 'list' to show available themes.
 ```
 
 ### CLI Examples

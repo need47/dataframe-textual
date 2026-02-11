@@ -83,17 +83,17 @@ def cli() -> argparse.Namespace:
         nargs="*",
         action=ConstWithMultiArgs,
         const="list",
-        help="Read only specified fields. Use 'list' to show available fields.",
+        help="When used without values, list available fields. Otherwise, read only specified fields.",
     )
     parser.add_argument(
         "-I", "--no-inference", action="store_true", help="Do not infer data types when reading CSV/TSV"
     )
     parser.add_argument(
-        "-t", "--truncate-ragged-lines", action="store_true", help="Truncate ragged lines when reading CSV/TSV"
+        "-T", "--truncate-ragged-lines", action="store_true", help="Truncate ragged lines when reading CSV/TSV"
     )
     parser.add_argument("-E", "--ignore-errors", action="store_true", help="Ignore errors when reading CSV/TSV")
     parser.add_argument(
-        "-c",
+        "-C",
         "--comment-prefix",
         metavar="PREFIX",
         nargs="?",
@@ -101,16 +101,16 @@ def cli() -> argparse.Namespace:
         help="Comment lines starting with `PREFIX` are skipped when reading CSV/TSV",
     )
     parser.add_argument(
-        "-q",
+        "-Q",
         "--quote-char",
         metavar="C",
         nargs="?",
         const=None,
         default='"',
-        help="Use `C` as quote character for reading CSV/TSV",
+        help="Use `C` as quote character for reading CSV/TSV. When used without value, disables special handling of quote characters.",
     )
     parser.add_argument(
-        "-L", "--skip-lines", metavar="N", type=int, default=0, help="Skip first N lines when reading CSV/TSV"
+        "-K", "--skip-lines", metavar="N", type=int, default=0, help="Skip first N lines when reading CSV/TSV"
     )
     parser.add_argument(
         "-A",
@@ -120,8 +120,8 @@ def cli() -> argparse.Namespace:
         default=0,
         help="Skip N rows after header when reading CSV/TSV",
     )
-    parser.add_argument("-N", "--n-rows", metavar="N", type=int, help="Stop after reading N rows from CSV/TSV")
-    parser.add_argument("-n", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
+    parser.add_argument("-M", "--n-rows", metavar="N", type=int, help="Read maximum rows from CSV/TSV")
+    parser.add_argument("-N", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
 
     parser.add_argument(
         "--theme",

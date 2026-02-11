@@ -686,14 +686,12 @@ def load_file(
         if header is False:
             has_header = False
             new_columns = None
-        elif header is True:
-            has_header = True
-            new_columns = None
         elif isinstance(header, list):
             has_header = True
             new_columns = header
         else:
-            raise ValueError("header parameter must be True, False, or list of column names")
+            has_header = True
+            new_columns = None
 
         lf = pl.scan_csv(
             source,
