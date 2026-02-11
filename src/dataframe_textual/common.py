@@ -758,7 +758,7 @@ def load_file(
         return load_file(
             source,
             file_format=file_format,
-            has_header=has_header,
+            header=header,
             infer_schema=infer_schema,
             comment_prefix=comment_prefix,
             quote_char=quote_char,
