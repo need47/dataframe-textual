@@ -237,7 +237,7 @@ class RowDetailScreen(TableScreen):
         elif event.key == "right_curly_bracket":  # '}'
             # Move to the next row
             ridx = self.ridx + 1
-            if ridx < len(self.df):
+            if ridx < len(self.dftable.df):
                 self.ridx = ridx
                 self.dftable.move_cursor_to(self.ridx)
                 self.build_table()
