@@ -476,7 +476,7 @@ def validate_expr(term: str, columns: list[str], current_col_idx: int) -> pl.Exp
 def load_dataframe(
     filenames: list[str],
     file_format: str | None = None,
-    has_header: bool = True,
+    header: bool | list[str] = True,
     infer_schema: bool = True,
     comment_prefix: str | None = None,
     quote_char: str | None = '"',
@@ -486,7 +486,7 @@ def load_dataframe(
     ignore_errors: bool = False,
     truncate_ragged_lines: bool = False,
     n_rows: int | None = None,
-    columns: list[str] | None = None,
+    use_columns: list[str] | None = None,
 ) -> list[Source]:
     """Load DataFrames from file specifications.
 
@@ -496,7 +496,7 @@ def load_dataframe(
     Args:
         filenames: List of filenames to load. If single filename is "-", read from stdin.
         file_format: Optional format specifier for input files (e.g., 'csv', 'excel').
-        has_header: Whether the input files have a header row. Defaults to True.
+        header: Specify header info. for CSV/TSV files. Can be True (header in first line), False (no header, auto-generate column names), or list of column names to use. Defaults to True.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
         comment_prefix: Character(s) indicating comment lines in CSV/TSV files. Defaults to None.
         quote_char: Quote character for reading CSV/TSV files. Defaults to '"'.
@@ -506,6 +506,7 @@ def load_dataframe(
         ignore_errors: Whether to ignore errors when reading CSV/TSV files. Defaults to False.
         truncate_ragged_lines: Whether to truncate ragged lines when reading CSV/TSV files. Defaults to False.
         n_rows: Number of rows to read from CSV/TSV files. Defaults to None (read all rows).
+        use_columns: List of columns to read from CSV/TSV files. Defaults to None (read all columns).
 
     Returns:
         List of `Source` objects.
@@ -546,7 +547,7 @@ def load_dataframe(
                 source,
                 prefix_sheet=prefix_sheet,
                 file_format=fmt,
-                has_header=has_header,
+                header=header,
                 infer_schema=infer_schema,
                 comment_prefix=comment_prefix,
                 quote_char=quote_char,
@@ -556,7 +557,7 @@ def load_dataframe(
                 ignore_errors=ignore_errors,
                 truncate_ragged_lines=truncate_ragged_lines,
                 n_rows=n_rows,
-                columns=columns,
+                use_columns=use_columns,
             )
         )
 
@@ -631,7 +632,7 @@ def load_file(
     first_sheet: bool = False,
     prefix_sheet: bool = False,
     file_format: str | None = None,
-    has_header: bool = True,
+    header: bool | list[str] = True,
     infer_schema: bool = True,
     comment_prefix: str | None = None,
     quote_char: str | None = '"',
@@ -642,7 +643,7 @@ def load_file(
     ignore_errors: bool = False,
     truncate_ragged_lines: bool = False,
     n_rows: int | None = None,
-    columns: list[str] | None = None,
+    use_columns: list[str] | None = None,
 ) -> list[Source]:
     """Load a single file.
 
@@ -659,7 +660,7 @@ def load_file(
         prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
         file_format: Optional format specifier (i.e., 'tsv', 'csv', 'excel', 'parquet', 'json', 'ndjson') for input files.
                      By default, infers from file extension.
-        has_header: Whether the input files have a header row. Defaults to True.
+        header: Specify header info. for the input file. Can be True (header in first line), False (no header, auto-generate column names), or list of column names to use.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
         comment_prefix: Character(s) indicating comment lines in CSV/TSV files. Defaults to None.
         quote_char: Quote character for reading CSV/TSV files. Defaults to '"'.
@@ -670,6 +671,7 @@ def load_file(
         ignore_errors: Whether to ignore errors when reading CSV/TSV files.
         truncate_ragged_lines: Whether to truncate ragged lines when reading CSV/TSV files. Defaults to False.
         n_rows: Number of rows to read from CSV/TSV files. Defaults to None (read all rows).
+        use_columns: List of columns to read from CSV/TSV files. Defaults to None (read all columns).
 
     Returns:
         List of `Source` objects.
@@ -681,6 +683,18 @@ def load_file(
 
     # Load based on file format
     if file_format in ("csv", "tsv", "psv"):
+        if header is False:
+            has_header = False
+            new_columns = None
+        elif header is True:
+            has_header = True
+            new_columns = None
+        elif isinstance(header, list):
+            has_header = True
+            new_columns = header
+        else:
+            raise ValueError("header parameter must be True, False, or list of column names")
+
         lf = pl.scan_csv(
             source,
             separator="\t" if file_format == "tsv" else ("|" if file_format == "psv" else ","),
@@ -695,6 +709,7 @@ def load_file(
             ignore_errors=ignore_errors,
             truncate_ragged_lines=truncate_ragged_lines,
             n_rows=n_rows,
+            new_columns=new_columns,
         )
         data.append(Source(lf, filename, filepath.stem))
     elif file_format in ("xlsx", "xls"):
@@ -723,7 +738,7 @@ def load_file(
     # Attempt to collect, handling ComputeError for schema inference issues
     try:
         data = [
-            Source((src.frame.select(columns) if columns else src.frame).collect(), src.filename, src.tabname)
+            Source((src.frame.select(use_columns) if use_columns else src.frame).collect(), src.filename, src.tabname)
             for src in data
         ]
     except pl.exceptions.NoDataError:
@@ -756,7 +771,7 @@ def load_file(
             ignore_errors=ignore_errors,
             truncate_ragged_lines=truncate_ragged_lines,
             n_rows=n_rows,
-            columns=columns,
+            use_columns=use_columns,
         )
 
     return data

@@ -71,9 +71,11 @@ def cli() -> argparse.Namespace:
     )
     parser.add_argument(
         "-H",
-        "--no-header",
-        action="store_true",
-        help="Specify that input files have no header row when reading CSV/TSV",
+        "--header",
+        nargs="*",
+        action=ConstWithMultiArgs,
+        const=False,
+        help="Specify header info. when reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column names (e.g., `-H col1 col2 col3`).",
     )
     parser.add_argument(
         "-F",
@@ -168,7 +170,7 @@ def main() -> None:
     sources = load_dataframe(
         args.files,
         file_format=args.format,
-        has_header=not args.no_header,
+        header=args.header,
         infer_schema=not args.no_inference,
         comment_prefix=args.comment_prefix,
         quote_char=args.quote_char,
@@ -178,7 +180,7 @@ def main() -> None:
         ignore_errors=args.ignore_errors,
         truncate_ragged_lines=args.truncate_ragged_lines,
         n_rows=20 if args.fields == "list" else args.n_rows,
-        columns=args.fields if args.fields and args.fields != "list" else None,
+        use_columns=args.fields if args.fields and args.fields != "list" else None,
     )
 
     # List available fields and exit
