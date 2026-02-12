@@ -270,33 +270,33 @@ def get_next_item(lst: list[Any], current, offset=1) -> Any:
     return lst[next_index]
 
 
-def tentative_expr(expression: str) -> bool:
-    """Check if the given expression could be a Polars expression.
+def tentative_expr(expr: str) -> bool:
+    """Check if the given expr could be a Polars expression.
 
     Heuristically determines whether a string might represent a Polars expression
     based on common patterns like column references ($) or direct Polars syntax (pl.).
 
     Args:
-        expression: The input expression as a string.
+        expr: The input expression as a string to be checked.
 
     Returns:
-        True if the expression appears to be a Polars expression, False otherwise.
+        True if the expr appears to be a Polars expression, False otherwise.
     """
-    if "$" in expression and not expression.endswith("$"):
+    if "$" in expr and not expr.endswith("$"):
         return True
-    if "pl." in expression:
+    if "pl." in expr:
         return True
     return False
 
 
-def validate_expr(expression: str, columns: list[str], current_col_idx: int) -> pl.Expr | None:
+def validate_expr(expr: str, columns: list[str], current_col_idx: int) -> pl.Expr | None:
     """Validate and return the expression.
 
     Parses a user-provided expression string and validates it as a valid Polars expression.
-    Converts special syntax like $_ references to proper Polars col() expressions.
+    Converts special syntax like $_ references to proper pl.col() expressions.
 
     Args:
-        expression: The input expression as a string.
+        expr: The input expression as a string.
         columns: The list of column names in the DataFrame.
         current_col_idx: The index of the currently selected column (0-based). Used for $_ reference.
 
@@ -304,29 +304,29 @@ def validate_expr(expression: str, columns: list[str], current_col_idx: int) -> 
         A valid Polars expression object if validation succeeds.
 
     Raises:
-        ValueError: If the expression is invalid, contains non-existent column references, or cannot be evaluated.
+        ValueError: If the expr is invalid, contains non-existent column references, or cannot be evaluated.
     """
-    expression = expression.strip()
+    expr = expr.strip()
 
     try:
         # Parse the expression
-        expr_str = parse_expr(expression, columns, current_col_idx)
+        expr_str = parse_expr(expr, columns, current_col_idx)
 
         # Validate by evaluating it
         try:
-            expr = eval(expr_str, {"pl": pl})
-            if not isinstance(expr, pl.Expr):
-                raise ValueError(f"Expression evaluated to `{type(expr).__name__}` instead of a Polars expression")
+            expr_pl = eval(expr_str, {"pl": pl})
+            if not isinstance(expr_pl, pl.Expr):
+                raise ValueError(f"Expression evaluated to `{type(expr_pl).__name__}` instead of a Polars expression")
 
             # Expression is valid
-            return expr
+            return expr_pl
         except Exception as e:
             raise ValueError(f"Failed to evaluate expression `{expr_str}`: {e}") from e
     except Exception as ve:
-        raise ValueError(f"Failed to parse expression `{expression}`: {ve}") from ve
+        raise ValueError(f"Failed to parse expression `{expr}`: {ve}") from ve
 
 
-def parse_expr(expression: str, columns: list[str], current_cidx: int) -> str:
+def parse_expr(expr: str, columns: list[str], current_cidx: int) -> str:
     """Parse and convert an expression to Polars syntax.
 
     Replaces column references with Polars col() expressions:
@@ -345,7 +345,7 @@ def parse_expr(expression: str, columns: list[str], current_cidx: int) -> str:
     - "$`product id` > 100" -> "pl.col('product id') > 100"
 
     Args:
-        expression: The input expression as a string.
+        expr: The input expression as a string.
         columns: The list of column names in the DataFrame.
         current_cidx: The index of the currently selected column (0-based). Used for $_ reference.
 
@@ -356,15 +356,15 @@ def parse_expr(expression: str, columns: list[str], current_cidx: int) -> str:
         ValueError: If a column reference is invalid.
     """
     # Early return if no $ present
-    if "$" not in expression:
-        if "pl." in expression:
+    if "$" not in expr:
+        if "pl." in expr:
             # This may be valid Polars expression already
-            return expression
+            return expr
         else:
             # Return as a literal string
-            return f"pl.lit({expression})"
+            return f"pl.lit({expr})"
 
-    parts = parse_placeholders(expression, columns, current_cidx)
+    parts = parse_placeholders(expr, columns, current_cidx)
 
     result = []
     for part in parts:
