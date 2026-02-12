@@ -405,7 +405,7 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
     if "$" not in template or template.endswith("$"):
         return [template]
 
-    # Regex matches: $_ or $# or $\d+ or $`...` (backtick-quoted names with spaces) or $\w+ (column names)
+    # Regex matches: $_ or $# or $\d+ or $`...` (backtick-Quoted names with spaces) or $\w+ (column names)
     # Pattern explanation:
     # \$(_|#|\d+|`[^`]+`|[a-zA-Z_]\w*)
     # - $_ : current column
@@ -596,7 +596,7 @@ def handle_compute_error(
 
         if "CSV malformed" in err_msg:
             print(
-                "\nSometimes quote characters might be mismatched. Try again with `-q` or `-E` to ignore errors",
+                "\nSometimes quote characters might be mismatched. Try again with `-Q` or `-E` to ignore errors",
                 file=sys.stderr,
             )
 
@@ -604,13 +604,13 @@ def handle_compute_error(
 
     # Schema mismatch error
     if "found more fields than defined in 'Schema'" in err_msg:
-        print(f"{err_msg}.\n\nInput might be malformed. Try again with `-t` to truncate ragged lines", file=sys.stderr)
+        print(f"{err_msg}.\n\nInput might be malformed. Try again with `-T` to truncate ragged lines", file=sys.stderr)
         sys.exit(1)
 
     # Field ... is not properly escaped
     if "is not properly escaped" in err_msg:
         print(
-            f"{err_msg}\n\nQuoting might be causing the issue. Try again with `-q` to disable quoting", file=sys.stderr
+            f"{err_msg}\n\nQuoting might be causing the issue. Try again with `-Q` to disable quoting", file=sys.stderr
         )
         sys.exit(1)
 
