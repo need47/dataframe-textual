@@ -3674,7 +3674,7 @@ class DataFrameTable(DataTable):
                 expr = validate_expr(term, self.df.columns, cidx)
             except Exception as e:
                 self.notify(
-                    f"Error validating expression [$error]{term}[/]", title="Filter Rows", severity="error", timeout=10
+                    f"Error validating expression [$error]{term}[/]", title="View Rows", severity="error", timeout=10
                 )
                 self.log(f"Error validating expression `{term}`: {str(e)}")
                 return
