@@ -25,7 +25,7 @@ class DataFrameViewer(App):
     HELP = dedent("""
         # 📊 DataFrame Viewer - App Controls
 
-        ## 🎯 File & Tab Management
+        ## ⚙️ File & Tab Management
         - **>** - ▶️ Next tab
         - **<** - ◀️ Previous tab
         - **b** - 🔄 Cycle through tabs

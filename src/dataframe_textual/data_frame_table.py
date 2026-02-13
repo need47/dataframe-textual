@@ -204,12 +204,12 @@ class DataFrameTable(DataTable):
         - **v** - 👁️ View selected rows (others hidden)
         - **V** - 🔧 View selected rows matching expression (others hidden)
 
-        ## ↕️ Sorting
+        ## 🔀 Sorting
         - **[** - 🔼 Sort column ascending
         - **]** - 🔽 Sort column descending
         - *(Multi-column sort supported)*
 
-        ## 🎯 Reorder
+        ## 🔃 Reorder
         - **Shift+↑↓** - ⬆️⬇️ Move row up/down
         - **Shift+←→** - ⬅️➡️ Move column left/right
 
@@ -219,12 +219,12 @@ class DataFrameTable(DataTable):
         - **!** - ✅ Cast column to boolean
         - **$** - 📝 Cast column to string
 
-        ## 💾 Copy
+        ## 📋 Copy
         - **c** - 📋 Copy cell to clipboard
         - **Ctrl+c** - 📊 Copy column to clipboard
         - **Ctrl+r** - 📝 Copy row to clipboard (tab-separated)
 
-        ## 🔍 SQL Interface
+        ## ⌨️ SQL Interface
         - **l** - 💬 Open simple SQL interface (select columns & where clause)
         - **L** - 🔎 Open advanced SQL interface (full SQL queries)
     """).strip()
