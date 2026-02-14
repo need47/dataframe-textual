@@ -245,12 +245,13 @@ dv data.csv -F
 
 | Key | Action |
 |-----|--------|
-| `g` | Jump to first row |
-| `G` | Jump to last row |
+| `g` | Go to first row |
+| `G` | Go to last row |
+| `Ctrl + G` | Go to row |
 | `↑` / `↓` | Move up/down one row |
 | `←` / `→` | Move left/right one column |
-| `Home` / `End` | Jump to first/last column |
-| `Ctrl + Home` / `Ctrl + End` | Jump to page top/bottom |
+| `Home` / `End` | Go to first/last column |
+| `Ctrl + Home` / `Ctrl + End` | Go to page top/bottom |
 | `PageDown` / `PageUp` | Scroll down/up one page |
 | `Ctrl+F` | Page forward |
 | `Ctrl+B` | Page backforward |

@@ -54,6 +54,7 @@ from .yes_no_screen import (
     FilterScreen,
     FindReplaceScreen,
     FreezeScreen,
+    GoToRowScreen,
     RenameColumnScreen,
     SearchScreen,
 )
@@ -132,10 +133,11 @@ class DataFrameTable(DataTable):
 
         ## ⬆️ Navigation
         - **↑↓←→** - 🎯 Move cursor (cell/row/column)
-        - **g** - ⬆️ Jump to first row
-        - **G** - ⬇️ Jump to last row
-        - **HOME/END** - 🎯 Jump to first/last column
-        - **Ctrl+HOME/END** - 🎯 Jump to page top/top
+        - **g** - ⬆️ Go to first row
+        - **G** - ⬇️ Go to last row
+        - **HOME/END** - 🎯 Go to first/last column
+        - **Ctrl+HOME/END** - 🎯 Go to page top/bottom
+        - **Ctrl+G** - 🎯 Go to row
         - **Ctrl+F** - 📜 Page down
         - **Ctrl+B** - 📜 Page up
         - **PgUp/PgDn** - 📜 Page up/down
@@ -232,8 +234,9 @@ class DataFrameTable(DataTable):
     # fmt: off
     BINDINGS = [
         # Navigation
-        ("g", "jump_top", "Jump to top"),
-        ("G", "jump_bottom", "Jump to bottom"),
+        ("g", "go_top", "Go to first row"),
+        ("G", "go_bottom", "Go to last row"),
+        ("ctrl+g", "go_to_row", "Go to row"),
         ("pageup,ctrl+b", "page_up", "Page up"),
         ("pagedown,ctrl+f", "page_down", "Page down"),
         # Undo/Redo/Reset
@@ -691,13 +694,17 @@ class DataFrameTable(DataTable):
                 self.do_edit_cell()
 
     # Action handlers for BINDINGS
-    def action_jump_top(self) -> None:
-        """Jump to the top of the table."""
-        self.do_jump_top()
+    def action_go_top(self) -> None:
+        """Go to the top of the table."""
+        self.do_go_top()
 
-    def action_jump_bottom(self) -> None:
-        """Jump to the bottom of the table."""
-        self.do_jump_bottom()
+    def action_go_bottom(self) -> None:
+        """Go to the bottom of the table."""
+        self.do_go_bottom()
+
+    def action_go_to_row(self) -> None:
+        """Go to a specific row number."""
+        self.do_go_to_row()
 
     def action_page_up(self) -> None:
         """Move the cursor one page up."""
@@ -1515,12 +1522,12 @@ class DataFrameTable(DataTable):
         return row_key
 
     # Navigation
-    def do_jump_top(self) -> None:
-        """Jump to the top of the table."""
+    def do_go_top(self) -> None:
+        """Go to the top of the table."""
         self.move_cursor(row=0)
 
-    def do_jump_bottom(self) -> None:
-        """Jump to the bottom of the table."""
+    def do_go_bottom(self) -> None:
+        """Go to the bottom of the table."""
         stop = len(self.df)
         start = max(0, stop - self.BATCH_SIZE)
 
@@ -1532,6 +1539,22 @@ class DataFrameTable(DataTable):
 
         self.load_rows_range(start, stop)
         self.move_cursor(row=self.row_count - 1)
+
+    def do_go_to_row(self) -> None:
+        """Open a modal screen to Go to a specific row."""
+        self.app.push_screen(GoToRowScreen(self), callback=self.go_to_row)
+
+    def go_to_row(self, result: int | None) -> None:
+        """Go to a specific row.
+
+        Args:
+            result: The 1-based row index to jump to.
+        """
+        if result is None:
+            return  # User cancelled the prompt
+
+        ridx = result - 1  # Convert to 0-based index in the dataframe
+        self.move_cursor_to(ridx, 0)
 
     def do_page_up(self) -> None:
         """Move the cursor one page up."""
