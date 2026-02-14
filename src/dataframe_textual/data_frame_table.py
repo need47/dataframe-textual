@@ -135,9 +135,9 @@ class DataFrameTable(DataTable):
         - **↑↓←→** - 🎯 Move cursor (cell/row/column)
         - **g** - ⬆️ Go to first row
         - **G** - ⬇️ Go to last row
+        - **Ctrl+G** - 🎯 Go to row
         - **HOME/END** - 🎯 Go to first/last column
         - **Ctrl+HOME/END** - 🎯 Go to page top/bottom
-        - **Ctrl+G** - 🎯 Go to row
         - **Ctrl+F** - 📜 Page down
         - **Ctrl+B** - 📜 Page up
         - **PgUp/PgDn** - 📜 Page up/down
