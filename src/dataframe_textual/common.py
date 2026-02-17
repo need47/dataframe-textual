@@ -627,6 +627,49 @@ def handle_compute_error(
     return infer_schema, schema_overrides
 
 
+def get_columms(all_columns: list[str], use_columns: list[str] | None) -> list[str]:
+    """Get the list of columns to read based on use_columns specification.
+
+    Determines which columns to read from the input based on the use_columns parameter,
+    which can specify columns by name, 1-based index, or negative index.
+
+    Args:
+        all_columns: The list of all column names in the input.
+        use_columns: The list of columns to read, specified by name, 1-based index, or negative index. Defaults to None (read all columns).
+
+    Returns:
+        The list of column names to read.
+
+    Raises:
+        ValueError: If a specified column name does not exist or an index is out of range.
+    """
+    if use_columns is None:
+        return all_columns
+
+    ok_columns = []
+    for col in use_columns:
+        if col in all_columns:
+            ok_columns.append(col)
+        else:
+            try:
+                idx = int(col)
+            except ValueError:
+                raise ValueError(
+                    f"Column name '{col}' not found in input (available columns: {', '.join(all_columns)})"
+                )
+
+            if 1 <= idx <= len(all_columns):
+                ok_columns.append(all_columns[idx - 1])
+            elif -len(all_columns) <= idx <= -1:
+                ok_columns.append(all_columns[idx])
+            else:
+                raise ValueError(
+                    f"Column index {col} is out of range (valid range: 1 to {len(all_columns)} or -{len(all_columns)} to -1)"
+                )
+
+    return ok_columns
+
+
 def load_file(
     source: str | StringIO,
     first_sheet: bool = False,
@@ -735,10 +778,20 @@ def load_file(
 
     # Attempt to collect, handling ComputeError for schema inference issues
     try:
-        data = [
-            Source((src.frame.select(use_columns) if use_columns else src.frame).collect(), src.filename, src.tabname)
-            for src in data
-        ]
+        data2 = []
+        for src in data:
+            if use_columns:
+                all_columns = [c for c in src.frame.collect_schema()]
+                try:
+                    ok_columns = get_columms(all_columns, use_columns)
+                except ValueError as ve:
+                    print(ve, file=sys.stderr)
+                    sys.exit(1)
+                data2.append(Source(src.frame.select(ok_columns).collect(), src.filename, src.tabname))
+            else:
+                data2.append(Source(src.frame.collect(), src.filename, src.tabname))
+
+        data = data2
     except pl.exceptions.NoDataError:
         print(
             "Warning: No data from stdin."

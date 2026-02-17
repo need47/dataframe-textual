@@ -203,6 +203,9 @@ dv --theme monokai data.csv
 
 # Show column headers
 dv data.csv -F
+
+# Read only specific columns: 'name', 'age', first column, and last column
+dv data.csv -F name age 1 -1
 ```
 
 ## Keyboard Shortcuts
