@@ -171,20 +171,18 @@ wheels = [
 
 [[package]]
 name = "dataframe-textual"
-version = "2.18.0"
+version = "2.19.0"
 source = { editable = "." }
 dependencies = [
     { name = "polars" },
     { name = "textual", extra = ["syntax"] },
+    { name = "fastexcel" },
+    { name = "xlsxwriter" },
 ]
 
 [package.optional-dependencies]
 dev = [
     { name = "textual-dev" },
-]
-excel = [
-    { name = "fastexcel" },
-    { name = "xlsxwriter" },
 ]
 
 [package.dev-dependencies]

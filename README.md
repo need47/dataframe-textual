@@ -35,9 +35,6 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/PSV/Excel/Parqu
 ```bash
 # Install from PyPI
 pip install dataframe-textual
-
-# With Excel support (fastexcel, xlsxwriter)
-pip install dataframe-textual[excel]
 ```
 
 This installs an executable `dv`.
@@ -50,12 +47,15 @@ dv <file>
 ### Using [uv](https://docs.astral.sh/uv/)
 
 ```bash
+# install as a tool
+uv install dataframe-textual
+
 # Quick run using uvx without installation
 uvx https://github.com/need47/dataframe-textual.git <csvfile>
 
 # Clone or download the project
 cd dataframe-textual
-uv sync --extra excel  # with Excel support
+uv sync
 
 # Run directly with uv
 uv run dv <file>
@@ -71,11 +71,8 @@ cd dataframe-textual
 # Install from local source
 pip install -e .
 
-# With Excel support
-pip install -e ".[excel]"
-
 # With development dependencies
-pip install -e ".[excel,dev]"
+pip install -e ".[dev]"
 ```
 
 ## Usage
