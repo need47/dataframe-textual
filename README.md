@@ -47,7 +47,7 @@ dv <file>
 ### Using [uv](https://docs.astral.sh/uv/)
 
 ```bash
-# install as a tool
+# Install as a tool
 uv install dataframe-textual
 
 # Quick run using uvx without installation
