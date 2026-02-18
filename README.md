@@ -583,6 +583,7 @@ Press `F` to see value distributions of the current column. The modal shows:
 - Press `[` and `]` to sort by any column (value, count, or percentage)
 - Press `v` to **view** all rows containing the selected value (others hidden but preserved)
 - Press `"` to **filter** all rows containing the selected value (others removed)
+- Press `Ctrl+S` to save the frequency table to file
 - Press `q` or `Escape` to close the frequency table
 
 This is useful for:

@@ -699,7 +699,7 @@ class DataFrameViewer(App):
             callback=partial(self.save_to_file, use_view=True),
         )
 
-    def save_to_file(self, result, use_view=False) -> None:
+    def save_to_file(self, result, use_view=False, use_df: pl.DataFrame = None) -> None:
         """Handle result from SaveFileScreen."""
         if result is None:
             return
@@ -710,24 +710,33 @@ class DataFrameViewer(App):
         if overwrite_prompt and Path(filename).exists():
             self.push_screen(
                 ConfirmScreen("File already exists. Overwrite?"),
-                callback=partial(self.confirm_overwrite, filename=filename, use_view=use_view),
+                callback=partial(self.confirm_overwrite, filename=filename, use_view=use_view, use_df=use_df),
             )
         else:
-            self.save_file(filename, use_view=use_view)
+            self.save_file(filename, use_view=use_view, use_df=use_df)
 
-    def confirm_overwrite(self, should_overwrite: bool, filename: str, use_view: bool = False) -> None:
+    def confirm_overwrite(
+        self, should_overwrite: bool, filename: str, use_view: bool = False, use_df: pl.DataFrame = None
+    ) -> None:
         """Handle result from ConfirmScreen."""
         if should_overwrite:
-            self.save_file(filename, use_view=use_view)
+            self.save_file(filename, use_view=use_view, use_df=use_df)
         else:
             # Go back to SaveFileScreen to allow user to enter a different name
             self.push_screen(
                 SaveFileScreen(filename, all_tabs=self._all_tabs),
-                callback=partial(self.save_to_file, use_view=use_view),
+                callback=partial(self.save_to_file, use_view=use_view, use_df=use_df),
             )
 
-    def save_file(self, filename: str, use_view: bool = False) -> None:
-        """Actually save to a file."""
+    def save_file(self, filename: str, use_view: bool = False, use_df: pl.DataFrame = None) -> None:
+        """
+        Actually save to a file.
+
+        Args:
+            filename: The filename to save to.
+            use_view: Whether to save the current view (True) or main table (False).
+            use_df: Optional DataFrame to save instead of the current table/view.
+        """
         if not (table := self.active_table):
             return
 
@@ -745,7 +754,13 @@ class DataFrameViewer(App):
             )
             fmt = "csv"
 
-        df = (table.df if table.df_view is None else table.df if use_view else table.df_view).select(pl.exclude(RID))
+        if use_df is not None:
+            lf = use_df.lazy()
+        else:
+            lf = (table.df if table.df_view is None else table.df if use_view else table.df_view).lazy()
+
+        df = lf.select(pl.exclude(RID)).collect()
+
         try:
             if fmt == "csv":
                 df.write_csv(filename)

@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .data_frame_table import DataFrameTable
 
+from functools import partial
+
 import polars as pl
 from rich.text import Text
 from textual.app import ComposeResult
@@ -14,6 +16,7 @@ from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
 from .common import NULL, NULL_DISPLAY, RID, DtypeConfig, format_float
+from .yes_no_screen import SaveFileScreen
 
 
 class TableScreen(ModalScreen):
@@ -409,6 +412,10 @@ class FrequencyScreen(TableScreen):
             # Highlight the main table by the selected value
             self.filter_or_view_selected_value(self.get_cidx_name_value(), action="filter")
             event.stop()
+        elif event.key == "ctrl+s":
+            # Save the frequency table to file
+            self.save_frequency_table()
+            event.stop()
 
     def build_table(self) -> None:
         """Build the frequency table."""
@@ -516,6 +523,16 @@ class FrequencyScreen(TableScreen):
         col_value = NULL if cell_value.plain == NULL_DISPLAY else DtypeConfig(col_dtype).convert(cell_value.plain)
 
         return self.cidx, col_name, col_value
+
+    def save_frequency_table(self) -> None:
+        """Save the frequency table to file."""
+        column = self.dftable.df.columns[self.cidx]
+        filename = f"{column}_freq.csv"
+
+        self.app.push_screen(
+            SaveFileScreen(filename, all_tabs=False),
+            callback=partial(self.app.save_to_file, use_df=self.df),
+        )
 
 
 class MetaShape(TableScreen):
