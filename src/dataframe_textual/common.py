@@ -508,7 +508,7 @@ def load_dataframe(
         truncate_ragged_lines: Whether to truncate ragged lines when reading CSV/TSV files. Defaults to False.
         n_rows: Number of rows to read from CSV/TSV files. Defaults to None (read all rows).
         use_columns: List of columns to read from CSV/TSV files. Defaults to None (read all columns).
-        all_in_one: Whether to read all files (must be of the same format and structure) into a single DataFrame. Defaults to False.
+        all_in_one: Whether to read all files (must be of the same structure) into a single DataFrame. Defaults to False.
     Returns:
         List of `Source` objects.
     """
