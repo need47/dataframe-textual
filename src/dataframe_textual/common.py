@@ -487,6 +487,7 @@ def load_dataframe(
     truncate_ragged_lines: bool = False,
     n_rows: int | None = None,
     use_columns: list[str] | None = None,
+    all_in_one: bool = False,
 ) -> list[Source]:
     """Load DataFrames from file specifications.
 
@@ -507,13 +508,43 @@ def load_dataframe(
         truncate_ragged_lines: Whether to truncate ragged lines when reading CSV/TSV files. Defaults to False.
         n_rows: Number of rows to read from CSV/TSV files. Defaults to None (read all rows).
         use_columns: List of columns to read from CSV/TSV files. Defaults to None (read all columns).
-
+        all_in_one: Whether to read all files (must be of the same format and structure) into a single DataFrame. Defaults to False.
     Returns:
         List of `Source` objects.
     """
     data: list[Source] = []
     prefix_sheet = len(filenames) > 1
 
+    # Read all files into a single DataFrame
+    if all_in_one:
+        fmt = file_format
+        if not fmt:
+            # Determine format from first file extension
+            ext = Path(filenames[0]).suffix.lower()
+            if ext == ".gz":
+                ext = Path(filenames[0]).with_suffix("").suffix.lower()
+            fmt = ext.removeprefix(".")
+            if not fmt or fmt not in SUPPORTED_FORMATS:
+                fmt = "tsv"
+
+        return load_file(
+            filenames,
+            prefix_sheet=prefix_sheet,
+            file_format=fmt,
+            header=header,
+            infer_schema=infer_schema,
+            comment_prefix=comment_prefix,
+            quote_char=quote_char,
+            skip_lines=skip_lines,
+            skip_rows_after_header=skip_rows_after_header,
+            null_values=null_values,
+            ignore_errors=ignore_errors,
+            truncate_ragged_lines=truncate_ragged_lines,
+            n_rows=n_rows,
+            use_columns=use_columns,
+        )
+
+    # Read files individually
     for filename in filenames:
         if filename == "-":
             source = StringIO(sys.stdin.read())
@@ -671,7 +702,7 @@ def get_columms(all_columns: list[str], use_columns: list[str] | None) -> list[s
 
 
 def load_file(
-    source: str | StringIO,
+    source: str | StringIO | list[str],
     first_sheet: bool = False,
     prefix_sheet: bool = False,
     file_format: str | None = None,
@@ -698,7 +729,7 @@ def load_file(
     all columns are successfully loaded or no further recovery is possible.
 
     Args:
-        filename: Path to file to load.
+        source: Path to file to load, a StringIO object, or a list of file paths.
         first_sheet: If True, only load first sheet for Excel files. Defaults to False.
         prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
         file_format: Optional format specifier (i.e., 'tsv', 'csv', 'excel', 'parquet', 'json', 'ndjson') for input files.
@@ -721,7 +752,13 @@ def load_file(
     """
     data: list[Source] = []
 
-    filename = f"stdin.{file_format}" if isinstance(source, StringIO) else source
+    filename = (
+        f"stdin.{file_format}"
+        if isinstance(source, StringIO)
+        else f"all-in-one.{file_format}"
+        if isinstance(source, list)
+        else source
+    )
     filepath = Path(filename)
 
     # Load based on file format
@@ -756,22 +793,28 @@ def load_file(
     elif file_format in ("xlsx", "xls"):
         if first_sheet:
             # Read only the first sheet for multiple files
-            lf = pl.read_excel(source).lazy()
-            data.append(Source(lf, filename, filepath.stem))
+            df = pl.read_excel(source)
+            if n_rows is not None:
+                df = df.head(n_rows)
+            data.append(Source(df.lazy(), filename, filepath.stem))
         else:
             # For single file, expand all sheets
             sheets = pl.read_excel(source, sheet_id=0)
             for sheet_name, df in sheets.items():
+                if n_rows is not None:
+                    df = df.head(n_rows)
                 tabname = f"{filepath.stem}_{sheet_name}" if prefix_sheet else sheet_name
                 data.append(Source(df.lazy(), filename, tabname))
     elif file_format == "parquet":
-        lf = pl.scan_parquet(source)
+        lf = pl.scan_parquet(source, n_rows=n_rows)
         data.append(Source(lf, filename, filepath.stem))
     elif file_format == "json":
-        lf = pl.read_json(source).lazy()
-        data.append(Source(lf, filename, filepath.stem))
+        df = pl.read_json(source)
+        if n_rows is not None:
+            df = df.head(n_rows)
+        data.append(Source(df.lazy(), filename, filepath.stem))
     elif file_format == "ndjson":
-        lf = pl.scan_ndjson(source, schema_overrides=schema_overrides)
+        lf = pl.scan_ndjson(source, n_rows=n_rows, schema_overrides=schema_overrides)
         data.append(Source(lf, filename, filepath.stem))
     else:
         raise ValueError(f"Unsupported file format: {file_format}. Supported formats are: {SUPPORTED_FORMATS}")

@@ -152,10 +152,11 @@ options:
   -K, --skip-lines N    Skip first N lines when reading CSV/TSV
   -A, --skip-rows-after-header N
                         Skip N rows after header when reading CSV/TSV
-  -M, --n-rows N        Read maximum rows from CSV/TSV
+  -M, --n-rows N        Read maximum rows
   -N, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
   --theme [THEME]       Set the theme for the application. Use 'list' to show available themes.
+  --all-in-one          Read all files (must be of the same format and structure) into a single table.
 ```
 
 ### CLI Examples
@@ -203,6 +204,9 @@ dv data.csv -F
 
 # Read only specific columns: 'name', 'age', first column, and last column
 dv data.csv -F name age 1 -1
+
+# Read all files (must be of the same format and structure) into a single table
+dv data-1.csv data-2.csv --all-in-one
 ```
 
 ## Keyboard Shortcuts

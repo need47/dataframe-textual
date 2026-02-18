@@ -120,7 +120,7 @@ def cli() -> argparse.Namespace:
         default=0,
         help="Skip N rows after header when reading CSV/TSV",
     )
-    parser.add_argument("-M", "--n-rows", metavar="N", type=int, help="Read maximum rows from CSV/TSV")
+    parser.add_argument("-M", "--n-rows", metavar="N", type=int, help="Read maximum rows")
     parser.add_argument("-N", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
 
     parser.add_argument(
@@ -129,6 +129,12 @@ def cli() -> argparse.Namespace:
         default="textual-dark",
         const="list",
         help="Set the theme for the application. Use 'list' to show available themes.",
+    )
+
+    parser.add_argument(
+        "--all-in-one",
+        action="store_true",
+        help="Read all files (must be of the same format and structure) into a single table.",
     )
 
     args = parser.parse_args()
@@ -181,6 +187,7 @@ def main() -> None:
         truncate_ragged_lines=args.truncate_ragged_lines,
         n_rows=20 if args.fields == "list" else args.n_rows,
         use_columns=args.fields if args.fields and args.fields != "list" else None,
+        all_in_one=args.all_in_one,
     )
 
     # List available fields and exit
