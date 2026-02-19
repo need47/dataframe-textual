@@ -134,7 +134,7 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "--all-in-one",
         action="store_true",
-        help="Read all files (must be of the same structure) into a single table.",
+        help="Read all files (must be of the same format and structure) into a single table.",
     )
 
     args = parser.parse_args()

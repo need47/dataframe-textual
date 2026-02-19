@@ -12,7 +12,7 @@ import polars as pl
 from rich.text import Text
 
 # Supported file formats
-SUPPORTED_FORMATS = ["tsv", "csv", "psv", "xlsx", "xls", "parquet", "json", "ndjson"]
+SUPPORTED_FORMATS = ["tsv", "csv", "psv", "xlsx", "xls", "parquet", "vortex", "json", "ndjson"]
 
 
 # Boolean string mappings
@@ -508,7 +508,7 @@ def load_dataframe(
         truncate_ragged_lines: Whether to truncate ragged lines when reading CSV/TSV files. Defaults to False.
         n_rows: Number of rows to read from CSV/TSV files. Defaults to None (read all rows).
         use_columns: List of columns to read from CSV/TSV files. Defaults to None (read all columns).
-        all_in_one: Whether to read all files (must be of the same structure) into a single DataFrame. Defaults to False.
+        all_in_one: Whether to read all files (must be of the same format and structure) into a single DataFrame. Defaults to False.
     Returns:
         List of `Source` objects.
     """
@@ -807,6 +807,13 @@ def load_file(
                 data.append(Source(df.lazy(), filename, tabname))
     elif file_format == "parquet":
         lf = pl.scan_parquet(source, n_rows=n_rows)
+        data.append(Source(lf, filename, filepath.stem))
+    elif file_format == "vortex":
+        import vortex as vx
+
+        lf = vx.open(source).to_polars()
+        if n_rows is not None:
+            lf = lf.head(n_rows)
         data.append(Source(lf, filename, filepath.stem))
     elif file_format == "json":
         df = pl.read_json(source)

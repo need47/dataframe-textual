@@ -1,6 +1,6 @@
 # DataFrame Textual
 
-A powerful, interactive terminal-based viewer/editor for CSV/TSV/PSV/Excel/Parquet/JSON/NDJSON built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in terminal with multi-tab support for multiple files!
+A powerful, interactive terminal-based viewer/editor for CSV/TSV/PSV/Excel/[Parquet](https://parquet.apache.org/)/[Vortex](https://vortex.dev/)/JSON/NDJSON built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in terminal with multi-tab support for multiple files!
 
 ![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshot.png)
 
@@ -156,7 +156,7 @@ options:
   -N, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
   --theme [THEME]       Set the theme for the application. Use 'list' to show available themes.
-  --all-in-one          Read all files (must be of the same structure) into a single table.
+  --all-in-one          Read all files (must be of the same format and structure) into a single table.
 ```
 
 ### CLI Examples
@@ -205,7 +205,7 @@ dv data.csv -F
 # Read only specific columns: 'name', 'age', first column, and last column
 dv data.csv -F name age 1 -1
 
-# Read all files (must be of the same structure) into a single table
+# Read all files (must be of the same format and structure) into a single table
 dv data-1.csv data-2.csv --all-in-one
 ```
 

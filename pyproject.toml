@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dataframe-textual"
-version = "2.21.0"
+version = "2.22.0"
 description = "Interactive terminal viewer/editor for tabular data"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -37,6 +37,7 @@ dependencies = [
     "fastexcel>=0.16.0",
     "xlsxwriter>=3.2.9",
     "textual[syntax]>=6.5.0",
+    "vortex-data>=0.59.4",
 ]
 
 [project.urls]

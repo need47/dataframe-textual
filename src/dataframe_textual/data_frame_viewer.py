@@ -776,6 +776,10 @@ class DataFrameViewer(App):
                 df.write_ndjson(filename)
             elif fmt == "parquet":
                 df.write_parquet(filename)
+            elif fmt == "vortex":
+                import vortex as vx
+
+                vx.io.write(df.to_arrow(), filename)
             else:  # Fallback to CSV
                 df.write_csv(filename)
 
