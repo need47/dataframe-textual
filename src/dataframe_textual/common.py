@@ -473,6 +473,163 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
     return parts
 
 
+RE_COMPUTE_ERROR = re.compile(r"at column '(.*?)' \(column number \d+\)")
+
+
+def handle_compute_error(
+    err_msg: str,
+    file_format: str | None,
+    infer_schema: bool,
+    schema_overrides: dict[str, pl.DataType] | None = None,
+) -> tuple[bool, dict[str, pl.DataType] | None]:
+    """Handle ComputeError during schema inference and determine retry strategy.
+
+    Analyzes the error message and determines whether to retry with schema overrides,
+    disable schema inference, or exit with an error.
+
+    Args:
+        err_msg: The error message from the ComputeError exception.
+        file_format: The file format being loaded (tsv, csv, etc.).
+        infer_schema: Whether schema inference is currently enabled.
+        schema_overrides: Current schema overrides, if any.
+
+    Returns:
+        A tuple of (infer_schema, schema_overrides):
+
+    Raises:
+        SystemExit: If the error is unrecoverable.
+    """
+    # Already disabled schema inference, cannot recover
+    if not infer_schema:
+        print(f"Error loading even with schema inference disabled:\n{err_msg}", file=sys.stderr)
+
+        if "CSV malformed" in err_msg:
+            print(
+                "\nSometimes quote characters might be mismatched. Try again with `-Q` or `-E` to ignore errors",
+                file=sys.stderr,
+            )
+
+        sys.exit(1)
+
+    # Schema mismatch error
+    if "found more fields than defined in 'Schema'" in err_msg:
+        print(f"{err_msg}.\n\nInput might be malformed. Try again with `-T` to truncate ragged lines", file=sys.stderr)
+        sys.exit(1)
+
+    # Field ... is not properly escaped
+    if "is not properly escaped" in err_msg:
+        print(
+            f"{err_msg}\n\nQuoting might be causing the issue. Try again with `-Q` to disable quoting", file=sys.stderr
+        )
+        sys.exit(1)
+
+    # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
+    if file_format in ("tsv", "csv") and (m := RE_COMPUTE_ERROR.search(err_msg)):
+        col_name = m.group(1)
+
+        if schema_overrides is None:
+            schema_overrides = {}
+        schema_overrides.update({col_name: pl.String})
+    else:
+        infer_schema = False
+
+    return infer_schema, schema_overrides
+
+
+def get_columms(all_columns: list[str], use_columns: list[str] | None) -> list[str]:
+    """Get the list of columns to read based on use_columns specification.
+
+    Determines which columns to read from the input based on the use_columns parameter,
+    which can specify columns by name, 1-based index, or negative index.
+
+    Args:
+        all_columns: The list of all column names in the input.
+        use_columns: The list of columns to read, specified by name, 1-based index, or negative index. Defaults to None (read all columns).
+
+    Returns:
+        The list of column names to read.
+
+    Raises:
+        ValueError: If a specified column name does not exist or an index is out of range.
+    """
+    if use_columns is None:
+        return all_columns
+
+    ok_columns = []
+    for col in use_columns:
+        if col in all_columns:
+            ok_columns.append(col)
+        else:
+            try:
+                idx = int(col)
+            except ValueError:
+                raise ValueError(
+                    f"Column name '{col}' not found in input (available columns: {', '.join(all_columns)})"
+                )
+
+            if 1 <= idx <= len(all_columns):
+                ok_columns.append(all_columns[idx - 1])
+            elif -len(all_columns) <= idx <= -1:
+                ok_columns.append(all_columns[idx])
+            else:
+                raise ValueError(
+                    f"Column index {col} is out of range (valid range: 1 to {len(all_columns)} or -{len(all_columns)} to -1)"
+                )
+
+    return ok_columns
+
+
+def round_to_nearest_hundreds(num: int, N: int = 100) -> tuple[int, int]:
+    """Round a number to the nearest hundred boundaries.
+
+    Given a number, return a tuple of the two closest hundreds that bracket it.
+
+    Args:
+        num: The number to round.
+
+    Returns:
+        A tuple (lower_hundred, upper_hundred) where:
+        - lower_hundred is the largest multiple of 100 <= num
+        - upper_hundred is the smallest multiple of 100 > num
+
+    Examples:
+        >>> round_to_nearest_hundreds(0)
+        (0, 100)
+        >>> round_to_nearest_hundreds(150)
+        (100, 200)
+        >>> round_to_nearest_hundreds(200)
+        (200, 300)
+    """
+    lower = (num // N) * N
+    upper = lower + N
+    return (lower, upper)
+
+
+def scan_vortex(source: str | list[str], n_rows: int | None = None) -> pl.LazyFrame:
+    """Scan a Vortex file into a Polars LazyFrame.
+
+    Args:
+        source: Path to the Vortex file or list of files.
+        n_rows: Number of rows to read from each file. If None, read all rows. Defaults to None.
+    Returns:
+        A Polars LazyFrame representing the scanned Vortex data.
+    """
+    import vortex as vx
+
+    if isinstance(source, list):
+        lf = None
+        for src in source:
+            lf_src = vx.open(src).to_polars()
+            lf = lf_src if lf is None else pl.concat([lf, lf_src])
+    else:
+        lf = vx.open(source).to_polars()
+
+    if n_rows is not None:
+        lf = lf.head(n_rows)
+
+    return lf
+
+
 def load_dataframe(
     filenames: list[str],
     file_format: str | None = None,
@@ -595,112 +752,6 @@ def load_dataframe(
     return data
 
 
-RE_COMPUTE_ERROR = re.compile(r"at column '(.*?)' \(column number \d+\)")
-
-
-def handle_compute_error(
-    err_msg: str,
-    file_format: str | None,
-    infer_schema: bool,
-    schema_overrides: dict[str, pl.DataType] | None = None,
-) -> tuple[bool, dict[str, pl.DataType] | None]:
-    """Handle ComputeError during schema inference and determine retry strategy.
-
-    Analyzes the error message and determines whether to retry with schema overrides,
-    disable schema inference, or exit with an error.
-
-    Args:
-        err_msg: The error message from the ComputeError exception.
-        file_format: The file format being loaded (tsv, csv, etc.).
-        infer_schema: Whether schema inference is currently enabled.
-        schema_overrides: Current schema overrides, if any.
-
-    Returns:
-        A tuple of (infer_schema, schema_overrides):
-
-    Raises:
-        SystemExit: If the error is unrecoverable.
-    """
-    # Already disabled schema inference, cannot recover
-    if not infer_schema:
-        print(f"Error loading even with schema inference disabled:\n{err_msg}", file=sys.stderr)
-
-        if "CSV malformed" in err_msg:
-            print(
-                "\nSometimes quote characters might be mismatched. Try again with `-Q` or `-E` to ignore errors",
-                file=sys.stderr,
-            )
-
-        sys.exit(1)
-
-    # Schema mismatch error
-    if "found more fields than defined in 'Schema'" in err_msg:
-        print(f"{err_msg}.\n\nInput might be malformed. Try again with `-T` to truncate ragged lines", file=sys.stderr)
-        sys.exit(1)
-
-    # Field ... is not properly escaped
-    if "is not properly escaped" in err_msg:
-        print(
-            f"{err_msg}\n\nQuoting might be causing the issue. Try again with `-Q` to disable quoting", file=sys.stderr
-        )
-        sys.exit(1)
-
-    # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
-    if file_format in ("tsv", "csv") and (m := RE_COMPUTE_ERROR.search(err_msg)):
-        col_name = m.group(1)
-
-        if schema_overrides is None:
-            schema_overrides = {}
-        schema_overrides.update({col_name: pl.String})
-    else:
-        infer_schema = False
-
-    return infer_schema, schema_overrides
-
-
-def get_columms(all_columns: list[str], use_columns: list[str] | None) -> list[str]:
-    """Get the list of columns to read based on use_columns specification.
-
-    Determines which columns to read from the input based on the use_columns parameter,
-    which can specify columns by name, 1-based index, or negative index.
-
-    Args:
-        all_columns: The list of all column names in the input.
-        use_columns: The list of columns to read, specified by name, 1-based index, or negative index. Defaults to None (read all columns).
-
-    Returns:
-        The list of column names to read.
-
-    Raises:
-        ValueError: If a specified column name does not exist or an index is out of range.
-    """
-    if use_columns is None:
-        return all_columns
-
-    ok_columns = []
-    for col in use_columns:
-        if col in all_columns:
-            ok_columns.append(col)
-        else:
-            try:
-                idx = int(col)
-            except ValueError:
-                raise ValueError(
-                    f"Column name '{col}' not found in input (available columns: {', '.join(all_columns)})"
-                )
-
-            if 1 <= idx <= len(all_columns):
-                ok_columns.append(all_columns[idx - 1])
-            elif -len(all_columns) <= idx <= -1:
-                ok_columns.append(all_columns[idx])
-            else:
-                raise ValueError(
-                    f"Column index {col} is out of range (valid range: 1 to {len(all_columns)} or -{len(all_columns)} to -1)"
-                )
-
-    return ok_columns
-
-
 def load_file(
     source: str | StringIO | list[str],
     first_sheet: bool = False,
@@ -809,11 +860,7 @@ def load_file(
         lf = pl.scan_parquet(source, n_rows=n_rows)
         data.append(Source(lf, filename, filepath.stem))
     elif file_format == "vortex":
-        import vortex as vx
-
-        lf = vx.open(source).to_polars()
-        if n_rows is not None:
-            lf = lf.head(n_rows)
+        lf = scan_vortex(source, n_rows=n_rows)
         data.append(Source(lf, filename, filepath.stem))
     elif file_format == "json":
         df = pl.read_json(source)
@@ -876,29 +923,3 @@ def load_file(
         )
 
     return data
-
-
-def round_to_nearest_hundreds(num: int, N: int = 100) -> tuple[int, int]:
-    """Round a number to the nearest hundred boundaries.
-
-    Given a number, return a tuple of the two closest hundreds that bracket it.
-
-    Args:
-        num: The number to round.
-
-    Returns:
-        A tuple (lower_hundred, upper_hundred) where:
-        - lower_hundred is the largest multiple of 100 <= num
-        - upper_hundred is the smallest multiple of 100 > num
-
-    Examples:
-        >>> round_to_nearest_hundreds(0)
-        (0, 100)
-        >>> round_to_nearest_hundreds(150)
-        (100, 200)
-        >>> round_to_nearest_hundreds(200)
-        (200, 300)
-    """
-    lower = (num // N) * N
-    upper = lower + N
-    return (lower, upper)

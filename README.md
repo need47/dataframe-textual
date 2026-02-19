@@ -205,6 +205,9 @@ dv data.csv -F
 # Read only specific columns: 'name', 'age', first column, and last column
 dv data.csv -F name age 1 -1
 
+# Filter data using SQL query (use 'self' as the table name)
+dv data.csv --sql 'SELECT * FROM self WHERE age > 30'
+
 # Read all files (must be of the same format and structure) into a single table
 dv data-1.csv data-2.csv --all-in-one
 ```

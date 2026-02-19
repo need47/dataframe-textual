@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import polars as pl
 from textual.theme import BUILTIN_THEMES
 
 from . import __version__
@@ -84,6 +85,9 @@ def cli() -> argparse.Namespace:
         action=ConstWithMultiArgs,
         const="list",
         help="When used without values, list available fields. Otherwise, read only specified fields.",
+    )
+    parser.add_argument(
+        "--sql", help="Specify a SQL query to execute on the input file (e.g., to select and filter data)"
     )
     parser.add_argument(
         "-I", "--no-inference", action="store_true", help="Do not infer data types when reading CSV/TSV"
@@ -198,6 +202,15 @@ def main() -> None:
             break  # Only list fields for the first source
 
         return
+
+    if args.sql:
+        for source in sources:
+            ctx = pl.SQLContext(frames={"self": source.frame})
+            try:
+                source.frame = ctx.execute(args.sql)
+            except pl.exceptions.SQLInterfaceError as e:
+                print(f"SQL error: {e}", file=sys.stderr)
+                sys.exit(1)
 
     # Run the DataFrame Viewer application
     app = DataFrameViewer(*sources, theme=args.theme)
