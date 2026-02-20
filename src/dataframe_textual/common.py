@@ -721,7 +721,7 @@ def load_dataframe(
 
 
 def load_file(
-    source: str | StringIO | list[str],
+    source: str | StringIO,
     first_sheet: bool = False,
     prefix_sheet: bool = False,
     file_format: str | None = None,
@@ -748,7 +748,7 @@ def load_file(
     all columns are successfully loaded or no further recovery is possible.
 
     Args:
-        source: Path to file to load, a StringIO object, or a list of file paths.
+        source: Path to file to load or a StringIO object.
         first_sheet: If True, only load first sheet for Excel files. Defaults to False.
         prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
         file_format: Optional format specifier (i.e., 'tsv', 'csv', 'excel', 'parquet', 'json', 'ndjson') for input files.
@@ -849,7 +849,7 @@ def load_file(
 
     # Attempt to collect, handling ComputeError for schema inference issues
     try:
-        data2 = []
+        ds = []
         for src in data:
             if use_columns:
                 all_columns = [c for c in src.frame.collect_schema()]
@@ -858,11 +858,11 @@ def load_file(
                 except ValueError as ve:
                     print(ve, file=sys.stderr)
                     sys.exit(1)
-                data2.append(Source(src.frame.select(ok_columns).collect(), src.filename, src.tabname))
+                ds.append(Source(src.frame.select(ok_columns).collect(), src.filename, src.tabname))
             else:
-                data2.append(Source(src.frame.collect(), src.filename, src.tabname))
+                ds.append(Source(src.frame.collect(), src.filename, src.tabname))
 
-        data = data2
+        data = ds
     except pl.exceptions.NoDataError:
         print(
             "Warning: No data from stdin."
