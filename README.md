@@ -156,7 +156,7 @@ options:
   -N, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
   --theme [THEME]       Set the theme for the application. Use 'list' to show available themes.
-  --all-in-one          Read all files (must be of the same format and structure) into a single table.
+  --all-in-one          Read all files (must be of the same structure) into a single table.
 ```
 
 ### CLI Examples
@@ -208,7 +208,7 @@ dv data.csv -F name age 1 -1
 # Filter data using SQL query (use 'self' as the table name)
 dv data.csv --sql 'SELECT * FROM self WHERE age > 30'
 
-# Read all files (must be of the same format and structure) into a single table
+# Read all files (must be of the same structure) into a single table
 dv data-1.csv data-2.csv --all-in-one
 ```
 

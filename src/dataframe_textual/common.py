@@ -665,29 +665,33 @@ def load_dataframe(
         truncate_ragged_lines: Whether to truncate ragged lines when reading CSV/TSV files. Defaults to False.
         n_rows: Number of rows to read from CSV/TSV files. Defaults to None (read all rows).
         use_columns: List of columns to read from CSV/TSV files. Defaults to None (read all columns).
-        all_in_one: Whether to read all files (must be of the same format and structure) into a single DataFrame. Defaults to False.
+        all_in_one: Whether to read all files (must be of the same structure) into a single DataFrame. Defaults to False.
     Returns:
         List of `Source` objects.
     """
     data: list[Source] = []
+    lf_aio = None
     prefix_sheet = len(filenames) > 1
 
-    # Read all files into a single DataFrame
-    if all_in_one:
-        fmt = file_format
-        if not fmt:
-            # Determine format from first file extension
-            ext = Path(filenames[0]).suffix.lower()
-            if ext == ".gz":
-                ext = Path(filenames[0]).with_suffix("").suffix.lower()
-            fmt = ext.removeprefix(".")
-            if not fmt or fmt not in SUPPORTED_FORMATS:
-                fmt = "tsv"
+    # Read files individually
+    for filename in filenames:
+        if filename == "-":
+            source = StringIO(sys.stdin.read())
 
-        return load_file(
-            filenames,
+            # Reopen stdin to /dev/tty for proper terminal interaction
+            try:
+                tty = open("/dev/tty")
+                os.dup2(tty.fileno(), sys.stdin.fileno())
+            except (OSError, FileNotFoundError):
+                pass
+        else:
+            source = filename
+
+        # Load the file
+        ds = load_file(
+            source,
             prefix_sheet=prefix_sheet,
-            file_format=fmt,
+            file_format=file_format,
             header=header,
             infer_schema=infer_schema,
             comment_prefix=comment_prefix,
@@ -701,53 +705,17 @@ def load_dataframe(
             use_columns=use_columns,
         )
 
-    # Read files individually
-    for filename in filenames:
-        if filename == "-":
-            source = StringIO(sys.stdin.read())
-            file_format = file_format or "tsv"
-
-            # Reopen stdin to /dev/tty for proper terminal interaction
-            try:
-                tty = open("/dev/tty")
-                os.dup2(tty.fileno(), sys.stdin.fileno())
-            except (OSError, FileNotFoundError):
-                pass
+        if all_in_one:
+            for src in ds:
+                if lf_aio is None:
+                    lf_aio = src.frame
+                else:
+                    lf_aio = pl.concat([lf_aio, src.frame])
         else:
-            source = filename
+            data.extend(ds)
 
-        # If not specified, determine file format (may be different for each file)
-        fmt = file_format
-        if not fmt:
-            ext = Path(filename).suffix.lower()
-            if ext == ".gz":
-                ext = Path(filename).with_suffix("").suffix.lower()
-
-            fmt = ext.removeprefix(".")
-
-            # Default to TSV
-            if not fmt or fmt not in SUPPORTED_FORMATS:
-                fmt = "tsv"
-
-        # Load the file
-        data.extend(
-            load_file(
-                source,
-                prefix_sheet=prefix_sheet,
-                file_format=fmt,
-                header=header,
-                infer_schema=infer_schema,
-                comment_prefix=comment_prefix,
-                quote_char=quote_char,
-                skip_lines=skip_lines,
-                skip_rows_after_header=skip_rows_after_header,
-                null_values=null_values,
-                ignore_errors=ignore_errors,
-                truncate_ragged_lines=truncate_ragged_lines,
-                n_rows=n_rows,
-                use_columns=use_columns,
-            )
-        )
+    if lf_aio is not None:
+        data.append(Source(lf_aio, "all-in-one.parquet", "all-in-one"))
 
     return data
 
@@ -803,17 +771,23 @@ def load_file(
     """
     data: list[Source] = []
 
-    filename = (
-        f"stdin.{file_format}"
-        if isinstance(source, StringIO)
-        else f"all-in-one.{file_format}"
-        if isinstance(source, list)
-        else source
-    )
+    fmt = file_format
+    if not fmt:
+        if isinstance(source, StringIO):
+            fmt = "tsv"
+        else:
+            ext = Path(source).suffix.lower()
+            if ext == ".gz":
+                ext = Path(source).with_suffix("").suffix.lower()
+            fmt = ext.removeprefix(".")
+            if not fmt or fmt not in SUPPORTED_FORMATS:
+                fmt = "tsv"
+
+    filename = f"stdin.{fmt}" if isinstance(source, StringIO) else source
     filepath = Path(filename)
 
     # Load based on file format
-    if file_format in ("csv", "tsv", "psv"):
+    if fmt in ("csv", "tsv", "psv"):
         if header is False:
             has_header = False
             new_columns = None
@@ -826,7 +800,7 @@ def load_file(
 
         lf = pl.scan_csv(
             source,
-            separator="\t" if file_format == "tsv" else ("|" if file_format == "psv" else ","),
+            separator="\t" if fmt == "tsv" else ("|" if fmt == "psv" else ","),
             has_header=has_header,
             infer_schema=infer_schema,
             comment_prefix=comment_prefix,
@@ -841,7 +815,7 @@ def load_file(
             new_columns=new_columns,
         )
         data.append(Source(lf, filename, filepath.stem))
-    elif file_format in ("xlsx", "xls"):
+    elif fmt in ("xlsx", "xls"):
         if first_sheet:
             # Read only the first sheet for multiple files
             df = pl.read_excel(source)
@@ -856,22 +830,22 @@ def load_file(
                     df = df.head(n_rows)
                 tabname = f"{filepath.stem}_{sheet_name}" if prefix_sheet else sheet_name
                 data.append(Source(df.lazy(), filename, tabname))
-    elif file_format == "parquet":
+    elif fmt == "parquet":
         lf = pl.scan_parquet(source, n_rows=n_rows)
         data.append(Source(lf, filename, filepath.stem))
-    elif file_format == "vortex":
+    elif fmt == "vortex":
         lf = scan_vortex(source, n_rows=n_rows)
         data.append(Source(lf, filename, filepath.stem))
-    elif file_format == "json":
+    elif fmt == "json":
         df = pl.read_json(source)
         if n_rows is not None:
             df = df.head(n_rows)
         data.append(Source(df.lazy(), filename, filepath.stem))
-    elif file_format == "ndjson":
+    elif fmt == "ndjson":
         lf = pl.scan_ndjson(source, n_rows=n_rows, schema_overrides=schema_overrides)
         data.append(Source(lf, filename, filepath.stem))
     else:
-        raise ValueError(f"Unsupported file format: {file_format}. Supported formats are: {SUPPORTED_FORMATS}")
+        raise ValueError(f"Unsupported file format: {fmt}. Supported formats are: {SUPPORTED_FORMATS}")
 
     # Attempt to collect, handling ComputeError for schema inference issues
     try:
@@ -899,7 +873,7 @@ def load_file(
         sys.exit()
     except pl.exceptions.ComputeError as ce:
         # Handle the error and determine retry strategy
-        infer_schema, schema_overrides = handle_compute_error(str(ce), file_format, infer_schema, schema_overrides)
+        infer_schema, schema_overrides = handle_compute_error(str(ce), fmt, infer_schema, schema_overrides)
 
         # Retry loading with updated schema overrides
         if isinstance(source, StringIO):
@@ -907,7 +881,7 @@ def load_file(
 
         return load_file(
             source,
-            file_format=file_format,
+            file_format=fmt,
             header=header,
             infer_schema=infer_schema,
             comment_prefix=comment_prefix,
