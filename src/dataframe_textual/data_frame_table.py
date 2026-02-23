@@ -51,12 +51,12 @@ from .yes_no_screen import (
     ConfirmScreen,
     EditCellScreen,
     EditColumnScreen,
-    FilterScreen,
     FindReplaceScreen,
     FreezeScreen,
     GoToRowScreen,
     RenameColumnScreen,
     SearchScreen,
+    ViewScreen,
 )
 
 # Color for highlighting selections and matches
@@ -273,8 +273,8 @@ class DataFrameTable(DataTable):
         ("V", "view_rows_expr", "View selected rows matching expression"),
         ("quotation_mark", "filter_rows", "Filter selected rows"),  # `"`
         # Row Selection
-        ("backslash", "select_row", "Select rows with cell matches or those matching cursor value in current column"),  # `\`
-        ("vertical_line", "select_row_expr", "Select rows with expression"),  # `|`
+        ("backslash", "select_rows", "Select rows with cell matches or those matching cursor value in current column"),  # `\`
+        ("vertical_line", "select_rows_expr", "Select rows with expression"),  # `|`
         ("right_curly_bracket", "next_selected_row", "Go to next selected row"),  # `}`
         ("left_curly_bracket", "previous_selected_row", "Go to previous selected row"),  # `{`
         ("apostrophe", "toggle_row_selection", "Toggle row selection"),  # `'`
@@ -817,13 +817,13 @@ class DataFrameTable(DataTable):
         """Clear cells in the current column that match the cursor value."""
         self.do_clear_column()
 
-    def action_select_row(self) -> None:
+    def action_select_rows(self) -> None:
         """Select rows with cursor value in the current column."""
-        self.do_select_row()
+        self.do_select_rows()
 
-    def action_select_row_expr(self) -> None:
+    def action_select_rows_expr(self) -> None:
         """Select rows by expression."""
-        self.do_select_row_expr()
+        self.do_select_rows_expr()
 
     def action_find_cursor_value(self, scope="column") -> None:
         """Find by cursor value.
@@ -2841,7 +2841,7 @@ class DataFrameTable(DataTable):
             self.log(f"Error casting column `{col_name}`: {str(e)}")
 
     # Row selection
-    def do_select_row(self) -> None:
+    def do_select_rows(self) -> None:
         """Select rows.
 
         If there are existing cell matches, use those to select rows.
@@ -2862,9 +2862,9 @@ class DataFrameTable(DataTable):
             else:
                 term = pl.col(col_name) == self.cursor_value
 
-        self.select_row((term, cidx, False, True))
+        self.select_rows((term, cidx, False, True, False))
 
-    def do_select_row_expr(self) -> None:
+    def do_select_rows_expr(self) -> None:
         """Select rows by expression."""
         cidx = self.cursor_cidx
 
@@ -2873,16 +2873,16 @@ class DataFrameTable(DataTable):
 
         # Push the search modal screen
         self.app.push_screen(
-            SearchScreen("Select", term, self.df, cidx),
-            callback=self.select_row,
+            SearchScreen("Select Rows", term, self.df, cidx),
+            callback=self.select_rows,
         )
 
-    def select_row(self, result) -> None:
+    def select_rows(self, result) -> None:
         """Select rows by value or expression."""
         if result is None:
             return
 
-        term, cidx, match_nocase, match_whole = result
+        term, cidx, match_nocase, match_whole, match_reverse = result
         col_name = "all columns" if cidx is None else self.df.columns[cidx]
 
         # Already a Polars expression
@@ -2926,12 +2926,16 @@ class DataFrameTable(DataTable):
                         term = f"^{term}$"
                     if match_nocase:
                         term = f"(?i){term}"
-                    expr = pl.col(col_name).cast(pl.String).str.contains(term)
+                    expr = pl.col(col_name).cast(pl.Utf8).str.contains(term)
                     self.notify(
                         f"Error converting [$error]{term}[/] to [$accent]{dtype}[/]. Cast to string.",
                         title="Select Row",
                         severity="warning",
                     )
+
+        # Reverse the expression if requested
+        if match_reverse:
+            expr = ~expr
 
         # Lazyframe for filtering
         lf = self.df.lazy()
@@ -2941,7 +2945,7 @@ class DataFrameTable(DataTable):
             ok_rids = set(lf.filter(expr).collect()[RID])
         except Exception as e:
             self.notify(
-                f"Error applying search filter `[$error]{term}[/]`", title="Select Row", severity="error", timeout=10
+                f"Error applying search filter `[$error]{term}[/]`", title="Select Rows", severity="error", timeout=10
             )
             self.log(f"Error applying search filter `{term}`: {str(e)}")
             return
@@ -2964,7 +2968,7 @@ class DataFrameTable(DataTable):
         self.selected_rows = ok_rids
 
         # Show notification immediately, then start highlighting
-        self.notify(message, title="Select Row")
+        self.notify(message, title="Select Rows")
 
         # Recreate table for display
         self.setup_table()
@@ -3040,7 +3044,12 @@ class DataFrameTable(DataTable):
 
     # Find & Replace
     def find_matches(
-        self, term: str, cidx: int | None = None, match_nocase: bool = False, match_whole: bool = False
+        self,
+        term: str,
+        cidx: int | None = None,
+        match_nocase: bool = False,
+        match_whole: bool = False,
+        match_reverse: bool = False,
     ) -> dict[int, set[str]]:
         """Find matches for a term in the dataframe.
 
@@ -3049,6 +3058,7 @@ class DataFrameTable(DataTable):
             cidx: Column index for column-specific search. If None, searches all columns.
             match_nocase: Whether to perform case-insensitive matching (for string terms)
             match_whole: Whether to match the whole cell content (for string terms)
+            match_reverse: Whether to reverse the match (i.e., find non-matching rows)
 
         Returns:
             Dictionary mapping row indices to sets of column indices containing matches.
@@ -3090,6 +3100,10 @@ class DataFrameTable(DataTable):
                     term = f"(?i){term}"
                 expr = pl.col(col_name).cast(pl.String).str.contains(term)
 
+            # Reverse the expression if requested
+            if match_reverse:
+                expr = ~expr
+
             # Get matched row indices
             try:
                 matched_ridxs = lf.filter(expr).collect()[RID]
@@ -3114,9 +3128,9 @@ class DataFrameTable(DataTable):
 
         if scope == "column":
             cidx = self.cursor_cidx
-            self.find((term, cidx, False, True))
+            self.find((term, cidx, False, True, False))
         else:
-            self.find_global((term, None, False, True))
+            self.find_global((term, None, False, True, False))
 
     def do_find_expr(self, scope="column") -> None:
         """Open screen to find by expression.
@@ -3139,12 +3153,12 @@ class DataFrameTable(DataTable):
         """Find a term in current column."""
         if result is None:
             return
-        term, cidx, match_nocase, match_whole = result
+        term, cidx, match_nocase, match_whole, match_reverse = result
 
         col_name = self.df.columns[cidx]
 
         try:
-            matches = self.find_matches(term, cidx, match_nocase, match_whole)
+            matches = self.find_matches(term, cidx, match_nocase, match_whole, match_reverse)
         except Exception as e:
             self.notify(f"Error finding matches for `[$error]{term}[/]`", title="Find", severity="error", timeout=10)
             self.log(f"Error finding matches for `{term}`: {str(e)}")
@@ -3174,10 +3188,12 @@ class DataFrameTable(DataTable):
         """Global find a term across all columns."""
         if result is None:
             return
-        term, cidx, match_nocase, match_whole = result
+        term, cidx, match_nocase, match_whole, match_reverse = result
 
         try:
-            matches = self.find_matches(term, cidx=None, match_nocase=match_nocase, match_whole=match_whole)
+            matches = self.find_matches(
+                term, cidx=None, match_nocase=match_nocase, match_whole=match_whole, match_reverse=match_reverse
+            )
         except Exception as e:
             self.notify(f"Error finding matches for `[$error]{term}[/]`", title="Find", severity="error", timeout=10)
             self.log(f"Error finding matches for `{term}`: {str(e)}")
@@ -3333,7 +3349,7 @@ class DataFrameTable(DataTable):
         """
         if result is None:
             return
-        term_find, term_replace, match_nocase, match_whole, replace_all = result
+        replace_all, term_find, term_replace, match_nocase, match_whole = result
 
         if cidx is None:
             col_name = "all columns"
@@ -3636,12 +3652,12 @@ class DataFrameTable(DataTable):
 
         term = pl.col(col_name).is_not_null()
 
-        self.view_rows((term, cidx, False, True))
+        self.view_rows((term, cidx, False, True, False))
 
     def do_view_rows(self) -> None:
         """View rows.
 
-        If there are selected rows, view those.
+        If there are selected rows, view those,
         Otherwise, view based on the cursor value.
         """
 
@@ -3657,17 +3673,17 @@ class DataFrameTable(DataTable):
             value = self.df.item(ridx, cidx)
             term = pl.col(col_name).is_null() if value is None else pl.col(col_name) == value
 
-        self.view_rows((term, cidx, False, True))
+        self.view_rows((term, cidx, False, True, False))
 
     def do_view_rows_expr(self) -> None:
-        """Open the filter screen to enter an expression."""
+        """Open the view screen to enter an expression."""
         ridx = self.cursor_ridx
         cidx = self.cursor_cidx
         cursor_value = self.df.item(ridx, cidx)
         term = NULL if cursor_value is None else str(cursor_value)
 
         self.app.push_screen(
-            FilterScreen(self.df, cidx, term),
+            ViewScreen(self.df, cidx, term),
             callback=self.view_rows,
         )
 
@@ -3675,7 +3691,7 @@ class DataFrameTable(DataTable):
         """View selected rows and hide others. Do not modify the dataframe."""
         if result is None:
             return
-        term, cidx, match_nocase, match_whole = result
+        term, cidx, match_nocase, match_whole, match_reverse = result
 
         col_name = self.df.columns[cidx]
 
@@ -3730,6 +3746,9 @@ class DataFrameTable(DataTable):
         # Lazyframe with row indices
         lf = self.df.lazy()
 
+        # Reverse the expression if requested
+        if match_reverse:
+            expr = ~expr
         expr_str = "boolean list or series" if isinstance(expr, (list, pl.Series)) else str(expr)
 
         # Add to history

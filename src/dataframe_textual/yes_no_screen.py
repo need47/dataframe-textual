@@ -97,6 +97,7 @@ class YesNoScreen(ModalScreen):
         input2: str | dict | Input = None,
         checkbox: str | dict | Checkbox = None,
         checkbox2: str | dict | Checkbox = None,
+        checkbox3: str | dict | Checkbox = None,
         yes: str | dict | Button = "Yes",
         maybe: str | dict | Button = None,
         no: str | dict | Button = "No",
@@ -115,6 +116,7 @@ class YesNoScreen(ModalScreen):
             input2: Optional second input widget or value. Defaults to None.
             checkbox: Optional checkbox widget or label. Defaults to None.
             checkbox2: Optional second checkbox widget or label. Defaults to None.
+            checkbox3: Optional third checkbox widget or label. Defaults to None.
             yes: Text or dict for the Yes button. If None, hides the Yes button. Defaults to "Yes".
             maybe: Optional Maybe button text/dict. Defaults to None.
             no: Text or dict for the No button. If None, hides the No button. Defaults to "No".
@@ -128,6 +130,7 @@ class YesNoScreen(ModalScreen):
         self.input2 = input2
         self.checkbox = checkbox
         self.checkbox2 = checkbox2
+        self.checkbox3 = checkbox3
         self.yes = yes
         self.maybe = maybe
         self.no = no
@@ -189,7 +192,7 @@ class YesNoScreen(ModalScreen):
                         self.input2.select_all()
                         yield self.input2
 
-            if self.checkbox or self.checkbox2:
+            if self.checkbox or self.checkbox2 or self.checkbox3:
                 with Horizontal(id="checkbox-container"):
                     if self.checkbox:
                         if isinstance(self.checkbox, Checkbox):
@@ -208,6 +211,15 @@ class YesNoScreen(ModalScreen):
                         else:
                             self.checkbox2 = Checkbox(self.checkbox2)
                         yield self.checkbox2
+
+                    if self.checkbox3:
+                        if isinstance(self.checkbox3, Checkbox):
+                            pass
+                        elif isinstance(self.checkbox3, dict):
+                            self.checkbox3 = Checkbox(**self.checkbox3)
+                        else:
+                            self.checkbox3 = Checkbox(self.checkbox3)
+                        yield self.checkbox3
 
             if self.yes or self.no or self.maybe:
                 with Horizontal(id="button-container"):
@@ -443,7 +455,7 @@ class RenameColumnScreen(YesNoScreen):
 class SearchScreen(YesNoScreen):
     """Modal screen to search for values in a column."""
 
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen")
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen").replace("max-width: 60;", "max-width: 70;")
 
     def __init__(self, title, term, df: pl.DataFrame, cidx: int):
         self.cidx = cidx
@@ -457,10 +469,11 @@ class SearchScreen(YesNoScreen):
             input=term,
             checkbox="Match Nocase",
             checkbox2="Match Whole",
+            checkbox3="Match Reverse",
             on_yes_callback=self._validate_input,
         )
 
-    def _validate_input(self) -> tuple[str, int, bool, bool]:
+    def _validate_input(self) -> tuple[str, int, bool, bool, bool]:
         """Validate the input and return it."""
         term = self.input.value  # Do not strip to preserve spaces
 
@@ -470,34 +483,37 @@ class SearchScreen(YesNoScreen):
 
         match_nocase = self.checkbox.value
         match_whole = self.checkbox2.value
+        match_reverse = self.checkbox3.value
 
-        return term, self.cidx, match_nocase, match_whole
+        return term, self.cidx, match_nocase, match_whole, match_reverse
 
 
-class FilterScreen(YesNoScreen):
-    """Modal screen to filter rows by column expression."""
+class ViewScreen(YesNoScreen):
+    """Modal screen to view rows by expression."""
 
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "FilterScreen")
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ViewScreen").replace("max-width: 60;", "max-width: 70;")
 
     def __init__(self, df: pl.DataFrame, cidx: int, term: str | None = None):
         self.df = df
         self.cidx = cidx
         super().__init__(
-            title="Filter by Expression",
-            label="e.g., NULL, $1 > 50, $name == 'text', $_ > 100, $a < $b, $_.str.contains('sub')",
+            title="View Rows",
+            label="By value or Polars expression, e.g., NULL, $1 > 50, $name == 'text', $_ > 100, $a < $b, $_.str.contains('sub')",
             input=term,
             checkbox="Match Nocase",
             checkbox2="Match Whole",
+            checkbox3="Match Reverse",
             on_yes_callback=self._get_input,
         )
 
-    def _get_input(self) -> tuple[str, int, bool, bool]:
+    def _get_input(self) -> tuple[str, int, bool, bool, bool]:
         """Get input."""
         term = self.input.value  # Do not strip to preserve spaces
         match_nocase = self.checkbox.value
         match_whole = self.checkbox2.value
+        match_reverse = self.checkbox3.value
 
-        return term, self.cidx, match_nocase, match_whole
+        return term, self.cidx, match_nocase, match_whole, match_reverse
 
 
 class FreezeScreen(YesNoScreen):
@@ -685,25 +701,25 @@ class FindReplaceScreen(YesNoScreen):
             on_maybe_callback=self._get_input_replace_all,
         )
 
-    def _get_input(self) -> tuple[str, str, bool, bool, bool]:
+    def _get_input(self) -> tuple[bool, str, str, bool, bool]:
         """Get input."""
-        term_find = self.input.value  # Do not strip to preserve spaces
-        term_replace = self.input2.value  # Do not strip to preserve spaces
-        match_nocase = self.checkbox.value
-        match_whole = self.checkbox2.value
         replace_all = False
-
-        return term_find, term_replace, match_nocase, match_whole, replace_all
-
-    def _get_input_replace_all(self) -> tuple[str, str, bool, bool, bool]:
-        """Get input for 'Replace All'."""
         term_find = self.input.value  # Do not strip to preserve spaces
         term_replace = self.input2.value  # Do not strip to preserve spaces
         match_nocase = self.checkbox.value
         match_whole = self.checkbox2.value
-        replace_all = True
 
-        return term_find, term_replace, match_nocase, match_whole, replace_all
+        return replace_all, term_find, term_replace, match_nocase, match_whole
+
+    def _get_input_replace_all(self) -> tuple[bool, str, str, bool, bool]:
+        """Get input for 'Replace All'."""
+        replace_all = True
+        term_find = self.input.value  # Do not strip to preserve spaces
+        term_replace = self.input2.value  # Do not strip to preserve spaces
+        match_nocase = self.checkbox.value
+        match_whole = self.checkbox2.value
+
+        return replace_all, term_find, term_replace, match_nocase, match_whole
 
 
 class RenameTabScreen(YesNoScreen):
