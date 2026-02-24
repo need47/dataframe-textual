@@ -316,7 +316,13 @@ class StatisticsScreen(TableScreen):
             df_n_unique = lf.select(pl.all().n_unique()).collect()
             df_n_unique.insert_column(0, pl.Series("statistic", ["n_unique"]))
             df_n_unique = df_n_unique.cast(stats_df.schema)
-            stats_df = stats_df.vstack(df_n_unique)
+
+            # Append total
+            df_total = lf.select(pl.all().len()).collect()
+            df_total.insert_column(0, pl.Series("statistic", ["n_total"]))
+            df_total = df_total.cast(stats_df.schema)
+
+            stats_df = stats_df.vstack(df_n_unique).vstack(df_total)
         else:
             col_name = self.dftable.df.columns[self.cidx]
             lf = self.dftable.df.lazy()
@@ -328,8 +334,14 @@ class StatisticsScreen(TableScreen):
 
             # Append unique count
             n_unique = lf.select(pl.col(col_name)).collect().n_unique()
-            new_row = pl.DataFrame({"statistic": ["n_unique"], col_name: n_unique}, schema=stats_df.schema)
-            stats_df = stats_df.vstack(new_row)
+            unique_row = pl.DataFrame({"statistic": ["n_unique"], col_name: n_unique}, schema=stats_df.schema)
+
+            # Append total count
+            # sum of null_count and non_null_count
+            n_total = len(self.dftable.df[col_name])
+            total_row = pl.DataFrame({"statistic": ["n_total"], col_name: n_total}, schema=stats_df.schema)
+
+            stats_df = stats_df.vstack(unique_row).vstack(total_row)
 
         return stats_df
 
