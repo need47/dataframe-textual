@@ -786,8 +786,8 @@ def load_file(
     filename = f"stdin.{fmt}" if isinstance(source, StringIO) else source
     filepath = Path(filename)
 
-    # Load based on file format
-    if fmt in ("csv", "tsv", "psv"):
+    # check header
+    if fmt in ("csv", "tsv", "psv", "xlsx", "xls"):
         if header is False:
             has_header = False
             new_columns = None
@@ -798,6 +798,8 @@ def load_file(
             has_header = True
             new_columns = None
 
+    # Load based on file format
+    if fmt in ("csv", "tsv", "psv"):
         lf = pl.scan_csv(
             source,
             separator="\t" if fmt == "tsv" else ("|" if fmt == "psv" else ","),
@@ -818,13 +820,13 @@ def load_file(
     elif fmt in ("xlsx", "xls"):
         if first_sheet:
             # Read only the first sheet for multiple files
-            df = pl.read_excel(source)
+            df = pl.read_excel(source, has_header=has_header)
             if n_rows is not None:
                 df = df.head(n_rows)
             data.append(Source(df.lazy(), filename, filepath.stem))
         else:
             # For single file, expand all sheets
-            sheets = pl.read_excel(source, sheet_id=0)
+            sheets = pl.read_excel(source, sheet_id=0, has_header=has_header)
             for sheet_name, df in sheets.items():
                 if n_rows is not None:
                     df = df.head(n_rows)
