@@ -281,6 +281,7 @@ class StatisticsScreen(TableScreen):
     def __init__(self, dftable: "DataFrameTable", cidx: int | None = None):
         super().__init__(dftable)
         self.cidx = cidx  # None for dataframe statistics, otherwise column index
+        self.df = self.build_df()
 
     def on_mount(self) -> None:
         """Create the statistics table."""
@@ -299,22 +300,43 @@ class StatisticsScreen(TableScreen):
             self.build_column_stats()
             self.table.cursor_type = "row"
 
+    def build_df(self) -> pl.DataFrame:
+        """Get the dataframe to use for statistics, applying any necessary filters."""
+        if self.cidx is None:
+            lf = self.dftable.df.lazy().select(pl.exclude(RID))
+
+            # Apply only to non-hidden columns
+            if self.dftable.hidden_columns:
+                lf = lf.select(pl.exclude(self.dftable.hidden_columns))
+
+            # Get dataframe statistics
+            stats_df = lf.describe()
+
+            # Append unique count for each column
+            df_n_unique = lf.select(pl.all().n_unique()).collect()
+            df_n_unique.insert_column(0, pl.Series("statistic", ["n_unique"]))
+            df_n_unique = df_n_unique.cast(stats_df.schema)
+            stats_df = stats_df.vstack(df_n_unique)
+        else:
+            col_name = self.dftable.df.columns[self.cidx]
+            lf = self.dftable.df.lazy()
+
+            # Get column statistics
+            stats_df = lf.select(pl.col(col_name)).describe()
+            if len(stats_df) == 0:
+                return
+
+            # Append unique count
+            n_unique = lf.select(pl.col(col_name)).collect().n_unique()
+            new_row = pl.DataFrame({"statistic": ["n_unique"], col_name: n_unique}, schema=stats_df.schema)
+            stats_df = stats_df.vstack(new_row)
+
+        return stats_df
+
     def build_column_stats(self) -> None:
         """Build statistics for a single column."""
         col_name = self.dftable.df.columns[self.cidx]
-        lf = self.dftable.df.lazy()
-
-        # Get column statistics
-        stats_df = lf.select(pl.col(col_name)).describe()
-        if len(stats_df) == 0:
-            return
-
-        # Append unique count
-        n_unique = lf.select(pl.col(col_name)).collect().n_unique()
-        new_row = pl.DataFrame({"statistic": ["n_unique"], col_name: n_unique}, schema=stats_df.schema)
-        stats_df = stats_df.vstack(new_row)
-
-        col_dtype = stats_df.dtypes[1]  # 'value' column
+        col_dtype = self.df.dtypes[1]  # 'value' column
         dc = DtypeConfig(col_dtype)
 
         # Add statistics label column
@@ -324,7 +346,7 @@ class StatisticsScreen(TableScreen):
         self.table.add_column(Text(col_name, justify=dc.justify), key=col_name)
 
         # Add rows
-        for row in stats_df.rows():
+        for row in self.df.rows():
             stat_label, stat_value = row
             self.table.add_row(
                 stat_label,
@@ -333,23 +355,8 @@ class StatisticsScreen(TableScreen):
 
     def build_dataframe_stats(self) -> None:
         """Build statistics for the entire dataframe."""
-        lf = self.dftable.df.lazy().select(pl.exclude(RID))
-
-        # Apply only to non-hidden columns
-        if self.dftable.hidden_columns:
-            lf = lf.select(pl.exclude(self.dftable.hidden_columns))
-
-        # Get dataframe statistics
-        stats_df = lf.describe()
-
-        # Append unique count for each column
-        df_n_unique = lf.select(pl.all().n_unique()).collect()
-        df_n_unique.insert_column(0, pl.Series("statistic", ["n_unique"]))
-        df_n_unique = df_n_unique.cast(stats_df.schema)
-        stats_df = stats_df.vstack(df_n_unique)
-
         # Add columns for each dataframe column with appropriate styling
-        for idx, (col_name, col_dtype) in enumerate(zip(stats_df.columns, stats_df.dtypes), 0):
+        for idx, (col_name, col_dtype) in enumerate(zip(self.df.columns, self.df.dtypes), 0):
             if idx == 0:
                 # Add statistics label column (first column, no styling)
                 self.table.add_column("Statistic", key="statistic")
@@ -359,7 +366,7 @@ class StatisticsScreen(TableScreen):
             self.table.add_column(Text(col_name, justify=dc.justify), key=col_name)
 
         # Add rows
-        for row in stats_df.rows():
+        for row in self.df.rows():
             formatted_row = []
 
             # Format remaining values with appropriate styling
@@ -369,7 +376,7 @@ class StatisticsScreen(TableScreen):
                     formatted_row.append(stat_value)
                     continue
 
-                col_dtype = stats_df.dtypes[idx]
+                col_dtype = self.df.dtypes[idx]
                 dc = DtypeConfig(col_dtype)
 
                 formatted_row.append(dc.format(stat_value, thousand_separator=self.thousand_separator))
