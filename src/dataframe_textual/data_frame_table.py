@@ -3809,10 +3809,10 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Showing [$success]{matched_count}[/] matching row(s)", title="View Rows")
 
-    def do_filter_rows(self) -> None:
+    def do_filter_rows(self, cidx: int = None, term: Any = None) -> None:
         """Filter rows.
 
-        If there are selected rows, use those.
+        If there are selected rows, use those. If value is provided, filter based on the value.
         Otherwise, filter based on the cursor value.
         """
         if self.selected_rows:
@@ -3820,14 +3820,14 @@ class DataFrameTable(DataTable):
             filter_expr = pl.col(RID).is_in(self.selected_rows)
         else:  # Search cursor value in current column
             message = "Filtered to rows matching cursor value (other rows removed)"
-            cidx = self.cursor_cidx
+            cidx = self.cursor_cidx if cidx is None else cidx
             col_name = self.df.columns[cidx]
-            value = self.cursor_value
+            term = self.cursor_value if term is None else term
 
-            if value is None:
+            if term == NULL:
                 filter_expr = pl.col(col_name).is_null()
             else:
-                filter_expr = pl.col(col_name) == value
+                filter_expr = pl.col(col_name) == term
 
         # Add to history
         self.add_history(message, dirty=True)

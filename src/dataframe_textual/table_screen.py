@@ -131,11 +131,11 @@ class TableScreen(ModalScreen):
 
         # Action filter
         if action == "filter":
-            self.dftable.do_filter_rows()
+            self.dftable.do_filter_rows(cidx, col_value)
 
         # Action view
         else:
-            self.dftable.view_rows((expr, cidx, False, True))
+            self.dftable.view_rows((expr, cidx, False, True, False))
 
         # Dismiss modal screen(s) to return to main table
         while len(self.app._screen_stack) > 1:
