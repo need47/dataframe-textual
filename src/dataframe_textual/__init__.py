@@ -28,7 +28,6 @@ from .yes_no_screen import (
     RenameTabScreen,
     SaveFileScreen,
     SearchScreen,
-    ViewScreen,
     YesNoScreen,
 )
 
@@ -55,6 +54,6 @@ __all__ = [
     "SearchScreen",
     "StatisticsScreen",
     "TableScreen",
-    "ViewScreen",
+    "SearchScreen",
     "YesNoScreen",
 ]

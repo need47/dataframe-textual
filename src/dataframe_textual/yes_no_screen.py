@@ -150,7 +150,7 @@ class YesNoScreen(ModalScreen):
             if self.title:
                 container.border_title = self.title
 
-            if self.label or self.input:
+            if self.label or self.input is not None:
                 with Container(id="input-container"):
                     if self.label:
                         if isinstance(self.label, Label):
@@ -161,7 +161,7 @@ class YesNoScreen(ModalScreen):
                             self.label = Label(self.label)
                         yield self.label
 
-                    if self.input:
+                    if self.input is not None:
                         if isinstance(self.input, Input):
                             pass
                         elif isinstance(self.input, dict):
@@ -171,7 +171,7 @@ class YesNoScreen(ModalScreen):
                         self.input.select_all()
                         yield self.input
 
-            if self.label2 or self.input2:
+            if self.label2 or self.input2 is not None:
                 with Container(id="input-container-2"):
                     if self.label2:
                         if isinstance(self.label2, Label):
@@ -182,7 +182,7 @@ class YesNoScreen(ModalScreen):
                             self.label2 = Label(self.label2)
                         yield self.label2
 
-                    if self.input2:
+                    if self.input2 is not None:
                         if isinstance(self.input2, Input):
                             pass
                         elif isinstance(self.input2, dict):
@@ -453,52 +453,19 @@ class RenameColumnScreen(YesNoScreen):
 
 
 class SearchScreen(YesNoScreen):
-    """Modal screen to search for values in a column."""
+    """Modal screen to search by value or expression."""
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen").replace("max-width: 60;", "max-width: 70;")
 
-    def __init__(self, title, term, df: pl.DataFrame, cidx: int):
+    def __init__(self, title: str, df: pl.DataFrame, cidx: int, term: str | None = None):
         self.cidx = cidx
 
-        EXPR = f"ABC, (?i)abc, ^abc$, {NULL}, $_ > 50, $1 < $HP, $_.str.contains('sub')"
+        EXPR = f"{NULL}, $1 > 50, $name == 'text', $_ > 100, $a < $b, $_.str.contains('sub')"
         label = f"By value or Polars expression, e.g., {EXPR}"
 
         super().__init__(
             title=title,
             label=label,
-            input=term,
-            checkbox="Match Nocase",
-            checkbox2="Match Whole",
-            checkbox3="Match Reverse",
-            on_yes_callback=self._validate_input,
-        )
-
-    def _validate_input(self) -> tuple[str, int, bool, bool, bool]:
-        """Validate the input and return it."""
-        term = self.input.value  # Do not strip to preserve spaces
-
-        if not term:
-            self.notify("Term cannot be empty", title=self.title, severity="error")
-            return
-
-        match_nocase = self.checkbox.value
-        match_whole = self.checkbox2.value
-        match_reverse = self.checkbox3.value
-
-        return term, self.cidx, match_nocase, match_whole, match_reverse
-
-
-class ViewScreen(YesNoScreen):
-    """Modal screen to view rows by expression."""
-
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ViewScreen").replace("max-width: 60;", "max-width: 70;")
-
-    def __init__(self, df: pl.DataFrame, cidx: int, term: str | None = None):
-        self.df = df
-        self.cidx = cidx
-        super().__init__(
-            title="View Rows",
-            label="By value or Polars expression, e.g., NULL, $1 > 50, $name == 'text', $_ > 100, $a < $b, $_.str.contains('sub')",
             input=term,
             checkbox="Match Nocase",
             checkbox2="Match Whole",

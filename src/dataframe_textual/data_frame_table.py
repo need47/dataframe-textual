@@ -56,7 +56,6 @@ from .yes_no_screen import (
     GoToRowScreen,
     RenameColumnScreen,
     SearchScreen,
-    ViewScreen,
 )
 
 # Color for highlighting selections and matches
@@ -2873,7 +2872,7 @@ class DataFrameTable(DataTable):
 
         # Push the search modal screen
         self.app.push_screen(
-            SearchScreen("Select Rows", term, self.df, cidx),
+            SearchScreen("Select Rows", self.df, cidx, term),
             callback=self.select_rows,
         )
 
@@ -2881,9 +2880,10 @@ class DataFrameTable(DataTable):
         """Select rows by value or expression."""
         if result is None:
             return
-
         term, cidx, match_nocase, match_whole, match_reverse = result
-        col_name = "all columns" if cidx is None else self.df.columns[cidx]
+
+        col_name = self.df.columns[cidx]
+        dtype = self.df.dtypes[cidx]
 
         # Already a Polars expression
         if isinstance(term, pl.Expr):
@@ -2896,6 +2896,13 @@ class DataFrameTable(DataTable):
         # Null case
         elif term == NULL:
             expr = pl.col(col_name).is_null()
+
+        # Empty string case
+        elif term == "":
+            if dtype == pl.String:
+                expr = pl.col(col_name) == ""
+            else:
+                expr = pl.col(col_name).is_null()
 
         # Expression in string form
         elif tentative_expr(term):
@@ -3084,6 +3091,11 @@ class DataFrameTable(DataTable):
             # Build expression based on term type
             if term == NULL:
                 expr = pl.col(col_name).is_null()
+            elif term == "":
+                if self.df.dtypes[col_idx] == pl.String:
+                    expr = pl.col(col_name) == ""
+                else:
+                    expr = pl.col(col_name).is_null()
             elif tentative_expr(term):
                 try:
                     expr = validate_expr(term, self.df.columns, col_idx)
@@ -3140,12 +3152,11 @@ class DataFrameTable(DataTable):
         """
         # Use current cell value as default search term
         term = NULL if self.cursor_value is None else str(self.cursor_value)
-        cidx = self.cursor_cidx if scope == "column" else None
+        cidx = self.cursor_cidx
 
         # Push the search modal screen
-
         self.app.push_screen(
-            SearchScreen("Find" if scope == "column" else "Global Find", term, self.df, cidx),
+            SearchScreen("Find" if scope == "column" else "Global Find", self.df, cidx, term),
             callback=self.find if scope == "column" else self.find_global,
         )
 
@@ -3683,7 +3694,7 @@ class DataFrameTable(DataTable):
         term = NULL if cursor_value is None else str(cursor_value)
 
         self.app.push_screen(
-            ViewScreen(self.df, cidx, term),
+            SearchScreen("View Rows", self.df, cidx, term),
             callback=self.view_rows,
         )
 
@@ -3694,6 +3705,7 @@ class DataFrameTable(DataTable):
         term, cidx, match_nocase, match_whole, match_reverse = result
 
         col_name = self.df.columns[cidx]
+        dtype = self.df.dtypes[cidx]
 
         # Support for polars expression
         if isinstance(term, pl.Expr):
@@ -3706,6 +3718,13 @@ class DataFrameTable(DataTable):
         # Null case
         elif term == NULL:
             expr = pl.col(col_name).is_null()
+
+        # Empty string case
+        elif term == "":
+            if dtype == pl.String:
+                expr = pl.col(col_name) == ""
+            else:
+                expr = pl.col(col_name).is_null()
 
         # Support for polars expression in string form
         elif tentative_expr(term):
@@ -3720,7 +3739,6 @@ class DataFrameTable(DataTable):
 
         # Type-aware search based on column dtype
         else:
-            dtype = self.df.dtypes[cidx]
             if dtype == pl.String:
                 if match_whole:
                     term = f"^{term}$"
