@@ -847,7 +847,11 @@ def load_file(
         lf = scan_vortex(source, n_rows=n_rows)
         data.append(Source(lf, filename, filepath.stem))
     elif fmt == "json":
-        df = pl.read_json(source)
+        try:
+            df = pl.read_json(source)
+        except Exception as e:
+            print(f"Error reading JSON file `{filename}`: {e}", file=sys.stderr)
+            sys.exit(1)
         if n_rows is not None:
             df = df.head(n_rows)
         data.append(Source(df.lazy(), filename, filepath.stem))
