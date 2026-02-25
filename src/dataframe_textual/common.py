@@ -820,13 +820,21 @@ def load_file(
     elif fmt in ("xlsx", "xls"):
         if first_sheet:
             # Read only the first sheet for multiple files
-            df = pl.read_excel(source, has_header=has_header)
+            try:
+                df = pl.read_excel(source, has_header=has_header)
+            except Exception as e:
+                print(f"Error reading Excel file `{filename}`: {e}", file=sys.stderr)
+                sys.exit(1)
             if n_rows is not None:
                 df = df.head(n_rows)
             data.append(Source(df.lazy(), filename, filepath.stem))
         else:
             # For single file, expand all sheets
-            sheets = pl.read_excel(source, sheet_id=0, has_header=has_header)
+            try:
+                sheets = pl.read_excel(source, sheet_id=0, has_header=has_header)
+            except Exception as e:
+                print(f"Error reading Excel file `{filename}`: {e}", file=sys.stderr)
+                sys.exit(1)
             for sheet_name, df in sheets.items():
                 if n_rows is not None:
                     df = df.head(n_rows)
