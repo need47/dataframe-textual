@@ -45,7 +45,7 @@ class YesNoScreen(ModalScreen):
         }
 
         YesNoScreen Label {
-            margin: 0
+            margin: 0;
             width: 100%;
             text-wrap: wrap;
         }
