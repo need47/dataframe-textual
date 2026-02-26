@@ -325,12 +325,12 @@ dv data-1.csv data-2.csv --all-in-one
 
 | Key | Action |
 |-----|--------|
-| `/` | Find in current column with cursor value and highlight matching cells |
-| `?` | Find in current column with expression and highlight matching cells |
+| `/` | Find across all columns with cursor value and highlight matching cells |
+| `?` | Find across all columns with expression and highlight matching cells |
+| `;` | Find in current column with cursor value and highlight matching cells |
+| `:` | Find in current column with expression and highlight matching cells |
 | `n` | Go to next matching cell |
 | `N` | Go to previous matching cell |
-| `;` | Find across all columns with cursor value |
-| `:` | Find across all columns with expression |
 | `r` | Find and replace in current column (interactive or replace all) |
 | `R` | Find and replace across all columns (interactive or replace all) |
 
@@ -435,10 +435,10 @@ These options work with plain text searches. Use Polars regex patterns in expres
 
 ### 4. Find & Replace
 Find by value/expression and highlight matching cells:
-- `/` - Find cursor value within current column (respects data type)
-- `?` - Open dialog to search current column with expression
-- `;` - Find cursor value across all columns
-- `:` - Open dialog to search all columns with expression
+- `/` - Find cursor value across all columns (global search)
+- `?` - Open dialog to search all columns with expression (global search)
+- `;` - Find cursor value within current column (respects data type)
+- `:` - Open dialog to search current column with expression
 - `n` - Go to next matching cell
 - `N` - Go to previous matching cell
 

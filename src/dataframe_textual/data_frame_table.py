@@ -231,10 +231,10 @@ class DataFrameTable(DataTable):
         - *(Supports case-insensitive & whole-word matching)*
 
         ## 🔎 Find & Replace
-        - **/** - 🔎 Find in current column with cursor value
-        - **?** - 🔎 Find in current column with expression
-        - **;** - 🌐 Global find using cursor value
-        - **:** - 🌐 Global find with expression
+        - **/** - 🌐 Global find using cursor value
+        - **?** - 🌐 Global find with expression
+        - **;** - 🔎 Find in current column with cursor value
+        - **:** - 🔎 Find in current column with expression
         - **n** - ⬇️ Go to next match
         - **N** - ⬆️ Go to previous match
         - **r** - 🔄 Replace in current column (interactive or all)
@@ -323,10 +323,10 @@ class DataFrameTable(DataTable):
         ("t", "toggle_selections", "Toggle all row selections"),
         ("T", "clear_selections_and_matches", "Clear selections"),
         # Find & Replace
-        ("slash", "find_cursor_value", "Find in column with cursor value"),  # `/`
-        ("question_mark", "find_expr", "Find in column with expression"),  # `?`
-        ("semicolon", "find_cursor_value('global')", "Global find with cursor value"),  # `;`
-        ("colon", "find_expr('global')", "Global find with expression"),  # `:`
+        ("slash", "find_cursor_value('global')", "Global find with cursor value"),  # `/`
+        ("question_mark", "find_expr('global')", "Global find with expression"),  # `?`
+        ("semicolon", "find_cursor_value", "Find in column with cursor value"),  # `;`
+        ("colon", "find_expr", "Find in column with expression"),  # `:`
         ("n", "next_match", "Go to next match"),  # `n`
         ("N", "previous_match", "Go to previous match"),  # `Shift+n`
         ("r", "replace", "Replace in column"),  # `r`
