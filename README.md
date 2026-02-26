@@ -283,7 +283,8 @@ dv data-1.csv data-2.csv --all-in-one
 | `K` | Cycle cursor types: cell → row → column → cell |
 | `~` | Toggle row labels |
 | `_` (underscore) | Toggle column full width |
-| `z` | Freeze rows and columns |
+| `z` | Freeze rows and/or columns |
+| `Z` | Unfreeze all rows and columns |
 | `,` | Toggle thousand separator for numeric display |
 | `&` | Set current row as the new header row |
 | `h` | Hide current column |

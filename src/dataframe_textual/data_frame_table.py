@@ -157,7 +157,8 @@ class DataFrameTable(DataTable):
         - **h** - 👁️ Hide current column
         - **H** - 👀 Show all hidden rows/columns
         - **_** - 📏 Toggle column full width
-        - **z** - 📌 Freeze rows and columns
+        - **z** - 📌 Freeze rows and/or columns
+        - **Z** - 🧊 Unfreeze all rows and columns
         - **~** - 🏷️ Toggle row labels
         - **,** - 🔢 Toggle thousand separator for numeric display
         - **K** - 🔄 Cycle cursor (cell → row → column → cell)
@@ -248,6 +249,7 @@ class DataFrameTable(DataTable):
         ("tilde", "toggle_row_labels", "Toggle row labels"),  # `~`
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
         ("z", "freeze_row_column", "Freeze rows/columns"),
+        ("Z", "freeze_row_column(True)", "Unfreeze all rows and columns"),
         ("comma", "toggle_thousand_separator", "Toggle thousand separator"),  # `,`
         ("underscore", "expand_column", "Expand column to full width"),  # `_`
         ("circumflex_accent", "toggle_rid", "Toggle internal row index"),  # `^`
@@ -916,9 +918,9 @@ class DataFrameTable(DataTable):
         """Cycle through cursor types."""
         self.do_cycle_cursor_type()
 
-    def action_freeze_row_column(self) -> None:
+    def action_freeze_row_column(self, unfreeze: bool = False) -> None:
         """Open the freeze screen."""
-        self.do_freeze_row_column()
+        self.do_freeze_row_column(unfreeze=unfreeze)
 
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility."""
@@ -1715,9 +1717,12 @@ class DataFrameTable(DataTable):
         """Show metadata for all columns in the dataframe."""
         self.app.push_screen(MetaColumnScreen(self))
 
-    def do_freeze_row_column(self) -> None:
+    def do_freeze_row_column(self, unfreeze: bool = False) -> None:
         """Open the freeze screen to set fixed rows and columns."""
-        self.app.push_screen(FreezeScreen(), callback=self.freeze_row_column)
+        if unfreeze:
+            self.freeze_row_column((0, 0))
+        else:
+            self.app.push_screen(FreezeScreen(), callback=self.freeze_row_column)
 
     def freeze_row_column(self, result: tuple[int, int] | None) -> None:
         """Handle result from PinScreen.
@@ -1730,8 +1735,17 @@ class DataFrameTable(DataTable):
 
         fixed_rows, fixed_columns = result
 
+        if fixed_rows == 0 and fixed_columns == 0:
+            descr = "Unfreezed all rows and columns"
+        elif fixed_rows > 0 and fixed_columns > 0:
+            descr = f"Freezed [$success]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns"
+        elif fixed_rows > 0:
+            descr = f"Freezed [$success]{fixed_rows}[/] rows"
+        else:
+            descr = f"Freezed [$success]{fixed_columns}[/] columns"
+
         # Add to history
-        self.add_history(f"Pinned [$success]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns")
+        self.add_history(descr)
 
         # Apply the pin settings to the table
         if fixed_rows >= 0:
@@ -1739,7 +1753,7 @@ class DataFrameTable(DataTable):
         if fixed_columns >= 0:
             self.fixed_columns = fixed_columns
 
-        # self.notify(f"Pinned [$success]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns", title="Pin Row/Column")
+        # self.notify(descr, title="Pin Row/Column")
 
     def do_hide_column(self) -> None:
         """Hide the currently selected column from the table display."""
