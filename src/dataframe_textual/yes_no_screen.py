@@ -1,5 +1,6 @@
 """Modal screens with Yes/No buttons and their specialized variants."""
 
+from functools import partial
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -8,7 +9,7 @@ if TYPE_CHECKING:
 
 import polars as pl
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal
+from textual.containers import Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, Input, Label, Static, TabPane
 from textual.widgets.tabbed_content import ContentTab
@@ -43,15 +44,14 @@ class YesNoScreen(ModalScreen):
             padding: 1 2;
         }
 
-        YesNoScreen Container {
-            margin: 1 0 0 0;
-            height: auto;
-            width: 100%;
-        }
-
         YesNoScreen Label {
+            margin: 1 0 0 0;
             width: 100%;
             text-wrap: wrap;
+        }
+
+        YesNoScreen Label:first-of-type {
+            margin: 0;
         }
 
         YesNoScreen Input {
@@ -95,9 +95,11 @@ class YesNoScreen(ModalScreen):
         input: str | dict | Input = None,
         label2: str | dict | Label = None,
         input2: str | dict | Input = None,
+        label3: str | dict | Label = None,
         checkbox: str | dict | Checkbox = None,
         checkbox2: str | dict | Checkbox = None,
         checkbox3: str | dict | Checkbox = None,
+        checkbox4: str | dict | Checkbox = None,
         yes: str | dict | Button = "Yes",
         maybe: str | dict | Button = None,
         no: str | dict | Button = "No",
@@ -117,6 +119,7 @@ class YesNoScreen(ModalScreen):
             checkbox: Optional checkbox widget or label. Defaults to None.
             checkbox2: Optional second checkbox widget or label. Defaults to None.
             checkbox3: Optional third checkbox widget or label. Defaults to None.
+            checkbox4: Optional fourth checkbox widget or label. Defaults to None.
             yes: Text or dict for the Yes button. If None, hides the Yes button. Defaults to "Yes".
             maybe: Optional Maybe button text/dict. Defaults to None.
             no: Text or dict for the No button. If None, hides the No button. Defaults to "No".
@@ -128,9 +131,11 @@ class YesNoScreen(ModalScreen):
         self.input = input
         self.label2 = label2
         self.input2 = input2
+        self.label3 = label3
         self.checkbox = checkbox
         self.checkbox2 = checkbox2
         self.checkbox3 = checkbox3
+        self.checkbox4 = checkbox4
         self.yes = yes
         self.maybe = maybe
         self.no = no
@@ -150,49 +155,54 @@ class YesNoScreen(ModalScreen):
             if self.title:
                 container.border_title = self.title
 
-            if self.label or self.input is not None:
-                with Container(id="input-container"):
-                    if self.label:
-                        if isinstance(self.label, Label):
-                            pass
-                        elif isinstance(self.label, dict):
-                            self.label = Label(**self.label)
-                        else:
-                            self.label = Label(self.label)
-                        yield self.label
+            if self.label:
+                if isinstance(self.label, Label):
+                    pass
+                elif isinstance(self.label, dict):
+                    self.label = Label(**self.label)
+                else:
+                    self.label = Label(self.label)
+                yield self.label
 
-                    if self.input is not None:
-                        if isinstance(self.input, Input):
-                            pass
-                        elif isinstance(self.input, dict):
-                            self.input = Input(**self.input)
-                        else:
-                            self.input = Input(self.input)
-                        self.input.select_all()
-                        yield self.input
+            if self.input is not None:
+                if isinstance(self.input, Input):
+                    pass
+                elif isinstance(self.input, dict):
+                    self.input = Input(**self.input)
+                else:
+                    self.input = Input(self.input)
+                self.input.select_all()
+                yield self.input
 
-            if self.label2 or self.input2 is not None:
-                with Container(id="input-container-2"):
-                    if self.label2:
-                        if isinstance(self.label2, Label):
-                            pass
-                        elif isinstance(self.label2, dict):
-                            self.label2 = Label(**self.label2)
-                        else:
-                            self.label2 = Label(self.label2)
-                        yield self.label2
+            if self.label2:
+                if isinstance(self.label2, Label):
+                    pass
+                elif isinstance(self.label2, dict):
+                    self.label2 = Label(**self.label2)
+                else:
+                    self.label2 = Label(self.label2)
+                yield self.label2
 
-                    if self.input2 is not None:
-                        if isinstance(self.input2, Input):
-                            pass
-                        elif isinstance(self.input2, dict):
-                            self.input2 = Input(**self.input2)
-                        else:
-                            self.input2 = Input(self.input2)
-                        self.input2.select_all()
-                        yield self.input2
+            if self.input2 is not None:
+                if isinstance(self.input2, Input):
+                    pass
+                elif isinstance(self.input2, dict):
+                    self.input2 = Input(**self.input2)
+                else:
+                    self.input2 = Input(self.input2)
+                self.input2.select_all()
+                yield self.input2
 
-            if self.checkbox or self.checkbox2 or self.checkbox3:
+            if self.label3:
+                if isinstance(self.label3, Label):
+                    pass
+                elif isinstance(self.label3, dict):
+                    self.label3 = Label(**self.label3)
+                else:
+                    self.label3 = Label(self.label3)
+                yield self.label3
+
+            if any([self.checkbox, self.checkbox2, self.checkbox3, self.checkbox4]):
                 with Horizontal(id="checkbox-container"):
                     if self.checkbox:
                         if isinstance(self.checkbox, Checkbox):
@@ -220,6 +230,15 @@ class YesNoScreen(ModalScreen):
                         else:
                             self.checkbox3 = Checkbox(self.checkbox3)
                         yield self.checkbox3
+
+                    if self.checkbox4:
+                        if isinstance(self.checkbox4, Checkbox):
+                            pass
+                        elif isinstance(self.checkbox4, dict):
+                            self.checkbox4 = Checkbox(**self.checkbox4)
+                        else:
+                            self.checkbox4 = Checkbox(self.checkbox4)
+                        yield self.checkbox4
 
             if self.yes or self.no or self.maybe:
                 with Horizontal(id="button-container"):
@@ -455,32 +474,35 @@ class RenameColumnScreen(YesNoScreen):
 class SearchScreen(YesNoScreen):
     """Modal screen to search by value or expression."""
 
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen").replace("max-width: 60;", "max-width: 70;")
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen").replace("max-width: 60", "max-width: 70")
 
     def __init__(self, title: str, df: pl.DataFrame, cidx: int, term: str | None = None):
         self.cidx = cidx
 
-        EXPR = f"{NULL}, $1 > 50, $name == 'text', $_ > 100, $a < $b, $_.str.contains('sub')"
+        EXPR = f"{NULL}, Fire, $1 > 50, $name == 'text', $_ > 100, $a < $b"
         label = f"By value or Polars expression, e.g., {EXPR}"
 
         super().__init__(
             title=title,
             label=label,
             input=term,
-            checkbox="Match Nocase",
-            checkbox2="Match Whole",
-            checkbox3="Match Reverse",
+            label2="Match options:",
+            checkbox="Nocase",
+            checkbox2="Whole",
+            checkbox3="Literal",
+            checkbox4="Reverse",
             on_yes_callback=self._get_input,
         )
 
-    def _get_input(self) -> tuple[str, int, bool, bool, bool]:
+    def _get_input(self) -> tuple[str, int, bool, bool, bool, bool]:
         """Get input."""
         term = self.input.value  # Do not strip to preserve spaces
         match_nocase = self.checkbox.value
         match_whole = self.checkbox2.value
-        match_reverse = self.checkbox3.value
+        match_literal = self.checkbox3.value
+        match_reverse = self.checkbox4.value
 
-        return term, self.cidx, match_nocase, match_whole, match_reverse
+        return term, self.cidx, match_nocase, match_whole, match_literal, match_reverse
 
 
 class FreezeScreen(YesNoScreen):
@@ -647,7 +669,7 @@ class FindReplaceScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ReplaceScreen")
 
-    def __init__(self, dftable: "DataFrameTable", title: str = "Find and Replace"):
+    def __init__(self, title: str, dftable: "DataFrameTable"):
         if (cursor_value := dftable.cursor_value) is None:
             term_find = NULL
         else:
@@ -659,34 +681,26 @@ class FindReplaceScreen(YesNoScreen):
             input=term_find,
             label2="Replace with",
             input2="new value or expression",
-            checkbox="Match Nocase",
-            checkbox2="Match Whole",
+            label3="Match options:",
+            checkbox="Nocase",
+            checkbox2="Whole",
+            checkbox3="Literal",
             yes="Replace",
             maybe="Replace All",
             no="Cancel",
             on_yes_callback=self._get_input,
-            on_maybe_callback=self._get_input_replace_all,
+            on_maybe_callback=partial(self._get_input, replace_all=True),
         )
 
-    def _get_input(self) -> tuple[bool, str, str, bool, bool]:
+    def _get_input(self, replace_all: bool = False) -> tuple[bool, str, str, bool, bool, bool]:
         """Get input."""
-        replace_all = False
         term_find = self.input.value  # Do not strip to preserve spaces
         term_replace = self.input2.value  # Do not strip to preserve spaces
         match_nocase = self.checkbox.value
         match_whole = self.checkbox2.value
+        match_literal = self.checkbox3.value
 
-        return replace_all, term_find, term_replace, match_nocase, match_whole
-
-    def _get_input_replace_all(self) -> tuple[bool, str, str, bool, bool]:
-        """Get input for 'Replace All'."""
-        replace_all = True
-        term_find = self.input.value  # Do not strip to preserve spaces
-        term_replace = self.input2.value  # Do not strip to preserve spaces
-        match_nocase = self.checkbox.value
-        match_whole = self.checkbox2.value
-
-        return replace_all, term_find, term_replace, match_nocase, match_whole
+        return replace_all, term_find, term_replace, match_nocase, match_whole, match_literal
 
 
 class RenameTabScreen(YesNoScreen):

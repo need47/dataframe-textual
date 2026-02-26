@@ -4,6 +4,7 @@ import io
 import sys
 from collections import defaultdict, deque
 from dataclasses import dataclass
+from functools import partial
 from itertools import zip_longest
 from pathlib import Path
 from textwrap import dedent
@@ -97,6 +98,7 @@ class ReplaceState:
     term_replace: str
     match_nocase: bool
     match_whole: bool
+    match_literal: bool
     cidx: int  # Column index to search in, could be None for all columns
     rows: list[int]  # List of row indices
     cols_per_row: list[list[int]]  # List of list of column indices per row
@@ -121,6 +123,45 @@ def add_rid_column(df: pl.DataFrame) -> pl.DataFrame:
     if RID not in df.columns:
         df = df.lazy().with_row_index(RID).select(pl.exclude(RID), RID).collect()
     return df
+
+
+def handle_term(
+    term: str, col_name: str, match_nocase: bool, match_whole: bool, match_literal: bool, cast_to_str: bool = False
+) -> pl.Expr:
+    """Handle search term based on matching options.
+
+    Args:
+        term: The original search term input by the user.
+        col_name: The name of the column to search in.
+        match_nocase: Whether to ignore case when matching.
+        match_whole: Whether to match whole cell values only.
+        match_literal: Whether to treat the term as a literal string (not a regex).
+        cast_to_str: Whether to cast the term to a string if possible (for non-regex search).
+
+    Returns:
+        A Polars expression that can be used for filtering based on the search term and options.
+    """
+    str_to_search = pl.col(col_name).cast(pl.String) if cast_to_str else pl.col(col_name)
+
+    if match_literal:
+        if match_whole:
+            if match_nocase:
+                expr = str_to_search.str.to_lowercase() == term.lower()
+            else:
+                expr = str_to_search == term
+        else:
+            if match_nocase:
+                expr = str_to_search.str.to_lowercase().str.contains(term.lower(), literal=True)
+            else:
+                expr = str_to_search.str.contains(term, literal=True)
+    else:
+        if match_whole:
+            term = f"^{term}$"
+        if match_nocase:
+            term = f"(?i){term}"
+        expr = str_to_search.str.contains(term, literal=match_literal)
+
+    return expr
 
 
 class DataFrameTable(DataTable):
@@ -289,7 +330,7 @@ class DataFrameTable(DataTable):
         ("n", "next_match", "Go to next match"),  # `n`
         ("N", "previous_match", "Go to previous match"),  # `Shift+n`
         ("r", "replace", "Replace in column"),  # `r`
-        ("R", "replace_global", "Replace global"),  # `Shift+R`
+        ("R", "replace('global')", "Replace global"),  # `Shift+R`
         # Delete
         ("delete", "clear_cell", "Clear cell"),
         ("shift+delete", "clear_column", "Clear cells in current column that match cursor value"),  # `Shift+Delete`
@@ -842,13 +883,9 @@ class DataFrameTable(DataTable):
         """
         self.do_find_expr(scope=scope)
 
-    def action_replace(self) -> None:
-        """Replace values in current column."""
-        self.do_replace()
-
-    def action_replace_global(self) -> None:
-        """Replace values across all columns."""
-        self.do_replace_global()
+    def action_replace(self, scope="column") -> None:
+        """Replace values in current column or globally."""
+        self.do_replace(scope=scope)
 
     def action_toggle_row_selection(self) -> None:
         """Toggle selection for the current row."""
@@ -2302,7 +2339,6 @@ class DataFrameTable(DataTable):
                 f"Error adding column [$error]{new_col_name}[/]", title="Add Column", severity="error", timeout=10
             )
             self.log(f"Error adding column `{new_col_name}`: {str(e)}")
-            raise e
 
     def do_add_column_expr(self) -> None:
         """Open screen to add a new column with optional expression."""
@@ -2894,7 +2930,7 @@ class DataFrameTable(DataTable):
         """Select rows by value or expression."""
         if result is None:
             return
-        term, cidx, match_nocase, match_whole, match_reverse = result
+        term, cidx, match_nocase, match_whole, match_literal, match_reverse = result
 
         col_name = self.df.columns[cidx]
         dtype = self.df.dtypes[cidx]
@@ -2933,21 +2969,13 @@ class DataFrameTable(DataTable):
         else:
             dtype = self.df.dtypes[cidx]
             if dtype == pl.String:
-                if match_whole:
-                    term = f"^{term}$"
-                if match_nocase:
-                    term = f"(?i){term}"
-                expr = pl.col(col_name).str.contains(term)
+                expr = handle_term(term, col_name, match_nocase, match_whole, match_literal)
             else:
                 try:
                     value = DtypeConfig(dtype).convert(term)
                     expr = pl.col(col_name) == value
                 except Exception:
-                    if match_whole:
-                        term = f"^{term}$"
-                    if match_nocase:
-                        term = f"(?i){term}"
-                    expr = pl.col(col_name).cast(pl.Utf8).str.contains(term)
+                    expr = handle_term(term, col_name, match_nocase, match_whole, match_literal, cast_to_str=True)
                     self.notify(
                         f"Error converting [$error]{term}[/] to [$accent]{dtype}[/]. Cast to string.",
                         title="Select Row",
@@ -2974,7 +3002,7 @@ class DataFrameTable(DataTable):
         match_count = len(ok_rids)
         if match_count == 0:
             self.notify(
-                f"No matches found for `[$warning]{term}[/]`. Try [$accent](?i)abc[/] for case-insensitive search.",
+                f"No matches found for `[$warning]{term}[/]`. Try other search options.",
                 title="Select Row",
                 severity="warning",
             )
@@ -3070,6 +3098,7 @@ class DataFrameTable(DataTable):
         cidx: int | None = None,
         match_nocase: bool = False,
         match_whole: bool = False,
+        match_literal: bool = False,
         match_reverse: bool = False,
     ) -> dict[int, set[str]]:
         """Find matches for a term in the dataframe.
@@ -3079,6 +3108,7 @@ class DataFrameTable(DataTable):
             cidx: Column index for column-specific search. If None, searches all columns.
             match_nocase: Whether to perform case-insensitive matching (for string terms)
             match_whole: Whether to match the whole cell content (for string terms)
+            match_literal: Whether to treat the search term as a literal string (disables regex)
             match_reverse: Whether to reverse the match (i.e., find non-matching rows)
 
         Returns:
@@ -3120,11 +3150,7 @@ class DataFrameTable(DataTable):
                     self.log(f"Error validating expression `{term}`: {str(e)}")
                     return matches
             else:
-                if match_whole:
-                    term = f"^{term}$"
-                if match_nocase:
-                    term = f"(?i){term}"
-                expr = pl.col(col_name).cast(pl.String).str.contains(term)
+                expr = handle_term(term, col_name, match_nocase, match_whole, match_literal, cast_to_str=True)
 
             # Reverse the expression if requested
             if match_reverse:
@@ -3154,9 +3180,9 @@ class DataFrameTable(DataTable):
 
         if scope == "column":
             cidx = self.cursor_cidx
-            self.find((term, cidx, False, True, False))
+            self.find((term, cidx, False, True, False, True))
         else:
-            self.find_global((term, None, False, True, False))
+            self.find_global((term, None, False, True, False, True))
 
     def do_find_expr(self, scope="column") -> None:
         """Open screen to find by expression.
@@ -3175,15 +3201,20 @@ class DataFrameTable(DataTable):
         )
 
     def find(self, result) -> None:
-        """Find a term in current column."""
+        """
+        Find a term in current column.
+
+        Args:
+            result: A tuple of (term, cidx, match_nocase, match_whole, match_literal, match_reverse)
+        """
         if result is None:
             return
-        term, cidx, match_nocase, match_whole, match_reverse = result
+        term, cidx, match_nocase, match_whole, match_literal, match_reverse = result
 
         col_name = self.df.columns[cidx]
 
         try:
-            matches = self.find_matches(term, cidx, match_nocase, match_whole, match_reverse)
+            matches = self.find_matches(term, cidx, match_nocase, match_whole, match_literal, match_reverse)
         except Exception as e:
             self.notify(f"Error finding matches for `[$error]{term}[/]`", title="Find", severity="error", timeout=10)
             self.log(f"Error finding matches for `{term}`: {str(e)}")
@@ -3191,7 +3222,7 @@ class DataFrameTable(DataTable):
 
         if not matches:
             self.notify(
-                f"No matches found for `[$warning]{term}[/]` in current column. Try [$accent](?i)abc[/] for case-insensitive search.",
+                f"No matches found for `[$warning]{term}[/]` in current column. Try other search options.",
                 title="Find",
                 severity="warning",
             )
@@ -3210,14 +3241,24 @@ class DataFrameTable(DataTable):
         self.setup_table()
 
     def find_global(self, result) -> None:
-        """Global find a term across all columns."""
+        """
+        Global find a term across all columns.
+
+        Args:
+            result: A tuple of (term, cidx, match_nocase, match_whole, match_literal, match_reverse)
+        """
         if result is None:
             return
-        term, cidx, match_nocase, match_whole, match_reverse = result
+        term, cidx, match_nocase, match_whole, match_literal, match_reverse = result
 
         try:
             matches = self.find_matches(
-                term, cidx=None, match_nocase=match_nocase, match_whole=match_whole, match_reverse=match_reverse
+                term,
+                cidx=None,
+                match_nocase=match_nocase,
+                match_whole=match_whole,
+                match_literal=match_literal,
+                match_reverse=match_reverse,
             )
         except Exception as e:
             self.notify(f"Error finding matches for `[$error]{term}[/]`", title="Find", severity="error", timeout=10)
@@ -3226,7 +3267,7 @@ class DataFrameTable(DataTable):
 
         if not matches:
             self.notify(
-                f"No matches found for `[$warning]{term}[/]` in any column. Try [$accent](?i)abc[/] for case-insensitive search.",
+                f"No matches found for `[$warning]{term}[/]` in any column. Try other search options.",
                 title="Global Find",
                 severity="warning",
             )
@@ -3341,40 +3382,29 @@ class DataFrameTable(DataTable):
         last_ridx = selected_row_indices[-1]
         self.move_cursor_to(last_ridx, self.cursor_cidx)
 
-    def do_replace(self) -> None:
-        """Open replace screen for current column."""
+    def do_replace(self, scope="column") -> None:
+        """Open replace screen for current column or globally."""
         # Push the replace modal screen
+        title = "Find and Replace" if scope == "column" else "Global Find and Replace"
         self.app.push_screen(
-            FindReplaceScreen(self, title="Find and Replace"),
-            callback=self.replace,
+            FindReplaceScreen(title, self),
+            callback=partial(self.replace, scope=scope),
         )
 
-    def replace(self, result) -> None:
-        """Handle replace in current column."""
-        self.handle_replace(result, self.cursor_cidx)
-
-    def do_replace_global(self) -> None:
-        """Open replace screen for all columns."""
-        # Push the replace modal screen
-        self.app.push_screen(
-            FindReplaceScreen(self, title="Global Find and Replace"),
-            callback=self.replace_global,
-        )
-
-    def replace_global(self, result) -> None:
-        """Handle replace across all columns."""
-        self.handle_replace(result, None)
+    def replace(self, result, scope="column") -> None:
+        """Handle replace in current column or globally."""
+        self.handle_replace(result, self.cursor_cidx if scope == "column" else None)
 
     def handle_replace(self, result, cidx) -> None:
-        """Handle replace result from ReplaceScreen.
+        """Handle replace result.
 
         Args:
-            result: Result tuple from ReplaceScreen
+            result: A tuple of (replace_all, term_find, term_replace, match_nocase, match_whole, match_literal)
             cidx: Column index to perform replacement. If None, replace across all columns.
         """
         if result is None:
             return
-        replace_all, term_find, term_replace, match_nocase, match_whole = result
+        replace_all, term_find, term_replace, match_nocase, match_whole, match_literal = result
 
         if cidx is None:
             col_name = "all columns"
@@ -3382,7 +3412,7 @@ class DataFrameTable(DataTable):
             col_name = self.df.columns[cidx]
 
         # Find all matches
-        matches = self.find_matches(term_find, cidx, match_nocase, match_whole)
+        matches = self.find_matches(term_find, cidx, match_nocase, match_whole, match_literal, match_reverse=False)
 
         if not matches:
             self.notify(f"No matches found for [$warning]{term_find}[/]", title="Replace", severity="warning")
@@ -3415,6 +3445,7 @@ class DataFrameTable(DataTable):
             term_replace=term_replace,
             match_nocase=match_nocase,
             match_whole=match_whole,
+            match_literal=match_literal,
             cidx=cidx,
             rows=list(rid2ridx.values()),
             cols_per_row=[[cidx for cidx, col in cidx2col.items() if col in self.matches[rid]] for rid in rid2ridx],
@@ -3491,7 +3522,7 @@ class DataFrameTable(DataTable):
                 new_value = (
                     pl.lit(None)
                     if state.term_replace == NULL
-                    else pl.col(col_name).str.replace_all(term_find, state.term_replace)
+                    else pl.col(col_name).str.replace_all(term_find, state.term_replace, literal=state.match_literal)
                 )
                 self.df = self.df.with_columns(
                     pl.when(mask).then(new_value).otherwise(pl.col(col_name)).alias(col_name)
@@ -3595,7 +3626,7 @@ class DataFrameTable(DataTable):
                 new_value = (
                     pl.lit(None)
                     if state.term_replace == NULL
-                    else pl.col(col_name).str.replace_all(term_find, state.term_replace)
+                    else pl.col(col_name).str.replace_all(term_find, state.term_replace, literal=state.match_literal)
                 )
                 self.df = self.df.with_columns(
                     pl.when(pl.arange(0, len(self.df)) == ridx)
@@ -3698,7 +3729,7 @@ class DataFrameTable(DataTable):
             value = self.df.item(ridx, cidx)
             term = pl.col(col_name).is_null() if value is None else pl.col(col_name) == value
 
-        self.view_rows((term, cidx, False, True, False))
+        self.view_rows((term, cidx, False, True, False, True))
 
     def do_view_rows_expr(self) -> None:
         """Open the view screen to enter an expression."""
@@ -3713,10 +3744,15 @@ class DataFrameTable(DataTable):
         )
 
     def view_rows(self, result) -> None:
-        """View selected rows and hide others. Do not modify the dataframe."""
+        """
+        View selected rows and hide others. Do not modify the dataframe.
+
+        Args:
+            result: A tuple of (term, cidx, match_nocase, match_whole, match_literal, match_reverse)
+        """
         if result is None:
             return
-        term, cidx, match_nocase, match_whole, match_reverse = result
+        term, cidx, match_nocase, match_whole, match_literal, match_reverse = result
 
         col_name = self.df.columns[cidx]
         dtype = self.df.dtypes[cidx]
@@ -3754,21 +3790,13 @@ class DataFrameTable(DataTable):
         # Type-aware search based on column dtype
         else:
             if dtype == pl.String:
-                if match_whole:
-                    term = f"^{term}$"
-                if match_nocase:
-                    term = f"(?i){term}"
-                expr = pl.col(col_name).str.contains(term)
+                expr = handle_term(term, col_name, match_nocase, match_whole, match_literal)
             else:
                 try:
                     value = DtypeConfig(dtype).convert(term)
                     expr = pl.col(col_name) == value
                 except Exception:
-                    if match_whole:
-                        term = f"^{term}$"
-                    if match_nocase:
-                        term = f"(?i){term}"
-                    expr = pl.col(col_name).cast(pl.String).str.contains(term)
+                    expr = handle_term(term, col_name, match_nocase, match_whole, match_literal, cast_to_str=True)
                     self.notify(
                         f"Unknown column type [$warning]{dtype}[/]. Cast to string.",
                         title="View Rows",

@@ -135,7 +135,7 @@ class TableScreen(ModalScreen):
 
         # Action view
         else:
-            self.dftable.view_rows((expr, cidx, False, True, False))
+            self.dftable.view_rows((expr, cidx, False, True, False, True))
 
         # Dismiss modal screen(s) to return to main table
         while len(self.app._screen_stack) > 1:
