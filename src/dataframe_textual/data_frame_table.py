@@ -2994,8 +2994,7 @@ class DataFrameTable(DataTable):
         )
 
     def find(self, result: dict, scope="column") -> None:
-        """
-        Find a term in current column or globally across all columns.
+        """Find a term in current column or globally across all columns.
 
         Args:
             result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse"
@@ -3511,8 +3510,7 @@ class DataFrameTable(DataTable):
         )
 
     def view_rows(self, result) -> None:
-        """
-        View selected rows and hide others. Do not modify the dataframe.
+        """View selected rows and hide others. Do not modify the dataframe.
 
         Args:
             result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse"
@@ -3626,8 +3624,8 @@ class DataFrameTable(DataTable):
     def do_filter_rows(self, cidx: int = None, term: Any = None) -> None:
         """Filter rows.
 
-        If there are selected rows, use those. If value is provided, filter based on the value.
-        Otherwise, filter based on the cursor value.
+        If there are selected rows, use those.
+        Otherwise, filter based on the value provided or the current cell value.
         """
         if self.selected_rows:
             message = "Filtered to selected rows (other rows removed)"
@@ -3723,8 +3721,7 @@ class DataFrameTable(DataTable):
         )
 
     def select_rows(self, result: dict) -> None:
-        """
-        Select rows by value or expression.
+        """Select rows by value or expression.
 
         Args:
             result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse"
