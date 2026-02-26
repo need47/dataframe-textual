@@ -359,8 +359,10 @@ class StatisticsScreen(TableScreen):
         self.table.add_column(Text(col_name, justify=dc.justify), key=col_name)
 
         # Add rows
-        for row in self.df.rows():
+        for idx, row in enumerate(self.df.rows()):
             stat_label, stat_value = row
+            if idx < 4 and col_dtype == pl.String and self.thousand_separator:
+                stat_value = f"{int(stat_value):,}"
             self.table.add_row(
                 stat_label,
                 dc.format(stat_value, thousand_separator=self.thousand_separator),
@@ -379,7 +381,7 @@ class StatisticsScreen(TableScreen):
             self.table.add_column(Text(col_name, justify=dc.justify), key=col_name)
 
         # Add rows
-        for row in self.df.rows():
+        for ridx, row in enumerate(self.df.rows()):
             formatted_row = []
 
             # Format remaining values with appropriate styling
@@ -391,6 +393,9 @@ class StatisticsScreen(TableScreen):
 
                 col_dtype = self.df.dtypes[idx]
                 dc = DtypeConfig(col_dtype)
+
+                if ridx < 4 and col_dtype == pl.String and self.thousand_separator:
+                    stat_value = f"{int(stat_value):,}"
 
                 formatted_row.append(dc.format(stat_value, thousand_separator=self.thousand_separator))
 
