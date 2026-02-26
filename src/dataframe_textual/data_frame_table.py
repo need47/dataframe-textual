@@ -3495,7 +3495,16 @@ class DataFrameTable(DataTable):
             value = self.df.item(ridx, cidx)
             term = pl.col(col_name).is_null() if value is None else pl.col(col_name) == value
 
-        self.view_rows((term, cidx, False, True, True, False))
+        self.view_rows(
+            {
+                "term": term,
+                "cidx": cidx,
+                "match_nocase": False,
+                "match_whole": True,
+                "match_literal": True,
+                "match_reverse": False,
+            }
+        )
 
     def do_view_rows_expr(self) -> None:
         """Open the view screen to enter an expression."""

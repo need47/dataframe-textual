@@ -45,17 +45,13 @@ class YesNoScreen(ModalScreen):
         }
 
         YesNoScreen Label {
-            margin: 1 0 0 0;
+            margin: 0
             width: 100%;
             text-wrap: wrap;
         }
 
-        YesNoScreen Label:first-of-type {
-            margin: 0;
-        }
-
         YesNoScreen Input {
-            margin: 1 0 0 0;
+            margin: 0 0 1 0;
         }
 
         YesNoScreen Input:blur {
@@ -63,7 +59,7 @@ class YesNoScreen(ModalScreen):
         }
 
         YesNoScreen #checkbox-container {
-            margin: 1 0 0 0;
+            margin: 0 0 1 0;
             height: auto;
             align: left middle;
         }
