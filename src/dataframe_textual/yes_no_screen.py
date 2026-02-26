@@ -476,7 +476,7 @@ class SearchScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen").replace("max-width: 60", "max-width: 70")
 
-    def __init__(self, title: str, df: pl.DataFrame, cidx: int, term: str | None = None):
+    def __init__(self, title: str, df: pl.DataFrame, cidx: int, term: str):
         self.cidx = cidx
 
         EXPR = f"{NULL}, Fire, $1 > 50, $name == 'text', $_ > 100, $a < $b"
@@ -502,7 +502,14 @@ class SearchScreen(YesNoScreen):
         match_literal = self.checkbox3.value
         match_reverse = self.checkbox4.value
 
-        return term, self.cidx, match_nocase, match_whole, match_literal, match_reverse
+        return {
+            "term": term,
+            "cidx": self.cidx,
+            "match_nocase": match_nocase,
+            "match_whole": match_whole,
+            "match_literal": match_literal,
+            "match_reverse": match_reverse,
+        }
 
 
 class FreezeScreen(YesNoScreen):
@@ -700,7 +707,14 @@ class FindReplaceScreen(YesNoScreen):
         match_whole = self.checkbox2.value
         match_literal = self.checkbox3.value
 
-        return replace_all, term_find, term_replace, match_nocase, match_whole, match_literal
+        return {
+            "replace_all": replace_all,
+            "term_find": term_find,
+            "term_replace": term_replace,
+            "match_nocase": match_nocase,
+            "match_whole": match_whole,
+            "match_literal": match_literal,
+        }
 
 
 class RenameTabScreen(YesNoScreen):

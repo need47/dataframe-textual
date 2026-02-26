@@ -135,7 +135,16 @@ class TableScreen(ModalScreen):
 
         # Action view
         else:
-            self.dftable.view_rows((expr, cidx, False, True, False, True))
+            self.dftable.view_rows(
+                {
+                    "term": expr,
+                    "cidx": cidx,
+                    "match_nocase": False,
+                    "match_whole": True,
+                    "match_literal": True,
+                    "match_reverse": False,
+                }
+            )
 
         # Dismiss modal screen(s) to return to main table
         while len(self.app._screen_stack) > 1:

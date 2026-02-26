@@ -290,7 +290,7 @@ class DataFrameTable(DataTable):
         ("tilde", "toggle_row_labels", "Toggle row labels"),  # `~`
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
         ("z", "freeze_row_column", "Freeze rows/columns"),
-        ("Z", "freeze_row_column(True)", "Unfreeze all rows and columns"),
+        ("Z", "freeze_row_column('unfreeze')", "Unfreeze all rows and columns"),
         ("comma", "toggle_thousand_separator", "Toggle thousand separator"),  # `,`
         ("underscore", "expand_column", "Expand column to full width"),  # `_`
         ("circumflex_accent", "toggle_rid", "Toggle internal row index"),  # `^`
@@ -310,7 +310,7 @@ class DataFrameTable(DataTable):
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
         # View & Filter
-        ("full_stop", "view_rows_non_null", "View rows with non-null values in current column"),
+        ("full_stop", "view_rows('non_null')", "View rows with non-null values in current column"),
         ("v", "view_rows", "View selected rows"),
         ("V", "view_rows_expr", "View selected rows matching expression"),
         ("quotation_mark", "filter_rows", "Filter selected rows"),  # `"`
@@ -815,13 +815,9 @@ class DataFrameTable(DataTable):
         """Show metadata for the current column."""
         self.do_metadata_column()
 
-    def action_view_rows_non_null(self) -> None:
-        """View rows with non-null values in the current column."""
-        self.do_view_rows_non_null()
-
-    def action_view_rows(self) -> None:
+    def action_view_rows(self, kind: str = None) -> None:
         """View rows by current cell value."""
-        self.do_view_rows()
+        self.do_view_rows(kind=kind)
 
     def action_view_rows_expr(self) -> None:
         """Open the advanced filter screen."""
@@ -868,23 +864,15 @@ class DataFrameTable(DataTable):
         self.do_select_rows_expr()
 
     def action_find_cursor_value(self, scope="column") -> None:
-        """Find by cursor value.
-
-        Args:
-            scope: "column" to find in current column, "global" to find across all columns.
-        """
+        """Find by cursor value in current column or globally across all columns."""
         self.do_find_cursor_value(scope=scope)
 
     def action_find_expr(self, scope="column") -> None:
-        """Find by expression.
-
-        Args:
-            scope: "column" to find in current column, "global" to find across all columns.
-        """
+        """Find by expression in current column or globally across all columns."""
         self.do_find_expr(scope=scope)
 
     def action_replace(self, scope="column") -> None:
-        """Replace values in current column or globally."""
+        """Replace values in current column or globally across all columns."""
         self.do_replace(scope=scope)
 
     def action_toggle_row_selection(self) -> None:
@@ -955,9 +943,9 @@ class DataFrameTable(DataTable):
         """Cycle through cursor types."""
         self.do_cycle_cursor_type()
 
-    def action_freeze_row_column(self, unfreeze: bool = False) -> None:
+    def action_freeze_row_column(self, action: str = None) -> None:
         """Open the freeze screen."""
-        self.do_freeze_row_column(unfreeze=unfreeze)
+        self.do_freeze_row_column(action=action)
 
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility."""
@@ -1754,9 +1742,9 @@ class DataFrameTable(DataTable):
         """Show metadata for all columns in the dataframe."""
         self.app.push_screen(MetaColumnScreen(self))
 
-    def do_freeze_row_column(self, unfreeze: bool = False) -> None:
+    def do_freeze_row_column(self, action: str = None) -> None:
         """Open the freeze screen to set fixed rows and columns."""
-        if unfreeze:
+        if action == "unfreeze":
             self.freeze_row_column((0, 0))
         else:
             self.app.push_screen(FreezeScreen(), callback=self.freeze_row_column)
@@ -2889,208 +2877,6 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error casting column `{col_name}`: {str(e)}")
 
-    # Row selection
-    def do_select_rows(self) -> None:
-        """Select rows.
-
-        If there are existing cell matches, use those to select rows.
-        Otherwise, use the current cell value as the search term and select rows matching that value.
-        """
-        cidx = self.cursor_cidx
-
-        # Use existing cell matches if present
-        if self.matches:
-            term = pl.col(RID).is_in(self.matches)
-        else:
-            col_name = self.cursor_col_name
-
-            # Get the value of the currently selected cell
-            term = NULL if self.cursor_value is None else str(self.cursor_value)
-            if self.cursor_value is None:
-                term = pl.col(col_name).is_null()
-            else:
-                term = pl.col(col_name) == self.cursor_value
-
-        self.select_rows((term, cidx, False, True, False))
-
-    def do_select_rows_expr(self) -> None:
-        """Select rows by expression."""
-        cidx = self.cursor_cidx
-
-        # Use current cell value as default search term
-        term = NULL if self.cursor_value is None else str(self.cursor_value)
-
-        # Push the search modal screen
-        self.app.push_screen(
-            SearchScreen("Select Rows", self.df, cidx, term),
-            callback=self.select_rows,
-        )
-
-    def select_rows(self, result) -> None:
-        """Select rows by value or expression."""
-        if result is None:
-            return
-        term, cidx, match_nocase, match_whole, match_literal, match_reverse = result
-
-        col_name = self.df.columns[cidx]
-        dtype = self.df.dtypes[cidx]
-
-        # Already a Polars expression
-        if isinstance(term, pl.Expr):
-            expr = term
-
-        # bool list or Series
-        elif isinstance(term, (list, pl.Series)):
-            expr = term
-
-        # Null case
-        elif term == NULL:
-            expr = pl.col(col_name).is_null()
-
-        # Empty string case
-        elif term == "":
-            if dtype == pl.String:
-                expr = pl.col(col_name) == ""
-            else:
-                expr = pl.col(col_name).is_null()
-
-        # Expression in string form
-        elif tentative_expr(term):
-            try:
-                expr = validate_expr(term, self.df.columns, cidx)
-            except Exception as e:
-                self.notify(
-                    f"Error validating expression [$error]{term}[/]", title="Select Row", severity="error", timeout=10
-                )
-                self.log(f"Error validating expression `{term}`: {str(e)}")
-                return
-
-        # Perform type-aware search based on column dtype
-        else:
-            dtype = self.df.dtypes[cidx]
-            if dtype == pl.String:
-                expr = handle_term(term, col_name, match_nocase, match_whole, match_literal)
-            else:
-                try:
-                    value = DtypeConfig(dtype).convert(term)
-                    expr = pl.col(col_name) == value
-                except Exception:
-                    expr = handle_term(term, col_name, match_nocase, match_whole, match_literal, cast_to_str=True)
-                    self.notify(
-                        f"Error converting [$error]{term}[/] to [$accent]{dtype}[/]. Cast to string.",
-                        title="Select Row",
-                        severity="warning",
-                    )
-
-        # Reverse the expression if requested
-        if match_reverse:
-            expr = ~expr
-
-        # Lazyframe for filtering
-        lf = self.df.lazy()
-
-        # Apply filter to get matched row indices
-        try:
-            ok_rids = set(lf.filter(expr).collect()[RID])
-        except Exception as e:
-            self.notify(
-                f"Error applying search filter `[$error]{term}[/]`", title="Select Rows", severity="error", timeout=10
-            )
-            self.log(f"Error applying search filter `{term}`: {str(e)}")
-            return
-
-        match_count = len(ok_rids)
-        if match_count == 0:
-            self.notify(
-                f"No matches found for `[$warning]{term}[/]`. Try other search options.",
-                title="Select Row",
-                severity="warning",
-            )
-            return
-
-        message = f"Found [$success]{match_count}[/] matching row(s)"
-
-        # Add to history
-        self.add_history(message)
-
-        # Update selected rows
-        self.selected_rows = ok_rids
-
-        # Show notification immediately, then start highlighting
-        self.notify(message, title="Select Rows")
-
-        # Recreate table for display
-        self.setup_table()
-
-    def do_toggle_selections(self) -> None:
-        """Toggle selected rows highlighting on/off."""
-        # Add to history
-        self.add_history("Toggled row selection")
-
-        # Invert all selected rows
-        self.selected_rows = {rid for rid in self.df[RID] if rid not in self.selected_rows}
-
-        # Check if we're highlighting or un-highlighting
-        if selected_count := len(self.selected_rows):
-            self.notify(f"Toggled selection for [$success]{selected_count}[/] rows", title="Toggle Selection(s)")
-
-        # Recreate table for display
-        self.setup_table()
-
-    def do_toggle_row_selection(self) -> None:
-        """Select/deselect current row."""
-        # Add to history
-        self.add_history("Toggled row selection")
-
-        # Get current row RID
-        ridx = self.cursor_ridx
-        rid = self.df[RID][ridx]
-
-        if rid in self.selected_rows:
-            self.selected_rows.discard(rid)
-        else:
-            self.selected_rows.add(rid)
-
-        row_key = self.cursor_row_key
-        is_selected = rid in self.selected_rows
-        match_cols = self.matches.get(rid, set())
-
-        for col_idx, col in enumerate(self.ordered_columns):
-            col_key = col.key
-            col_name = col_key.value
-            cell_text: Text = self.get_cell(row_key, col_key)
-
-            if is_selected or (col_name in match_cols):
-                cell_text.style = HIGHLIGHT_COLOR
-            else:
-                # Reset to default style based on dtype
-                dtype = self.df.dtypes[col_idx]
-                dc = DtypeConfig(dtype)
-                cell_text.style = dc.style
-
-            self.update_cell(row_key, col_key, cell_text)
-
-    def do_clear_selections_and_matches(self) -> None:
-        """Clear all selected rows and matches without removing them from the dataframe."""
-        # Check if any selected rows or matches
-        if not self.selected_rows and not self.matches:
-            # self.notify("No selections to clear", title="Clear Selections and Matches", severity="warning")
-            return
-
-        # row_count = len(self.selected_rows | set(self.matches.keys()))
-
-        # Add to history
-        self.add_history("Cleared all selections and matches")
-
-        # Clear all selections
-        self.selected_rows = set()
-        self.matches = defaultdict(set)
-
-        # Recreate table for display
-        self.setup_table()
-
-        # self.notify(f"Cleared selections for [$success]{row_count}[/] rows", title="Clear Selections and Matches")
-
     # Find & Replace
     def find_matches(
         self,
@@ -3125,10 +2911,10 @@ class DataFrameTable(DataTable):
         lf = self.df.lazy()
 
         # Determine which columns to search: single column or all columns
-        if cidx is not None:
-            columns_to_search = [(cidx, self.df.columns[cidx])]
-        else:
+        if cidx is None:
             columns_to_search = list(enumerate(self.df.columns))
+        else:
+            columns_to_search = [(cidx, self.df.columns[cidx])]
 
         # Handle each column consistently
         for col_idx, col_name in columns_to_search:
@@ -3177,12 +2963,19 @@ class DataFrameTable(DataTable):
         """
         # Get the value of the currently selected cell
         term = NULL if self.cursor_value is None else str(self.cursor_value)
+        cidx = self.cursor_cidx
 
-        if scope == "column":
-            cidx = self.cursor_cidx
-            self.find((term, cidx, False, True, False, True))
-        else:
-            self.find_global((term, None, False, True, False, True))
+        self.find(
+            {
+                "term": term,
+                "cidx": cidx,
+                "match_nocase": False,
+                "match_whole": True,
+                "match_literal": True,
+                "match_reverse": False,
+            },
+            scope=scope,
+        )
 
     def do_find_expr(self, scope="column") -> None:
         """Open screen to find by expression.
@@ -3197,93 +2990,59 @@ class DataFrameTable(DataTable):
         # Push the search modal screen
         self.app.push_screen(
             SearchScreen("Find" if scope == "column" else "Global Find", self.df, cidx, term),
-            callback=self.find if scope == "column" else self.find_global,
+            callback=partial(self.find, scope=scope),
         )
 
-    def find(self, result) -> None:
+    def find(self, result: dict, scope="column") -> None:
         """
-        Find a term in current column.
+        Find a term in current column or globally across all columns.
 
         Args:
-            result: A tuple of (term, cidx, match_nocase, match_whole, match_literal, match_reverse)
+            result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse"
         """
         if result is None:
             return
-        term, cidx, match_nocase, match_whole, match_literal, match_reverse = result
+        term = result.get("term")
+        cidx = result.get("cidx", self.cursor_cidx)
+        match_nocase = result.get("match_nocase")
+        match_whole = result.get("match_whole")
+        match_literal = result.get("match_literal")
+        match_reverse = result.get("match_reverse")
 
-        col_name = self.df.columns[cidx]
-
-        try:
-            matches = self.find_matches(term, cidx, match_nocase, match_whole, match_literal, match_reverse)
-        except Exception as e:
-            self.notify(f"Error finding matches for `[$error]{term}[/]`", title="Find", severity="error", timeout=10)
-            self.log(f"Error finding matches for `{term}`: {str(e)}")
-            return
-
-        if not matches:
-            self.notify(
-                f"No matches found for `[$warning]{term}[/]` in current column. Try other search options.",
-                title="Find",
-                severity="warning",
-            )
-            return
-
-        # Add to history
-        self.add_history(f"Found `[$success]{term}[/]` in column [$accent]{col_name}[/]")
-
-        # Update matches and count total
-        match_count = sum(len(cols) for cols in matches.values())
-        self.matches = matches
-
-        self.notify(f"Found [$success]{match_count}[/] matches for `[$accent]{term}[/]`", title="Find")
-
-        # Recreate table for display
-        self.setup_table()
-
-    def find_global(self, result) -> None:
-        """
-        Global find a term across all columns.
-
-        Args:
-            result: A tuple of (term, cidx, match_nocase, match_whole, match_literal, match_reverse)
-        """
-        if result is None:
-            return
-        term, cidx, match_nocase, match_whole, match_literal, match_reverse = result
+        col_name = self.df.columns[cidx] if scope == "column" else "all columns"
+        title = "Find" if scope == "column" else "Global Find"
+        cidx = cidx if scope == "column" else None
 
         try:
             matches = self.find_matches(
                 term,
-                cidx=None,
+                cidx,
                 match_nocase=match_nocase,
                 match_whole=match_whole,
                 match_literal=match_literal,
                 match_reverse=match_reverse,
             )
         except Exception as e:
-            self.notify(f"Error finding matches for `[$error]{term}[/]`", title="Find", severity="error", timeout=10)
+            self.notify(f"Error finding matches for `[$error]{term}[/]`", title=title, severity="error", timeout=10)
             self.log(f"Error finding matches for `{term}`: {str(e)}")
             return
 
         if not matches:
             self.notify(
-                f"No matches found for `[$warning]{term}[/]` in any column. Try other search options.",
-                title="Global Find",
+                f"No matches found for `[$warning]{term}[/]` in [$accent]{col_name}[/]. Try other search options.",
+                title=title,
                 severity="warning",
             )
             return
 
         # Add to history
-        self.add_history(f"Found `[$success]{term}[/]` across all columns")
+        self.add_history(f"Found `[$success]{term}[/]` in [$accent]{col_name}[/]")
 
         # Update matches and count total
         match_count = sum(len(cols) for cols in matches.values())
         self.matches = matches
 
-        self.notify(
-            f"Found [$success]{match_count}[/] matches for `[$accent]{term}[/]` across all columns",
-            title="Global Find",
-        )
+        self.notify(f"Found [$success]{match_count}[/] matches for `[$accent]{term}[/]`", title=title)
 
         # Recreate table for display
         self.setup_table()
@@ -3383,7 +3142,7 @@ class DataFrameTable(DataTable):
         self.move_cursor_to(last_ridx, self.cursor_cidx)
 
     def do_replace(self, scope="column") -> None:
-        """Open replace screen for current column or globally."""
+        """Open replace screen for current column or globally across all columns."""
         # Push the replace modal screen
         title = "Find and Replace" if scope == "column" else "Global Find and Replace"
         self.app.push_screen(
@@ -3392,19 +3151,24 @@ class DataFrameTable(DataTable):
         )
 
     def replace(self, result, scope="column") -> None:
-        """Handle replace in current column or globally."""
+        """Handle replace in current column or globally across all columns."""
         self.handle_replace(result, self.cursor_cidx if scope == "column" else None)
 
-    def handle_replace(self, result, cidx) -> None:
+    def handle_replace(self, result: dict, cidx) -> None:
         """Handle replace result.
 
         Args:
-            result: A tuple of (replace_all, term_find, term_replace, match_nocase, match_whole, match_literal)
+            result: A dictionary containing the replace parameters.
             cidx: Column index to perform replacement. If None, replace across all columns.
         """
         if result is None:
             return
-        replace_all, term_find, term_replace, match_nocase, match_whole, match_literal = result
+        replace_all = result.get("replace_all")
+        term_find = result.get("term_find")
+        term_replace = result.get("term_replace")
+        match_nocase = result.get("match_nocase")
+        match_whole = result.get("match_whole")
+        match_literal = result.get("match_literal")
 
         if cidx is None:
             col_name = "all columns"
@@ -3412,7 +3176,16 @@ class DataFrameTable(DataTable):
             col_name = self.df.columns[cidx]
 
         # Find all matches
-        matches = self.find_matches(term_find, cidx, match_nocase, match_whole, match_literal, match_reverse=False)
+        matches = self.find_matches(
+            {
+                "term": term_find,
+                "cidx": cidx,
+                "match_nocase": match_nocase,
+                "match_whole": match_whole,
+                "match_literal": match_literal,
+                "match_reverse": False,
+            }
+        )
 
         if not matches:
             self.notify(f"No matches found for [$warning]{term_find}[/]", title="Replace", severity="warning")
@@ -3701,27 +3474,21 @@ class DataFrameTable(DataTable):
         self.show_next_replace_confirmation()
 
     # View & Filter
-    def do_view_rows_non_null(self) -> None:
-        """View non-null rows based on the cursor column."""
-        cidx = self.cursor_cidx
-        col_name = self.cursor_col_name
-
-        term = pl.col(col_name).is_not_null()
-
-        self.view_rows((term, cidx, False, True, False))
-
-    def do_view_rows(self) -> None:
+    def do_view_rows(self, kind: str = None) -> None:
         """View rows.
 
-        If there are selected rows, view those,
-        Otherwise, view based on the cursor value.
+        If kind is "non_null", view rows where the cursor column is not null.
+        If there are selected rows, view those, Otherwise, view based on the cursor value.
         """
 
         cidx = self.cursor_cidx
         col_name = self.cursor_col_name
 
+        # Non-null case
+        if kind == "non_null":
+            term = pl.col(col_name).is_not_null()
         # If there are selected rows, use those
-        if self.selected_rows:
+        elif self.selected_rows:
             term = pl.col(RID).is_in(self.selected_rows)
         # Otherwise, use the current cell value
         else:
@@ -3729,7 +3496,7 @@ class DataFrameTable(DataTable):
             value = self.df.item(ridx, cidx)
             term = pl.col(col_name).is_null() if value is None else pl.col(col_name) == value
 
-        self.view_rows((term, cidx, False, True, False, True))
+        self.view_rows((term, cidx, False, True, True, False))
 
     def do_view_rows_expr(self) -> None:
         """Open the view screen to enter an expression."""
@@ -3748,11 +3515,16 @@ class DataFrameTable(DataTable):
         View selected rows and hide others. Do not modify the dataframe.
 
         Args:
-            result: A tuple of (term, cidx, match_nocase, match_whole, match_literal, match_reverse)
+            result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse"
         """
         if result is None:
             return
-        term, cidx, match_nocase, match_whole, match_literal, match_reverse = result
+        term = result.get("term")
+        cidx = result.get("cidx", self.cursor_cidx)
+        match_nocase = result.get("match_nocase")
+        match_whole = result.get("match_whole")
+        match_literal = result.get("match_literal")
+        match_reverse = result.get("match_reverse")
 
         col_name = self.df.columns[cidx]
         dtype = self.df.dtypes[cidx]
@@ -3904,6 +3676,226 @@ class DataFrameTable(DataTable):
         self.setup_table()
 
         self.notify(f"{message}. Now showing [$success]{len(self.df)}[/] rows.", title="Filter Rows")
+
+    # Row selection
+    def do_select_rows(self) -> None:
+        """Select rows.
+
+        If there are existing cell matches, use those to select rows.
+        Otherwise, use the current cell value as the search term and select rows matching that value.
+        """
+        cidx = self.cursor_cidx
+
+        # Use existing cell matches if present
+        if self.matches:
+            term = pl.col(RID).is_in(self.matches)
+        else:
+            col_name = self.cursor_col_name
+
+            # Get the value of the currently selected cell
+            if self.cursor_value is None:
+                term = pl.col(col_name).is_null()
+            else:
+                term = pl.col(col_name) == self.cursor_value
+
+        self.select_rows(
+            {
+                "term": term,
+                "cidx": cidx,
+                "match_nocase": False,
+                "match_whole": True,
+                "match_literal": True,
+                "match_reverse": False,
+            }
+        )
+
+    def do_select_rows_expr(self) -> None:
+        """Select rows by expression."""
+        cidx = self.cursor_cidx
+
+        # Use current cell value as default search term
+        term = NULL if self.cursor_value is None else str(self.cursor_value)
+
+        # Push the search modal screen
+        self.app.push_screen(
+            SearchScreen("Select Rows", self.df, cidx, term),
+            callback=self.select_rows,
+        )
+
+    def select_rows(self, result: dict) -> None:
+        """
+        Select rows by value or expression.
+
+        Args:
+            result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse"
+        """
+        if result is None:
+            return
+        term = result.get("term")
+        cidx = result.get("cidx", self.cursor_cidx)
+        match_nocase = result.get("match_nocase")
+        match_whole = result.get("match_whole")
+        match_literal = result.get("match_literal")
+        match_reverse = result.get("match_reverse")
+
+        col_name = self.df.columns[cidx]
+        dtype = self.df.dtypes[cidx]
+
+        # Already a Polars expression
+        if isinstance(term, pl.Expr):
+            expr = term
+
+        # bool list or Series
+        elif isinstance(term, (list, pl.Series)):
+            expr = term
+
+        # Null case
+        elif term == NULL:
+            expr = pl.col(col_name).is_null()
+
+        # Empty string case
+        elif term == "":
+            if dtype == pl.String:
+                expr = pl.col(col_name) == ""
+            else:
+                expr = pl.col(col_name).is_null()
+
+        # Expression in string form
+        elif tentative_expr(term):
+            try:
+                expr = validate_expr(term, self.df.columns, cidx)
+            except Exception as e:
+                self.notify(
+                    f"Error validating expression [$error]{term}[/]", title="Select Row", severity="error", timeout=10
+                )
+                self.log(f"Error validating expression `{term}`: {str(e)}")
+                return
+
+        # Perform type-aware search based on column dtype
+        else:
+            dtype = self.df.dtypes[cidx]
+            if dtype == pl.String:
+                expr = handle_term(term, col_name, match_nocase, match_whole, match_literal)
+            else:
+                try:
+                    value = DtypeConfig(dtype).convert(term)
+                    expr = pl.col(col_name) == value
+                except Exception:
+                    expr = handle_term(term, col_name, match_nocase, match_whole, match_literal, cast_to_str=True)
+                    self.notify(
+                        f"Error converting [$error]{term}[/] to [$accent]{dtype}[/]. Cast to string.",
+                        title="Select Row",
+                        severity="warning",
+                    )
+
+        # Reverse the expression if requested
+        if match_reverse:
+            expr = ~expr
+
+        # Lazyframe for filtering
+        lf = self.df.lazy()
+
+        # Apply filter to get matched row indices
+        try:
+            ok_rids = set(lf.filter(expr).collect()[RID])
+        except Exception as e:
+            self.notify(
+                f"Error applying search filter `[$error]{term}[/]`", title="Select Rows", severity="error", timeout=10
+            )
+            self.log(f"Error applying search filter `{term}`: {str(e)}")
+            return
+
+        match_count = len(ok_rids)
+        if match_count == 0:
+            self.notify(
+                f"No matches found for `[$warning]{term}[/]`. Try other search options.",
+                title="Select Row",
+                severity="warning",
+            )
+            return
+
+        message = f"Found [$success]{match_count}[/] matching row(s)"
+
+        # Add to history
+        self.add_history(message)
+
+        # Update selected rows
+        self.selected_rows = ok_rids
+
+        # Show notification immediately, then start highlighting
+        self.notify(message, title="Select Rows")
+
+        # Recreate table for display
+        self.setup_table()
+
+    def do_toggle_selections(self) -> None:
+        """Toggle selected rows highlighting on/off."""
+        # Add to history
+        self.add_history("Toggled row selection")
+
+        # Invert all selected rows
+        self.selected_rows = {rid for rid in self.df[RID] if rid not in self.selected_rows}
+
+        # Check if we're highlighting or un-highlighting
+        if selected_count := len(self.selected_rows):
+            self.notify(f"Toggled selection for [$success]{selected_count}[/] rows", title="Toggle Selection(s)")
+
+        # Recreate table for display
+        self.setup_table()
+
+    def do_toggle_row_selection(self) -> None:
+        """Select/deselect current row."""
+        # Add to history
+        self.add_history("Toggled row selection")
+
+        # Get current row RID
+        ridx = self.cursor_ridx
+        rid = self.df[RID][ridx]
+
+        if rid in self.selected_rows:
+            self.selected_rows.discard(rid)
+        else:
+            self.selected_rows.add(rid)
+
+        row_key = self.cursor_row_key
+        is_selected = rid in self.selected_rows
+        match_cols = self.matches.get(rid, set())
+
+        for col_idx, col in enumerate(self.ordered_columns):
+            col_key = col.key
+            col_name = col_key.value
+            cell_text: Text = self.get_cell(row_key, col_key)
+
+            if is_selected or (col_name in match_cols):
+                cell_text.style = HIGHLIGHT_COLOR
+            else:
+                # Reset to default style based on dtype
+                dtype = self.df.dtypes[col_idx]
+                dc = DtypeConfig(dtype)
+                cell_text.style = dc.style
+
+            self.update_cell(row_key, col_key, cell_text)
+
+    def do_clear_selections_and_matches(self) -> None:
+        """Clear all selected rows and matches without removing them from the dataframe."""
+        # Check if any selected rows or matches
+        if not self.selected_rows and not self.matches:
+            # self.notify("No selections to clear", title="Clear Selections and Matches", severity="warning")
+            return
+
+        # row_count = len(self.selected_rows | set(self.matches.keys()))
+
+        # Add to history
+        self.add_history("Cleared all selections and matches")
+
+        # Clear all selections
+        self.selected_rows = set()
+        self.matches = defaultdict(set)
+
+        # Recreate table for display
+        self.setup_table()
+
+        # self.notify(f"Cleared selections for [$success]{row_count}[/] rows", title="Clear Selections and Matches")
 
     # Copy
     def do_copy_to_clipboard(self, content: str, message: str) -> None:
