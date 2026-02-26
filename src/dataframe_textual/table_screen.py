@@ -312,17 +312,18 @@ class StatisticsScreen(TableScreen):
             # Get dataframe statistics
             stats_df = lf.describe()
 
-            # Append unique count for each column
+            # total
+            df_n_total = lf.select(pl.all().len()).collect()
+            df_n_total.insert_column(0, pl.Series("statistic", ["n_total"]))
+            df_n_total = df_n_total.cast(stats_df.schema)
+
+            # unique count for each column
             df_n_unique = lf.select(pl.all().n_unique()).collect()
             df_n_unique.insert_column(0, pl.Series("statistic", ["n_unique"]))
             df_n_unique = df_n_unique.cast(stats_df.schema)
 
-            # Append total
-            df_total = lf.select(pl.all().len()).collect()
-            df_total.insert_column(0, pl.Series("statistic", ["n_total"]))
-            df_total = df_total.cast(stats_df.schema)
-
-            stats_df = stats_df.vstack(df_n_unique).vstack(df_total)
+            # total first, then n_unique, then describe stats
+            stats_df = df_n_total.vstack(df_n_unique).vstack(stats_df)
         else:
             col_name = self.dftable.df.columns[self.cidx]
             lf = self.dftable.df.lazy()
@@ -332,16 +333,16 @@ class StatisticsScreen(TableScreen):
             if len(stats_df) == 0:
                 return
 
-            # Append unique count
+            # unique count
             n_unique = lf.select(pl.col(col_name)).collect().n_unique()
-            unique_row = pl.DataFrame({"statistic": ["n_unique"], col_name: n_unique}, schema=stats_df.schema)
+            df_n_unique = pl.DataFrame({"statistic": ["n_unique"], col_name: n_unique}, schema=stats_df.schema)
 
-            # Append total count
-            # sum of null_count and non_null_count
+            # total count
             n_total = len(self.dftable.df[col_name])
-            total_row = pl.DataFrame({"statistic": ["n_total"], col_name: n_total}, schema=stats_df.schema)
+            df_n_total = pl.DataFrame({"statistic": ["n_total"], col_name: n_total}, schema=stats_df.schema)
 
-            stats_df = stats_df.vstack(unique_row).vstack(total_row)
+            # total first, then n_unique, then describe stats
+            stats_df = df_n_total.vstack(df_n_unique).vstack(stats_df)
 
         return stats_df
 

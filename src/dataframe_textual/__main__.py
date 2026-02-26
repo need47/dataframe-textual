@@ -137,6 +137,7 @@ def cli() -> argparse.Namespace:
 
     parser.add_argument(
         "--all-in-one",
+        "--aio",
         action="store_true",
         help="Read all files (must be of the same structure) into a single table.",
     )

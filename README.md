@@ -156,7 +156,7 @@ options:
   -N, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
   --theme [THEME]       Set the theme for the application. Use 'list' to show available themes.
-  --all-in-one          Read all files (must be of the same structure) into a single table.
+  --all-in-one, --aio   Read all files (must be of the same structure) into a single table.
 ```
 
 ### CLI Examples
