@@ -597,14 +597,19 @@ class AddColumnScreen(YesNoScreen):
         self.df = df
         self.link = link
         self.existing_columns = set(df.columns)
+
+        label2 = (
+            "Link template, e.g., https://example.com/$1/id/$_, PC/compound/$cid"
+            if link
+            else f"Value or Polars expression, e.g., abc, pl.lit(123), {NULL}, $_ * 2, $1 + $total, $_ + '_suffix', $_.str.to_uppercase()"
+        )
+
         super().__init__(
             title="Add Column",
             label="Column name",
             input="Link" if link else "New column",
-            label2="Link template, e.g., https://example.com/$1/id/$_, PC/compound/$cid"
-            if link
-            else "Value or Polars expression, e.g., abc, pl.lit(123), NULL, $_ * 2, $1 + $total, $_ + '_suffix', $_.str.to_uppercase()",
-            input2="Link template" if link else "Value or expression",
+            label2=label2,
+            input2="Link template" if link else "Value or Polars expression",
             on_yes_callback=self._get_input,
         )
 
