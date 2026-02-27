@@ -162,7 +162,7 @@ class SimpleSqlScreen(SqlScreen):
         """Compose the simple SQL screen widget structure."""
         with Container(id="sql-container") as container:
             container.border_title = "SQL Query Builder"
-            yield Label("SELECT columns (all if none selected):", id="select-label")
+            yield Label("SELECT columns (all if none selected)", id="select-label")
             yield SelectionList(
                 *[
                     Selection(col, col)
@@ -171,7 +171,7 @@ class SimpleSqlScreen(SqlScreen):
                 ],
                 id="column-selection",
             )
-            yield Label("WHERE condition (optional):", id="where-label")
+            yield Label("WHERE condition (optional)", id="where-label")
             yield Input(placeholder="e.g., age > 30 and height < 180", id="where-input")
             yield from super().compose()
 

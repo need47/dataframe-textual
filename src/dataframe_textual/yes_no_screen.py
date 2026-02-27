@@ -514,11 +514,11 @@ class FreezeScreen(YesNoScreen):
     Accepts one value for fixed rows, or two space-separated values for fixed rows and columns.
     """
 
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "PinScreen")
+    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "FreezeScreen")
 
     def __init__(self):
         super().__init__(
-            title="Pin Rows / Columns",
+            title="Freeze Rows / Columns",
             label="Enter number of fixed rows",
             input={"value": "0", "type": "number"},
             label2="Enter number of fixed columns",

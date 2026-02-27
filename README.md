@@ -218,31 +218,31 @@ dv data-1.csv data-2.csv --all-in-one
 
 #### File & Tab Management
 
-| Key | Action |
-|-----|--------|
-| `>` | Move to next tab |
-| `<` | Move to previous tab |
-| `b` | Cycle through tabs |
-| `B` | Toggle tab bar visibility |
-| `q` | Close current tab (prompts to save unsaved changes) |
-| `Q` | Close all tabs and quit app (prompts to save unsaved changes) |
-| `Ctrl+Q` | Force to quit app (regardless of unsaved changes) |
-| `Ctrl+V` | Save current view to file |
-| `Ctrl+T` | Save current tab to file |
-| `Ctrl+S` | Save all tabs to file |
-| `w` | Save current tab to file (overwrite without prompt) |
-| `W` | Save all tabs to file (overwrite without prompt) |
-| `Ctrl+D` | Duplicate current tab |
-| `Ctrl+O` | Open file in a new tab |
-| `Double-click` | Rename tab |
+| Key            | Action                                                        |
+| -------------- | ------------------------------------------------------------- |
+| `>`            | Move to next tab                                              |
+| `<`            | Move to previous tab                                          |
+| `b`            | Cycle through tabs                                            |
+| `B`            | Toggle tab bar visibility                                     |
+| `q`            | Close current tab (prompts to save unsaved changes)           |
+| `Q`            | Close all tabs and quit app (prompts to save unsaved changes) |
+| `Ctrl+Q`       | Force to quit app (regardless of unsaved changes)             |
+| `Ctrl+V`       | Save current view to file                                     |
+| `Ctrl+T`       | Save current tab to file                                      |
+| `Ctrl+S`       | Save all tabs to file                                         |
+| `w`            | Save current tab to file (overwrite without prompt)           |
+| `W`            | Save all tabs to file (overwrite without prompt)              |
+| `Ctrl+D`       | Duplicate current tab                                         |
+| `Ctrl+O`       | Open file in a new tab                                        |
+| `Double-click` | Rename tab                                                    |
 
 #### View & Settings
 
-| Key | Action |
-|-----|--------|
-| `F1` | Toggle help panel |
-| `k` | Cycle through dark, light and other themes |
-| `Ctrl+P` -> `Screenshot` | Capture terminal view as a SVG image |
+| Key                      | Action                                     |
+| ------------------------ | ------------------------------------------ |
+| `F1`                     | Toggle help panel                          |
+| `k`                      | Cycle through dark, light and other themes |
+| `Ctrl+P` -> `Screenshot` | Capture terminal view as a SVG image       |
 
 ---
 
@@ -250,136 +250,135 @@ dv data-1.csv data-2.csv --all-in-one
 
 #### Navigation
 
-| Key | Action |
-|-----|--------|
-| `g` | Go to first row |
-| `G` | Go to last row |
-| `Ctrl + G` | Go to row |
-| `↑` / `↓` | Move up/down one row |
-| `←` / `→` | Move left/right one column |
-| `Home` / `End` | Go to first/last column |
-| `Ctrl + Home` / `Ctrl + End` | Go to page top/bottom |
-| `PageDown` / `PageUp` | Scroll down/up one page |
-| `Ctrl+F` | Page forward |
-| `Ctrl+B` | Page backforward |
+| Key                          | Action                     |
+| ---------------------------- | -------------------------- |
+| `g`                          | Go to first row            |
+| `G`                          | Go to last row             |
+| `Ctrl + G`                   | Go to row                  |
+| `↑` / `↓`                    | Move up/down one row       |
+| `←` / `→`                    | Move left/right one column |
+| `Home` / `End`               | Go to first/last column    |
+| `Ctrl + Home` / `Ctrl + End` | Go to page top/bottom      |
+| `PageDown` / `PageUp`        | Scroll down/up one page    |
+| `Ctrl+F`                     | Page forward               |
+| `Ctrl+B`                     | Page backforward           |
 
 #### Undo/Redo/Reset
-| Key | Action |
-|-----|--------|
-| `u` | Undo last action |
-| `U` | Redo last undone action |
-| `Ctrl+U` | Reset to initial state |
+| Key      | Action                  |
+| -------- | ----------------------- |
+| `u`      | Undo last action        |
+| `U`      | Redo last undone action |
+| `Ctrl+U` | Reset to initial state  |
 
 #### Display
 
-| Key | Action |
-|-----|--------|
-| `Enter` | Record view of current row transposed |
-| `F` | Show frequency distribution for current column |
-| `s` | Show statistics for current column |
-| `S` | Show statistics for entire dataframe |
-| `m` | Show metadata for row count and column count |
-| `M` | Show metadata for current column |
-| `K` | Cycle cursor types: cell → row → column → cell |
-| `~` | Toggle row labels |
-| `_` (underscore) | Toggle column full width |
-| `z` | Freeze rows and/or columns |
-| `Z` | Unfreeze all rows and columns |
-| `,` | Toggle thousand separator for numeric display |
-| `&` | Set current row as the new header row |
-| `h` | Hide current column |
-| `H` | Show all hidden columns |
+| Key              | Action                                         |
+| ---------------- | ---------------------------------------------- |
+| `Enter`          | Record view of current row transposed          |
+| `F`              | Show frequency distribution for current column |
+| `s`              | Show statistics for current column             |
+| `S`              | Show statistics for entire dataframe           |
+| `m`              | Show metadata for row count and column count   |
+| `M`              | Show metadata for current column               |
+| `K`              | Cycle cursor types: cell → row → column → cell |
+| `~`              | Toggle row labels                              |
+| `_` (underscore) | Toggle column full width                       |
+| `f`              | Toggle freeze rows and/or columns              |
+| `,`              | Toggle thousand separator for numeric display  |
+| `&`              | Set current row as the new header row          |
+| `h`              | Hide current column                            |
+| `H`              | Show all hidden columns                        |
 
 #### Editing
 
-| Key | Action |
-|-----|--------|
-| `Double-click` | Edit cell or rename column header |
-| `Delete` | Clear current cell (set to NULL) |
+| Key            | Action                                            |
+| -------------- | ------------------------------------------------- |
+| `Double-click` | Edit cell or rename column header                 |
+| `Delete`       | Clear current cell (set to NULL)                  |
 | `Shift+Delete` | Clear current column (set matching cells to NULL) |
-| `e` | Edit current cell (respects data type) |
-| `E` | Edit entire column with value/expression |
-| `a` | Add empty column after current |
-| `A` | Add column with name and value/expression |
-| `@` | Add a link column from URL template |
-| `-` (minus) | Delete current column |
-| `x` | Delete current row |
-| `X` | Delete current row and all those below |
-| `Ctrl+X` | Delete current row and all those above |
-| `d` | Duplicate current column |
-| `D` | Duplicate current row |
+| `e`            | Edit current cell (respects data type)            |
+| `E`            | Edit entire column with value/expression          |
+| `a`            | Add empty column after current                    |
+| `A`            | Add column with name and value/expression         |
+| `@`            | Add a link column from URL template               |
+| `-` (minus)    | Delete current column                             |
+| `x`            | Delete current row                                |
+| `X`            | Delete current row and all those below            |
+| `Ctrl+X`       | Delete current row and all those above            |
+| `d`            | Duplicate current column                          |
+| `D`            | Duplicate current row                             |
 
 #### Row Selection
 
-| Key | Action |
-|-----|--------|
-| `\` | Select rows wth cell matches or those matching cursor value in current column |
-| `\|` (pipe) | Select rows by expression |
-| `{` | Go to previous selected row |
-| `}` | Go to next selected row |
-| `'` | Select/deselect current row |
-| `t` | Toggle row selections (invert) |
-| `T` | Clear all row selections and/or cell matches |
+| Key         | Action                                                                        |
+| ----------- | ----------------------------------------------------------------------------- |
+| `\`         | Select rows wth cell matches or those matching cursor value in current column |
+| `\|` (pipe) | Select rows by expression                                                     |
+| `{`         | Go to previous selected row                                                   |
+| `}`         | Go to next selected row                                                       |
+| `'`         | Select/deselect current row                                                   |
+| `t`         | Toggle row selections (invert)                                                |
+| `T`         | Clear all row selections and/or cell matches                                  |
 
 #### Find & Replace
 
-| Key | Action |
-|-----|--------|
+| Key | Action                                                                 |
+| --- | ---------------------------------------------------------------------- |
 | `/` | Find across all columns with cursor value and highlight matching cells |
-| `?` | Find across all columns with expression and highlight matching cells |
-| `;` | Find in current column with cursor value and highlight matching cells |
-| `:` | Find in current column with expression and highlight matching cells |
-| `n` | Go to next matching cell |
-| `N` | Go to previous matching cell |
-| `r` | Find and replace in current column (interactive or replace all) |
-| `R` | Find and replace across all columns (interactive or replace all) |
+| `?` | Find across all columns with expression and highlight matching cells   |
+| `;` | Find in current column with cursor value and highlight matching cells  |
+| `:` | Find in current column with expression and highlight matching cells    |
+| `n` | Go to next matching cell                                               |
+| `N` | Go to previous matching cell                                           |
+| `r` | Find and replace in current column (interactive or replace all)        |
+| `R` | Find and replace across all columns (interactive or replace all)       |
 
 #### View & Filter
-| Key | Action |
-|-----|--------|
-| `"` (quote) | Filter selected rows (others removed) |
-| `.` | View rows with non-null values in current column (others hidden) |
-| `v` | View selected rows (others hidden) |
-| `V` | View selected by expression (others hidden) |
+| Key         | Action                                           |
+| ----------- | ------------------------------------------------ |
+| `v`         | View selected rows                               |
+| `V`         | View selected by expression                      |
+| `.`         | View rows with non-null values in current column |
+| `"` (quote) | Filter selected rows to a new tab                |
 
 #### Sorting (supporting multiple columns)
 
-| Key | Action |
-|-----|--------|
-| `[` | Sort current column ascending |
+| Key | Action                         |
+| --- | ------------------------------ |
+| `[` | Sort current column ascending  |
 | `]` | Sort current column descending |
 
 #### Reordering
 
-| Key | Action |
-|-----|--------|
-| `Shift+↑` | Move current row up |
-| `Shift+↓` | Move current row down |
-| `Shift+←` | Move current column left |
+| Key       | Action                    |
+| --------- | ------------------------- |
+| `Shift+↑` | Move current row up       |
+| `Shift+↓` | Move current row down     |
+| `Shift+←` | Move current column left  |
 | `Shift+→` | Move current column right |
 
 #### Type Casting
 
-| Key | Action |
-|-----|--------|
+| Key | Action                                 |
+| --- | -------------------------------------- |
 | `#` | Cast current column to integer (Int64) |
 | `%` | Cast current column to float (Float64) |
-| `!` | Cast current column to boolean |
-| `$` | Cast current column to string |
+| `!` | Cast current column to boolean         |
+| `$` | Cast current column to string          |
 
 #### Copy
 
-| Key | Action |
-|-----|--------|
-| `c` | Copy current cell to clipboard |
-| `Ctrl+C` | Copy column to clipboard |
+| Key      | Action                                |
+| -------- | ------------------------------------- |
+| `c`      | Copy current cell to clipboard        |
+| `Ctrl+C` | Copy column to clipboard              |
 | `Ctrl+R` | Copy row to clipboard (tab-separated) |
 
 #### SQL Interface
 
-| Key | Action |
-|-----|--------|
-| `l` | Simple SQL interface (select columns & where clause) |
+| Key | Action                                                        |
+| --- | ------------------------------------------------------------- |
+| `l` | Simple SQL interface (select columns & where clause)          |
 | `L` | Advanced SQL interface (full SQL query with syntax highlight) |
 
 ## Features in Detail
@@ -399,8 +398,8 @@ Press `Enter` on any row to open a modal showing all column values for that row.
 Useful for examining wide datasets where columns don't fit well on screen.
 
 **In the Row Detail Modal**:
-- Press `v` to **view** all rows containing the selected column value (others hidden but preserved)
-- Press `"` to **filter** all rows containing the selected column value (others removed)
+- Press `v` to **view** all rows containing the selected column value
+- Press `"` to **filter** all rows containing the selected column value to a new tab
 - Press `{` to move to the previous row
 - Press `}` to move to the next row
 - Press `F` to show the frequency table for the selected column
@@ -467,28 +466,24 @@ When you press `r` or `R`, enter:
 - Use `Match Whole` to avoid partial replacements
 - Support undo (`u`)
 
-### 5. Filter vs. View
+### 5. View vs. Filter
 
 Both operations show selected rows but with fundamentally different effects:
-
-| Operation | Keyboard | Effect | Data Preserved |
-|-----------|----------|--------|-----------------|
-| **View** | `v`, `V` | Hides non-matching rows | Yes (hidden, can be restored by `H`) |
-| **Filter** | `"` | Removes non-matching rows | No (permanently deleted) |
 
 **When to use View** (`v` or `V`):
 - Exploring or analyzing data safely
 - Switching between different perspectives
+- Edits made in view mode are applied to the original dataframe
 - Press `q` to return to main table
 - Press `Ctrl+V` to save current view to a file. This does not affect the main table.
 
 **When to use Filter** (`"`):
 - Cleaning data (removing unwanted rows)
-- Creating a trimmed dataset for export
-- Permanent row removal from your dataframe
+- Creating a trimmed dataset for export in a new tab
+- Edits are independent and do not affect the source dataframe
 
 **Note**:
-- If currently there are no selected rows and no matching cells, the `"` (Filter) and `v` (View) will use cursor value for search.
+- If currently there are no selected rows and no matching cells, the `v` (View) and `"` (Filter) will use cursor value for search.
 - Both support full undo with `u`.
 
 ### 6. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
@@ -585,8 +580,8 @@ Press `F` to see value distributions of the current column. The modal shows:
 
 **In the Frequency Table**:
 - Press `[` and `]` to sort by any column (value, count, or percentage)
-- Press `v` to **view** all rows containing the selected value (others hidden but preserved)
-- Press `"` to **filter** all rows containing the selected value (others removed)
+- Press `v` to **view** all rows containing the selected value
+- Press `"` to **filter** all rows containing the selected value to a new tab
 - Press `Ctrl+S` to save the frequency table to file
 - Press `q` or `Escape` to close the frequency table
 

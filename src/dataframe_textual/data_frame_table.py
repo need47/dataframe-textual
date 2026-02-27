@@ -242,10 +242,10 @@ class DataFrameTable(DataTable):
         - *(Supports case-insensitive & whole-word matching)*
 
         ## 👁️ View & Filter
-        - **"** - 📍 Filter selected rows (others removed)
-        - **.** - 👁️ View rows with non-null values in current column (others hidden)
-        - **v** - 👁️ View selected rows (others hidden)
-        - **V** - 🔧 View selected rows matching expression (others hidden)
+        - **v** - 👁️ View selected rows
+        - **V** - 🔧 View selected rows matching expression
+        - **.** - 👁️ View rows with non-null values in current column
+        - **"** - 📍 Filter selected rows to a new tab
 
         ## 🔀 Sorting
         - **[** - 🔼 Sort column ascending
@@ -289,8 +289,7 @@ class DataFrameTable(DataTable):
         ("H", "show_hidden_columns", "Show hidden column(s)"),
         ("tilde", "toggle_row_labels", "Toggle row labels"),  # `~`
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
-        ("z", "freeze_row_column", "Freeze rows/columns"),
-        ("Z", "freeze_row_column('unfreeze')", "Unfreeze all rows and columns"),
+        ("f", "toggle_freeze_row_column", "Freeze rows/columns"),
         ("comma", "toggle_thousand_separator", "Toggle thousand separator"),  # `,`
         ("underscore", "expand_column", "Expand column to full width"),  # `_`
         ("circumflex_accent", "toggle_rid", "Toggle internal row index"),  # `^`
@@ -310,9 +309,9 @@ class DataFrameTable(DataTable):
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
         # View & Filter
-        ("full_stop", "view_rows('non_null')", "View rows with non-null values in current column"),
         ("v", "view_rows", "View selected rows"),
         ("V", "view_rows_expr", "View selected rows matching expression"),
+        ("full_stop", "view_rows('non_null')", "View rows with non-null values in current column"),
         ("quotation_mark", "filter_rows", "Filter selected rows"),  # `"`
         # Row Selection
         ("backslash", "select_rows", "Select rows with cell matches or those matching cursor value in current column"),  # `\`
@@ -943,9 +942,9 @@ class DataFrameTable(DataTable):
         """Cycle through cursor types."""
         self.do_cycle_cursor_type()
 
-    def action_freeze_row_column(self, action: str = None) -> None:
-        """Open the freeze screen."""
-        self.do_freeze_row_column(action=action)
+    def action_toggle_freeze_row_column(self) -> None:
+        """Toggle the freeze."""
+        self.do_toggle_freeze_row_column()
 
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility."""
@@ -1742,14 +1741,14 @@ class DataFrameTable(DataTable):
         """Show metadata for all columns in the dataframe."""
         self.app.push_screen(MetaColumnScreen(self))
 
-    def do_freeze_row_column(self, action: str = None) -> None:
-        """Open the freeze screen to set fixed rows and columns."""
-        if action == "unfreeze":
-            self.freeze_row_column((0, 0))
+    def do_toggle_freeze_row_column(self) -> None:
+        """Toggle the freeze."""
+        if self.fixed_rows or self.fixed_columns:
+            self.fixed_rows = self.fixed_columns = 0
         else:
-            self.app.push_screen(FreezeScreen(), callback=self.freeze_row_column)
+            self.app.push_screen(FreezeScreen(), callback=self.toggle_freeze_row_column)
 
-    def freeze_row_column(self, result: tuple[int, int] | None) -> None:
+    def toggle_freeze_row_column(self, result: tuple[int, int] | None) -> None:
         """Handle result from PinScreen.
 
         Args:
@@ -1757,17 +1756,16 @@ class DataFrameTable(DataTable):
         """
         if result is None:
             return
-
         fixed_rows, fixed_columns = result
 
-        if fixed_rows == 0 and fixed_columns == 0:
-            descr = "Unfreezed all rows and columns"
-        elif fixed_rows > 0 and fixed_columns > 0:
+        if fixed_rows > 0 and fixed_columns > 0:
             descr = f"Freezed [$success]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns"
         elif fixed_rows > 0:
             descr = f"Freezed [$success]{fixed_rows}[/] rows"
-        else:
+        elif fixed_columns > 0:
             descr = f"Freezed [$success]{fixed_columns}[/] columns"
+        else:
+            return
 
         # Add to history
         self.add_history(descr)
@@ -3637,10 +3635,8 @@ class DataFrameTable(DataTable):
         Otherwise, filter based on the value provided or the current cell value.
         """
         if self.selected_rows:
-            message = "Filtered to selected rows (other rows removed)"
             filter_expr = pl.col(RID).is_in(self.selected_rows)
         else:  # Search cursor value in current column
-            message = "Filtered to rows matching cursor value (other rows removed)"
             cidx = self.cursor_cidx if cidx is None else cidx
             col_name = self.df.columns[cidx]
             term = self.cursor_value if term is None else term
@@ -3650,39 +3646,15 @@ class DataFrameTable(DataTable):
             else:
                 filter_expr = pl.col(col_name) == term
 
-        # Add to history
-        self.add_history(message, dirty=True)
-
         # Apply filter to dataframe with row indices
         df_filtered = self.df.lazy().filter(filter_expr).collect()
-        ok_rids = set(df_filtered[RID])
 
-        # Update selected rows
-        if self.selected_rows:
-            selected_rows = {rid for rid in self.selected_rows if rid in ok_rids}
-        else:
-            selected_rows = set()
-
-        # Update matches
-        if self.matches:
-            matches = {rid: cols for rid, cols in self.matches.items() if rid in ok_rids}
-        else:
-            matches = defaultdict(set)
-
-        # Update dataframe
-        self.reset_df(df_filtered)
-
-        # Clear view for filter mode
-        self.df_view = None
-
-        # Restore selected rows and matches
-        self.selected_rows = selected_rows
-        self.matches = matches
-
-        # Recreate table for display
-        self.setup_table()
-
-        self.notify(f"{message}. Now showing [$success]{len(self.df)}[/] rows.", title="Filter Rows")
+        self.app.add_tab(
+            df_filtered,
+            filename="filtered_results.csv",
+            tabname="filtered-results",
+            after=self.app.tabbed.active_pane,
+        )
 
     # Row selection
     def do_select_rows(self) -> None:
@@ -3996,7 +3968,10 @@ class DataFrameTable(DataTable):
         # Show results in new tab if requested
         if new_tab:
             return self.app.add_tab(
-                df_filtered, filename="query_result.csv", tabname="Query Result", after=self.app.tabbed.active_pane
+                df_filtered,
+                filename="query_results.csv",
+                tabname="query-results",
+                after=self.app.tabbed.active_pane,
             )
 
         # Add to history
