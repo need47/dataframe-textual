@@ -9,12 +9,13 @@ if TYPE_CHECKING:
 
 import polars as pl
 from textual.app import ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Button, Checkbox, Input, Label, Static, TabPane
+from textual.widgets import Button, Checkbox, Input, Label, SelectionList, TabPane, TextArea
+from textual.widgets.selection_list import Selection
 from textual.widgets.tabbed_content import ContentTab
 
-from .common import NULL, DtypeConfig, tentative_expr, validate_expr
+from .common import NULL, RID, DtypeConfig, tentative_expr, validate_expr
 
 
 class YMNScreen(ModalScreen):
@@ -31,11 +32,12 @@ class YMNScreen(ModalScreen):
         YMNScreen #button-container {
             margin: 1 0 0 0;
             width: 100%;
-            height: 3;
+            height: auto;
             align: center middle;
         }
 
         YMNScreen Button {
+            height: 3;
             margin: 0 2;
         }
     """
@@ -81,9 +83,9 @@ class YMNScreen(ModalScreen):
                 if isinstance(self.yes, Button):
                     pass
                 elif isinstance(self.yes, dict):
-                    self.yes = Button(**self.yes, id="yes", variant="success")
+                    self.yes = Button(**self.yes, id="yes", variant="success", compact=True)
                 else:
-                    self.yes = Button(self.yes, id="yes", variant="success")
+                    self.yes = Button(self.yes, id="yes", variant="success", compact=True)
 
                 yield self.yes
 
@@ -91,9 +93,9 @@ class YMNScreen(ModalScreen):
                 if isinstance(self.maybe, Button):
                     pass
                 elif isinstance(self.maybe, dict):
-                    self.maybe = Button(**self.maybe, id="maybe", variant="warning")
+                    self.maybe = Button(**self.maybe, id="maybe", variant="warning", compact=True)
                 else:
-                    self.maybe = Button(self.maybe, id="maybe", variant="warning")
+                    self.maybe = Button(self.maybe, id="maybe", variant="warning", compact=True)
 
                 yield self.maybe
 
@@ -101,9 +103,9 @@ class YMNScreen(ModalScreen):
                 if isinstance(self.no, Button):
                     pass
                 elif isinstance(self.no, dict):
-                    self.no = Button(**self.no, id="no", variant="error")
+                    self.no = Button(**self.no, id="no", variant="error", compact=True)
                 else:
-                    self.no = Button(self.no, id="no", variant="error")
+                    self.no = Button(self.no, id="no", variant="error", compact=True)
 
                 yield self.no
 
@@ -162,16 +164,13 @@ class YesNoScreen(YMNScreen):
             align: center middle;
         }
 
-        YesNoScreen > Static {
+        YesNoScreen > Container {
             width: auto;
             min-width: 40;
             max-width: 60;
             height: auto;
-            border: heavy $accent;
+            border: $accent;
             border-title-color: $accent;
-            border-title-background: $panel;
-            border-title-style: bold;
-            background: $background;
             padding: 1 2;
         }
 
@@ -270,7 +269,7 @@ class YesNoScreen(YMNScreen):
         Yields:
             Widget: The components of the modal screen in rendering order.
         """
-        with Static(id="modal-container") as container:
+        with Container(id="modal-container") as container:
             if self.title:
                 container.border_title = self.title
 
@@ -819,3 +818,159 @@ class GoToRowScreen(YesNoScreen):
             timeout=10,
         )
         return None
+
+
+class SimpleSqlScreen(YMNScreen):
+    """Simple SQL query screen."""
+
+    CSS = """
+        SimpleSqlScreen {
+            align: center middle;
+        }
+
+        SimpleSqlScreen > Container {
+            width: auto;
+            height: auto;
+            border: $accent;
+            border-title-color: $accent;
+            padding: 1 2;
+            overflow: auto;
+        }
+
+        SimpleSqlScreen SelectionList {
+            width: auto;
+            min-width: 60;
+            margin: 0 0 1 0;
+        }
+
+        SimpleSqlScreen SelectionList:blur {
+            border: solid $secondary;
+        }
+
+        SimpleSqlScreen Label {
+            width: auto;
+        }
+
+        SimpleSqlScreen Input {
+            width: auto;
+        }
+
+        SimpleSqlScreen Input:blur {
+            border: solid $secondary;
+        }
+
+        #button-container {
+            min-width: 30;
+        }
+    """
+
+    def __init__(self, dftable: "DataFrameTable") -> None:
+        """Initialize the simple SQL screen.
+
+        Sets up the modal screen with reference to the main DataFrameTable widget
+        and stores the DataFrame for display.
+
+        Args:
+            dftable: Reference to the parent DataFrameTable widget.
+        """
+        super().__init__(
+            yes="Query",
+            maybe="Query to Tab",
+            no="Cancel",
+            on_yes_callback=self.handle_simple,
+            on_maybe_callback=partial(self.handle_simple, new_tab=True),
+        )
+        self.dftable = dftable  # DataFrameTable
+
+    def compose(self) -> ComposeResult:
+        """Compose the simple SQL screen widget structure."""
+        with Container(id="sql-container") as container:
+            container.border_title = "SQL Query Builder"
+            yield Label("SELECT columns (default to all if none selected)", id="select-label")
+            yield SelectionList(
+                *[
+                    Selection(col, col)
+                    for col in self.dftable.df.columns
+                    if col not in self.dftable.hidden_columns and col != RID
+                ],
+                id="column-selection",
+            )
+            yield Label("WHERE condition (optional)", id="where-label")
+            yield Input(placeholder="e.g., age > 30 and height < 180", id="where-input")
+            yield from super().compose()
+
+    def handle_simple(self, new_tab: bool = False) -> None:
+        """Handle Yes button/Enter key press."""
+        selections = self.query_one(SelectionList).selected
+        if not selections:
+            selections = [
+                col for col in self.dftable.df.columns if col not in self.dftable.hidden_columns and col != RID
+            ]
+
+        columns = ", ".join(f"`{s}`" for s in selections)
+        where = self.query_one(Input).value.strip()
+
+        return columns, where, new_tab
+
+
+class AdvancedSqlScreen(YMNScreen):
+    """Advanced SQL query screen."""
+
+    CSS = """
+        AdvancedSqlScreen {
+            align: center middle;
+        }
+
+        AdvancedSqlScreen > Container {
+            width: auto;
+            height: auto;
+            border: $accent;
+            border-title-color: $accent;
+            padding: 1 2;
+            overflow: auto;
+        }
+
+        AdvancedSqlScreen TextArea {
+            width: auto;
+            min-width: 60;
+            height: auto;
+            min-height: 10;
+        }
+
+        #button-container {
+            min-width: 60;
+        }
+    """
+
+    def __init__(self, dftable: "DataFrameTable") -> None:
+        """Initialize the simple SQL screen.
+
+        Sets up the modal screen with reference to the main DataFrameTable widget
+        and stores the DataFrame for display.
+
+        Args:
+            dftable: Reference to the parent DataFrameTable widget.
+        """
+        super().__init__(
+            yes="Query",
+            maybe="Query to Tab",
+            no="Cancel",
+            on_yes_callback=self.handle_advanced,
+            on_maybe_callback=partial(self.handle_advanced, new_tab=True),
+        )
+        self.dftable = dftable  # DataFrameTable
+
+    def compose(self) -> ComposeResult:
+        """Compose the advanced SQL screen widget structure."""
+        with Container(id="sql-container") as container:
+            container.border_title = "Advanced SQL Query Builder"
+            yield TextArea.code_editor(
+                placeholder="Enter SQL query, e.g., \n\nSELECT * \nFROM self \nWHERE age > 30\n\n- use 'self' as the table name\n- use backticks (`) for column names with spaces.",
+                id="sql-textarea",
+                language="sql",
+            )
+            yield from super().compose()
+
+    def handle_advanced(self, new_tab: bool = False) -> None:
+        """Handle Yes button/Enter key press."""
+        return self.query_one(TextArea).text.strip(), new_tab

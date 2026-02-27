@@ -44,11 +44,11 @@ from .common import (
     tentative_expr,
     validate_expr,
 )
-from .sql_screen import AdvancedSqlScreen, SimpleSqlScreen
 from .table_screen import FrequencyScreen, MetaColumnScreen, MetaShape, RowDetailScreen, StatisticsScreen
 from .yes_no_screen import (
     AddColumnScreen,
     AddLinkScreen,
+    AdvancedSqlScreen,
     ConfirmScreen,
     EditCellScreen,
     EditColumnScreen,
@@ -57,6 +57,7 @@ from .yes_no_screen import (
     GoToRowScreen,
     RenameColumnScreen,
     SearchScreen,
+    SimpleSqlScreen,
 )
 
 # Color for highlighting selections and matches
