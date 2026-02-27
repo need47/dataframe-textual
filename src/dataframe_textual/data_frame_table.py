@@ -3939,13 +3939,13 @@ class DataFrameTable(DataTable):
         """Handle SQL result result from SimpleSqlScreen."""
         if result is None:
             return
-        columns, where, view = result
+        columns, where, new_tab = result
 
         sql = f"SELECT {columns} FROM self"
         if where:
             sql += f" WHERE {where}"
 
-        self.run_sql(sql, view)
+        self.run_sql(sql, new_tab)
 
     def do_advanced_sql(self) -> None:
         """Open the advanced SQL interface screen."""
@@ -3958,15 +3958,16 @@ class DataFrameTable(DataTable):
         """Handle SQL result result from AdvancedSqlScreen."""
         if result is None:
             return
-        sql, view = result
+        sql, new_tab = result
 
-        self.run_sql(sql, view)
+        self.run_sql(sql, new_tab)
 
-    def run_sql(self, sql: str, view: bool = True) -> None:
+    def run_sql(self, sql: str, new_tab: bool = False) -> None:
         """Execute a SQL query directly.
 
         Args:
             sql: The SQL query string to execute.
+            new_tab: Whether to show results in a new tab or update the current view.
         """
 
         sql = sql.replace("$#", f"(`{RID}` + 1)")
@@ -3979,7 +3980,7 @@ class DataFrameTable(DataTable):
 
         # Execute the SQL query
         try:
-            df_filtered = self.df.lazy().sql(sql).collect()
+            df_filtered = self.df.sql(sql)
 
             if not len(df_filtered):
                 self.notify(
@@ -3992,28 +3993,21 @@ class DataFrameTable(DataTable):
             self.log(f"Error executing SQL query `{sql}`: {str(e)}")
             return
 
+        # Show results in new tab if requested
+        if new_tab:
+            return self.app.add_tab(
+                df_filtered, filename="query_result.csv", tabname="Query Result", after=self.app.tabbed.active_pane
+            )
+
         # Add to history
-        self.add_history(f"SQL Query:\n[$success]{sql}[/]", dirty=not view)
+        self.add_history(f"SQL Query:\n[$success]{sql}[/]")
 
         # Create a view of self.df as a copy
-        if view and self.df_view is None:
+        if self.df_view is None:
             self.df_view = self.df
-
-        # Clear view for filter mode
-        if not view:
-            self.df_view = None
 
         # Update dataframe
         self.df = df_filtered
-        ok_rids = set(df_filtered[RID])
-
-        # Update selected rows
-        if self.selected_rows:
-            self.selected_rows.intersection_update(ok_rids)
-
-        # Update matches
-        if self.matches:
-            self.matches = {rid: cols for rid, cols in self.matches.items() if rid in ok_rids}
 
         # Recreate table for display
         self.setup_table()

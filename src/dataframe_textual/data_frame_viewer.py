@@ -450,9 +450,11 @@ class DataFrameViewer(App):
         if this is no longer the only tab.
 
         Args:
-            lf: The Polars DataFrame to display in the new tab.
+            df: The Polars DataFrame to display in the new tab.
             filename: The source filename for this data (used in table metadata).
             tabname: The display name for the tab.
+            before: Optional; If specified, insert the new tab before this tab.
+            after: Optional; If specified, insert the new tab after this tab.
         """
         tabname = self.get_unique_tabname(tabname)
 
@@ -563,6 +565,8 @@ class DataFrameViewer(App):
             # Quit app if no tabs remain
             if len(self.tabs) == 0:
                 self.exit()
+            elif len(self.tabs) == 1:
+                self.query_one(ContentTabs).display = False
         except Exception:
             pass
 

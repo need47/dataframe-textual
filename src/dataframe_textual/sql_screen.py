@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .data_frame_table import DataFrameTable
 
-import polars as pl
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
@@ -53,7 +52,6 @@ class SqlScreen(ModalScreen):
         """Initialize the SQL screen."""
         super().__init__()
         self.dftable = dftable  # DataFrameTable
-        self.df: pl.DataFrame = dftable.df  # Polars DataFrame
         self.on_yes_callback = on_yes_callback
         self.on_maybe_callback = on_maybe_callback
 
@@ -61,8 +59,8 @@ class SqlScreen(ModalScreen):
         """Compose the SQL screen widget structure."""
         # Shared by subclasses
         with Horizontal(id="button-container"):
-            yield Button("View", id="yes", variant="success")
-            yield Button("Filter", id="maybe", variant="warning")
+            yield Button("Query", id="yes", variant="success")
+            yield Button("Query to Tab", id="maybe", variant="warning")
             yield Button("Cancel", id="no", variant="error")
 
     def on_key(self, event) -> None:
@@ -121,7 +119,7 @@ class SimpleSqlScreen(SqlScreen):
         SimpleSqlScreen SelectionList {
             width: auto;
             min-width: 40;
-            margin: 1 0;
+            margin: 0 0 1 0;
         }
 
         SimpleSqlScreen SelectionList:blur {
@@ -141,7 +139,7 @@ class SimpleSqlScreen(SqlScreen):
         }
 
         #button-container {
-            min-width: 40;
+            min-width: 30;
         }
     """
 
@@ -157,36 +155,38 @@ class SimpleSqlScreen(SqlScreen):
         super().__init__(
             dftable,
             on_yes_callback=self.handle_simple,
-            on_maybe_callback=partial(self.handle_simple, view=False),
+            on_maybe_callback=partial(self.handle_simple, new_tab=True),
         )
 
     def compose(self) -> ComposeResult:
         """Compose the simple SQL screen widget structure."""
         with Container(id="sql-container") as container:
-            container.border_title = "SQL Query"
+            container.border_title = "SQL Query Builder"
             yield Label("SELECT columns (all if none selected):", id="select-label")
             yield SelectionList(
                 *[
                     Selection(col, col)
-                    for col in self.df.columns
+                    for col in self.dftable.df.columns
                     if col not in self.dftable.hidden_columns and col != RID
                 ],
                 id="column-selection",
             )
-            yield Label("WHERE condition (optional)", id="where-label")
+            yield Label("WHERE condition (optional):", id="where-label")
             yield Input(placeholder="e.g., age > 30 and height < 180", id="where-input")
             yield from super().compose()
 
-    def handle_simple(self, view: bool = True) -> None:
+    def handle_simple(self, new_tab: bool = False) -> None:
         """Handle Yes button/Enter key press."""
         selections = self.query_one(SelectionList).selected
         if not selections:
-            selections = [col for col in self.df.columns if col not in self.dftable.hidden_columns and col != RID]
+            selections = [
+                col for col in self.dftable.df.columns if col not in self.dftable.hidden_columns and col != RID
+            ]
 
         columns = ", ".join(f"`{s}`" for s in selections)
         where = self.query_one(Input).value.strip()
 
-        return columns, where, view
+        return columns, where, new_tab
 
 
 class AdvancedSqlScreen(SqlScreen):
@@ -219,13 +219,13 @@ class AdvancedSqlScreen(SqlScreen):
         super().__init__(
             dftable,
             on_yes_callback=self.handle_advanced,
-            on_maybe_callback=partial(self.handle_advanced, view=False),
+            on_maybe_callback=partial(self.handle_advanced, new_tab=True),
         )
 
     def compose(self) -> ComposeResult:
         """Compose the advanced SQL screen widget structure."""
         with Container(id="sql-container") as container:
-            container.border_title = "Advanced SQL Query"
+            container.border_title = "Advanced SQL Query Builder"
             yield TextArea.code_editor(
                 placeholder="Enter SQL query, e.g., \n\nSELECT * \nFROM self \nWHERE age > 30\n\n- use 'self' as the table name\n- use backticks (`) for column names with spaces.",
                 id="sql-textarea",
@@ -233,6 +233,6 @@ class AdvancedSqlScreen(SqlScreen):
             )
             yield from super().compose()
 
-    def handle_advanced(self, view: bool = True) -> None:
+    def handle_advanced(self, new_tab: bool = False) -> None:
         """Handle Yes button/Enter key press."""
-        return self.query_one(TextArea).text.strip(), view
+        return self.query_one(TextArea).text.strip(), new_tab
