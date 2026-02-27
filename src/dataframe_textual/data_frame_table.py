@@ -3641,7 +3641,7 @@ class DataFrameTable(DataTable):
             col_name = self.df.columns[cidx]
             term = self.cursor_value if term is None else term
 
-            if term == NULL:
+            if term is None:
                 filter_expr = pl.col(col_name).is_null()
             else:
                 filter_expr = pl.col(col_name) == term
