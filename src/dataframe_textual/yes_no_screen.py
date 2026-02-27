@@ -968,6 +968,7 @@ class AdvancedSqlScreen(YMNScreen):
                 placeholder="Enter SQL query, e.g., \n\nSELECT * \nFROM self \nWHERE age > 30\n\n- use 'self' as the table name\n- use backticks (`) for column names with spaces.",
                 id="sql-textarea",
                 language="sql",
+                tab_behavior="focus",  # Tab to focus next and allow Esc to exit
             )
             yield from super().compose()
 
