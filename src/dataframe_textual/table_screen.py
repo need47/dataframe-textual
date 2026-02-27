@@ -191,8 +191,6 @@ class TableScreen(ModalScreen):
 class RowDetailScreen(TableScreen):
     """Modal screen to display a single row's details."""
 
-    CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "RowDetailScreen")
-
     def __init__(self, ridx: int, dftable):
         super().__init__(dftable)
         self.ridx = ridx
@@ -284,8 +282,6 @@ class RowDetailScreen(TableScreen):
 
 class StatisticsScreen(TableScreen):
     """Modal screen to display statistics for a column or entire dataframe."""
-
-    CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "StatisticsScreen")
 
     def __init__(self, dftable: "DataFrameTable", cidx: int | None = None):
         super().__init__(dftable)
@@ -413,8 +409,6 @@ class StatisticsScreen(TableScreen):
 
 class FrequencyScreen(TableScreen):
     """Modal screen to display frequency of values in a column."""
-
-    CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "FrequencyScreen")
 
     def __init__(self, cidx: int, dftable: "DataFrameTable") -> None:
         super().__init__(dftable)
@@ -572,8 +566,6 @@ class FrequencyScreen(TableScreen):
 class MetaShape(TableScreen):
     """Modal screen to display metadata about the dataframe."""
 
-    CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "MetadataScreen")
-
     def on_mount(self) -> None:
         """Initialize the metadata screen.
 
@@ -602,8 +594,6 @@ class MetaShape(TableScreen):
 
 class MetaColumnScreen(TableScreen):
     """Modal screen to display metadata about the columns in the dataframe."""
-
-    CSS = TableScreen.DEFAULT_CSS.replace("TableScreen", "MetaColumnScreen")
 
     def on_mount(self) -> None:
         """Initialize the column metadata screen.
