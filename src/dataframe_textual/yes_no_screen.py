@@ -17,16 +17,147 @@ from textual.widgets.tabbed_content import ContentTab
 from .common import NULL, DtypeConfig, tentative_expr, validate_expr
 
 
-class YesNoScreen(ModalScreen):
-    """Reusable modal screen with Yes/No buttons and customizable label and input.
+class YMNScreen(ModalScreen):
+    """Base class for Yes/Maybe/No modal screens with customizable content and callbacks.
 
     This widget handles:
-    - Yes/No button responses
+    - Yes/Maybe/No button responses
     - Enter key for Yes, Escape for No
     - Optional callback function for Yes action
+    - Optional second callback for Maybe action
     """
 
     DEFAULT_CSS = """
+        YMNScreen #button-container {
+            margin: 1 0 0 0;
+            width: 100%;
+            height: 3;
+            align: center middle;
+        }
+
+        YMNScreen Button {
+            margin: 0 2;
+        }
+    """
+
+    def __init__(
+        self,
+        yes: str | dict | Button = "Yes",
+        maybe: str | dict | Button = None,
+        no: str | dict | Button = "No",
+        on_yes_callback=None,
+        on_maybe_callback=None,
+    ) -> None:
+        """Initialize the modal screen.
+
+        Creates a customizable Yes/Maybe/No dialog with optional input fields, labels, and checkboxes.
+
+        Args:
+            yes: Text or dict for the Yes button. If None, hides the Yes button. Defaults to "Yes".
+            maybe: Optional Maybe button text/dict. Defaults to None.
+            no: Text or dict for the No button. If None, hides the No button. Defaults to "No".
+            on_yes_callback: Optional callable that takes no args and returns the value to dismiss with when Yes is pressed. Defaults to None.
+            on_maybe_callback: Optional callable that takes no args and returns the value to dismiss with when Maybe is pressed. Defaults to None.
+        """
+
+        super().__init__()
+        self.yes = yes
+        self.maybe = maybe
+        self.no = no
+        self.on_yes_callback = on_yes_callback
+        self.on_maybe_callback = on_maybe_callback
+
+    def compose(self) -> ComposeResult:
+        """Compose the modal screen widget structure.
+
+        Builds the widget hierarchy with optional title, labels, inputs, checkboxes,
+        and action buttons based on initialization parameters.
+
+        Yields:
+            Widget: The components of the modal screen in rendering order.
+        """
+        with Horizontal(id="button-container"):
+            if self.yes:
+                if isinstance(self.yes, Button):
+                    pass
+                elif isinstance(self.yes, dict):
+                    self.yes = Button(**self.yes, id="yes", variant="success")
+                else:
+                    self.yes = Button(self.yes, id="yes", variant="success")
+
+                yield self.yes
+
+            if self.maybe:
+                if isinstance(self.maybe, Button):
+                    pass
+                elif isinstance(self.maybe, dict):
+                    self.maybe = Button(**self.maybe, id="maybe", variant="warning")
+                else:
+                    self.maybe = Button(self.maybe, id="maybe", variant="warning")
+
+                yield self.maybe
+
+            if self.no:
+                if isinstance(self.no, Button):
+                    pass
+                elif isinstance(self.no, dict):
+                    self.no = Button(**self.no, id="no", variant="error")
+                else:
+                    self.no = Button(self.no, id="no", variant="error")
+
+                yield self.no
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press events in the Yes/No screen."""
+        if event.button.id == "yes":
+            self._handle_yes()
+        elif event.button.id == "maybe":
+            self._handle_maybe()
+        elif event.button.id == "no":
+            self.dismiss(None)
+
+    def on_key(self, event) -> None:
+        """Handle key press events in the table screen."""
+        if event.key == "enter":
+            for button in self.query(Button):
+                if button.has_focus:
+                    if button.id == "yes":
+                        self._handle_yes()
+                    elif button.id == "maybe":
+                        self._handle_maybe()
+                    elif button.id == "no":
+                        self.dismiss(None)
+                    break
+            else:
+                self._handle_yes()
+
+            event.stop()
+        elif event.key == "escape":
+            self.dismiss(None)
+            event.stop()
+
+    def _handle_yes(self) -> None:
+        """Handle Yes button/Enter key press."""
+        if self.on_yes_callback:
+            result = self.on_yes_callback()
+            self.dismiss(result)
+        else:
+            self.dismiss(True)
+
+    def _handle_maybe(self) -> None:
+        """Handle Maybe button press."""
+        if self.on_maybe_callback:
+            result = self.on_maybe_callback()
+            self.dismiss(result)
+        else:
+            self.dismiss(False)
+
+
+class YesNoScreen(YMNScreen):
+    """Reusable modal screen with Yes/Maybe/No buttons and customizable label and input."""
+
+    # fmt: off
+    DEFAULT_CSS = YMNScreen.DEFAULT_CSS.replace("YMNScreen", "YesNoScreen") + """
         YesNoScreen {
             align: center middle;
         }
@@ -71,18 +202,8 @@ class YesNoScreen(ModalScreen):
         YesNoScreen Checkbox:blur {
             border: solid $secondary;
         }
-
-        YesNoScreen #button-container {
-            margin: 1 0 0 0;
-            width: 100%;
-            height: 3;
-            align: center middle;
-        }
-
-        YesNoScreen Button {
-            margin: 0 2;
-        }
     """
+    # fmt: on
 
     def __init__(
         self,
@@ -120,8 +241,15 @@ class YesNoScreen(ModalScreen):
             maybe: Optional Maybe button text/dict. Defaults to None.
             no: Text or dict for the No button. If None, hides the No button. Defaults to "No".
             on_yes_callback: Optional callable that takes no args and returns the value to dismiss with when Yes is pressed. Defaults to None.
+            on_maybe_callback: Optional callable that takes no args and returns the value to dismiss with when Maybe is pressed. Defaults to None.
         """
-        super().__init__()
+        super().__init__(
+            yes=yes,
+            maybe=maybe,
+            no=no,
+            on_yes_callback=on_yes_callback,
+            on_maybe_callback=on_maybe_callback,
+        )
         self.title = title
         self.label = label
         self.input = input
@@ -132,11 +260,6 @@ class YesNoScreen(ModalScreen):
         self.checkbox2 = checkbox2
         self.checkbox3 = checkbox3
         self.checkbox4 = checkbox4
-        self.yes = yes
-        self.maybe = maybe
-        self.no = no
-        self.on_yes_callback = on_yes_callback
-        self.on_maybe_callback = on_maybe_callback
 
     def compose(self) -> ComposeResult:
         """Compose the modal screen widget structure.
@@ -237,87 +360,11 @@ class YesNoScreen(ModalScreen):
                         yield self.checkbox4
 
             if self.yes or self.no or self.maybe:
-                with Horizontal(id="button-container"):
-                    if self.yes:
-                        if isinstance(self.yes, Button):
-                            pass
-                        elif isinstance(self.yes, dict):
-                            self.yes = Button(**self.yes, id="yes", variant="success")
-                        else:
-                            self.yes = Button(self.yes, id="yes", variant="success")
-
-                        yield self.yes
-
-                    if self.maybe:
-                        if isinstance(self.maybe, Button):
-                            pass
-                        elif isinstance(self.maybe, dict):
-                            self.maybe = Button(**self.maybe, id="maybe", variant="warning")
-                        else:
-                            self.maybe = Button(self.maybe, id="maybe", variant="warning")
-
-                        yield self.maybe
-
-                    if self.no:
-                        if isinstance(self.no, Button):
-                            pass
-                        elif isinstance(self.no, dict):
-                            self.no = Button(**self.no, id="no", variant="error")
-                        else:
-                            self.no = Button(self.no, id="no", variant="error")
-
-                        yield self.no
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button press events in the Yes/No screen."""
-        if event.button.id == "yes":
-            self._handle_yes()
-        elif event.button.id == "maybe":
-            self._handle_maybe()
-        elif event.button.id == "no":
-            self.dismiss(None)
-
-    def on_key(self, event) -> None:
-        """Handle key press events in the table screen."""
-        if event.key == "enter":
-            for button in self.query(Button):
-                if button.has_focus:
-                    if button.id == "yes":
-                        self._handle_yes()
-                    elif button.id == "maybe":
-                        self._handle_maybe()
-                    elif button.id == "no":
-                        self.dismiss(None)
-                    break
-            else:
-                self._handle_yes()
-
-            event.stop()
-        elif event.key == "escape":
-            self.dismiss(None)
-            event.stop()
-
-    def _handle_yes(self) -> None:
-        """Handle Yes button/Enter key press."""
-        if self.on_yes_callback:
-            result = self.on_yes_callback()
-            self.dismiss(result)
-        else:
-            self.dismiss(True)
-
-    def _handle_maybe(self) -> None:
-        """Handle Maybe button press."""
-        if self.on_maybe_callback:
-            result = self.on_maybe_callback()
-            self.dismiss(result)
-        else:
-            self.dismiss(False)
+                yield from super().compose()
 
 
 class SaveFileScreen(YesNoScreen):
     """Modal screen to save the dataframe to a CSV file."""
-
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SaveFileScreen")
 
     def __init__(self, filename: str, all_tabs: bool = False, tab_count: int = 1):
         self.all_tabs = all_tabs
@@ -343,8 +390,6 @@ class SaveFileScreen(YesNoScreen):
 class ConfirmScreen(YesNoScreen):
     """Modal screen to ask for confirmation."""
 
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ConfirmScreen")
-
     def __init__(self, title: str, label=None, yes="Yes", maybe: str = None, no="No"):
         super().__init__(
             title=title,
@@ -364,8 +409,6 @@ class ConfirmScreen(YesNoScreen):
 
 class EditCellScreen(YesNoScreen):
     """Modal screen to edit a single cell value."""
-
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "EditCellScreen")
 
     def __init__(self, ridx: int, cidx: int, df: pl.DataFrame):
         self.ridx = ridx
@@ -423,8 +466,6 @@ class EditCellScreen(YesNoScreen):
 
 class RenameColumnScreen(YesNoScreen):
     """Modal screen to rename a column."""
-
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "RenameColumnScreen")
 
     def __init__(self, col_idx: int, col_name: str, existing_columns: list[str]):
         self.col_idx = col_idx
@@ -514,8 +555,6 @@ class FreezeScreen(YesNoScreen):
     Accepts one value for fixed rows, or two space-separated values for fixed rows and columns.
     """
 
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "FreezeScreen")
-
     def __init__(self):
         super().__init__(
             title="Freeze Rows / Columns",
@@ -545,8 +584,6 @@ class FreezeScreen(YesNoScreen):
 class OpenFileScreen(YesNoScreen):
     """Modal screen to open a CSV file."""
 
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "OpenFileScreen")
-
     def __init__(self):
         super().__init__(
             title="Open File",
@@ -569,8 +606,6 @@ class OpenFileScreen(YesNoScreen):
 class EditColumnScreen(YesNoScreen):
     """Modal screen to edit an entire column with an expression."""
 
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "EditColumnScreen")
-
     def __init__(self, cidx: int, df: pl.DataFrame):
         self.cidx = cidx
         self.df = df
@@ -589,8 +624,6 @@ class EditColumnScreen(YesNoScreen):
 
 class AddColumnScreen(YesNoScreen):
     """Modal screen to add a new column with an expression."""
-
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "AddColumnScreen")
 
     def __init__(self, cidx: int, df: pl.DataFrame, link: bool = False):
         self.cidx = cidx
@@ -666,16 +699,12 @@ class AddLinkScreen(AddColumnScreen):
     Inherits column name and expression validation from AddColumnScreen.
     """
 
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "AddLinkScreen")
-
     def __init__(self, cidx: int, df: pl.DataFrame):
         super().__init__(cidx, df, link=True)
 
 
 class FindReplaceScreen(YesNoScreen):
     """Modal screen to replace column values with an expression."""
-
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "ReplaceScreen")
 
     def __init__(self, title: str, dftable: "DataFrameTable"):
         if (cursor_value := dftable.cursor_value) is None:
@@ -721,8 +750,6 @@ class FindReplaceScreen(YesNoScreen):
 class RenameTabScreen(YesNoScreen):
     """Modal screen to rename a tab."""
 
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "RenameTabScreen")
-
     def __init__(self, content_tab: ContentTab, existing_tabs: list[TabPane]):
         self.content_tab = content_tab
         self.existing_tabs = existing_tabs
@@ -760,8 +787,6 @@ class RenameTabScreen(YesNoScreen):
 
 class GoToRowScreen(YesNoScreen):
     """Modal screen to jump to a specific row index."""
-
-    CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "GoToRowScreen")
 
     def __init__(self, dftable: "DataFrameTable"):
         self.dftable = dftable

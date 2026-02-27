@@ -7,23 +7,23 @@ if TYPE_CHECKING:
     from .data_frame_table import DataFrameTable
 
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal
-from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, SelectionList, TextArea
+from textual.containers import Container
+from textual.widgets import Input, Label, SelectionList, TextArea
 from textual.widgets.selection_list import Selection
 
 from .common import RID
+from .yes_no_screen import YMNScreen
 
 
-class SqlScreen(ModalScreen):
-    """Base class for modal screens handling SQL query."""
+class SimpleSqlScreen(YMNScreen):
+    """Simple SQL query screen."""
 
-    DEFAULT_CSS = """
-        SqlScreen {
+    CSS = """
+        SimpleSqlScreen {
             align: center middle;
         }
 
-        SqlScreen > Container {
+        SimpleSqlScreen > Container {
             width: auto;
             height: auto;
             border: heavy $accent;
@@ -35,90 +35,9 @@ class SqlScreen(ModalScreen):
             overflow: auto;
         }
 
-        #button-container {
-            width: auto;
-            margin: 1 0 0 0;
-            height: 3;
-            align: center middle;
-        }
-
-        Button {
-            margin: 0 2;
-        }
-
-    """
-
-    def __init__(self, dftable: "DataFrameTable", on_yes_callback=None, on_maybe_callback=None) -> None:
-        """Initialize the SQL screen."""
-        super().__init__()
-        self.dftable = dftable  # DataFrameTable
-        self.on_yes_callback = on_yes_callback
-        self.on_maybe_callback = on_maybe_callback
-
-    def compose(self) -> ComposeResult:
-        """Compose the SQL screen widget structure."""
-        # Shared by subclasses
-        with Horizontal(id="button-container"):
-            yield Button("Query", id="yes", variant="success")
-            yield Button("Query to Tab", id="maybe", variant="warning")
-            yield Button("Cancel", id="no", variant="error")
-
-    def on_key(self, event) -> None:
-        """Handle key press events in the SQL screen"""
-        if event.key in ("q", "escape"):
-            self.app.pop_screen()
-            event.stop()
-        elif event.key == "enter":
-            for button in self.query(Button):
-                if button.has_focus:
-                    if button.id == "yes":
-                        self._handle_yes()
-                    elif button.id == "maybe":
-                        self._handle_maybe()
-                    break
-            else:
-                self._handle_yes()
-
-            event.stop()
-        elif event.key == "escape":
-            self.dismiss(None)
-            event.stop()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button press events in the SQL screen."""
-        if event.button.id == "yes":
-            self._handle_yes()
-        elif event.button.id == "maybe":
-            self._handle_maybe()
-        elif event.button.id == "no":
-            self.dismiss(None)
-
-    def _handle_yes(self) -> None:
-        """Handle Yes button/Enter key press."""
-        if self.on_yes_callback:
-            result = self.on_yes_callback()
-            self.dismiss(result)
-        else:
-            self.dismiss(True)
-
-    def _handle_maybe(self) -> None:
-        """Handle Maybe button press."""
-        if self.on_maybe_callback:
-            result = self.on_maybe_callback()
-            self.dismiss(result)
-        else:
-            self.dismiss(True)
-
-
-class SimpleSqlScreen(SqlScreen):
-    """Simple SQL query screen."""
-
-    DEFAULT_CSS = SqlScreen.DEFAULT_CSS.replace("SqlScreen", "SimpleSqlScreen")
-
-    CSS = """
         SimpleSqlScreen SelectionList {
             width: auto;
-            min-width: 40;
+            min-width: 60;
             margin: 0 0 1 0;
         }
 
@@ -153,16 +72,19 @@ class SimpleSqlScreen(SqlScreen):
             dftable: Reference to the parent DataFrameTable widget.
         """
         super().__init__(
-            dftable,
+            yes="Query",
+            maybe="Query to Tab",
+            no="Cancel",
             on_yes_callback=self.handle_simple,
             on_maybe_callback=partial(self.handle_simple, new_tab=True),
         )
+        self.dftable = dftable  # DataFrameTable
 
     def compose(self) -> ComposeResult:
         """Compose the simple SQL screen widget structure."""
         with Container(id="sql-container") as container:
             container.border_title = "SQL Query Builder"
-            yield Label("SELECT columns (all if none selected)", id="select-label")
+            yield Label("SELECT columns (default to all if none selected)", id="select-label")
             yield SelectionList(
                 *[
                     Selection(col, col)
@@ -189,12 +111,26 @@ class SimpleSqlScreen(SqlScreen):
         return columns, where, new_tab
 
 
-class AdvancedSqlScreen(SqlScreen):
+class AdvancedSqlScreen(YMNScreen):
     """Advanced SQL query screen."""
 
-    DEFAULT_CSS = SqlScreen.DEFAULT_CSS.replace("SqlScreen", "AdvancedSqlScreen")
-
     CSS = """
+        AdvancedSqlScreen {
+            align: center middle;
+        }
+
+        AdvancedSqlScreen > Container {
+            width: auto;
+            height: auto;
+            border: heavy $accent;
+            border-title-color: $accent;
+            border-title-background: $panel;
+            border-title-style: bold;
+            background: $background;
+            padding: 1 2;
+            overflow: auto;
+        }
+
         AdvancedSqlScreen TextArea {
             width: auto;
             min-width: 60;
@@ -217,10 +153,13 @@ class AdvancedSqlScreen(SqlScreen):
             dftable: Reference to the parent DataFrameTable widget.
         """
         super().__init__(
-            dftable,
+            yes="Query",
+            maybe="Query to Tab",
+            no="Cancel",
             on_yes_callback=self.handle_advanced,
             on_maybe_callback=partial(self.handle_advanced, new_tab=True),
         )
+        self.dftable = dftable  # DataFrameTable
 
     def compose(self) -> ComposeResult:
         """Compose the advanced SQL screen widget structure."""
