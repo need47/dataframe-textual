@@ -29,6 +29,19 @@ class YMNScreen(ModalScreen):
     """
 
     DEFAULT_CSS = """
+        YMNScreen {
+            align: center middle;
+        }
+
+        YMNScreen > Container {
+            width: auto;
+            height: auto;
+            border: solid $accent;
+            border-title-color: $accent;
+            padding: 1 2;
+            overflow: auto;
+        }
+
         YMNScreen #button-container {
             margin: 1 0 0 0;
             width: 100%;
@@ -160,18 +173,9 @@ class YesNoScreen(YMNScreen):
 
     # fmt: off
     DEFAULT_CSS = YMNScreen.DEFAULT_CSS.replace("YMNScreen", "YesNoScreen") + """
-        YesNoScreen {
-            align: center middle;
-        }
-
         YesNoScreen > Container {
-            width: auto;
             min-width: 40;
             max-width: 60;
-            height: auto;
-            border: $accent;
-            border-title-color: $accent;
-            padding: 1 2;
         }
 
         YesNoScreen Label {
@@ -824,19 +828,6 @@ class SimpleSqlScreen(YMNScreen):
     """Simple SQL query screen."""
 
     CSS = """
-        SimpleSqlScreen {
-            align: center middle;
-        }
-
-        SimpleSqlScreen > Container {
-            width: auto;
-            height: auto;
-            border: $accent;
-            border-title-color: $accent;
-            padding: 1 2;
-            overflow: auto;
-        }
-
         SimpleSqlScreen SelectionList {
             width: auto;
             min-width: 60;
@@ -917,23 +908,10 @@ class AdvancedSqlScreen(YMNScreen):
     """Advanced SQL query screen."""
 
     CSS = """
-        AdvancedSqlScreen {
-            align: center middle;
-        }
-
-        AdvancedSqlScreen > Container {
-            width: auto;
-            height: auto;
-            border: $accent;
-            border-title-color: $accent;
-            padding: 1 2;
-            overflow: auto;
-        }
-
         AdvancedSqlScreen TextArea {
             width: auto;
-            min-width: 60;
             height: auto;
+            min-width: 60;
             min-height: 10;
         }
 
