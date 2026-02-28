@@ -174,8 +174,8 @@ class YesNoScreen(YMNScreen):
     # fmt: off
     DEFAULT_CSS = YMNScreen.DEFAULT_CSS.replace("YMNScreen", "YesNoScreen") + """
         YesNoScreen > Container {
-            min-width: 40;
-            max-width: 60;
+            min-width: 48;
+            max-width: 64;
         }
 
         YesNoScreen Label {
@@ -392,6 +392,12 @@ class SaveFileScreen(YesNoScreen):
 
 class ConfirmScreen(YesNoScreen):
     """Modal screen to ask for confirmation."""
+
+    CSS = """
+        ConfirmScreen > Container {
+            min-width: 64;
+        }
+    """
 
     def __init__(self, title: str, label=None, yes="Yes", maybe: str = None, no="No"):
         super().__init__(
@@ -849,10 +855,6 @@ class SimpleSqlScreen(YMNScreen):
         SimpleSqlScreen Input:blur {
             border: solid $secondary;
         }
-
-        #button-container {
-            min-width: 30;
-        }
     """
 
     def __init__(self, dftable: "DataFrameTable") -> None:
@@ -913,10 +915,6 @@ class AdvancedSqlScreen(YMNScreen):
             height: auto;
             min-width: 60;
             min-height: 10;
-        }
-
-        #button-container {
-            min-width: 60;
         }
     """
 

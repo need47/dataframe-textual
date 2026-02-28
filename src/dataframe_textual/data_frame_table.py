@@ -3013,8 +3013,8 @@ class DataFrameTable(DataTable):
 
         try:
             matches = self.find_matches(
-                term,
-                cidx,
+                term=term,
+                cidx=cidx,
                 match_nocase=match_nocase,
                 match_whole=match_whole,
                 match_literal=match_literal,
@@ -3175,14 +3175,12 @@ class DataFrameTable(DataTable):
 
         # Find all matches
         matches = self.find_matches(
-            {
-                "term": term_find,
-                "cidx": cidx,
-                "match_nocase": match_nocase,
-                "match_whole": match_whole,
-                "match_literal": match_literal,
-                "match_reverse": False,
-            }
+            term=term_find,
+            cidx=cidx,
+            match_nocase=match_nocase,
+            match_whole=match_whole,
+            match_literal=match_literal,
+            match_reverse=False,
         )
 
         if not matches:
