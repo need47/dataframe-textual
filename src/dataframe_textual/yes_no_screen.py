@@ -175,7 +175,7 @@ class YesNoScreen(YMNScreen):
     DEFAULT_CSS = YMNScreen.DEFAULT_CSS.replace("YMNScreen", "YesNoScreen") + """
         YesNoScreen > Container {
             min-width: 48;
-            max-width: 64;
+            max-width: 72;
         }
 
         YesNoScreen Label {
