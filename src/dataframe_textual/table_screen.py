@@ -210,7 +210,9 @@ class RowDetailScreen(TableScreen):
         self.table.add_column("Value")
 
         # Get all columns and values from the dataframe row
-        for col, val, dtype in zip(self.dftable.df.columns, self.dftable.df.row(self.ridx), self.dftable.df.dtypes):
+        for idx, (col, val, dtype) in enumerate(
+            zip(self.dftable.df.columns, self.dftable.df.row(self.ridx), self.dftable.df.dtypes)
+        ):
             if col in self.dftable.hidden_columns or col == RID:
                 continue  # Skip RID column
             formatted_row = []
@@ -218,7 +220,7 @@ class RowDetailScreen(TableScreen):
 
             dc = DtypeConfig(dtype)
             formatted_row.append(dc.format(val, justify="", thousand_separator=self.thousand_separator))
-            self.table.add_row(*formatted_row)
+            self.table.add_row(*formatted_row, label=str(idx + 1))
 
         self.table.cursor_type = "row"
 
@@ -626,24 +628,22 @@ class MetaColumnScreen(TableScreen):
         """Build the column metadata table."""
         self.table.clear(columns=True)
         self.table.add_column("Column")
-        self.table.add_column("Name")
         self.table.add_column("Type")
 
         # Get schema information
         schema = self.dftable.df.schema
-        dc_int = DtypeConfig(pl.Int64)
         dc_str = DtypeConfig(pl.String)
 
         # Add a row for each column
-        for idx, (col_name, col_type) in enumerate(schema.items(), 1):
+        for idx, (col_name, col_type) in enumerate(schema.items()):
             if col_name == RID:
                 continue  # Skip RID column
 
             dc = DtypeConfig(col_type)
             self.table.add_row(
-                dc_int.format(idx, thousand_separator=self.thousand_separator),
                 col_name,
                 dc_str.format("Datetime" if str(col_type).startswith("Datetime") else col_type, style=dc.style),
+                label=str(idx + 1),
             )
 
         self.table.cursor_type = "row"
