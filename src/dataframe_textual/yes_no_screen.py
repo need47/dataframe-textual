@@ -373,7 +373,6 @@ class SaveFileScreen(YesNoScreen):
         self.all_tabs = all_tabs
         super().__init__(
             title="Save to File",
-            label="Filename",
             input=filename,
             yes=f"Save {tab_count} Tabs" if self.all_tabs else "Save Current Tab" if tab_count > 1 else "Save",
             no="Cancel",

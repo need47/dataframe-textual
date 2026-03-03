@@ -171,7 +171,7 @@ wheels = [
 
 [[package]]
 name = "dataframe-textual"
-version = "2.26.2"
+version = "2.26.3"
 source = { editable = "." }
 dependencies = [
     { name = "fastexcel" },
