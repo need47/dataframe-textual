@@ -32,7 +32,7 @@ class ThemeScreen(ModalScreen):
 
     def __init__(self) -> None:
         super().__init__()
-        self.themes = list(BUILTIN_THEMES.keys())
+        self.themes = sorted(list(BUILTIN_THEMES.keys()))
         self.original_theme = self.app.theme
 
     def compose(self) -> ComposeResult:
