@@ -9,9 +9,10 @@ import polars as pl
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
 from textual.events import Click
-from textual.theme import BUILTIN_THEMES
 from textual.widgets import TabbedContent, TabPane
 from textual.widgets.tabbed_content import ContentTab, ContentTabs
+
+from dataframe_textual.theme_screen import ThemeScreen
 
 from .common import RID, SUPPORTED_FORMATS, Source, get_next_item, load_file
 from .data_frame_help_panel import DataFrameHelpPanel
@@ -44,7 +45,7 @@ class DataFrameViewer(App):
 
         ## 🎨 View & Settings
         - **F1** - ❓ Toggle this help panel
-        - **k** - 🌙 Cycle through themes
+        - **k** - 🌙 Select theme
         - **Ctrl+P -> Screenshot** - 📸 Capture terminal view as a SVG image
 
         ## ⭐ Features
@@ -71,6 +72,7 @@ class DataFrameViewer(App):
         ("w", "save_current_tab_overwrite", "Save Current Tab (overwrite)"),
         ("W", "save_all_tabs_overwrite", "Save All Tabs (overwrite)"),
         ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
+        ("k", "select_theme", "Select Theme"),
         ("greater_than_sign,b", "next_tab(1)", "Next Tab"),  # '>' and 'b'
         ("less_than_sign", "next_tab(-1)", "Prev Tab"),  # '<'
     ]
@@ -178,18 +180,6 @@ class DataFrameViewer(App):
         """Called when the app is ready."""
         # self.log(self.tree)
         pass
-
-    def on_key(self, event) -> None:
-        """Handle key press events at the application level.
-
-        Currently handles theme cycling with the 'k' key.
-
-        Args:
-            event: The key event object containing key information.
-        """
-        if event.key == "k":
-            self.theme = get_next_item(list(BUILTIN_THEMES.keys()), self.theme)
-            self.notify(f"Switched to theme: [$success]{self.theme}[/]", title="SwitchTheme")
 
     def on_click(self, event: Click) -> None:
         """Handle mouse click events on tabs.
@@ -313,6 +303,10 @@ class DataFrameViewer(App):
         The new tab is named with '_copy' suffix and inserted after the current tab.
         """
         self.do_duplicate_tab()
+
+    def action_select_theme(self) -> None:
+        """Open the theme selection screen."""
+        self.push_screen(ThemeScreen())
 
     def do_duplicate_tab(self) -> None:
         """Duplicate the currently active tab.

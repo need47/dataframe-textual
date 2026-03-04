@@ -241,7 +241,7 @@ dv data-1.csv data-2.csv --all-in-one
 | Key                      | Action                                     |
 | ------------------------ | ------------------------------------------ |
 | `F1`                     | Toggle help panel                          |
-| `k`                      | Cycle through dark, light and other themes |
+| `k`                      | Select theme                               |
 | `Ctrl+P` -> `Screenshot` | Capture terminal view as a SVG image       |
 
 ---
