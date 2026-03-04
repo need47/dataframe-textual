@@ -9,6 +9,7 @@ from functools import partial
 
 import polars as pl
 from rich.text import Text
+from textual import work
 from textual.app import ComposeResult
 from textual.coordinate import Coordinate
 from textual.renderables.bar import Bar
@@ -33,9 +34,11 @@ class TableScreen(ModalScreen):
 
         TableScreen > DataTable {
             width: auto;
-            height: auto;
-            border: solid $primary;
             max-width: 100%;
+            height: auto;
+            min-width: 20; /* for LoadIndicator */
+            min-height: 3; /* for LoadIndicator */
+            border: solid $primary;
             overflow: auto;
         }
     """
@@ -288,11 +291,23 @@ class StatisticsScreen(TableScreen):
     def __init__(self, dftable: "DataFrameTable", cidx: int | None = None):
         super().__init__(dftable)
         self.cidx = cidx  # None for dataframe statistics, otherwise column index
-        self.df = self.build_df()
+        self.df: pl.DataFrame = None
 
     def on_mount(self) -> None:
         """Create the statistics table."""
+        self.table.loading = True
+        self.calculate_statistics()
+
+    @work(thread=True)
+    def calculate_statistics(self) -> None:
+        """Calculate statistics in a background thread."""
+        self.df = self.build_df()
+        self.app.call_from_thread(self._on_calculation_ready)
+
+    def _on_calculation_ready(self) -> None:
         self.build_table()
+        self.table.loading = False
+        self.table.focus()
 
     def build_table(self) -> None:
         """Build the statistics table."""
@@ -417,13 +432,23 @@ class FrequencyScreen(TableScreen):
         self.cidx = cidx
         self.sorted_columns = {1: True}  # Count sort by default
         self.total_count = len(dftable.df)
-
-        col = dftable.df.columns[self.cidx]
-        self.df: pl.DataFrame = dftable.df.lazy().select(pl.col(col).value_counts(sort=True)).unnest(col).collect()
+        self.df: pl.DataFrame = None
 
     def on_mount(self) -> None:
-        """Create the frequency table."""
+        """Start frequency calculation."""
+        self.table.loading = True
+        self.calculate_frequency()
+
+    @work(thread=True)
+    def calculate_frequency(self) -> None:
+        col = self.dftable.df.columns[self.cidx]
+        self.df = self.dftable.df.lazy().select(pl.col(col).value_counts(sort=True)).unnest(col).collect()
+        self.app.call_from_thread(self._on_calculation_ready)
+
+    def _on_calculation_ready(self) -> None:
         self.build_table()
+        self.table.loading = False
+        self.table.focus()
 
     def on_key(self, event):
         if event.key == "left_square_bracket":  # '['
