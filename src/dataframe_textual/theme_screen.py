@@ -9,8 +9,7 @@ from textual.widgets import OptionList
 
 class ThemeScreen(ModalScreen):
     BINDINGS = [
-        ("q", "cancel", "Cancel"),
-        ("escape", "cancel", "Cancel"),
+        ("q,escape", "cancel", "Cancel"),
     ]
 
     DEFAULT_CSS = """
@@ -21,9 +20,8 @@ class ThemeScreen(ModalScreen):
         #theme-container {
             width: 40;
             height: auto;
-            padding: 0 1;
-            border: solid $accent;
-            border-title-color: $accent;
+            border: solid $primary;
+            border-title-color: $primary;
         }
 
         #theme-list {

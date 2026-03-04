@@ -36,8 +36,8 @@ class YMNScreen(ModalScreen):
         YMNScreen > Container {
             width: auto;
             height: auto;
-            border: solid $accent;
-            border-title-color: $accent;
+            border: solid $primary;
+            border-title-color: $primary;
             padding: 1 2;
             overflow: auto;
         }
