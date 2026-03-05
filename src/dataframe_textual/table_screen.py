@@ -518,7 +518,7 @@ class FrequencyScreen(TableScreen):
                     highlight_range=(0.0, percentage / 100 * 10),
                     width=10,
                 ),
-                key=str(row_idx + 1),
+                label=str(row_idx + 1),
             )
 
         # Add a total row
@@ -538,7 +538,6 @@ class FrequencyScreen(TableScreen):
                 highlight_range=(0.0, 10),
                 width=10,
             ),
-            key="total",
         )
 
     def sort_by_column(self, descending: bool) -> None:
