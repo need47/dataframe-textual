@@ -162,23 +162,38 @@ options:
 ### CLI Examples
 
 ```bash
+# Open a file
+dv data.csv
+
+# Process compressed data
+dv data.csv.gz
+
+# Read from stdin
+zcat compressed_data.csv.gz | dv -f csv
+
 # View headless CSV file
 dv data_no_header.csv -H
+
+# View headless CSV file with provided header
+dv data_no_header.csv -H country ip requests
+
+# Skip first 3 lines of file (e.g., metadata)
+dv data_with_meta.csv -K 3
+
+# Skip 1 row after header (e.g., units row)
+dv data_with_units.csv -A 1
+
+# Complex CSV with comments and units row
+dv messy_scientific_data.csv -K 3 -A 1
+
+# Skip comment lines (or just -C)
+dv commented_data.csv -C '#'
 
 # Disable type inference for faster loading
 dv large_data.csv -I
 
 # Ignore parsing errors in malformed CSV
 dv data_with_errors.csv -E
-
-# Skip first 3 lines of file (e.g., metadata)
-dv data_with_meta.csv -K 3
-
-# Skip 1 row after header (e.g., units row)
-dv data_with_units.csv -A1
-
-# Skip comment lines (or just -C)
-dv commented_data.csv -C '#'
 
 # Treat specific values as null/missing (e.g., 'NA', 'N/A', '-')
 dv data.csv -N NA N/A
@@ -188,13 +203,6 @@ dv data.csv -Q "'"
 
 # Disable quote character processing for TSV with embedded quotes
 dv data.tsv -Q
-
-# Complex CSV with comments and units row
-dv messy_scientific_data.csv -K 3 -A 1
-
-# Process compressed data
-dv data.csv.gz
-zcat compressed_data.csv.gz | dv -f csv
 
 # Choose the `monokai` theme
 dv data.csv --theme monokai
