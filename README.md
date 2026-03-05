@@ -177,8 +177,8 @@ dv data_with_meta.csv -K 3
 # Skip 1 row after header (e.g., units row)
 dv data_with_units.csv -A1
 
-# Skip comment lines (or just -c)
-dv commented_data.csv -c '#'
+# Skip comment lines (or just -C)
+dv commented_data.csv -C '#'
 
 # Treat specific values as null/missing (e.g., 'NA', 'N/A', '-')
 dv data.csv -N NA N/A
