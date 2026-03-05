@@ -115,7 +115,7 @@ dv data1.tsv < data2.tsv
 
 When multiple files are opened:
 - Each file appears as a separate tab. An Excel file may contain multiple tabs.
-- Switch between tabs using `>` (next) or `<` (previous), or use `b` for cycling through tabs
+- Move the current tab with `>` (right, wrap to first) or `<` (left, wrap to last); use `b` to cycle tabs
 - Save current tab to file with `Ctrl+T`
 - Save all tabs to file with `Ctrl+A`
 - Duplicate the current tab with `Ctrl+D`
@@ -220,8 +220,8 @@ dv data-1.csv data-2.csv --all-in-one
 
 | Key            | Action                                                        |
 | -------------- | ------------------------------------------------------------- |
-| `>`            | Move to next tab                                              |
-| `<`            | Move to previous tab                                          |
+| `>`            | Move current tab right (wrap to first)                        |
+| `<`            | Move current tab left (wrap to last)                          |
 | `b`            | Cycle through tabs                                            |
 | `B`            | Toggle tab bar visibility                                     |
 | `q`            | Close current tab (prompts to save unsaved changes)           |

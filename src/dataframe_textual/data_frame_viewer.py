@@ -27,8 +27,8 @@ class DataFrameViewer(App):
         # 📊 DataFrame Viewer - App Controls
 
         ## ⚙️ File & Tab Management
-        - **>** - ▶️ Next tab
-        - **<** - ◀️ Previous tab
+        - **>** - ▶️ Move current tab right (wrap to first)
+        - **<** - ◀️ Move current tab left (wrap to last)
         - **b** - 🔄 Cycle through tabs
         - **B** - 👁️ Toggle tab bar visibility
         - **q** - ❌ Close current tab (prompts to save unsaved changes)
@@ -73,8 +73,9 @@ class DataFrameViewer(App):
         ("W", "save_all_tabs_overwrite", "Save All Tabs (overwrite)"),
         ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
         ("k", "select_theme", "Select Theme"),
-        ("greater_than_sign,b", "next_tab(1)", "Next Tab"),  # '>' and 'b'
-        ("less_than_sign", "next_tab(-1)", "Prev Tab"),  # '<'
+        ("greater_than_sign", "move_tab(1)", "Move tab right"),  # '>'
+        ("less_than_sign", "move_tab(-1)", "Move tab left"),  # '<'
+        ("b", "next_tab(1)", "Next Tab"),
     ]
 
     CSS = """
@@ -357,6 +358,15 @@ class DataFrameViewer(App):
         """
         self.do_next_tab(offset)
 
+    def action_move_tab(self, offset: int = 1) -> None:
+        """Move the current tab left or right with wrap.
+
+        Args:
+            offset: Direction to move (+1 right, -1 left). Defaults to 1.
+        """
+
+        self.do_move_tab(offset)
+
     def do_next_tab(self, offset: int = 1) -> None:
         """Switch to the next tab or previous tab.
 
@@ -374,6 +384,49 @@ class DataFrameViewer(App):
             self.tabbed.active = next_tab.id
         except (NoMatches, ValueError):
             pass
+
+    def do_move_tab(self, offset: int = 1) -> None:
+        """Move the active tab left or right with wrap.
+
+        Args:
+            offset: Direction to move (+1 right, -1 left). Defaults to 1.
+        """
+
+        if len(self.tabs) <= 1:
+            return
+
+        try:
+            tabs = list(self.tabs.keys())
+            active_pane = self.tabbed.active_pane
+            current_index = tabs.index(active_pane)
+
+            tabs.pop(current_index)
+            # len(tabs) is now len(self.tabs) - 1, but we want modulo len(self.tabs)
+            new_index = (current_index + offset) % (len(tabs) + 1)
+            tabs.insert(new_index, active_pane)
+
+            # Rebuild self.tabs to preserve new order
+            self.tabs = {pane: self.tabs[pane] for pane in tabs}
+
+            active_tab = self.tabbed.get_tab(active_pane.id)
+
+            if new_index == 0:
+                reference_pane = tabs[1]
+                reference_tab = self.tabbed.get_tab(reference_pane.id)
+                active_tab.parent.move_child(active_tab, before=reference_tab)
+                active_pane.parent.move_child(active_pane, before=reference_pane)
+            else:
+                reference_pane = tabs[new_index - 1]
+                reference_tab = self.tabbed.get_tab(reference_pane.id)
+                active_tab.parent.move_child(active_tab, after=reference_tab)
+                active_pane.parent.move_child(active_pane, after=reference_pane)
+
+            # Reset the active pane highlight visually
+            tabs_widget = self.query_one(ContentTabs)
+            self.call_after_refresh(lambda: tabs_widget._highlight_active())
+
+        except Exception as e:
+            self.log(f"Error moving tab: {e}")
 
     def action_toggle_tab_bar(self) -> None:
         """Toggle the tab bar visibility.
