@@ -163,41 +163,41 @@ options:
 
 ```bash
 # View headless CSV file
-dv -H data_no_header.csv
+dv data_no_header.csv -H
 
 # Disable type inference for faster loading
-dv -I large_data.csv
+dv large_data.csv -I
 
 # Ignore parsing errors in malformed CSV
-dv -E data_with_errors.csv
+dv data_with_errors.csv -E
 
 # Skip first 3 lines of file (e.g., metadata)
-dv -l 3 data_with_meta.csv
+dv data_with_meta.csv -K 3
 
 # Skip 1 row after header (e.g., units row)
-dv -a 1 data_with_units.csv
+dv data_with_units.csv -A1
 
 # Skip comment lines (or just -c)
-dv -c "#" commented_data.csv
+dv commented_data.csv -c '#'
 
 # Treat specific values as null/missing (e.g., 'NA', 'N/A', '-')
-dv -n NA N/A - data.csv
+dv data.csv -N NA N/A
 
 # Use different quote character (e.g., single quote for CSV)
-dv -q "'" data.csv
+dv data.csv -Q "'"
 
 # Disable quote character processing for TSV with embedded quotes
-dv -q data.tsv
+dv data.tsv -Q
 
 # Complex CSV with comments and units row
-dv -l 3 -a 1 -I messy_scientific_data.csv
+dv messy_scientific_data.csv -K 3 -A 1
 
 # Process compressed data
 dv data.csv.gz
 zcat compressed_data.csv.gz | dv -f csv
 
 # Choose the `monokai` theme
-dv --theme monokai data.csv
+dv data.csv --theme monokai
 
 # Show column headers
 dv data.csv -F
