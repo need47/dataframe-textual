@@ -569,8 +569,7 @@ View quick metadata about your dataframe and columns to understand their structu
 
 **Column Metadata** (`M`):
 - Press `M` to open a modal displaying details for all columns:
-  - **ID** - 1-based column index
-  - **Name** - Column name
+  - **Column** - Column name
   - **Type** - Data type (e.g., Int64, String, Float64, Boolean)
 
 **In the Column Metadata Table**
