@@ -366,29 +366,6 @@ class YesNoScreen(YMNScreen):
                 yield from super().compose()
 
 
-class SaveFileScreen(YesNoScreen):
-    """Modal screen to save the dataframe to a CSV file."""
-
-    def __init__(self, filename: str, all_tabs: bool = False, tab_count: int = 1):
-        self.all_tabs = all_tabs
-        super().__init__(
-            title="Save to File",
-            input=filename,
-            yes=f"Save {tab_count} Tabs" if self.all_tabs else "Save Current Tab" if tab_count > 1 else "Save",
-            no="Cancel",
-            on_yes_callback=self.handle_save,
-        )
-
-    def handle_save(self):
-        if self.input:
-            input_filename = self.input.value.strip()
-            if input_filename:
-                return input_filename, self.all_tabs, True  # Overwrite prompt
-            else:
-                self.notify("Filename cannot be empty", title="Save", severity="error")
-                return None
-
-
 class ConfirmScreen(YesNoScreen):
     """Modal screen to ask for confirmation."""
 
@@ -587,28 +564,6 @@ class FreezeScreen(YesNoScreen):
             return None
 
         return fixed_rows, fixed_cols
-
-
-class OpenFileScreen(YesNoScreen):
-    """Modal screen to open a CSV file."""
-
-    def __init__(self):
-        super().__init__(
-            title="Open File",
-            input="Enter relative or absolute file path",
-            yes="Open",
-            no="Cancel",
-            on_yes_callback=self.handle_open,
-        )
-
-    def handle_open(self):
-        if self.input:
-            filename_input = self.input.value.strip()
-            if filename_input:
-                return filename_input
-            else:
-                self.notify("Filename cannot be empty", title="Open", severity="error")
-                return None
 
 
 class EditColumnScreen(YesNoScreen):

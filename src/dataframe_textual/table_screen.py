@@ -17,7 +17,7 @@ from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
 from .common import NULL, NULL_DISPLAY, RID, DtypeConfig, format_float
-from .yes_no_screen import SaveFileScreen
+from .file_picker import SaveFilePicker
 
 
 class TableScreen(ModalScreen):
@@ -584,8 +584,8 @@ class FrequencyScreen(TableScreen):
         filename = f"{column}_freq.csv"
 
         self.app.push_screen(
-            SaveFileScreen(filename, all_tabs=False),
-            callback=partial(self.app.save_to_file, use_df=self.df),
+            SaveFilePicker(filename=filename),
+            callback=partial(self.app.save_to_file, all_tabs=False, use_df=self.df),
         )
 
 

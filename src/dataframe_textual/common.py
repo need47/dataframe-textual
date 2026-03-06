@@ -630,6 +630,26 @@ def scan_vortex(source: str | list[str], n_rows: int | None = None) -> pl.LazyFr
     return lf
 
 
+def guess_file_format(filename: str | Path) -> str | None:
+    """Guess the file format based on the filename extension.
+
+    Args:
+        filename: The name of the file to guess the format for.
+
+    Returns:
+        The guessed file format as a string (e.g., 'csv', 'excel', etc.) or None if the format cannot be determined or is not supported.
+    """
+    if not isinstance(filename, (str, Path)):
+        return None
+
+    ext = Path(filename).suffix.lower()
+    if ext == ".gz":  # Handle .csv.gz, .tsv.gz, etc.
+        ext = Path(filename).with_suffix("").suffix.lower()
+
+    fmt = ext.removeprefix(".")
+    return fmt if fmt in SUPPORTED_FORMATS else None
+
+
 def load_dataframe(
     filenames: list[str],
     file_format: str | None = None,
@@ -771,18 +791,7 @@ def load_file(
     """
     data: list[Source] = []
 
-    fmt = file_format
-    if not fmt:
-        if isinstance(source, StringIO):
-            fmt = "tsv"
-        else:
-            ext = Path(source).suffix.lower()
-            if ext == ".gz":
-                ext = Path(source).with_suffix("").suffix.lower()
-            fmt = ext.removeprefix(".")
-            if not fmt or fmt not in SUPPORTED_FORMATS:
-                fmt = "tsv"
-
+    fmt = file_format or guess_file_format(source) or "tsv"
     filename = f"stdin.{fmt}" if isinstance(source, StringIO) else source
     filepath = Path(filename)
 
