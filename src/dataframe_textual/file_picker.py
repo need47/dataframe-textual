@@ -121,7 +121,6 @@ class FilePicker(ModalScreen):
             with Horizontal(id="folder"):
                 yield Label("In")
                 yield Input(id="dirname", value=str(self.dirname))
-                # yield Button(label="Home", id="home", variant="warning", compact=True)
                 yield Button(label=Text.from_markup(":left_arrow:"), id="back", variant="warning", compact=True)
                 yield Button(label=Text.from_markup(":up_arrow:"), id="up", variant="warning", compact=True)
                 yield Button(label=Text.from_markup(":house:"), id="home", variant="warning", compact=True)
@@ -132,6 +131,7 @@ class FilePicker(ModalScreen):
                 yield Input(value=self.filename, id="filename")
                 yield Select(
                     [
+                        ("All Files (*)", "*"),
                         ("CSV (*.csv)", "csv"),
                         ("TSV (*.tsv)", "tsv"),
                         ("Excel (*.xlsx, *.xls)", "excel"),
@@ -140,7 +140,7 @@ class FilePicker(ModalScreen):
                         ("JSON (*.json)", "json"),
                     ],
                     id="file-type",
-                    prompt="All Files (*)",
+                    allow_blank=False,
                 )
 
             with Horizontal(id="file-action"):
@@ -241,12 +241,12 @@ class FilePicker(ModalScreen):
             The selected file type value or None.
         """
         try:
-            file_type_select_value = str(self.query_one("#file-type", Select).value)
+            file_type_select_value = self.query_one("#file-type", Select).value
         except Exception as e:
-            self.log(f"Error retrieving file type selection: {str(e)}")
             file_type_select_value = "*"
+            self.log(f"Error retrieving file type selection: {str(e)}")
 
-        return "*" if file_type_select_value == "Select.NULL" else file_type_select_value
+        return file_type_select_value
 
     def _matches_file_type(self, path: Path, file_type: str | None) -> bool:
         """Check if a file matches the selected file type filter.
