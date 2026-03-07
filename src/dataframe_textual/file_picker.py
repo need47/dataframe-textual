@@ -94,14 +94,16 @@ class FilePicker(ModalScreen):
         }
     """
 
-    def __init__(self, title: str = "", confirm_label: str = "Open", dirname: str = ".", filename: str = "") -> None:
+    def __init__(
+        self, title: str = "", dirname: str = ".", filename: str = None, confirm_label: str = "Confirm"
+    ) -> None:
         """Initialize the file picker.
 
         Args:
             title: Dialog title to display in the border.
-            confirm: Label for the confirm button.
             dirname: Initial directory to display.
             filename: Initial filename to populate.
+            confirm_label: Label for the confirm button.
         """
         super().__init__()
         self.title = title
@@ -159,9 +161,45 @@ class FilePicker(ModalScreen):
         if event.key == "escape":
             self.dismiss()
             event.stop()
+        # allow `q` to quit if the focus is not on an input
+        elif event.key == "q":
+            inputs = self.query(Input)
+            if self.app.focused not in inputs:
+                self.dismiss()
+                event.stop()
         elif event.key == "enter":
+            dirname_input = self.query_one("#dirname", Input)
+            if self.app.focused is dirname_input:
+                self._try_set_directory_from_input(dirname_input)
+                event.stop()
+                return
+
             self.confirm()
             event.stop()
+
+    def _try_set_directory_from_input(self, dirname_input: Input) -> bool:
+        """Try to navigate to the directory entered in the dirname input.
+
+        Returns:
+            True when navigation succeeds, otherwise False.
+        """
+        raw_path = dirname_input.value.strip()
+        if not raw_path:
+            dirname_input.value = str(self.dirname)
+            return False
+
+        candidate = Path(raw_path).expanduser()
+        if not candidate.is_absolute():
+            candidate = self.dirname / candidate
+        candidate = candidate.resolve()
+
+        if candidate.exists() and candidate.is_dir():
+            self._set_directory(candidate)
+            self.query_one("#file-list", OptionList).focus()
+            return True
+
+        self.notify(f"Directory not found: {candidate}", title="Open File", severity="error", timeout=10)
+        return False
 
     def confirm(self) -> None:
         """Confirm the dialog selection.
@@ -183,7 +221,7 @@ class FilePicker(ModalScreen):
         self._option_is_dir.clear()
 
         if not directory.exists() or not directory.is_dir():
-            self.notify(f"Directory not found: {directory}", severity="error", timeout=5)
+            self.notify(f"Directory not found: {directory}", title="Open File", severity="error", timeout=10)
             return
 
         if not self._is_root(directory):
@@ -469,69 +507,78 @@ class FilePicker(ModalScreen):
 class OpenFilePicker(FilePicker):
     """Modal screen for opening files."""
 
-    def __init__(self, title: str = "Open File", confirm: str = "Open", dirname: str = ".", filename: str = "") -> None:
+    def __init__(
+        self,
+        title: str = "Open File",
+        dirname: str = ".",
+        filename: str = "",
+        confirm_label: str = "Open",
+    ) -> None:
         """Initialize the open file picker.
 
         Args:
             title: Dialog title.
-            confirm: Label for the confirm button.
+            confirm_label: Label for the confirm button.
             dirname: Initial directory.
             filename: Initial filename.
         """
-        super().__init__(title=title, confirm_label=confirm, dirname=dirname, filename=filename)
+        super().__init__(title=title, dirname=dirname, filename=filename, confirm_label=confirm_label)
 
-    def on_mount(self):
+    def on_mount(self) -> None:
         super().on_mount()
         self.query_one("#file-list", OptionList).focus()
 
     def confirm(self) -> None:
         """Confirm opening the selected file."""
         if not (filepath := self._get_filename()):
-            self.notify("No file selected.", severity="warning")
+            self.notify("No file selected.", title="Open File", severity="warning")
             return
 
         if filepath.exists() and filepath.is_file():
             self.dismiss(filepath)
         else:
-            self.notify(f"File not found: {filepath}", severity="error", timeout=5)
+            self.notify(f"File not found: {filepath}", title="Open File", severity="error", timeout=10)
 
 
 class SaveFilePicker(FilePicker):
     """Modal screen for saving files."""
 
-    def __init__(self, title: str = "Save File", confirm: str = "Save", dirname: str = ".", filename: str = "") -> None:
+    def __init__(
+        self, title: str = "Save File", dirname: str = ".", filename: str = "", confirm_label: str = "Save"
+    ) -> None:
         """Initialize the save file picker.
 
         Args:
             title: Dialog title.
-            confirm: Label for the confirm button.
             dirname: Initial directory.
             filename: Initial filename.
+            confirm_label: Label for the confirm button.
         """
-        super().__init__(title=title, confirm_label=confirm, dirname=dirname, filename=filename)
+        super().__init__(title=title, dirname=dirname, filename=filename, confirm_label=confirm_label)
 
-    def on_mount(self):
+    def on_mount(self) -> None:
         super().on_mount()
         self.query_one("#filename", Input).focus()
 
     def confirm(self) -> None:
         """Confirm saving the selected file."""
         if not (filepath := self._get_filename()):
-            self.notify("No filename provided.", severity="warning")
+            self.notify("No filename provided.", title="Save File", severity="warning")
             return
 
         if not filepath.is_absolute():
             filepath = self.dirname / filepath
 
-        if not (fmt := guess_file_format(filepath)):
+        if not guess_file_format(filepath):
             self.notify(
                 f"Extension '[$error]{filepath.suffix}[/]' is invalid. Supported formats are: {', '.join(SUPPORTED_FORMATS)}",
+                title="Save File",
                 severity="error",
-                timeout=5,
+                timeout=10,
             )
             return
 
         if filepath.parent.exists() and filepath.parent.is_dir():
             self.dismiss(filepath)
         else:
-            self.notify(f"Directory not found: {filepath.parent}", severity="error", timeout=5)
+            self.notify(f"Directory not found: {filepath.parent}", title="Save File", severity="error", timeout=10)
