@@ -18,8 +18,6 @@ from .common import SUPPORTED_FORMATS, guess_file_format
 class FilePicker(ModalScreen):
     """Base modal screen for file picker dialogs."""
 
-    BINDINGS = [("q,escape", "cancel", "Cancel")]
-
     DEFAULT_CSS = """
         FilePicker {
             align: center middle;
