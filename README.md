@@ -590,6 +590,9 @@ Press `F` to see value distributions of the current column. The modal shows:
 - Press `[` and `]` to sort by any column (value, count, or percentage)
 - Press `v` to **view** all rows containing the selected value
 - Press `"` to **filter** all rows containing the selected value to a new tab
+- Press `,` to toggle thousand separator
+- Press `g` to scroll to top
+- Press `G` to scroll to bottom
 - Press `Ctrl+S` to save the frequency table to file
 - Press `q` or `Escape` to close the frequency table
 
