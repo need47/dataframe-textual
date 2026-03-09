@@ -125,7 +125,7 @@ When multiple files are opened:
 ## Command Line Options
 
 ```
-usage: dv [-h] [-V] [-d DELIMITER] [-H [HEADER ...]] [-F [FIELDS ...]] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M N] [-N NULL [NULL ...]] [--theme [THEME]]
+usage: dv [-h] [-V] [-d DELIMITER] [-f [FIELDS ...]] [-H [HEADER ...]] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M N] [-N NULL [NULL ...]] [--theme [THEME]]
           [files ...]
 
 Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).
@@ -209,10 +209,10 @@ dv data.tsv -Q
 dv data.csv --theme monokai
 
 # Show column headers
-dv data.csv -F
+dv data.csv -f
 
 # Read only specific columns: 'name', 'age', first column, and last column
-dv data.csv -F name age 1 -1
+dv data.csv -f name age 1 -1
 
 # Filter data using SQL query (use 'self' as the table name)
 dv data.csv --sql 'SELECT * FROM self WHERE age > 30'
