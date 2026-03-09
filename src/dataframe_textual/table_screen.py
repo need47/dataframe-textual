@@ -93,6 +93,12 @@ class TableScreen(ModalScreen):
             self.thousand_separator = not self.thousand_separator
             self.build_table()
             event.stop()
+        elif event.key == "g":
+            self.table.action_scroll_top()
+            event.stop()
+        elif event.key == "G":
+            self.table.action_scroll_bottom()
+            event.stop()
 
     def filter_or_view_selected_value(self, cidx_name_value: tuple[int, str, Any] | None, action: str = "view") -> None:
         """Apply filter or view action by the selected value.
