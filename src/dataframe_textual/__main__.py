@@ -8,7 +8,7 @@ import polars as pl
 from textual.theme import BUILTIN_THEMES
 
 from . import __version__
-from .common import SUPPORTED_FORMATS, load_dataframe
+from .common import load_dataframe
 from .data_frame_viewer import DataFrameViewer
 
 
@@ -54,8 +54,8 @@ def cli() -> argparse.Namespace:
         epilog="Examples:\n"
         "  %(prog)s data.csv\n"
         "  %(prog)s file1.csv file2.csv file3.csv\n"
-        "  %(prog)s data.xlsx  (opens each sheet in separate tab)\n"
-        "  cat data.csv | %(prog)s --format csv\n",
+        "  %(prog)s data.xlsx (opens each sheet in separate tab)\n"
+        "  cat data.txt | %(prog)s -d ';'\n",
     )
     parser.add_argument("files", nargs="*", help="Files to view (or read from stdin)")
     parser.add_argument(
@@ -65,10 +65,17 @@ def cli() -> argparse.Namespace:
         version=f"%(prog)s {__version__}",
     )
     parser.add_argument(
+        "-d",
+        "--delimiter",
+        help="Specify the delimiter of the input files (must be a single character, e.g., `,` or `|`)",
+    )
+    parser.add_argument(
         "-f",
-        "--format",
-        choices=SUPPORTED_FORMATS,
-        help="Specify the format of the input files (csv, excel, tsv etc.)",
+        "--fields",
+        nargs="*",
+        action=ConstWithMultiArgs,
+        const="list",
+        help="When used without values, list available fields. Otherwise, read only specified fields.",
     )
     parser.add_argument(
         "-H",
@@ -77,17 +84,6 @@ def cli() -> argparse.Namespace:
         action=ConstWithMultiArgs,
         const=False,
         help="Specify header info. when reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column names (e.g., `-H col1 col2 col3`).",
-    )
-    parser.add_argument(
-        "-F",
-        "--fields",
-        nargs="*",
-        action=ConstWithMultiArgs,
-        const="list",
-        help="When used without values, list available fields. Otherwise, read only specified fields.",
-    )
-    parser.add_argument(
-        "--sql", help="Specify a SQL query to execute on the input file (e.g., to select and filter data)"
     )
     parser.add_argument(
         "-I", "--no-inference", action="store_true", help="Do not infer data types when reading CSV/TSV"
@@ -102,7 +98,7 @@ def cli() -> argparse.Namespace:
         metavar="PREFIX",
         nargs="?",
         const="#",
-        help="Comment lines starting with `PREFIX` are skipped when reading CSV/TSV",
+        help="Skip comment lines starting with `PREFIX` when reading CSV/TSV",
     )
     parser.add_argument(
         "-Q",
@@ -128,11 +124,14 @@ def cli() -> argparse.Namespace:
     parser.add_argument("-N", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
 
     parser.add_argument(
+        "--sql", help="Specify a SQL query to execute on the input file (e.g., to select and filter data)"
+    )
+    parser.add_argument(
         "--theme",
         nargs="?",
         default="textual-dark",
         const="list",
-        help="Set the theme for the application. Use 'list' to show available themes.",
+        help="Set the theme for the application. If used without value, show available themes.",
     )
 
     parser.add_argument(
@@ -143,6 +142,10 @@ def cli() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
+
+    if args.delimiter and len(args.delimiter) != 1:
+        print("Delimiter must be a single character.", file=sys.stderr)
+        sys.exit(1)
 
     # List available themes and exit
     if args.theme == "list":
@@ -180,7 +183,7 @@ def main() -> None:
 
     sources = load_dataframe(
         args.files,
-        file_format=args.format,
+        delimiter=args.delimiter,
         header=args.header,
         infer_schema=not args.no_inference,
         comment_prefix=args.comment_prefix,

@@ -12,7 +12,17 @@ import polars as pl
 from rich.text import Text
 
 # Supported file formats
-SUPPORTED_FORMATS = ["tsv", "csv", "psv", "xlsx", "xls", "parquet", "vortex", "json", "ndjson"]
+SUPPORTED_FORMATS = {
+    "tsv": "\t",
+    "csv": ",",
+    "psv": "|",
+    "xlsx": None,
+    "xls": None,
+    "parquet": None,
+    "vortex": None,
+    "json": None,
+    "ndjson": None,
+}
 
 
 # Boolean string mappings
@@ -652,7 +662,7 @@ def guess_file_format(filename: str | Path) -> str | None:
 
 def load_dataframe(
     filenames: list[str],
-    file_format: str | None = None,
+    delimiter: str | None = None,
     header: bool | list[str] = True,
     infer_schema: bool = True,
     comment_prefix: str | None = None,
@@ -673,7 +683,7 @@ def load_dataframe(
 
     Args:
         filenames: List of filenames to load. If single filename is "-", read from stdin.
-        file_format: Optional format specifier for input files (e.g., 'csv', 'excel').
+        delimiter: Optional delimiter specifier for input files (e.g., ';' for SSV).
         header: Specify header info. for CSV/TSV files. Can be True (header in first line), False (no header, auto-generate column names), or list of column names to use. Defaults to True.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
         comment_prefix: Character(s) indicating comment lines in CSV/TSV files. Defaults to None.
@@ -711,7 +721,7 @@ def load_dataframe(
         ds = load_file(
             source,
             prefix_sheet=prefix_sheet,
-            file_format=file_format,
+            delimiter=delimiter,
             header=header,
             infer_schema=infer_schema,
             comment_prefix=comment_prefix,
@@ -744,7 +754,7 @@ def load_file(
     source: str | StringIO,
     first_sheet: bool = False,
     prefix_sheet: bool = False,
-    file_format: str | None = None,
+    delimiter: str | None = None,
     header: bool | list[str] = True,
     infer_schema: bool = True,
     comment_prefix: str | None = None,
@@ -771,8 +781,7 @@ def load_file(
         source: Path to file to load or a StringIO object.
         first_sheet: If True, only load first sheet for Excel files. Defaults to False.
         prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
-        file_format: Optional format specifier (i.e., 'tsv', 'csv', 'excel', 'parquet', 'json', 'ndjson') for input files.
-                     By default, infers from file extension.
+        delimiter: Optional delimiter specifier for input files (e.g., ';' for SSV). Defaults to None (infer from file extension).
         header: Specify header info. for the input file. Can be True (header in first line), False (no header, auto-generate column names), or list of column names to use.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
         comment_prefix: Character(s) indicating comment lines in CSV/TSV files. Defaults to None.
@@ -791,27 +800,34 @@ def load_file(
     """
     data: list[Source] = []
 
-    fmt = file_format or guess_file_format(source) or "tsv"
+    fmt = None if delimiter else guess_file_format(source)
+
+    if delimiter:
+        fmt = None
+    else:
+        # Default to TSV if format cannot be determined
+        fmt = guess_file_format(source) or "tsv"
+        delimiter = SUPPORTED_FORMATS.get(fmt)
+
     filename = f"stdin.{fmt}" if isinstance(source, StringIO) else source
     filepath = Path(filename)
 
     # check header
-    if fmt in ("csv", "tsv", "psv", "xlsx", "xls"):
-        if header is False:
-            has_header = False
-            new_columns = None
-        elif isinstance(header, list):
-            has_header = True
-            new_columns = header
-        else:
-            has_header = True
-            new_columns = None
+    if header is False:
+        has_header = False
+        new_columns = None
+    elif isinstance(header, list):
+        has_header = True
+        new_columns = header
+    else:
+        has_header = True
+        new_columns = None
 
     # Load based on file format
-    if fmt in ("csv", "tsv", "psv"):
+    if delimiter:
         lf = pl.scan_csv(
             source,
-            separator="\t" if fmt == "tsv" else ("|" if fmt == "psv" else ","),
+            separator=delimiter,
             has_header=has_header,
             infer_schema=infer_schema,
             comment_prefix=comment_prefix,
@@ -904,7 +920,7 @@ def load_file(
 
         return load_file(
             source,
-            file_format=fmt,
+            delimiter=delimiter,
             header=header,
             infer_schema=infer_schema,
             comment_prefix=comment_prefix,

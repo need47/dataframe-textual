@@ -1,6 +1,6 @@
 # DataFrame Textual
 
-A powerful, interactive terminal-based viewer/editor for CSV/TSV/PSV/Excel/[Parquet](https://parquet.apache.org/)/[Vortex](https://vortex.dev/)/JSON/NDJSON built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in terminal with multi-tab support for multiple files!
+A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet](https://parquet.apache.org/)/[Vortex](https://vortex.dev/)/JSON/NDJSON built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in terminal with multi-tab support for multiple files!
 
 ![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshot.png)
 
@@ -93,8 +93,8 @@ uv run python main.py pokemon.csv
 cat data.tsv | dv
 dv < data.tsv
 
-# Specify format for gzipped stdin
-zcat data.csv.gz | dv -f csv
+# Specify delimiter
+dv data.txt -d '|'
 
 # Gzipped files are supported
 dv data.csv.gz
@@ -125,7 +125,7 @@ When multiple files are opened:
 ## Command Line Options
 
 ```
-usage: dv [-h] [-V] [-f {tsv,csv,psv,xlsx,xls,parquet,json,ndjson}] [-H [HEADER ...]] [-F [FIELDS ...]] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M N] [-N NULL [NULL ...]] [--theme [THEME]]
+usage: dv [-h] [-V] [-d DELIMITER] [-H [HEADER ...]] [-F [FIELDS ...]] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M N] [-N NULL [NULL ...]] [--theme [THEME]]
           [files ...]
 
 Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).
@@ -136,12 +136,12 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   -V, --version         show program's version number and exit
-  -f, --format {tsv,csv,psv,xlsx,xls,parquet,json,ndjson}
-                        Specify the format of the input files (csv, excel, tsv etc.)
+  -d, --delimiter DELIMITER
+                        Specify the delimiter of the input files (must be a single character, e.g., `,` or `|`)
+  -f, --fields [FIELDS ...]
+                        When used without values, list available fields. Otherwise, read only specified fields.
   -H, --header [HEADER ...]
                         Specify header info. when reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column names (e.g., `-H col1 col2 col3`).
-  -F, --fields [FIELDS ...]
-                        When used without values, list available fields. Otherwise, read only specified fields.
   -I, --no-inference    Do not infer data types when reading CSV/TSV
   -T, --truncate-ragged-lines
                         Truncate ragged lines when reading CSV/TSV
@@ -155,7 +155,8 @@ options:
   -M, --n-rows N        Read maximum rows
   -N, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
-  --theme [THEME]       Set the theme for the application. Use 'list' to show available themes.
+  --sql SQL             Specify a SQL query to execute on the input file (e.g., to select and filter data)
+  --theme [THEME]       Set the theme for the application. If used without value, show available themes.
   --all-in-one, --aio   Read all files (must be of the same structure) into a single table.
 ```
 
