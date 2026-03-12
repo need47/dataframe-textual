@@ -353,10 +353,10 @@ class DataFrameViewer(App):
         new_tabname = f"{current_tabname}_copy"
         new_tabname = self.get_unique_tabname(new_tabname)
 
-        # Create new table with the same dataframe and filename
+        # Create new table with the same LazyFrame and filename
         new_table = DataFrameTable(
-            table.df.clone(),
-            table.filename,
+            table.lf.clone(),  # Clone the LazyFrame to ensure independent state
+            filename=Path(table.filename).with_stem(new_tabname),  # Update filename stem to match new tab name
             tabname=new_tabname,
             zebra_stripes=True,
             id=f"tab-{len(self.tabs) + 1}",
