@@ -216,7 +216,7 @@ class DataFrameViewer(App):
             table.focus()
 
             if table.loaded_rows == 0:
-                table.setup_table()
+                table.init_table()
 
     def action_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.

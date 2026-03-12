@@ -886,6 +886,9 @@ def load_file(
     else:
         raise ValueError(f"Unsupported file format: {fmt}. Supported formats are: {SUPPORTED_FORMATS}")
 
+
+    return data
+
     # Attempt to collect, handling ComputeError for schema inference issues
     try:
         ds = []

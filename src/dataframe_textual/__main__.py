@@ -4,7 +4,6 @@ import argparse
 import sys
 from pathlib import Path
 
-import polars as pl
 from textual.theme import BUILTIN_THEMES
 
 from . import __version__
@@ -124,9 +123,6 @@ def cli() -> argparse.Namespace:
     parser.add_argument("-N", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
 
     parser.add_argument(
-        "--sql", help="Specify a SQL query to execute on the input file (e.g., to select and filter data)"
-    )
-    parser.add_argument(
         "--theme",
         nargs="?",
         default="textual-dark",
@@ -206,15 +202,6 @@ def main() -> None:
             break  # Only list fields for the first source
 
         return
-
-    if args.sql:
-        for source in sources:
-            ctx = pl.SQLContext(frames={"self": source.frame})
-            try:
-                source.frame = ctx.execute(args.sql)
-            except pl.exceptions.SQLInterfaceError as e:
-                print(f"SQL error: {e}", file=sys.stderr)
-                sys.exit(1)
 
     # Run the DataFrame Viewer application
     app = DataFrameViewer(*sources, theme=args.theme)

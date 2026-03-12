@@ -12,6 +12,7 @@ from typing import Any
 
 import polars as pl
 from rich.text import Text, TextType
+from textual import work
 from textual._two_way_dict import TwoWayDict
 from textual.coordinate import Coordinate
 from textual.events import Click
@@ -112,17 +113,17 @@ class ReplaceState:
     done: bool = False  # Whether the replace operation is complete
 
 
-def add_rid_column(df: pl.DataFrame) -> pl.DataFrame:
+def add_rid_column(df: pl.DataFrame, offset: int = 0) -> pl.DataFrame:
     """Add internal row index as last column to the dataframe if not already present.
 
     Args:
         df: The Polars DataFrame to modify.
-
+        offset: The starting index for the row IDs.
     Returns:
         The modified DataFrame with the internal row index column added.
     """
     if RID not in df.columns:
-        df = df.lazy().with_row_index(RID).select(pl.exclude(RID), RID).collect()
+        df = df.lazy().with_row_index(RID, offset=offset).select(pl.exclude(RID), RID).collect()
     return df
 
 
@@ -367,7 +368,7 @@ class DataFrameTable(DataTable):
     # Track if dataframe has unsaved changes
     dirty: reactive[bool] = reactive(False)
 
-    def __init__(self, df: pl.DataFrame, filename: str = "", tabname: str = "", **kwargs) -> None:
+    def __init__(self, lf: pl.LazyFrame, filename: str = "", tabname: str = "", **kwargs) -> None:
         """Initialize the DataFrameTable with a dataframe and manage all state.
 
         Sets up the table widget with display configuration, loads the dataframe, and
@@ -382,8 +383,9 @@ class DataFrameTable(DataTable):
         super().__init__(**kwargs)
 
         # DataFrame state
-        self.dataframe = add_rid_column(df)  # Original dataframe
-        self.df = self.dataframe  # Internal/working dataframe
+        self.lf = lf  # Original LazyFrame for reference and reloading
+        self.dataframe = None  # Original dataframe
+        self.df = None  # Internal/working dataframe
         self.filename = filename or "untitled.csv"  # Current filename
         self.tabname = tabname or Path(filename).stem  # Tab name
 
@@ -418,6 +420,36 @@ class DataFrameTable(DataTable):
 
         # Whether to show internal row index column
         self.show_rid = False
+
+    def init_table(self):
+        batch_gen = self.lf.collect_batches()
+        try:
+            self.dataframe = add_rid_column(next(batch_gen))
+            self.df = self.dataframe
+            # self.notify(f"loaded {len(self.df)} rows in initial batch")
+
+            # Populate the table with the initial batch of data
+            self.setup_table()
+        except StopIteration:
+            self.app.exit(-1)
+
+        self.load_remaining_batches(batch_gen)
+
+    @work(thread=True)
+    def load_remaining_batches(self, batch_gen):
+        """Background load the rest of the dataframe in batches."""
+
+        batches, offset = [], len(self.df)
+        for batch in batch_gen:
+            batches.append(add_rid_column(batch, offset=offset))
+            offset += len(batch)
+
+        if batches:
+            self.dataframe = pl.concat([self.df] + batches, rechunk=True)
+            self.df = self.dataframe
+
+            if self.loaded_rows < self.BATCH_SIZE:
+                self.load_rows_range(self.loaded_rows, self.BATCH_SIZE)
 
     @property
     def cursor_key(self) -> CellKey:
@@ -1397,7 +1429,7 @@ class DataFrameTable(DataTable):
             return range_count
 
         except Exception as e:
-            self.notify("Error loading rows", title="Load Rows", severity="error", timeout=10)
+            self.notify(f"Error loading rows {str(e)}", title="Load Rows", severity="error", timeout=10)
             self.log(f"Error loading rows: {str(e)}")
             return 0
 
