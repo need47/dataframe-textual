@@ -171,12 +171,12 @@ class Source:
     """Data source representation.
 
     Attributes:
-        frame: The Polars DataFrame or LazyFrame.
+        lf: The LazyFrame.
         filename: The name of the source file.
         tabname: The name of the tab to display.
     """
 
-    frame: pl.DataFrame | pl.LazyFrame
+    lf: pl.LazyFrame
     filename: str
     tabname: str
 
@@ -700,13 +700,17 @@ def load_dataframe(
         List of `Source` objects.
     """
     data: list[Source] = []
-    lf_aio = None
+    lfs_aio = []
     prefix_sheet = len(filenames) > 1
 
     # Read files individually
     for filename in filenames:
         if filename == "-":
-            source = StringIO(sys.stdin.read())
+            content = sys.stdin.read()
+            if not content:
+                print("No data received from stdin", file=sys.stderr)
+                sys.exit(1)
+            source = StringIO(content)
 
             # Reopen stdin to /dev/tty for proper terminal interaction
             try:
@@ -736,15 +740,12 @@ def load_dataframe(
         )
 
         if all_in_one:
-            for src in ds:
-                if lf_aio is None:
-                    lf_aio = src.frame
-                else:
-                    lf_aio = pl.concat([lf_aio, src.frame])
+            lfs_aio.extend([src.lf for src in ds])
         else:
             data.extend(ds)
 
-    if lf_aio is not None:
+    if lfs_aio:
+        lf_aio = lfs_aio[0] if len(lfs_aio) == 1 else pl.concat(lfs_aio, rechunk=True)
         data.append(Source(lf_aio, "all-in-one.parquet", "all-in-one"))
 
     return data
@@ -886,23 +887,21 @@ def load_file(
     else:
         raise ValueError(f"Unsupported file format: {fmt}. Supported formats are: {SUPPORTED_FORMATS}")
 
-
-    return data
-
     # Attempt to collect, handling ComputeError for schema inference issues
     try:
         ds = []
         for src in data:
+            all_columns = [c for c in src.lf.collect_schema().names()]
+
             if use_columns:
-                all_columns = [c for c in src.frame.collect_schema()]
                 try:
                     ok_columns = get_columms(all_columns, use_columns)
                 except ValueError as ve:
                     print(ve, file=sys.stderr)
                     sys.exit(1)
-                ds.append(Source(src.frame.select(ok_columns).collect(), src.filename, src.tabname))
+                ds.append(Source(src.lf.select(ok_columns), src.filename, src.tabname))
             else:
-                ds.append(Source(src.frame.collect(), src.filename, src.tabname))
+                ds.append(Source(src.lf, src.filename, src.tabname))
 
         data = ds
     except pl.exceptions.NoDataError:

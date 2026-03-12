@@ -158,14 +158,24 @@ def cli() -> argparse.Namespace:
         args.files = []
 
     # Check if reading from stdin (pipe or redirect)
-    if not sys.stdin.isatty():
+    if not sys.stdin.isatty() and "-" not in args.files:
         args.files.append("-")
-    else:
-        # Validate all files exist
-        for filename in args.files:
-            if not Path(filename).exists():
-                print(f"File not found: {filename}", file=sys.stderr)
-                sys.exit(1)
+
+    # Validate all files
+    for filename in args.files:
+        if filename == "-":
+            continue  # stdin will be handled separately
+
+        filepath = Path(filename)
+        if not filepath.exists():
+            print(f"File not found: `{filename}`", file=sys.stderr)
+            sys.exit(1)
+        elif not filepath.is_file():
+            print(f"Not a file: `{filename}`", file=sys.stderr)
+            sys.exit(1)
+        elif filepath.stat().st_size == 0:
+            print(f"File is empty: `{filename}`", file=sys.stderr)
+            sys.exit(1)
 
     if not args.files:
         parser.print_help()
@@ -197,7 +207,7 @@ def main() -> None:
     # List available fields and exit
     if args.fields == "list":
         for source in sources:
-            for idx, field in enumerate(source.frame.columns):
+            for idx, field in enumerate(source.lf.collect_schema().names()):
                 print(idx + 1, field, sep="\t")
             break  # Only list fields for the first source
 

@@ -36,7 +36,7 @@ class TableScreen(ModalScreen):
             width: auto;
             max-width: 100%;
             height: auto;
-            min-width: 20; /* for LoadIndicator */
+            min-width: 16; /* for LoadIndicator */
             min-height: 3; /* for LoadIndicator */
             border: solid $primary;
             overflow: auto;
@@ -196,6 +196,11 @@ class TableScreen(ModalScreen):
         # Show statistics screen
         self.dftable.do_show_statistics(cidx)
 
+    def _on_calc_ready(self) -> None:
+        self.build_table()
+        self.table.loading = False
+        self.table.focus()
+
 
 class RowDetailScreen(TableScreen):
     """Modal screen to display a single row's details."""
@@ -306,14 +311,11 @@ class StatisticsScreen(TableScreen):
 
     @work(thread=True)
     def calculate_statistics(self) -> None:
-        """Calculate statistics in a background thread."""
+        """Calculate statistics."""
+        # Wait for the dataframe to be fully loaded
+        self.dftable.wait_for_df_done()
         self.df = self.build_df()
-        self.app.call_from_thread(self._on_calculation_ready)
-
-    def _on_calculation_ready(self) -> None:
-        self.build_table()
-        self.table.loading = False
-        self.table.focus()
+        self.app.call_from_thread(self._on_calc_ready)
 
     def build_table(self) -> None:
         """Build the statistics table."""
@@ -443,18 +445,16 @@ class FrequencyScreen(TableScreen):
     def on_mount(self) -> None:
         """Start frequency calculation."""
         self.table.loading = True
-        self.calculate_frequency()
+        self._calculate_frequency()
 
     @work(thread=True)
-    def calculate_frequency(self) -> None:
+    def _calculate_frequency(self) -> None:
+        """Calculate frequency."""
+        # Wait for the dataframe to be fully loaded
+        self.dftable.wait_for_df_done()
         col = self.dftable.df.columns[self.cidx]
         self.df = self.dftable.df.lazy().select(pl.col(col).value_counts(sort=True)).unnest(col).collect()
-        self.app.call_from_thread(self._on_calculation_ready)
-
-    def _on_calculation_ready(self) -> None:
-        self.build_table()
-        self.table.loading = False
-        self.table.focus()
+        self.app.call_from_thread(self._on_calc_ready)
 
     def on_key(self, event):
         if event.key == "left_square_bracket":  # '['
@@ -604,7 +604,15 @@ class MetaShape(TableScreen):
         Populates the table with metadata information about the dataframe,
         including row and column counts.
         """
-        self.build_table()
+        self.table.loading = True
+        self._calc_metashape()
+
+    @work(thread=True)
+    def _calc_metashape(self) -> None:
+        """Calculate metadata shape."""
+        # Wait for the dataframe to be fully loaded
+        self.dftable.wait_for_df_done()
+        self.app.call_from_thread(self._on_calc_ready)
 
     def build_table(self) -> None:
         """Build the metadata table."""

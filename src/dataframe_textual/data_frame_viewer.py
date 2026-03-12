@@ -140,7 +140,7 @@ class DataFrameViewer(App):
         with self.tabbed:
             seen_names = set()
             for idx, source in enumerate(self.sources, start=1):
-                df, filename, tabname = source.frame, source.filename, source.tabname
+                df, filename, tabname = source.lf, source.filename, source.tabname
                 tab_id = f"tab-{idx}"
 
                 if not tabname:
@@ -477,7 +477,7 @@ class DataFrameViewer(App):
             try:
                 n_tab = 0
                 for source in load_file(filename, prefix_sheet=True):
-                    self.add_tab(source.frame, filename, source.tabname, after=self.tabbed.active_pane)
+                    self.add_tab(source.lf, filename, source.tabname, after=self.tabbed.active_pane)
                     n_tab += 1
                 # self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open File")
             except Exception as e:

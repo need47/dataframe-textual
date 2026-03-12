@@ -8,6 +8,7 @@ from functools import partial
 from itertools import zip_longest
 from pathlib import Path
 from textwrap import dedent
+from time import sleep
 from typing import Any
 
 import polars as pl
@@ -122,7 +123,7 @@ def add_rid_column(df: pl.DataFrame, offset: int = 0) -> pl.DataFrame:
     Returns:
         The modified DataFrame with the internal row index column added.
     """
-    if RID not in df.columns:
+    if df is not None and RID not in df.columns:
         df = df.lazy().with_row_index(RID, offset=offset).select(pl.exclude(RID), RID).collect()
     return df
 
@@ -383,9 +384,10 @@ class DataFrameTable(DataTable):
         super().__init__(**kwargs)
 
         # DataFrame state
-        self.lf = lf  # Original LazyFrame for reference and reloading
+        self.lf = lf  # Original LazyFrame for reference
         self.dataframe = None  # Original dataframe
         self.df = None  # Internal/working dataframe
+        self.df_done = False  # Whether the entire dataframe has been loaded
         self.filename = filename or "untitled.csv"  # Current filename
         self.tabname = tabname or Path(filename).stem  # Tab name
 
@@ -421,8 +423,15 @@ class DataFrameTable(DataTable):
         # Whether to show internal row index column
         self.show_rid = False
 
-    def init_table(self):
+    def init_table(self) -> None:
+        """Initial load of the dataframe and setup of the table display.
+
+        Loads the dataframe in batches if it's large, sets up the initial table display,
+        and then continues loading the rest of the dataframe in the background.
+        """
+
         batch_gen = self.lf.collect_batches()
+
         try:
             self.dataframe = add_rid_column(next(batch_gen))
             self.df = self.dataframe
@@ -431,12 +440,14 @@ class DataFrameTable(DataTable):
             # Populate the table with the initial batch of data
             self.setup_table()
         except StopIteration:
-            self.app.exit(-1)
+            self.log("The provided LazyFrame has no data to load")
+            self.app.exit(1)
 
+        # Continue loading the rest of the dataframe in the background
         self.load_remaining_batches(batch_gen)
 
     @work(thread=True)
-    def load_remaining_batches(self, batch_gen):
+    def load_remaining_batches(self, batch_gen) -> None:
         """Background load the rest of the dataframe in batches."""
 
         batches, offset = [], len(self.df)
@@ -450,6 +461,14 @@ class DataFrameTable(DataTable):
 
             if self.loaded_rows < self.BATCH_SIZE:
                 self.load_rows_range(self.loaded_rows, self.BATCH_SIZE)
+
+        # fully loaded the dataframe
+        self.df_done = True
+
+    def wait_for_df_done(self) -> None:
+        """Wait for the dataframe to be fully loaded."""
+        while not self.df_done:
+            sleep(0.1)
 
     @property
     def cursor_key(self) -> CellKey:
@@ -1586,6 +1605,9 @@ class DataFrameTable(DataTable):
 
     def do_go_bottom(self) -> None:
         """Go to the bottom of the table."""
+        # Wait for the dataframe to be fully loaded
+        self.wait_for_df_done()
+
         stop = len(self.df)
         start = max(0, stop - self.BATCH_SIZE)
 
@@ -1610,6 +1632,9 @@ class DataFrameTable(DataTable):
         """
         if result is None:
             return  # User cancelled the prompt
+
+        # Wait for the dataframe to be fully loaded
+        self.wait_for_df_done()
 
         ridx = result - 1  # Convert to 0-based index in the dataframe
         self.move_cursor_to(ridx, 0)
