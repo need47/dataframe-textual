@@ -7,7 +7,7 @@ from pathlib import Path
 from textual.theme import BUILTIN_THEMES
 
 from . import __version__
-from .common import load_dataframe
+from .common import handle_compute_error, load_dataframe
 from .data_frame_viewer import DataFrameViewer
 
 
@@ -215,7 +215,7 @@ def main() -> None:
 
     # Run the DataFrame Viewer application
     app = DataFrameViewer(*sources, theme=args.theme)
-    app.run()
+    handle_compute_error(app.run())
 
 
 if __name__ == "__main__":

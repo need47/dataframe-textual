@@ -486,12 +486,7 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
 RE_COMPUTE_ERROR = re.compile(r"at column '(.*?)' \(column number \d+\)")
 
 
-def handle_compute_error(
-    err_msg: str,
-    file_format: str | None,
-    infer_schema: bool,
-    schema_overrides: dict[str, pl.DataType] | None = None,
-) -> tuple[bool, dict[str, pl.DataType] | None]:
+def handle_compute_error(err_msg: str) -> None:
     """Handle ComputeError during schema inference and determine retry strategy.
 
     Analyzes the error message and determines whether to retry with schema overrides,
@@ -509,44 +504,50 @@ def handle_compute_error(
     Raises:
         SystemExit: If the error is unrecoverable.
     """
+    if not err_msg:
+        return
+
     # Already disabled schema inference, cannot recover
-    if not infer_schema:
-        print(f"Error loading even with schema inference disabled:\n{err_msg}", file=sys.stderr)
-
-        if "CSV malformed" in err_msg:
-            print(
-                "\nSometimes quote characters might be mismatched. Try again with `-Q` or `-E` to ignore errors",
-                file=sys.stderr,
-            )
-
+    if "CSV malformed" in err_msg:
+        print(
+            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nSometimes quote characters might be mismatched. Try again with `-Q` to disable quoting",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Schema mismatch error
-    if "found more fields than defined in 'Schema'" in err_msg:
-        print(f"{err_msg}.\n\nInput might be malformed. Try again with `-T` to truncate ragged lines", file=sys.stderr)
+    elif "found more fields than defined in 'Schema'" in err_msg:
+        print(
+            f"{'-' * 21}\n{err_msg}.\n{'-' * 21}\nInput might be malformed. Try again with `-T` to truncate ragged lines",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Field ... is not properly escaped
-    if "is not properly escaped" in err_msg:
+    elif "is not properly escaped" in err_msg:
         print(
-            f"{err_msg}\n\nQuoting might be causing the issue. Try again with `-Q` to disable quoting", file=sys.stderr
+            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nQuoting might be causing the issue. Try again with `-Q` to use a different quote character or disable quoting",
+            file=sys.stderr,
         )
         sys.exit(1)
 
     # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
-    if file_format in ("tsv", "csv") and (m := RE_COMPUTE_ERROR.search(err_msg)):
+    elif m := RE_COMPUTE_ERROR.search(err_msg):
         col_name = m.group(1)
+        print(
+            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nColumn '{col_name}' has mixed types. Try again with `-I` to disable type inference",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
-        if schema_overrides is None:
-            schema_overrides = {}
-        schema_overrides.update({col_name: pl.String})
     else:
-        infer_schema = False
+        print(
+            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nUnhandled error. Try again with `-E` to ignore errors", file=sys.stderr
+        )
+        sys.exit(1)
 
-    return infer_schema, schema_overrides
 
-
-def get_columms(all_columns: list[str], use_columns: list[str] | None) -> list[str]:
+def get_columns(all_columns: list[str], use_columns: list[str] | None) -> list[str]:
     """Get the list of columns to read based on use_columns specification.
 
     Determines which columns to read from the input based on the use_columns parameter,
@@ -895,46 +896,18 @@ def load_file(
 
             if use_columns:
                 try:
-                    ok_columns = get_columms(all_columns, use_columns)
+                    ok_columns = get_columns(all_columns, use_columns)
                 except ValueError as ve:
                     print(ve, file=sys.stderr)
                     sys.exit(1)
+
                 ds.append(Source(src.lf.select(ok_columns), src.filename, src.tabname))
             else:
                 ds.append(Source(src.lf, src.filename, src.tabname))
 
         data = ds
-    except pl.exceptions.NoDataError:
-        print(
-            "Warning: No data from stdin."
-            if isinstance(source, StringIO)
-            else f"Warning: No data found in file `{filename}`.",
-            file=sys.stderr,
-        )
-        sys.exit()
-    except pl.exceptions.ComputeError as ce:
-        # Handle the error and determine retry strategy
-        infer_schema, schema_overrides = handle_compute_error(str(ce), fmt, infer_schema, schema_overrides)
-
-        # Retry loading with updated schema overrides
-        if isinstance(source, StringIO):
-            source.seek(0)
-
-        return load_file(
-            source,
-            delimiter=delimiter,
-            header=header,
-            infer_schema=infer_schema,
-            comment_prefix=comment_prefix,
-            quote_char=quote_char,
-            skip_lines=skip_lines,
-            skip_rows_after_header=skip_rows_after_header,
-            schema_overrides=schema_overrides,
-            null_values=null_values,
-            ignore_errors=ignore_errors,
-            truncate_ragged_lines=truncate_ragged_lines,
-            n_rows=n_rows,
-            use_columns=use_columns,
-        )
+    except Exception as e:
+        print(f"Error loading file `{filename}`: {str(e)}", file=sys.stderr)
+        sys.exit(1)
 
     return data

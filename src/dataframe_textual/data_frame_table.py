@@ -429,19 +429,21 @@ class DataFrameTable(DataTable):
         Loads the dataframe in batches if it's large, sets up the initial table display,
         and then continues loading the rest of the dataframe in the background.
         """
-
         batch_gen = self.lf.collect_batches()
 
         try:
             self.dataframe = add_rid_column(next(batch_gen))
             self.df = self.dataframe
-            # self.notify(f"loaded {len(self.df)} rows in initial batch")
-
-            # Populate the table with the initial batch of data
-            self.setup_table()
+            # self.log(f"loaded {len(self.df)} rows in initial batch")
+        except pl.exceptions.ComputeError as e:
+            self.log(f"Error loading initial batch: {e}")
+            return self.app.exit(return_code=1, result=str(e))
         except StopIteration:
             self.log("The provided LazyFrame has no data to load")
-            self.app.exit(1)
+            return self.app.exit(return_code=1, result="The provided LazyFrame has no data to load")
+
+        # Populate the table with the initial batch of data
+        self.setup_table()
 
         # Continue loading the rest of the dataframe in the background
         self.load_remaining_batches(batch_gen)
@@ -449,11 +451,15 @@ class DataFrameTable(DataTable):
     @work(thread=True)
     def load_remaining_batches(self, batch_gen) -> None:
         """Background load the rest of the dataframe in batches."""
-
         batches, offset = [], len(self.df)
-        for batch in batch_gen:
-            batches.append(add_rid_column(batch, offset=offset))
-            offset += len(batch)
+
+        try:
+            for batch in batch_gen:
+                batches.append(add_rid_column(batch, offset=offset))
+                offset += len(batch)
+        except pl.exceptions.ComputeError as e:
+            self.log(f"Error loading remaining batch: {e}")
+            return self.app.exit(return_code=1, result=str(e))
 
         if batches:
             self.dataframe = pl.concat([self.df] + batches, rechunk=True)
