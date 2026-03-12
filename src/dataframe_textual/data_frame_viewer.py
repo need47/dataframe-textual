@@ -489,20 +489,20 @@ class DataFrameViewer(App):
 
     def add_tab(
         self,
-        df: pl.DataFrame,
+        lf: pl.LazyFrame,
         filename: str,
         tabname: str,
         before: TabPane | str | None = None,
         after: TabPane | str | None = None,
     ) -> None:
-        """Add new tab for the given DataFrame.
+        """Add new tab for the given LazyFrame.
 
-        Creates and adds a new tab with the provided DataFrame and configuration.
+        Creates and adds a new tab with the provided LazyFrame and configuration.
         Ensures unique tab names by appending an index if needed. Shows the tab bar
         if this is no longer the only tab.
 
         Args:
-            df: The Polars DataFrame to display in the new tab.
+            lf: The LazyFrame to add in the new tab.
             filename: The source filename for this data (used in table metadata).
             tabname: The display name for the tab.
             before: Optional; If specified, insert the new tab before this tab.
@@ -520,7 +520,7 @@ class DataFrameViewer(App):
             tab_idx = pending_tab_idx
             break
 
-        table = DataFrameTable(df, filename, tabname=tabname, zebra_stripes=True, id=tab_idx)
+        table = DataFrameTable(lf, filename, tabname=tabname, zebra_stripes=True, id=tab_idx)
         tab = TabPane(tabname, table, id=tab_idx)
         self.tabbed.add_pane(tab, before=before, after=after)
 

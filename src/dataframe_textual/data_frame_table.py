@@ -3704,9 +3704,15 @@ class DataFrameTable(DataTable):
 
         # Apply filter to dataframe with row indices
         df_filtered = self.df.lazy().filter(filter_expr).collect()
+        if len(df_filtered) == len(self.df):
+            self.notify("Filter does not reduce any rows. No new tab created.", title="Filter Rows", severity="warning")
+            return
+        elif len(df_filtered) == 0:
+            self.notify("Filter results in zero rows. No new tab created.", title="Filter Rows", severity="warning")
+            return
 
         self.app.add_tab(
-            df_filtered,
+            df_filtered.lazy(),
             filename="filtered_results.csv",
             tabname="filtered-results",
             after=self.app.tabbed.active_pane,
@@ -4008,9 +4014,8 @@ class DataFrameTable(DataTable):
 
         # Execute the SQL query
         try:
-            df_filtered = self.df.sql(sql)
-
-            if not len(df_filtered):
+            df_filtered = self.df.lazy().sql(sql).collect()
+            if len(df_filtered) == 0:
                 self.notify(
                     f"SQL query returned no results for [$warning]{sql}[/]", title="SQL Query", severity="warning"
                 )
@@ -4024,7 +4029,7 @@ class DataFrameTable(DataTable):
         # Show results in new tab if requested
         if new_tab:
             return self.app.add_tab(
-                df_filtered,
+                df_filtered.lazy(),
                 filename="query_results.csv",
                 tabname="query-results",
                 after=self.app.tabbed.active_pane,
