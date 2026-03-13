@@ -23,6 +23,7 @@ class LoadingScreen(ModalScreen):
         #loading-indicator {
             width: 17;
             height: 3;
+            background: $surface;
         }
     """
 
