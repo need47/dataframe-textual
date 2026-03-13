@@ -140,11 +140,11 @@ class TableScreen(ModalScreen):
 
         # Action filter
         if action == "filter":
-            self.dftable.do_filter_rows(cidx, col_value)
+            self.dftable.action_filter_rows(cidx, col_value)
 
         # Action view
         else:
-            self.dftable.view_rows(
+            self.dftable.action_view_rows(
                 {
                     "term": expr,
                     "cidx": cidx,
@@ -176,7 +176,7 @@ class TableScreen(ModalScreen):
         # self.app.pop_screen()
 
         # Show frequency screen
-        self.dftable.do_show_frequency(cidx)
+        self.dftable.action_show_frequency(cidx)
 
     def show_statistics(self, cidx_name_value: tuple[int, str, Any] | None) -> None:
         """Show frequency by the selected value.
@@ -194,7 +194,7 @@ class TableScreen(ModalScreen):
         # self.app.pop_screen()
 
         # Show statistics screen
-        self.dftable.do_show_statistics(cidx)
+        self.dftable.action_show_statistics(cidx)
 
     def _on_calc_ready(self) -> None:
         self.build_table()

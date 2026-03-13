@@ -314,7 +314,7 @@ class DataFrameTable(DataTable):
         # View & Filter
         ("v", "view_rows", "View selected rows"),
         ("V", "view_rows_expr", "View selected rows matching expression"),
-        ("full_stop", "view_rows('non_null')", "View rows with non-null values in current column"),
+        ("full_stop", "view_rows_non_null", "View rows with non-null values in current column"),
         ("quotation_mark", "filter_rows", "Filter selected rows"),  # `"`
         # Row Selection
         ("backslash", "select_rows", "Select rows with cell matches or those matching cursor value in current column"),  # `\`
@@ -818,7 +818,6 @@ class DataFrameTable(DataTable):
         self.load_rows_down()
 
     # Action handlers for BINDINGS
-    @wait_full_df
     def action_go_top(self) -> None:
         """Go to the top of the table."""
         self.do_go_top()
@@ -833,7 +832,6 @@ class DataFrameTable(DataTable):
         """Go to a specific row number."""
         self.do_go_to_row()
 
-    @wait_full_df
     def action_page_up(self) -> None:
         """Move the cursor one page up."""
         self.do_page_up()
@@ -865,7 +863,6 @@ class DataFrameTable(DataTable):
         """Load more rows below the current view."""
         self.load_rows_down()
 
-    @wait_full_df
     def action_view_row_detail(self) -> None:
         """View details of the current row."""
         self.do_view_row_detail()
@@ -875,17 +872,14 @@ class DataFrameTable(DataTable):
         """Delete the current column."""
         self.do_delete_column()
 
-    @wait_full_df
     def action_hide_column(self) -> None:
         """Hide the current column."""
         self.do_hide_column()
 
-    @wait_full_df
     def action_expand_column(self) -> None:
         """Expand the current column to its full width."""
         self.do_expand_column()
 
-    @wait_full_df
     def action_toggle_rid(self) -> None:
         """Toggle the internal row index column visibility."""
         self.do_toggle_rid()
@@ -895,7 +889,6 @@ class DataFrameTable(DataTable):
         """Set cursor row as the new header row."""
         self.do_set_cursor_row_as_header()
 
-    @wait_full_df
     def action_show_hidden_columns(self) -> None:
         """Show all hidden columns."""
         self.do_show_hidden_columns()
@@ -911,9 +904,9 @@ class DataFrameTable(DataTable):
         self.do_sort_by_column(descending=True)
 
     @wait_full_df
-    def action_show_frequency(self) -> None:
+    def action_show_frequency(self, cidx: int | None = None) -> None:
         """Show frequency distribution for the current column."""
-        self.do_show_frequency()
+        self.do_show_frequency(cidx)
 
     @wait_full_df
     def action_show_statistics(self, cidx: int | None = None) -> None:
@@ -932,15 +925,19 @@ class DataFrameTable(DataTable):
         """Show metadata about the dataframe (row and column counts)."""
         self.do_metadata_shape()
 
-    @wait_full_df
     def action_metadata_column(self) -> None:
         """Show metadata for the current column."""
         self.do_metadata_column()
 
     @wait_full_df
-    def action_view_rows(self, kind: str = None) -> None:
-        """View rows by current cell value."""
-        self.do_view_rows(kind=kind)
+    def action_view_rows(self, result: dict | None = None) -> None:
+        """View rows."""
+        self.do_view_rows(result)
+
+    @wait_full_df
+    def action_view_rows_non_null(self) -> None:
+        """View rows with non-null values in the current column."""
+        self.do_view_rows_non_null()
 
     @wait_full_df
     def action_view_rows_expr(self) -> None:
@@ -1023,9 +1020,9 @@ class DataFrameTable(DataTable):
         self.do_toggle_selections()
 
     @wait_full_df
-    def action_filter_rows(self) -> None:
+    def action_filter_rows(self, cidx: int = None, term: Any = None) -> None:
         """Filter to show only selected rows."""
-        self.do_filter_rows()
+        self.do_filter_rows(cidx=cidx, term=term)
 
     @wait_full_df
     def action_delete_row(self) -> None:
@@ -1092,17 +1089,14 @@ class DataFrameTable(DataTable):
         """Clear all row selections and matches."""
         self.do_clear_selections_and_matches()
 
-    @wait_full_df
     def action_cycle_cursor_type(self) -> None:
         """Cycle through cursor types."""
         self.do_cycle_cursor_type()
 
-    @wait_full_df
     def action_toggle_freeze_row_column(self) -> None:
         """Toggle the freeze."""
         self.do_toggle_freeze_row_column()
 
-    @wait_full_df
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility."""
         self.show_row_labels = not self.show_row_labels
@@ -1114,7 +1108,6 @@ class DataFrameTable(DataTable):
         """Cast the current column to a different data type."""
         self.do_cast_column_dtype(dtype)
 
-    @wait_full_df
     def action_copy_cell(self) -> None:
         """Copy the current cell to clipboard."""
         ridx = self.cursor_ridx
@@ -1153,7 +1146,6 @@ class DataFrameTable(DataTable):
                 timeout=10,
             )
 
-    @wait_full_df
     def action_copy_row(self) -> None:
         """Copy the current row to clipboard (values separated by tabs)."""
         ridx = self.cursor_ridx
@@ -1869,8 +1861,7 @@ class DataFrameTable(DataTable):
         # Push the modal screen
         self.app.push_screen(RowDetailScreen(ridx, self))
 
-    @wait_full_df
-    def do_show_frequency(self, cidx=None) -> None:
+    def do_show_frequency(self, cidx: int | None = None) -> None:
         """Show frequency distribution for a given columnn."""
         cidx = self.cursor_cidx if cidx is None else cidx
 
@@ -3627,27 +3618,42 @@ class DataFrameTable(DataTable):
         self.show_next_replace_confirmation()
 
     # View & Filter
-    def do_view_rows(self, kind: str = None) -> None:
+    def do_view_rows(self, result: dict | None = None) -> None:
         """View rows.
 
-        If kind is "non_null", view rows where the cursor column is not null.
         If there are selected rows, view those, Otherwise, view based on the cursor value.
         """
-
         cidx = self.cursor_cidx
         col_name = self.cursor_col_name
 
-        # Non-null case
-        if kind == "non_null":
-            term = pl.col(col_name).is_not_null()
-        # If there are selected rows, use those
-        elif self.selected_rows:
-            term = pl.col(RID).is_in(self.selected_rows)
-        # Otherwise, use the current cell value
+        if result:
+            self.view_rows(result)
         else:
-            ridx = self.cursor_ridx
-            value = self.df.item(ridx, cidx)
-            term = pl.col(col_name).is_null() if value is None else pl.col(col_name) == value
+            # If there are selected rows, use those
+            if self.selected_rows:
+                term = pl.col(RID).is_in(self.selected_rows)
+            # Otherwise, use the current cell value
+            else:
+                ridx = self.cursor_ridx
+                value = self.df.item(ridx, cidx)
+                term = pl.col(col_name).is_null() if value is None else pl.col(col_name) == value
+
+            self.view_rows(
+                {
+                    "term": term,
+                    "cidx": cidx,
+                    "match_nocase": False,
+                    "match_whole": True,
+                    "match_literal": True,
+                    "match_reverse": False,
+                }
+            )
+
+    def do_view_rows_non_null(self) -> None:
+        """View non-null rows."""
+        cidx = self.cursor_cidx
+        col_name = self.cursor_col_name
+        term = pl.col(col_name).is_not_null()
 
         self.view_rows(
             {
@@ -3680,12 +3686,12 @@ class DataFrameTable(DataTable):
         """
         if result is None:
             return
-        term = result.get("term")
+        term = result.get("term", NULL)
         cidx = result.get("cidx", self.cursor_cidx)
-        match_nocase = result.get("match_nocase")
-        match_whole = result.get("match_whole")
-        match_literal = result.get("match_literal")
-        match_reverse = result.get("match_reverse")
+        match_nocase = result.get("match_nocase", False)
+        match_whole = result.get("match_whole", False)
+        match_literal = result.get("match_literal", False)
+        match_reverse = result.get("match_reverse", False)
 
         col_name = self.df.columns[cidx]
         dtype = self.df.dtypes[cidx]
@@ -3784,7 +3790,7 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Showing [$success]{matched_count}[/] matching row(s)", title="View Rows")
 
-    def do_filter_rows(self, cidx: int = None, term: Any = None) -> None:
+    def do_filter_rows(self, cidx: int | None = None, term: Any = None) -> None:
         """Filter rows.
 
         If there are selected rows, use those.
