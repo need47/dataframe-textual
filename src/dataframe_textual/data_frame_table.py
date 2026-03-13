@@ -786,7 +786,10 @@ class DataFrameTable(DataTable):
         Args:
             event: The key event object.
         """
-        pass
+        if event.key == "up":
+            self.load_rows_up()
+        elif event.key == "down":
+            self.load_rows_down()
 
     def on_click(self, event: Click) -> None:
         """Handle mouse click events on the table.
@@ -822,6 +825,7 @@ class DataFrameTable(DataTable):
         """Go to the top of the table."""
         self.do_go_top()
 
+    @wait_full_df
     def action_go_bottom(self) -> None:
         """Go to the bottom of the table."""
         self.do_go_bottom()
@@ -839,26 +843,6 @@ class DataFrameTable(DataTable):
         """Move the cursor one page down."""
         self.do_page_down()
         super().action_page_down()
-
-    def action_cursor_up(self) -> None:
-        """Move cursor up and load more rows if needed."""
-        self.load_rows_up()
-        super().action_cursor_up()
-
-    def action_cursor_down(self) -> None:
-        """Move cursor down and load more rows if needed."""
-        self.load_rows_down()
-        super().action_cursor_down()
-
-    @wait_full_df
-    def action_load_rows_up(self) -> None:
-        """Load more rows above the current view."""
-        self.load_rows_up()
-
-    @wait_full_df
-    def action_load_rows_down(self) -> None:
-        """Load more rows below the current view."""
-        self.load_rows_down()
 
     def action_view_row_detail(self) -> None:
         """View details of the current row."""
