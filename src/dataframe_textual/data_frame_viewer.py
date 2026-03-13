@@ -61,7 +61,7 @@ class DataFrameViewer(App):
     """).strip()
 
     BINDINGS = [
-        ("q", "close", "Close current tab or view"),
+        ("q,escape", "close", "Close current tab or view"),
         ("Q", "close_all", "Close all tabs and quit"),
         ("B", "toggle_tab_bar", "Toggle Tab Bar"),
         ("f1", "toggle_help_panel", "Help"),

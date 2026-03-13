@@ -157,13 +157,13 @@ class FilePickerScreen(ModalScreen):
             event: The key event instance.
         """
         if event.key == "escape":
-            self.dismiss()
+            self.app.pop_screen()
             event.stop()
         # allow `q` to quit if the focus is not on an input
         elif event.key == "q":
             inputs = self.query(Input)
             if self.app.focused not in inputs:
-                self.dismiss()
+                self.app.pop_screen()
                 event.stop()
         elif event.key == "enter":
             dirname_input = self.query_one("#dirname", Input)
