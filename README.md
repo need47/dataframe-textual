@@ -48,7 +48,7 @@ dv <file>
 
 ```bash
 # Install as a tool
-uv install dataframe-textual
+uv tool install dataframe-textual
 
 # Quick run using uvx without installation
 uvx https://github.com/need47/dataframe-textual.git <csvfile>

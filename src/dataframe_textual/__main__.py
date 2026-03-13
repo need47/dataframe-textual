@@ -52,7 +52,7 @@ def cli() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Examples:\n"
         "  %(prog)s data.csv\n"
-        "  %(prog)s file1.csv file2.csv file3.csv\n"
+        "  %(prog)s file1.csv.gz file2.tsv file3.csv\n"
         "  %(prog)s data.xlsx (opens each sheet in separate tab)\n"
         "  cat data.txt | %(prog)s -d ';'\n",
     )
@@ -82,7 +82,7 @@ def cli() -> argparse.Namespace:
         nargs="*",
         action=ConstWithMultiArgs,
         const=False,
-        help="Specify header info. when reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column names (e.g., `-H col1 col2 col3`).",
+        help="Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column names (e.g., `-H col1 col2 col3`).",
     )
     parser.add_argument(
         "-I", "--no-inference", action="store_true", help="Do not infer data types when reading CSV/TSV"
