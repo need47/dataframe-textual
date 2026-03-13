@@ -321,7 +321,7 @@ class DataFrameTable(DataTable):
         ("vertical_line", "select_rows_expr", "Select rows with expression"),  # `|`
         ("right_curly_bracket", "next_selected_row", "Go to next selected row"),  # `}`
         ("left_curly_bracket", "previous_selected_row", "Go to previous selected row"),  # `{`
-        ("apostrophe", "toggle_row_selection", "Toggle row selection"),  # `'`
+        ("apostrophe", "toggle_selection_current_row", "Toggle row selection"),  # `'`
         ("t", "toggle_selections", "Toggle all row selections"),
         ("T", "clear_selections_and_matches", "Clear selections"),
         # Find & Replace
@@ -822,7 +822,6 @@ class DataFrameTable(DataTable):
         """Go to the top of the table."""
         self.do_go_top()
 
-    @wait_full_df
     def action_go_bottom(self) -> None:
         """Go to the bottom of the table."""
         self.do_go_bottom()
@@ -1008,10 +1007,9 @@ class DataFrameTable(DataTable):
         """Replace values in current column or globally across all columns."""
         self.do_replace(scope=scope)
 
-    @wait_full_df
-    def action_toggle_row_selection(self) -> None:
+    def action_toggle_selection_current_row(self) -> None:
         """Toggle selection for the current row."""
-        self.do_toggle_row_selection()
+        self.do_toggle_selection_current_row()
 
     @wait_full_df
     def action_toggle_selections(self) -> None:
@@ -1083,7 +1081,6 @@ class DataFrameTable(DataTable):
         """Move the current row down."""
         self.do_move_row("down")
 
-    @wait_full_df
     def action_clear_selections_and_matches(self) -> None:
         """Clear all row selections and matches."""
         self.do_clear_selections_and_matches()
@@ -3987,7 +3984,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-    def do_toggle_row_selection(self) -> None:
+    def do_toggle_selection_current_row(self) -> None:
         """Select/deselect current row."""
         # Add to history
         self.add_history("Toggled row selection")
