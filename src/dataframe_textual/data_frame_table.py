@@ -8,7 +8,6 @@ from functools import partial
 from itertools import zip_longest
 from pathlib import Path
 from textwrap import dedent
-from time import sleep
 from typing import Any
 
 import polars as pl
@@ -46,6 +45,7 @@ from .common import (
     tentative_expr,
     validate_expr,
 )
+from .loading_screen import LoadingScreen
 from .table_screen import FrequencyScreen, MetaColumnScreen, MetaShape, RowDetailScreen, StatisticsScreen
 from .yes_no_screen import (
     AddColumnScreen,
@@ -281,8 +281,8 @@ class DataFrameTable(DataTable):
         ("g", "go_top", "Go to first row"),
         ("G", "go_bottom", "Go to last row"),
         ("ctrl+g", "go_to_row", "Go to row"),
-        ("pageup,ctrl+b", "page_up", "Page up"),
-        ("pagedown,ctrl+f", "page_down", "Page down"),
+        ("ctrl+b", "page_up", "Page up"),
+        ("ctrl+f", "page_down", "Page down"),
         # Undo/Redo/Reset
         ("u", "undo", "Undo"),
         ("U", "redo", "Redo"),
@@ -471,10 +471,32 @@ class DataFrameTable(DataTable):
         # fully loaded the dataframe
         self.df_done = True
 
-    def wait_for_df_done(self) -> None:
-        """Wait for the dataframe to be fully loaded."""
-        while not self.df_done:
-            sleep(0.1)
+    def check_data_ready(self, callback: callable = None) -> bool:
+        """Check if the dataframe is fully loaded.
+
+        If not loaded, show LoadingScreen and execute callback when done.
+
+        Returns:
+            bool: True if already ready, False if loading screen was shown.
+        """
+        if not self.df_done:
+            self.app.push_screen(LoadingScreen(self, callback=callback))
+            return False
+        return True
+
+    def wait_full_df(func):
+        """Decorator to ensure the dataframe is fully loaded before executing a method.
+
+        If the dataframe is not loaded, show a loading indicator and schedule the
+        method to be called once loading is complete.
+        """
+
+        def wrapper(self, *args, **kwargs):
+            callback = partial(func, self, *args, **kwargs)
+            if self.check_data_ready(callback):
+                return func(self, *args, **kwargs)
+
+        return wrapper
 
     @property
     def cursor_key(self) -> CellKey:
@@ -759,17 +781,12 @@ class DataFrameTable(DataTable):
         pass
 
     def on_key(self, event) -> None:
-        """Handle key press events for pagination.
+        """Handle key press events.
 
         Args:
             event: The key event object.
         """
-        if event.key == "up":
-            # Let the table handle the navigation first
-            self.load_rows_up()
-        elif event.key == "down":
-            # Let the table handle the navigation first
-            self.load_rows_down()
+        pass
 
     def on_click(self, event: Click) -> None:
         """Handle mouse click events on the table.
@@ -792,67 +809,115 @@ class DataFrameTable(DataTable):
             else:
                 self.do_edit_cell()
 
+    def on_mouse_scroll_up(self, event) -> None:
+        """Load more rows when scrolling up with mouse."""
+        self.load_rows_up()
+
+    def on_mouse_scroll_down(self, event) -> None:
+        """Load more rows when scrolling down with mouse."""
+        self.load_rows_down()
+
     # Action handlers for BINDINGS
+    @wait_full_df
     def action_go_top(self) -> None:
         """Go to the top of the table."""
         self.do_go_top()
 
+    @wait_full_df
     def action_go_bottom(self) -> None:
         """Go to the bottom of the table."""
         self.do_go_bottom()
 
+    @wait_full_df
     def action_go_to_row(self) -> None:
         """Go to a specific row number."""
         self.do_go_to_row()
 
+    @wait_full_df
     def action_page_up(self) -> None:
         """Move the cursor one page up."""
         self.do_page_up()
+        super().action_page_up()
 
+    @wait_full_df
     def action_page_down(self) -> None:
         """Move the cursor one page down."""
         self.do_page_down()
+        super().action_page_down()
 
+    @wait_full_df
+    def action_cursor_up(self) -> None:
+        """Move cursor up and load more rows if needed."""
+        self.load_rows_up()
+        super().action_cursor_up()
+
+    @wait_full_df
+    def action_cursor_down(self) -> None:
+        """Move cursor down and load more rows if needed."""
+        self.load_rows_down()
+        super().action_cursor_down()
+
+    @wait_full_df
+    def action_load_rows_up(self) -> None:
+        """Load more rows above the current view."""
+        self.load_rows_up()
+
+    @wait_full_df
+    def action_load_rows_down(self) -> None:
+        """Load more rows below the current view."""
+        self.load_rows_down()
+
+    @wait_full_df
     def action_view_row_detail(self) -> None:
         """View details of the current row."""
         self.do_view_row_detail()
 
+    @wait_full_df
     def action_delete_column(self) -> None:
         """Delete the current column."""
         self.do_delete_column()
 
+    @wait_full_df
     def action_hide_column(self) -> None:
         """Hide the current column."""
         self.do_hide_column()
 
+    @wait_full_df
     def action_expand_column(self) -> None:
         """Expand the current column to its full width."""
         self.do_expand_column()
 
+    @wait_full_df
     def action_toggle_rid(self) -> None:
         """Toggle the internal row index column visibility."""
         self.do_toggle_rid()
 
+    @wait_full_df
     def action_set_cursor_row_as_header(self) -> None:
         """Set cursor row as the new header row."""
         self.do_set_cursor_row_as_header()
 
+    @wait_full_df
     def action_show_hidden_columns(self) -> None:
         """Show all hidden columns."""
         self.do_show_hidden_columns()
 
+    @wait_full_df
     def action_sort_ascending(self) -> None:
         """Sort by current column in ascending order."""
         self.do_sort_by_column(descending=False)
 
+    @wait_full_df
     def action_sort_descending(self) -> None:
         """Sort by current column in descending order."""
         self.do_sort_by_column(descending=True)
 
+    @wait_full_df
     def action_show_frequency(self) -> None:
         """Show frequency distribution for the current column."""
         self.do_show_frequency()
 
+    @wait_full_df
     def action_show_statistics(self, cidx: int | None = None) -> None:
         """Show statistics for the current column or entire dataframe.
 
@@ -864,156 +929,194 @@ class DataFrameTable(DataTable):
         """
         self.do_show_statistics(cidx)
 
+    @wait_full_df
     def action_metadata_shape(self) -> None:
         """Show metadata about the dataframe (row and column counts)."""
         self.do_metadata_shape()
 
+    @wait_full_df
     def action_metadata_column(self) -> None:
         """Show metadata for the current column."""
         self.do_metadata_column()
 
+    @wait_full_df
     def action_view_rows(self, kind: str = None) -> None:
         """View rows by current cell value."""
         self.do_view_rows(kind=kind)
 
+    @wait_full_df
     def action_view_rows_expr(self) -> None:
         """Open the advanced filter screen."""
         self.do_view_rows_expr()
 
+    @wait_full_df
     def action_edit_cell(self) -> None:
         """Edit the current cell."""
         self.do_edit_cell()
 
+    @wait_full_df
     def action_edit_column(self) -> None:
         """Edit the entire current column with an expression."""
         self.do_edit_column()
 
+    @wait_full_df
     def action_add_column(self) -> None:
         """Add an empty column after the current column."""
         self.do_add_column()
 
+    @wait_full_df
     def action_add_column_expr(self) -> None:
         """Add a new column with optional expression after the current column."""
         self.do_add_column_expr()
 
+    @wait_full_df
     def action_add_link_column(self) -> None:
         """Open AddLinkScreen to create a new link column from a Polars expression."""
         self.do_add_link_column()
 
+    @wait_full_df
     def action_rename_column(self) -> None:
         """Rename the current column."""
         self.do_rename_column()
 
+    @wait_full_df
     def action_clear_cell(self) -> None:
         """Clear the current cell (set to None)."""
         self.do_clear_cell()
 
+    @wait_full_df
     def action_clear_column(self) -> None:
         """Clear cells in the current column that match the cursor value."""
         self.do_clear_column()
 
+    @wait_full_df
     def action_select_rows(self) -> None:
         """Select rows with cursor value in the current column."""
         self.do_select_rows()
 
+    @wait_full_df
     def action_select_rows_expr(self) -> None:
         """Select rows by expression."""
         self.do_select_rows_expr()
 
+    @wait_full_df
     def action_find_cursor_value(self, scope="column") -> None:
         """Find by cursor value in current column or globally across all columns."""
         self.do_find_cursor_value(scope=scope)
 
+    @wait_full_df
     def action_find_expr(self, scope="column") -> None:
         """Find by expression in current column or globally across all columns."""
         self.do_find_expr(scope=scope)
 
+    @wait_full_df
     def action_replace(self, scope="column") -> None:
         """Replace values in current column or globally across all columns."""
         self.do_replace(scope=scope)
 
+    @wait_full_df
     def action_toggle_row_selection(self) -> None:
         """Toggle selection for the current row."""
         self.do_toggle_row_selection()
 
+    @wait_full_df
     def action_toggle_selections(self) -> None:
         """Toggle all row selections."""
         self.do_toggle_selections()
 
+    @wait_full_df
     def action_filter_rows(self) -> None:
         """Filter to show only selected rows."""
         self.do_filter_rows()
 
+    @wait_full_df
     def action_delete_row(self) -> None:
         """Delete the current row."""
         self.do_delete_row()
 
+    @wait_full_df
     def action_delete_row_and_below(self) -> None:
         """Delete the current row and those below."""
         self.do_delete_row(more="below")
 
+    @wait_full_df
     def action_delete_row_and_up(self) -> None:
         """Delete the current row and those above."""
         self.do_delete_row(more="above")
 
+    @wait_full_df
     def action_duplicate_column(self) -> None:
         """Duplicate the current column."""
         self.do_duplicate_column()
 
+    @wait_full_df
     def action_duplicate_row(self) -> None:
         """Duplicate the current row."""
         self.do_duplicate_row()
 
+    @wait_full_df
     def action_undo(self) -> None:
         """Undo the last action."""
         self.do_undo()
 
+    @wait_full_df
     def action_redo(self) -> None:
         """Redo the last undone action."""
         self.do_redo()
 
+    @wait_full_df
     def action_reset(self) -> None:
         """Reset to the initial state."""
         self.do_reset()
 
+    @wait_full_df
     def action_move_column_left(self) -> None:
         """Move the current column to the left."""
         self.do_move_column("left")
 
+    @wait_full_df
     def action_move_column_right(self) -> None:
         """Move the current column to the right."""
         self.do_move_column("right")
 
+    @wait_full_df
     def action_move_row_up(self) -> None:
         """Move the current row up."""
         self.do_move_row("up")
 
+    @wait_full_df
     def action_move_row_down(self) -> None:
         """Move the current row down."""
         self.do_move_row("down")
 
+    @wait_full_df
     def action_clear_selections_and_matches(self) -> None:
         """Clear all row selections and matches."""
         self.do_clear_selections_and_matches()
 
+    @wait_full_df
     def action_cycle_cursor_type(self) -> None:
         """Cycle through cursor types."""
         self.do_cycle_cursor_type()
 
+    @wait_full_df
     def action_toggle_freeze_row_column(self) -> None:
         """Toggle the freeze."""
         self.do_toggle_freeze_row_column()
 
+    @wait_full_df
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility."""
         self.show_row_labels = not self.show_row_labels
         # status = "shown" if self.show_row_labels else "hidden"
         # self.notify(f"Row labels {status}", title="Toggle Row Labels")
 
+    @wait_full_df
     def action_cast_column_dtype(self, dtype: str | pl.DataType) -> None:
         """Cast the current column to a different data type."""
         self.do_cast_column_dtype(dtype)
 
+    @wait_full_df
     def action_copy_cell(self) -> None:
         """Copy the current cell to clipboard."""
         ridx = self.cursor_ridx
@@ -1030,6 +1133,7 @@ class DataFrameTable(DataTable):
                 timeout=10,
             )
 
+    @wait_full_df
     def action_copy_column(self) -> None:
         """Copy the current column to clipboard (one value per line)."""
         col_name = self.cursor_col_name
@@ -1051,6 +1155,7 @@ class DataFrameTable(DataTable):
                 timeout=10,
             )
 
+    @wait_full_df
     def action_copy_row(self) -> None:
         """Copy the current row to clipboard (values separated by tabs)."""
         ridx = self.cursor_ridx
@@ -1069,6 +1174,7 @@ class DataFrameTable(DataTable):
                 f"Error copying row [$error]{ridx}[/] to clipboard", title="Copy Row", severity="error", timeout=10
             )
 
+    @wait_full_df
     def action_toggle_thousand_separator(self) -> None:
         """Toggle thousand separator for numeric display."""
         self.thousand_separator = not self.thousand_separator
@@ -1076,37 +1182,35 @@ class DataFrameTable(DataTable):
         # status = "enabled" if self.thousand_separator else "disabled"
         # self.notify(f"Thousand separator {status}", title="Toggle Thousand Separator")
 
+    @wait_full_df
     def action_next_match(self) -> None:
         """Go to the next matched cell."""
         self.do_next_match()
 
+    @wait_full_df
     def action_previous_match(self) -> None:
         """Go to the previous matched cell."""
         self.do_previous_match()
 
+    @wait_full_df
     def action_next_selected_row(self) -> None:
         """Go to the next selected row."""
         self.do_next_selected_row()
 
+    @wait_full_df
     def action_previous_selected_row(self) -> None:
         """Go to the previous selected row."""
         self.do_previous_selected_row()
 
+    @wait_full_df
     def action_simple_sql(self) -> None:
         """Open the SQL interface screen."""
         self.do_simple_sql()
 
+    @wait_full_df
     def action_advanced_sql(self) -> None:
         """Open the advanced SQL interface screen."""
         self.do_advanced_sql()
-
-    def on_mouse_scroll_up(self, event) -> None:
-        """Load more rows when scrolling up with mouse."""
-        self.load_rows_up()
-
-    def on_mouse_scroll_down(self, event) -> None:
-        """Load more rows when scrolling down with mouse."""
-        self.load_rows_down()
 
     # Setup & Loading
     def reset_df(self, new_df: pl.DataFrame, dirty: bool = True) -> None:
@@ -1611,9 +1715,6 @@ class DataFrameTable(DataTable):
 
     def do_go_bottom(self) -> None:
         """Go to the bottom of the table."""
-        # Wait for the dataframe to be fully loaded
-        self.wait_for_df_done()
-
         stop = len(self.df)
         start = max(0, stop - self.BATCH_SIZE)
 
@@ -1639,9 +1740,6 @@ class DataFrameTable(DataTable):
         if result is None:
             return  # User cancelled the prompt
 
-        # Wait for the dataframe to be fully loaded
-        self.wait_for_df_done()
-
         ridx = result - 1  # Convert to 0-based index in the dataframe
         self.move_cursor_to(ridx, 0)
 
@@ -1658,12 +1756,9 @@ class DataFrameTable(DataTable):
             self.load_rows_range(start, stop)
 
             self.move_cursor(row=self.get_row_idx(str(next_ridx)), column=col_idx)
-        else:
-            super().action_page_up()
 
     def do_page_down(self) -> None:
         """Move the cursor one page down."""
-        super().action_page_down()
         self.load_rows_down()
 
     # History & Undo
@@ -1776,6 +1871,7 @@ class DataFrameTable(DataTable):
         # Push the modal screen
         self.app.push_screen(RowDetailScreen(ridx, self))
 
+    @wait_full_df
     def do_show_frequency(self, cidx=None) -> None:
         """Show frequency distribution for a given columnn."""
         cidx = self.cursor_cidx if cidx is None else cidx

@@ -17,7 +17,7 @@ from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
 from .common import NULL, NULL_DISPLAY, RID, DtypeConfig, format_float
-from .file_picker import SaveFilePicker
+from .file_picker_screen import SaveFileScreen
 
 
 class TableScreen(ModalScreen):
@@ -36,7 +36,7 @@ class TableScreen(ModalScreen):
             width: auto;
             max-width: 100%;
             height: auto;
-            min-width: 16; /* for LoadIndicator */
+            min-width: 17; /* for LoadIndicator */
             min-height: 3; /* for LoadIndicator */
             border: solid $primary;
             overflow: auto;
@@ -312,8 +312,6 @@ class StatisticsScreen(TableScreen):
     @work(thread=True)
     def calculate_statistics(self) -> None:
         """Calculate statistics."""
-        # Wait for the dataframe to be fully loaded
-        self.dftable.wait_for_df_done()
         self.df = self.build_df()
         self.app.call_from_thread(self._on_calc_ready)
 
@@ -450,8 +448,6 @@ class FrequencyScreen(TableScreen):
     @work(thread=True)
     def _calculate_frequency(self) -> None:
         """Calculate frequency."""
-        # Wait for the dataframe to be fully loaded
-        self.dftable.wait_for_df_done()
         col = self.dftable.df.columns[self.cidx]
         self.df = self.dftable.df.lazy().select(pl.col(col).value_counts(sort=True)).unnest(col).collect()
         self.app.call_from_thread(self._on_calc_ready)
@@ -590,7 +586,7 @@ class FrequencyScreen(TableScreen):
         filename = f"{column}_freq.csv"
 
         self.app.push_screen(
-            SaveFilePicker(filename=filename),
+            SaveFileScreen(filename=filename),
             callback=partial(self.app.save_to_file, all_tabs=False, use_df=self.df),
         )
 
@@ -610,8 +606,6 @@ class MetaShape(TableScreen):
     @work(thread=True)
     def _calc_metashape(self) -> None:
         """Calculate metadata shape."""
-        # Wait for the dataframe to be fully loaded
-        self.dftable.wait_for_df_done()
         self.app.call_from_thread(self._on_calc_ready)
 
     def build_table(self) -> None:

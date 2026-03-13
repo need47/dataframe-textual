@@ -15,11 +15,11 @@ from textual.widgets.option_list import Option
 from .common import SUPPORTED_FORMATS, guess_file_format
 
 
-class FilePicker(ModalScreen):
+class FilePickerScreen(ModalScreen):
     """Base modal screen for file picker dialogs."""
 
     DEFAULT_CSS = """
-        FilePicker {
+        FilePickerScreen {
             align: center middle;
         }
 
@@ -502,7 +502,7 @@ class FilePicker(ModalScreen):
         self.dismiss()
 
 
-class OpenFilePicker(FilePicker):
+class OpenFileScreen(FilePickerScreen):
     """Modal screen for opening files."""
 
     def __init__(
@@ -538,7 +538,7 @@ class OpenFilePicker(FilePicker):
             self.notify(f"File not found: {filepath}", title="Open File", severity="error", timeout=10)
 
 
-class SaveFilePicker(FilePicker):
+class SaveFileScreen(FilePickerScreen):
     """Modal screen for saving files."""
 
     def __init__(

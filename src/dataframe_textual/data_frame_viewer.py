@@ -16,7 +16,7 @@ from dataframe_textual.theme_screen import ThemeScreen
 from .common import RID, SUPPORTED_FORMATS, Source, get_next_item, guess_file_format, load_file
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
-from .file_picker import OpenFilePicker, SaveFilePicker
+from .file_picker_screen import OpenFileScreen, SaveFileScreen
 from .yes_no_screen import ConfirmScreen, RenameTabScreen
 
 
@@ -235,7 +235,7 @@ class DataFrameViewer(App):
         Displays the file open dialog for the user to select a file to load
         as a new tab in the interface.
         """
-        self.push_screen(OpenFilePicker(), self.do_open_file)
+        self.push_screen(OpenFileScreen(), self.do_open_file)
 
     def action_close(self) -> None:
         """Close current tab or view.
@@ -733,7 +733,7 @@ class DataFrameViewer(App):
             filename = str(filepath.with_stem(table.tabname))
 
         self.push_screen(
-            SaveFilePicker(filename=filename),
+            SaveFileScreen(filename=filename),
             callback=partial(self.save_to_file, all_tabs=all_tabs),
         )
 
@@ -750,7 +750,7 @@ class DataFrameViewer(App):
         filename = str(filepath.with_stem(f"{table.tabname}_view"))
 
         self.push_screen(
-            SaveFilePicker(filename=filename),
+            SaveFileScreen(filename=filename),
             callback=partial(self.save_to_file, all_tabs=False, use_view=True),
         )
 
@@ -791,7 +791,7 @@ class DataFrameViewer(App):
         else:
             # Go back to SaveFilePicker to allow user to enter a different name
             self.push_screen(
-                SaveFilePicker(filename=filename),
+                SaveFileScreen(filename=filename),
                 callback=partial(self.save_to_file, all_tabs=all_tabs, use_view=use_view, use_df=use_df),
             )
 
