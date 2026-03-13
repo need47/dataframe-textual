@@ -120,7 +120,13 @@ def cli() -> argparse.Namespace:
         help="Skip N rows after header when reading CSV/TSV",
     )
     parser.add_argument("-M", "--n-rows", metavar="N", type=int, help="Read maximum rows")
-    parser.add_argument("-N", "--null", nargs="+", help="Values to interpret as null values when reading CSV/TSV")
+    parser.add_argument(
+        "-N",
+        "--null",
+        nargs="+",
+        default=["IsNULL", "NULL"],
+        help="Values to interpret as null values when reading CSV/TSV",
+    )
 
     parser.add_argument(
         "--theme",
