@@ -1167,22 +1167,18 @@ class DataFrameTable(DataTable):
         # status = "enabled" if self.thousand_separator else "disabled"
         # self.notify(f"Thousand separator {status}", title="Toggle Thousand Separator")
 
-    @wait_full_df
     def action_next_match(self) -> None:
         """Go to the next matched cell."""
         self.do_next_match()
 
-    @wait_full_df
     def action_previous_match(self) -> None:
         """Go to the previous matched cell."""
         self.do_previous_match()
 
-    @wait_full_df
     def action_next_selected_row(self) -> None:
         """Go to the next selected row."""
         self.do_next_selected_row()
 
-    @wait_full_df
     def action_previous_selected_row(self) -> None:
         """Go to the previous selected row."""
         self.do_previous_selected_row()
