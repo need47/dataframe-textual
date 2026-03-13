@@ -148,7 +148,7 @@ class YMNScreen(ModalScreen):
 
             event.stop()
         elif event.key == "escape":
-            self.dismiss(None)
+            self.app.pop_screen()
             event.stop()
 
     def _handle_yes(self) -> None:
