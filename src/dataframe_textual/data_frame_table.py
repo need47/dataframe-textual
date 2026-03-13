@@ -837,7 +837,6 @@ class DataFrameTable(DataTable):
         self.do_page_up()
         super().action_page_up()
 
-    @wait_full_df
     def action_page_down(self) -> None:
         """Move the cursor one page down."""
         self.do_page_down()
