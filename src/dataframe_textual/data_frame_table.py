@@ -1164,7 +1164,6 @@ class DataFrameTable(DataTable):
                 f"Error copying row [$error]{ridx}[/] to clipboard", title="Copy Row", severity="error", timeout=10
             )
 
-    @wait_full_df
     def action_toggle_thousand_separator(self) -> None:
         """Toggle thousand separator for numeric display."""
         self.thousand_separator = not self.thousand_separator
