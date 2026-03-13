@@ -7,7 +7,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 ## Features
 
 ### Data Viewing
-- 🚀 **Fast Loading** - Powered by Polars for efficient data handling
+- 🚀 **Fast Loading** - Powered by Polars for efficient batch data handling
 - 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with various data types (e.g., integer, float, string)
 - ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls
 - 📊 **Flexible Input** - Read from files and/or stdin (pipes/redirects)

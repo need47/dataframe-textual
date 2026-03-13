@@ -474,10 +474,10 @@ class DataFrameTable(DataTable):
     def check_data_ready(self, callback: callable = None) -> bool:
         """Check if the dataframe is fully loaded.
 
-        If not loaded, show LoadingScreen and execute callback when done.
+        If not ready, show LoadingScreen and execute callback when done.
 
         Returns:
-            bool: True if already ready, False if loading screen was shown.
+            bool: True if already ready, False otherwise.
         """
         if not self.df_done:
             self.app.push_screen(LoadingScreen(self, callback=callback))
@@ -845,13 +845,11 @@ class DataFrameTable(DataTable):
         self.do_page_down()
         super().action_page_down()
 
-    @wait_full_df
     def action_cursor_up(self) -> None:
         """Move cursor up and load more rows if needed."""
         self.load_rows_up()
         super().action_cursor_up()
 
-    @wait_full_df
     def action_cursor_down(self) -> None:
         """Move cursor down and load more rows if needed."""
         self.load_rows_down()
