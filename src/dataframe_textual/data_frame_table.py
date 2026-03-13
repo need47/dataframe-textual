@@ -826,7 +826,6 @@ class DataFrameTable(DataTable):
         """Go to the bottom of the table."""
         self.do_go_bottom()
 
-    @wait_full_df
     def action_go_to_row(self) -> None:
         """Go to a specific row number."""
         self.do_go_to_row()
@@ -927,27 +926,22 @@ class DataFrameTable(DataTable):
         """Show metadata for the current column."""
         self.do_metadata_column()
 
-    @wait_full_df
     def action_view_rows(self, result: dict | None = None) -> None:
         """View rows."""
         self.do_view_rows(result)
 
-    @wait_full_df
     def action_view_rows_non_null(self) -> None:
         """View rows with non-null values in the current column."""
         self.do_view_rows_non_null()
 
-    @wait_full_df
     def action_view_rows_expr(self) -> None:
         """Open the advanced filter screen."""
         self.do_view_rows_expr()
 
-    @wait_full_df
     def action_edit_cell(self) -> None:
         """Edit the current cell."""
         self.do_edit_cell()
 
-    @wait_full_df
     def action_edit_column(self) -> None:
         """Edit the entire current column with an expression."""
         self.do_edit_column()
@@ -957,7 +951,6 @@ class DataFrameTable(DataTable):
         """Add an empty column after the current column."""
         self.do_add_column()
 
-    @wait_full_df
     def action_add_column_expr(self) -> None:
         """Add a new column with optional expression after the current column."""
         self.do_add_column_expr()
@@ -967,7 +960,6 @@ class DataFrameTable(DataTable):
         """Open AddLinkScreen to create a new link column from a Polars expression."""
         self.do_add_link_column()
 
-    @wait_full_df
     def action_rename_column(self) -> None:
         """Rename the current column."""
         self.do_rename_column()
@@ -982,27 +974,22 @@ class DataFrameTable(DataTable):
         """Clear cells in the current column that match the cursor value."""
         self.do_clear_column()
 
-    @wait_full_df
     def action_select_rows(self) -> None:
         """Select rows with cursor value in the current column."""
         self.do_select_rows()
 
-    @wait_full_df
     def action_select_rows_expr(self) -> None:
         """Select rows by expression."""
         self.do_select_rows_expr()
 
-    @wait_full_df
     def action_find_cursor_value(self, scope="column") -> None:
         """Find by cursor value in current column or globally across all columns."""
         self.do_find_cursor_value(scope=scope)
 
-    @wait_full_df
     def action_find_expr(self, scope="column") -> None:
         """Find by expression in current column or globally across all columns."""
         self.do_find_expr(scope=scope)
 
-    @wait_full_df
     def action_replace(self, scope="column") -> None:
         """Replace values in current column or globally across all columns."""
         self.do_replace(scope=scope)
@@ -1183,12 +1170,10 @@ class DataFrameTable(DataTable):
         """Go to the previous selected row."""
         self.do_previous_selected_row()
 
-    @wait_full_df
     def action_simple_sql(self) -> None:
         """Open the SQL interface screen."""
         self.do_simple_sql()
 
-    @wait_full_df
     def action_advanced_sql(self) -> None:
         """Open the advanced SQL interface screen."""
         self.do_advanced_sql()
@@ -1712,6 +1697,7 @@ class DataFrameTable(DataTable):
         """Open a modal screen to Go to a specific row."""
         self.app.push_screen(GoToRowScreen(self), callback=self.go_to_row)
 
+    @wait_full_df
     def go_to_row(self, result: int | None) -> None:
         """Go to a specific row.
 
@@ -2135,6 +2121,7 @@ class DataFrameTable(DataTable):
             callback=self.edit_cell,
         )
 
+    @wait_full_df
     def edit_cell(self, result) -> None:
         """Handle result from EditCellScreen."""
         if result is None:
@@ -2206,6 +2193,7 @@ class DataFrameTable(DataTable):
             callback=self.edit_column,
         )
 
+    @wait_full_df
     def edit_column(self, result) -> None:
         """Edit a column."""
         if result is None:
@@ -2283,6 +2271,7 @@ class DataFrameTable(DataTable):
             callback=self.rename_column,
         )
 
+    @wait_full_df
     def rename_column(self, result) -> None:
         """Handle result from RenameColumnScreen."""
         if result is None:
@@ -2474,6 +2463,7 @@ class DataFrameTable(DataTable):
             self.add_column_expr,
         )
 
+    @wait_full_df
     def add_column_expr(self, result: tuple[int, str, str, pl.Expr] | None) -> None:
         """Add a new column with an expression."""
         if result is None:
@@ -3016,6 +3006,7 @@ class DataFrameTable(DataTable):
             self.log(f"Error casting column `{col_name}`: {str(e)}")
 
     # Find & Replace
+    @wait_full_df
     def find_matches(
         self,
         term: str,
@@ -3131,6 +3122,7 @@ class DataFrameTable(DataTable):
             callback=partial(self.find, scope=scope),
         )
 
+    @wait_full_df
     def find(self, result: dict, scope="column") -> None:
         """Find a term in current column or globally across all columns.
 
@@ -3669,6 +3661,7 @@ class DataFrameTable(DataTable):
             callback=self.view_rows,
         )
 
+    @wait_full_df
     def view_rows(self, result) -> None:
         """View selected rows and hide others. Do not modify the dataframe.
 
@@ -3860,6 +3853,7 @@ class DataFrameTable(DataTable):
             callback=self.select_rows,
         )
 
+    @wait_full_df
     def select_rows(self, result: dict) -> None:
         """Select rows by value or expression.
 
@@ -4093,6 +4087,7 @@ class DataFrameTable(DataTable):
 
         self.run_sql(sql, new_tab)
 
+    @wait_full_df
     def run_sql(self, sql: str, new_tab: bool = False) -> None:
         """Execute a SQL query directly.
 
