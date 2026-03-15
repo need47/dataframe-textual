@@ -210,7 +210,6 @@ def main() -> None:
         null_values=args.null,
         ignore_errors=args.ignore_errors,
         truncate_ragged_lines=args.truncate_ragged_lines,
-        missing_columns=args.missing_columns,
         n_rows=20 if args.fields == "list" else args.n_rows,
         use_columns=args.fields if args.fields and args.fields != "list" else None,
         all_in_one=args.all_in_one,
