@@ -39,10 +39,6 @@ pip install dataframe-textual
 
 This installs an executable `dv`.
 
-Then run:
-```bash
-dv <file>
-```
 
 ### Using [uv](https://docs.astral.sh/uv/)
 
@@ -52,13 +48,6 @@ uv tool install dataframe-textual
 
 # Quick run using uvx without installation
 uvx https://github.com/need47/dataframe-textual.git <csvfile>
-
-# Clone or download the project
-cd dataframe-textual
-uv sync
-
-# Run directly with uv
-uv run dv <file>
 ```
 
 ### Development installation
@@ -68,10 +57,7 @@ uv run dv <file>
 git clone https://github.com/need47/dataframe-textual.git
 cd dataframe-textual
 
-# Install from local source
-pip install -e .
-
-# With development dependencies
+# Install from local source with development dependencies
 pip install -e ".[dev]"
 ```
 
@@ -82,12 +68,6 @@ pip install -e ".[dev]"
 ```bash
 # After pip install dataframe-textual
 dv pokemon.csv
-
-# Or run from module
-python -m dataframe-textual pokemon.csv
-
-# Or with uv
-uv run python main.py pokemon.csv
 
 # Read from stdin (defaults to TSV)
 cat data.tsv | dv
@@ -113,11 +93,19 @@ dv file.xlsx
 dv data1.tsv < data2.tsv
 ```
 
+### Multi-File Usage - Single Tab
+
+```bash
+
+# Read all parquet files (must be of same format and same structure) into one single table
+dv *.parquet --all-in-one
+```
+
 When multiple files are opened:
 - Each file appears as a separate tab. An Excel file may contain multiple tabs.
 - Move the current tab with `>` (right, wrap to first) or `<` (left, wrap to last); use `b` to cycle tabs
 - Save current tab to file with `Ctrl+T`
-- Save all tabs to file with `Ctrl+A`
+- Save all tabs to file with `Ctrl+S`
 - Duplicate the current tab with `Ctrl+D`
 - Open additional files with `Ctrl+O`
 - Each file maintains its own state (edits, sort order, selections, history, etc.) and allow undo/redo.
@@ -125,10 +113,10 @@ When multiple files are opened:
 ## Command Line Options
 
 ```
-usage: dv [-h] [-V] [-d DELIMITER] [-f [FIELDS ...]] [-H [HEADER ...]] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M N] [-N NULL [NULL ...]] [--theme [THEME]]
+usage: dv [-h] [-V] [-d DELIMITER] [-f [FIELDS ...]] [-H [HEADER ...]] [-I] [-T] [-X {insert,raise}] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M N] [-N NULL [NULL ...]] [--theme [THEME]] [--all-in-one]
           [files ...]
 
-Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).
+TUI viewer/editor for tabular data (e.g., CSV/Excel).
 
 positional arguments:
   files                 Files to view (or read from stdin)
@@ -137,17 +125,19 @@ options:
   -h, --help            show this help message and exit
   -V, --version         show program's version number and exit
   -d, --delimiter DELIMITER
-                        Specify the delimiter of the input files (must be a single character, e.g., `,` or `|`)
+                        Specify the delimiter of the input files (must be a single character, e.g., `|` or `;`)
   -f, --fields [FIELDS ...]
                         When used without values, list available fields. Otherwise, read only specified fields.
   -H, --header [HEADER ...]
-                        Specify header info. when reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column names (e.g., `-H col1 col2 col3`).
+                        Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column header (e.g., `-H col1 col2 col3`).
   -I, --no-inference    Do not infer data types when reading CSV/TSV
   -T, --truncate-ragged-lines
                         Truncate ragged lines when reading CSV/TSV
+  -X, --missing-columns {insert,raise}
+                        Handle missing columns when reading multiple CSV/TSV
   -E, --ignore-errors   Ignore errors when reading CSV/TSV
   -C, --comment-prefix [PREFIX]
-                        Comment lines starting with `PREFIX` are skipped when reading CSV/TSV
+                        Skip comment lines starting with `PREFIX` when reading CSV/TSV
   -Q, --quote-char [C]  Use `C` as quote character for reading CSV/TSV. When used without value, disables special handling of quote characters.
   -K, --skip-lines N    Skip first N lines when reading CSV/TSV
   -A, --skip-rows-after-header N
@@ -155,9 +145,9 @@ options:
   -M, --n-rows N        Read maximum rows
   -N, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
-  --sql SQL             Specify a SQL query to execute on the input file (e.g., to select and filter data)
   --theme [THEME]       Set the theme for the application. If used without value, show available themes.
-  --all-in-one, --aio   Read all files (must be of the same structure) into a single table.
+  --all-in-one, --one   Read all files (must be of same format and same structure) into one single table.
+  --sql SQL             Specify a SQL query to execute on the input file (e.g., to select and filter data)
 ```
 
 ### CLI Examples
@@ -196,7 +186,7 @@ dv large_data.csv -I
 # Ignore parsing errors in malformed CSV
 dv data_with_errors.csv -E
 
-# Treat specific values as null/missing (e.g., 'NA', 'N/A', '-')
+# Treat specific values as null/missing (e.g., 'NA', 'N/A')
 dv data.csv -N NA N/A
 
 # Use different quote character (e.g., single quote for CSV)
@@ -214,11 +204,11 @@ dv data.csv -f
 # Read only specific columns: 'name', 'age', first column, and last column
 dv data.csv -f name age 1 -1
 
+# Read all files (must be of same format and same structure) into one single table
+dv data-1.csv data-2.csv --all-in-one
+
 # Filter data using SQL query (use 'self' as the table name)
 dv data.csv --sql 'SELECT * FROM self WHERE age > 30'
-
-# Read all files (must be of the same structure) into a single table
-dv data-1.csv data-2.csv --all-in-one
 ```
 
 ## Keyboard Shortcuts
@@ -247,11 +237,11 @@ dv data-1.csv data-2.csv --all-in-one
 
 #### View & Settings
 
-| Key                      | Action                                     |
-| ------------------------ | ------------------------------------------ |
-| `F1`                     | Toggle help panel                          |
-| `k`                      | Select theme                               |
-| `Ctrl+P` -> `Screenshot` | Capture terminal view as a SVG image       |
+| Key                      | Action                               |
+| ------------------------ | ------------------------------------ |
+| `F1`                     | Toggle help panel                    |
+| `k`                      | Select theme                         |
+| `Ctrl+P` -> `Screenshot` | Capture terminal view as a SVG image |
 
 ---
 

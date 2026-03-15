@@ -171,7 +171,7 @@ wheels = [
 
 [[package]]
 name = "dataframe-textual"
-version = "2.33.0"
+version = "2.34.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastexcel" },
@@ -194,7 +194,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastexcel", specifier = ">=0.16.0" },
-    { name = "polars", specifier = ">=1.34.0" },
+    { name = "polars", specifier = ">=1.34.0,<1.39.0" },
     { name = "textual", extras = ["syntax"], specifier = ">=8.0.2" },
     { name = "textual-dev", marker = "extra == 'dev'", specifier = ">=1.8.0" },
     { name = "vortex-data", specifier = ">=0.59.4" },

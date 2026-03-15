@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import polars as pl
 from textual.theme import BUILTIN_THEMES
 
 from . import __version__
@@ -48,7 +49,7 @@ def cli() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         prog="dv",
-        description="Interactive terminal based viewer/editor for tabular data (e.g., CSV/Excel).",
+        description="TUI viewer/editor for tabular data (e.g., CSV/Excel).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Examples:\n"
         "  %(prog)s data.csv\n"
@@ -66,7 +67,7 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "-d",
         "--delimiter",
-        help="Specify the delimiter of the input files (must be a single character, e.g., `,` or `|`)",
+        help="Specify the delimiter of the input files (must be a single character, e.g., `|` or `;`)",
     )
     parser.add_argument(
         "-f",
@@ -82,7 +83,7 @@ def cli() -> argparse.Namespace:
         nargs="*",
         action=ConstWithMultiArgs,
         const=False,
-        help="Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column names (e.g., `-H col1 col2 col3`).",
+        help="Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column header (e.g., `-H col1 col2 col3`).",
     )
     parser.add_argument(
         "-I", "--no-inference", action="store_true", help="Do not infer data types when reading CSV/TSV"
@@ -140,7 +141,11 @@ def cli() -> argparse.Namespace:
         "--all-in-one",
         "--aio",
         action="store_true",
-        help="Read all files (must be of the same structure) into a single table.",
+        help="Read all files (must be of same format and same structure) into one single table.",
+    )
+
+    parser.add_argument(
+        "--sql", help="Specify a SQL query to execute on the input file (e.g., to select and filter data)"
     )
 
     args = parser.parse_args()
@@ -205,6 +210,7 @@ def main() -> None:
         null_values=args.null,
         ignore_errors=args.ignore_errors,
         truncate_ragged_lines=args.truncate_ragged_lines,
+        missing_columns=args.missing_columns,
         n_rows=20 if args.fields == "list" else args.n_rows,
         use_columns=args.fields if args.fields and args.fields != "list" else None,
         all_in_one=args.all_in_one,
@@ -218,6 +224,15 @@ def main() -> None:
             break  # Only list fields for the first source
 
         return
+
+    if args.sql:
+        for source in sources:
+            ctx = pl.SQLContext(frames={"self": source.lf})
+            try:
+                source.lf = ctx.execute(args.sql)
+            except pl.exceptions.SQLInterfaceError as e:
+                print(f"SQL error: {e}", file=sys.stderr)
+                sys.exit(1)
 
     # Run the DataFrame Viewer application
     app = DataFrameViewer(*sources, theme=args.theme)
