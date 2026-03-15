@@ -23,7 +23,7 @@ class LoadingScreen(ModalScreen):
         #loading-indicator {
             width: 17;
             height: 3;
-            background: $surface;
+            background: $surface-lighten-2 75%; /* close to that used in TableScreen */
         }
     """
 
