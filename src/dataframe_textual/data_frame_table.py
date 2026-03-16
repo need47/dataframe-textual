@@ -1222,11 +1222,11 @@ class DataFrameTable(DataTable):
         # Get available width for the table (with some padding for borders/scrollbar)
         available_width = self.scrollable_content_region.width
 
-        # Calculate how much width we need for string columns first
-        string_cols = [col for col, dtype in zip(self.df.columns, self.df.dtypes) if dtype == pl.String]
+        # Check if there are any string or list columns to determine if we need to calculate widths
+        has_string_or_list_col = any(dtype == pl.String or dtype == pl.List for dtype in self.df.dtypes)
 
-        # No string columns, let TextualDataTable auto-size all columns
-        if not string_cols:
+        # No string columns, let Textual auto-size all columns
+        if not has_string_or_list_col:
             return col_widths
 
         # Sample a reasonable number of rows to calculate widths (don't scan entire dataframe)
@@ -1243,20 +1243,24 @@ class DataFrameTable(DataTable):
             label_width = measure(self.app.console, col, 1) + 2
             col_label_widths[col] = label_width
 
-            # Let Textual auto-size for non-string columns and already expanded columns
-            if dtype != pl.String or col in self.expanded_columns:
+            # Let Textual auto-size for non-string and non-list columns and already expanded columns
+            if (dtype != pl.String and dtype != pl.List) or col in self.expanded_columns:
                 available_width -= label_width
                 continue
 
             try:
                 # Get sample values from the column
                 sample_values = sample_lf.select(col).collect().get_column(col).drop_nulls().to_list()
-                if any(val.startswith(("https://", "http://")) for val in sample_values):
+                if dtype == pl.String and any(val.startswith(("https://", "http://")) for val in sample_values):
                     continue  # Skip link columns so they can auto-size and be clickable
 
                 # Find maximum width in sample
+                # For list columns, measure the string representation of the first three items to avoid extremely long widths
                 max_cell_width = max(
-                    (measure(self.app.console, val, 1) for val in sample_values),
+                    (
+                        measure(self.app.console, str(val[:3]) if isinstance(val, list) else str(val), 1)
+                        for val in sample_values
+                    ),
                     default=label_width,
                 )
 
@@ -1919,7 +1923,7 @@ class DataFrameTable(DataTable):
         dtype = self.df.dtypes[cidx]
 
         # Only expand string columns
-        if dtype != pl.String:
+        if dtype != pl.String and dtype != pl.List:
             return
 
         # The column to expand/shrink
