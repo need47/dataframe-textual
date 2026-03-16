@@ -71,8 +71,8 @@ BUFFER_SIZE = 5
 # Warning threshold for loading rows
 WARN_ROWS_THRESHOLD = 50_000
 
-# Maximum width for string columns before truncation
-STRING_WIDTH_CAP = 35
+# Maximum width for columns before truncation
+COLUMN_WIDTH_CAP = 35
 
 
 @dataclass
@@ -1277,8 +1277,8 @@ class DataFrameTable(DataTable):
         # If there's no more available width, auto-size remaining columns
         if available_width < 0:
             for col in col_widths:
-                if col_widths[col] > STRING_WIDTH_CAP and col_label_widths[col] < STRING_WIDTH_CAP:
-                    col_widths[col] = STRING_WIDTH_CAP  # Cap string columns
+                if col_widths[col] > COLUMN_WIDTH_CAP and col_label_widths[col] < COLUMN_WIDTH_CAP:
+                    col_widths[col] = COLUMN_WIDTH_CAP  # Cap width to prevent extremely wide columns
 
         return col_widths
 
@@ -1934,7 +1934,7 @@ class DataFrameTable(DataTable):
 
         # If already expanded, shrink back to label width
         if col_name in self.expanded_columns:
-            col.width = max(label_width, STRING_WIDTH_CAP)
+            col.width = max(label_width, COLUMN_WIDTH_CAP)
             self.expanded_columns.remove(col_name)
 
         # If not expanded, check if we need to expand by comparing label width to max cell width in loaded rows
