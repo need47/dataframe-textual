@@ -1932,37 +1932,39 @@ class DataFrameTable(DataTable):
         # Calculate the maximum width across all loaded rows
         label_width = len(col_name) + 2  # Start with column name width + padding
 
-        try:
-            need_expand = False
-            max_width = label_width
+        # If already expanded, shrink back to label width
+        if col_name in self.expanded_columns:
+            col.width = max(label_width, STRING_WIDTH_CAP)
+            self.expanded_columns.remove(col_name)
 
-            # Scan through all loaded rows that are visible to find max width
-            for row_start, row_end in self.loaded_ranges:
-                for ridx in range(row_start, row_end):
-                    cell_value = str(self.df.item(ridx, cidx))
-                    cell_width = measure(self.app.console, cell_value, 1)
+        # If not expanded, check if we need to expand by comparing label width to max cell width in loaded rows
+        else:
+            try:
+                need_expand = False
+                max_width = label_width
 
-                    if cell_width > max_width:
-                        need_expand = True
-                        max_width = cell_width
+                # Scan through all loaded rows that are visible to find max width
+                for row_start, row_end in self.loaded_ranges:
+                    for ridx in range(row_start, row_end):
+                        cell_value = str(self.df.item(ridx, cidx))
+                        cell_width = measure(self.app.console, cell_value, 1)
 
-            if not need_expand:
-                return
+                        if cell_width > max_width:
+                            need_expand = True
+                            max_width = cell_width
 
-            if col_name in self.expanded_columns:
-                col.width = max(label_width, STRING_WIDTH_CAP)
-                self.expanded_columns.remove(col_name)
-            else:
-                self.expanded_columns.add(col_name)
+                if not need_expand:
+                    return
 
                 # Update the column width
+                self.expanded_columns.add(col_name)
                 col.width = max_width
 
-        except Exception as e:
-            self.notify(
-                f"Error expanding column [$error]{col_name}[/]", title="Expand Column", severity="error", timeout=10
-            )
-            self.log(f"Error expanding column `{col_name}`: {str(e)}")
+            except Exception as e:
+                self.notify(
+                    f"Error expanding column [$error]{col_name}[/]", title="Expand Column", severity="error", timeout=10
+                )
+                self.log(f"Error expanding column `{col_name}`: {str(e)}")
 
         # Force a refresh
         self._update_count += 1
