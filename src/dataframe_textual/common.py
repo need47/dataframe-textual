@@ -883,7 +883,7 @@ def load_file(
             df = df.head(n_rows)
         data.append(Source(df.lazy(), filename, filepath.stem))
     elif fmt == "ndjson":
-        lf = pl.scan_ndjson(source, n_rows=n_rows, schema_overrides=schema_overrides)
+        lf = pl.scan_ndjson(source, n_rows=n_rows, schema_overrides=schema_overrides, ignore_errors=ignore_errors)
         data.append(Source(lf, filename, filepath.stem))
     else:
         raise ValueError(f"Unsupported file format: {fmt}. Supported formats are: {SUPPORTED_FORMATS}")
