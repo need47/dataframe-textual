@@ -531,7 +531,7 @@ def handle_compute_error(err_msg: str) -> None:
     elif m := RE_COMPUTE_ERROR.search(err_msg):
         col_name = m.group(1)
         print(
-            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nColumn '{col_name}' has mixed types. Try again with `-L` to increase the number of rows used for schema inference or `-I` to disable type inference",
+            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nColumn `{col_name}` has mixed types. Try again with `-L` to increase the number of rows used for schema inference or `-I` to disable type inference",
             file=sys.stderr,
         )
         sys.exit(1)
