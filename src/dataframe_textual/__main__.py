@@ -88,6 +88,7 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "-L",
         "--infer_schema_length",
+        nargs="?",
         metavar="N",
         type=int,
         default=100,
