@@ -63,7 +63,11 @@ class DataFrameViewer(App):
     BINDINGS = [
         ("q,escape", "close", "Close current tab or view"),
         ("Q", "close_all", "Close all tabs and quit"),
-        ("B", "toggle_tab_bar", "Toggle Tab Bar"),
+        ("space", "toggle_tab_bar", "Toggle Tab Bar"),
+        ("b", "next_tab(1)", "Next Tab"),
+        ("B", "next_tab(-1)", "Previous Tab"),
+        ("greater_than_sign", "move_tab(1)", "Move tab right"),  # '>'
+        ("less_than_sign", "move_tab(-1)", "Move tab left"),  # '<'
         ("f1", "toggle_help_panel", "Help"),
         ("ctrl+o", "open_file", "Open File"),
         ("ctrl+v", "save_current_view", "Save Current View"),
@@ -73,9 +77,6 @@ class DataFrameViewer(App):
         ("W", "save_all_tabs_overwrite", "Save All Tabs (overwrite)"),
         ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
         ("k", "select_theme", "Select Theme"),
-        ("greater_than_sign", "move_tab(1)", "Move tab right"),  # '>'
-        ("less_than_sign", "move_tab(-1)", "Move tab left"),  # '<'
-        ("b", "next_tab(1)", "Next Tab"),
     ]
 
     CSS = """

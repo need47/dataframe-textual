@@ -219,12 +219,13 @@ dv data.csv --sql 'SELECT * FROM self WHERE age > 30'
 
 | Key            | Action                                                        |
 | -------------- | ------------------------------------------------------------- |
-| `>`            | Move current tab right (wrap to first)                        |
-| `<`            | Move current tab left (wrap to last)                          |
-| `b`            | Cycle through tabs                                            |
-| `B`            | Toggle tab bar visibility                                     |
 | `q`            | Close current tab (prompts to save unsaved changes)           |
 | `Q`            | Close all tabs and quit app (prompts to save unsaved changes) |
+| `space`        | Toggle tab bar visibility                                     |
+| `b`            | Next tab                                                      |
+| `B`            | Previous tab                                                  |
+| `>`            | Move current tab right (wrap to first)                        |
+| `<`            | Move current tab left (wrap to last)                          |
 | `Ctrl+Q`       | Force to quit app (regardless of unsaved changes)             |
 | `Ctrl+V`       | Save current view to file                                     |
 | `Ctrl+T`       | Save current tab to file                                      |
