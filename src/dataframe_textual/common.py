@@ -496,10 +496,6 @@ def handle_compute_error(err_msg: str) -> None:
         err_msg: The error message from the ComputeError exception.
         file_format: The file format being loaded (tsv, csv, etc.).
         infer_schema: Whether schema inference is currently enabled.
-        schema_overrides: Current schema overrides, if any.
-
-    Returns:
-        A tuple of (infer_schema, schema_overrides):
 
     Raises:
         SystemExit: If the error is unrecoverable.
@@ -535,7 +531,7 @@ def handle_compute_error(err_msg: str) -> None:
     elif m := RE_COMPUTE_ERROR.search(err_msg):
         col_name = m.group(1)
         print(
-            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nColumn '{col_name}' has mixed types. Try again with `-I` to disable type inference",
+            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nColumn '{col_name}' has mixed types. Try again with `-L` to increase the number of rows used for schema inference or `-I` to disable type inference",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -666,6 +662,7 @@ def load_dataframe(
     delimiter: str | None = None,
     header: bool | list[str] = True,
     infer_schema: bool = True,
+    infer_schema_length: int | None = 100,
     comment_prefix: str | None = None,
     quote_char: str | None = '"',
     skip_lines: int = 0,
@@ -687,6 +684,7 @@ def load_dataframe(
         delimiter: Optional delimiter specifier for input files (e.g., ';' for SSV).
         header: Specify header info. for CSV/TSV files. Can be True (header in first line), False (no header, auto-generate column names), or list of column names to use. Defaults to True.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
+        infer_schema_length: Number of rows to use for schema inference when infer_schema is True. Defaults to 100.
         comment_prefix: Character(s) indicating comment lines in CSV/TSV files. Defaults to None.
         quote_char: Quote character for reading CSV/TSV files. Defaults to '"'.
         skip_lines: Number of lines to skip when reading CSV/TSV files. Defaults to 0.
@@ -729,6 +727,7 @@ def load_dataframe(
             delimiter=delimiter,
             header=header,
             infer_schema=infer_schema,
+            infer_schema_length=infer_schema_length,
             comment_prefix=comment_prefix,
             quote_char=quote_char,
             skip_lines=skip_lines,
@@ -758,12 +757,12 @@ def load_file(
     prefix_sheet: bool = False,
     delimiter: str | None = None,
     header: bool | list[str] = True,
+    infer_schema_length: int | None = 100,
     infer_schema: bool = True,
     comment_prefix: str | None = None,
     quote_char: str | None = '"',
     skip_lines: int = 0,
     skip_rows_after_header: int = 0,
-    schema_overrides: dict[str, pl.DataType] | None = None,
     null_values: list[str] | None = None,
     ignore_errors: bool = False,
     truncate_ragged_lines: bool = False,
@@ -786,11 +785,12 @@ def load_file(
         delimiter: Optional delimiter specifier for input files (e.g., ';' for SSV). Defaults to None (infer from file extension).
         header: Specify header info. for the input file. Can be True (header in first line), False (no header, auto-generate column names), or list of column names to use.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
+        infer_schema_length: Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100.
         comment_prefix: Character(s) indicating comment lines in CSV/TSV files. Defaults to None.
         quote_char: Quote character for reading CSV/TSV files. Defaults to '"'.
         skip_lines: Number of lines to skip when reading CSV/TSV files. The header will be parsed at this offset. Defaults to 0.
         skip_rows_after_header: Number of rows to skip after header when reading CSV/TSV files. Defaults to 0.
-        schema_overrides: Optional dictionary of column name to Polars data type to override inferred schema.
+        infer_schema_length: Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100.
         null_values: List of values to interpret as null when reading CSV/TSV files. Defaults to None.
         ignore_errors: Whether to ignore errors when reading CSV/TSV files.
         truncate_ragged_lines: Whether to truncate ragged lines when reading CSV/TSV files. Defaults to False.
@@ -832,11 +832,11 @@ def load_file(
             separator=delimiter,
             has_header=has_header,
             infer_schema=infer_schema,
+            infer_schema_length=infer_schema_length,
             comment_prefix=comment_prefix,
             quote_char=quote_char,
             skip_lines=skip_lines,
             skip_rows_after_header=skip_rows_after_header,
-            schema_overrides=schema_overrides,
             null_values=null_values,
             ignore_errors=ignore_errors,
             truncate_ragged_lines=truncate_ragged_lines,
@@ -883,7 +883,12 @@ def load_file(
             df = df.head(n_rows)
         data.append(Source(df.lazy(), filename, filepath.stem))
     elif fmt == "ndjson":
-        lf = pl.scan_ndjson(source, n_rows=n_rows, schema_overrides=schema_overrides, ignore_errors=ignore_errors)
+        lf = pl.scan_ndjson(
+            source,
+            n_rows=n_rows,
+            infer_schema_length=infer_schema_length,
+            ignore_errors=ignore_errors,
+        )
         data.append(Source(lf, filename, filepath.stem))
     else:
         raise ValueError(f"Unsupported file format: {fmt}. Supported formats are: {SUPPORTED_FORMATS}")

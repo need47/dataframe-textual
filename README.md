@@ -113,7 +113,7 @@ When multiple files are opened:
 ## Command Line Options
 
 ```
-usage: dv [-h] [-V] [-d DELIMITER] [-f [FIELDS ...]] [-H [HEADER ...]] [-I] [-T] [-X {insert,raise}] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M N] [-N NULL [NULL ...]] [--theme [THEME]] [--all-in-one]
+usage: dv [-h] [-V] [-d DELIMITER] [-f [FIELDS ...]] [-H [HEADER ...]] [-L N] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M N] [-N NULL [NULL ...]] [--theme [THEME]] [--all-in-one] [--sql SQL]
           [files ...]
 
 TUI viewer/editor for tabular data (e.g., CSV/Excel).
@@ -130,11 +130,11 @@ options:
                         When used without values, list available fields. Otherwise, read only specified fields.
   -H, --header [HEADER ...]
                         Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column header (e.g., `-H col1 col2 col3`).
+  -L, --infer_schema_length N
+                        Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100. When used without value, uses all rows for schema inference (can be slow for large files).
   -I, --no-inference    Do not infer data types when reading CSV/TSV
   -T, --truncate-ragged-lines
                         Truncate ragged lines when reading CSV/TSV
-  -X, --missing-columns {insert,raise}
-                        Handle missing columns when reading multiple CSV/TSV
   -E, --ignore-errors   Ignore errors when reading CSV/TSV
   -C, --comment-prefix [PREFIX]
                         Skip comment lines starting with `PREFIX` when reading CSV/TSV
@@ -146,7 +146,7 @@ options:
   -N, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
   --theme [THEME]       Set the theme for the application. If used without value, show available themes.
-  --all-in-one, --one   Read all files (must be of same format and same structure) into one single table.
+  --all-in-one, --aio   Read all files (must be of same format and same structure) into one single table.
   --sql SQL             Specify a SQL query to execute on the input file (e.g., to select and filter data)
 ```
 

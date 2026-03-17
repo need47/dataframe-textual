@@ -86,6 +86,15 @@ def cli() -> argparse.Namespace:
         help="Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column header (e.g., `-H col1 col2 col3`).",
     )
     parser.add_argument(
+        "-L",
+        "--infer_schema_length",
+        metavar="N",
+        type=int,
+        default=100,
+        const=None,
+        help="Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100. When used without value, uses all rows for schema inference (can be slow for large files).",
+    )
+    parser.add_argument(
         "-I", "--no-inference", action="store_true", help="Do not infer data types when reading CSV/TSV"
     )
     parser.add_argument(
@@ -203,6 +212,7 @@ def main() -> None:
         delimiter=args.delimiter,
         header=args.header,
         infer_schema=not args.no_inference,
+        infer_schema_length=args.infer_schema_length,
         comment_prefix=args.comment_prefix,
         quote_char=args.quote_char,
         skip_lines=args.skip_lines,
