@@ -8,7 +8,7 @@ import polars as pl
 from textual.theme import BUILTIN_THEMES
 
 from . import __version__
-from .common import SUPPORTED_FORMATS, convert_file, guess_file_format, handle_compute_error, load_dataframe
+from .common import SUPPORTED_FORMATS, guess_file_format, handle_compute_error, load_dataframe, write_file
 from .data_frame_viewer import DataFrameViewer
 
 
@@ -130,7 +130,7 @@ def cli() -> argparse.Namespace:
         default=0,
         help="Skip N rows after header when reading CSV/TSV",
     )
-    parser.add_argument("-M", "--n-rows", metavar="N", type=int, help="Read maximum rows")
+    parser.add_argument("-M", "--n-rows", metavar="N", nargs="?", type=int, const=100, help="Read maximum rows")
     parser.add_argument(
         "-N",
         "--null",
@@ -261,7 +261,7 @@ def main() -> None:
 
     # If output file is specified, write the (optionally modified) data to the output file and exit
     if args.output:
-        return convert_file(sources, args.output, fmt)
+        return write_file(sources, args.output, fmt)
 
     # Run the DataFrame Viewer application
     app = DataFrameViewer(*sources, theme=args.theme)

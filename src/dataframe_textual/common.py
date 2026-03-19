@@ -919,7 +919,7 @@ def load_file(
     return data
 
 
-def convert_file(sources: list[Source], filename: str, fmt: str) -> None:
+def write_file(sources: list[Source], filename: str, fmt: str) -> None:
     if len(sources) > 1 and fmt not in ("xlsx", "xls"):
         print("Only Excel formats (.xlsx, .xls) support multiple tabs", file=sys.stderr)
         sys.exit(1)
