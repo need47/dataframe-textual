@@ -113,7 +113,8 @@ When multiple files are opened:
 ## Command Line Options
 
 ```
-usage: dv [-h] [-V] [-d DELIMITER] [-f [FIELDS ...]] [-H [HEADER ...]] [-L N] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M N] [-N NULL [NULL ...]] [--theme [THEME]] [--all-in-one] [--sql SQL]
+usage: dv [-h] [-V] [-d DELIMITER] [-f [FIELDS ...]] [-H [HEADER ...]] [-L [N]] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M N] [-N NULL [NULL ...]] [--theme [THEME]] [--all-in-one]
+          [--sql SQL] [-o OUTPUT]
           [files ...]
 
 TUI viewer/editor for tabular data (e.g., CSV/Excel).
@@ -130,7 +131,7 @@ options:
                         When used without values, list available fields. Otherwise, read only specified fields.
   -H, --header [HEADER ...]
                         Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column header (e.g., `-H col1 col2 col3`).
-  -L, --infer_schema_length N
+  -L, --infer_schema_length [N]
                         Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100. When used without value, uses all rows for schema inference (can be slow for large files).
   -I, --no-inference    Do not infer data types when reading CSV/TSV
   -T, --truncate-ragged-lines
@@ -146,8 +147,10 @@ options:
   -N, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
   --theme [THEME]       Set the theme for the application. If used without value, show available themes.
-  --all-in-one, --aio   Read all files (must be of same format and same structure) into one single table.
+  --all-in-one, --aio, --one
+                        Read all files (must be of same format and same structure) into one single table.
   --sql SQL             Specify a SQL query to execute on the input file (e.g., to select and filter data)
+  -o, --output OUTPUT   Output file (optionally modified) with specified format, which is inferred from file extension (e.g., .csv, .xlsx).
 ```
 
 ### CLI Examples
@@ -209,6 +212,9 @@ dv data-1.csv data-2.csv --all-in-one
 
 # Filter data using SQL query (use 'self' as the table name)
 dv data.csv --sql 'SELECT * FROM self WHERE age > 30'
+
+# Convert to other format
+dv data.csv -o data.parquet
 ```
 
 ## Keyboard Shortcuts

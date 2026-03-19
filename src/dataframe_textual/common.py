@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
+import xlsxwriter
 from rich.text import Text
 
 # Supported file formats
@@ -916,3 +917,45 @@ def load_file(
         sys.exit(1)
 
     return data
+
+
+def convert_file(sources: list[Source], filename: str, fmt: str) -> None:
+    if len(sources) > 1 and fmt not in ("xlsx", "xls"):
+        print("Only Excel formats (.xlsx, .xls) support multiple tabs", file=sys.stderr)
+        sys.exit(1)
+
+    # Get rid of the RID column
+    for source in sources:
+        source.lf = source.lf.select(pl.exclude(RID))
+
+    try:
+        if fmt == "csv":
+            sources[0].lf.sink_csv(filename)
+        elif fmt == "tsv":
+            sources[0].lf.sink_csv(filename, separator="\t")
+        elif fmt == "psv":
+            sources[0].lf.sink_csv(filename, separator="|")
+        elif fmt == "parquet":
+            sources[0].lf.sink_parquet(filename)
+        elif fmt == "ndjson":
+            sources[0].lf.sink_ndjson(filename)
+        elif fmt == "json":
+            sources[0].lf.collect().write_json(filename)
+        elif fmt == "vortex":
+            import vortex as vx
+
+            vx.io.write(sources[0].lf.collect().to_arrow(), filename)
+        elif fmt in ("xlsx", "xls"):
+            if len(sources) == 1:
+                sources[0].lf.collect().write_excel(filename)
+            else:
+                with xlsxwriter.Workbook(filename) as wb:
+                    for source in sources:
+                        worksheet = wb.add_worksheet(source.tabname)
+                        source.lf.collect().write_excel(workbook=wb, worksheet=worksheet)
+        else:
+            print(f"Unsupported output format: {fmt}. Supported formats are: {SUPPORTED_FORMATS}", file=sys.stderr)
+            sys.exit(1)
+    except Exception as e:
+        print(f"Error writing to output file: {e}", file=sys.stderr)
+        sys.exit(1)

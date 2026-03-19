@@ -8,7 +8,7 @@ import polars as pl
 from textual.theme import BUILTIN_THEMES
 
 from . import __version__
-from .common import handle_compute_error, load_dataframe
+from .common import SUPPORTED_FORMATS, convert_file, guess_file_format, handle_compute_error, load_dataframe
 from .data_frame_viewer import DataFrameViewer
 
 
@@ -150,12 +150,19 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "--all-in-one",
         "--aio",
+        "--one",
         action="store_true",
         help="Read all files (must be of same format and same structure) into one single table.",
     )
 
     parser.add_argument(
         "--sql", help="Specify a SQL query to execute on the input file (e.g., to select and filter data)"
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Output file (optionally modified) with specified format, which is inferred from file extension (e.g., .csv, .xlsx).",
     )
 
     args = parser.parse_args()
@@ -208,6 +215,14 @@ def cli() -> argparse.Namespace:
 def main() -> None:
     args = cli()
 
+    if args.output:
+        if not (fmt := guess_file_format(args.output)):
+            print(
+                f"Unsupported output file format for `{args.output}`. Supported formats: {', '.join(SUPPORTED_FORMATS)}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
     sources = load_dataframe(
         args.files,
         delimiter=args.delimiter,
@@ -243,6 +258,10 @@ def main() -> None:
             except pl.exceptions.SQLInterfaceError as e:
                 print(f"SQL error: {e}", file=sys.stderr)
                 sys.exit(1)
+
+    # If output file is specified, write the (optionally modified) data to the output file and exit
+    if args.output:
+        return convert_file(sources, args.output, fmt)
 
     # Run the DataFrame Viewer application
     app = DataFrameViewer(*sources, theme=args.theme)
