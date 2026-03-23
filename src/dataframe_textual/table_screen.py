@@ -612,16 +612,18 @@ class MetaShape(TableScreen):
         """Build the metadata table."""
         self.table.clear(columns=True)
         self.table.add_column("")
-        self.table.add_column(Text("Count", justify="right"))
+        self.table.add_column(Text("Value", justify="right"))
 
         # Get shape information
         num_rows, num_cols = self.dftable.df.shape
         num_cols -= 1  # Exclude RID column
         dc_int = DtypeConfig(pl.Int64)
+        dc_str = DtypeConfig(pl.String)
 
         # Add rows to the table
-        self.table.add_row("Row", dc_int.format(num_rows, thousand_separator=self.thousand_separator))
-        self.table.add_row("Column", dc_int.format(num_cols, thousand_separator=self.thousand_separator))
+        self.table.add_row("File Name", dc_str.format(self.dftable.filename, justify="right"))
+        self.table.add_row("Row Count", dc_int.format(num_rows, thousand_separator=self.thousand_separator))
+        self.table.add_row("Column Count", dc_int.format(num_cols, thousand_separator=self.thousand_separator))
 
         self.table.cursor_type = "none"
 
