@@ -833,18 +833,18 @@ class DataFrameViewer(App):
         try:
             if fmt == "csv":
                 df.write_csv(filename)
-            elif fmt in ("tsv", "tab"):
+            elif fmt == "tsv":
                 df.write_csv(filename, separator="\t")
             elif fmt == "psv":
                 df.write_csv(filename, separator="|")
             elif fmt in ("xlsx", "xls"):
                 self.save_excel(filename, all_tabs=all_tabs, use_view=use_view)
-            elif fmt == "json":
-                df.write_json(filename)
-            elif fmt == "ndjson":
-                df.write_ndjson(filename)
             elif fmt == "parquet":
                 df.write_parquet(filename)
+            elif fmt in ("jsonl", "ndjson"):
+                df.write_ndjson(filename)
+            elif fmt == "json":
+                df.write_json(filename)
             elif fmt == "vortex":
                 import vortex as vx
 

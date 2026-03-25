@@ -20,9 +20,10 @@ SUPPORTED_FORMATS = {
     "xlsx": None,
     "xls": None,
     "parquet": None,
-    "vortex": None,
-    "json": None,
     "ndjson": None,
+    "jsonl": None,
+    "json": None,
+    "vortex": None,
 }
 
 
@@ -871,8 +872,13 @@ def load_file(
     elif fmt == "parquet":
         lf = pl.scan_parquet(source, n_rows=n_rows)
         data.append(Source(lf, filename, filepath.stem))
-    elif fmt == "vortex":
-        lf = scan_vortex(source, n_rows=n_rows)
+    elif fmt in ("jsonl", "ndjson"):
+        lf = pl.scan_ndjson(
+            source,
+            n_rows=n_rows,
+            infer_schema_length=infer_schema_length,
+            ignore_errors=ignore_errors,
+        )
         data.append(Source(lf, filename, filepath.stem))
     elif fmt == "json":
         try:
@@ -883,16 +889,11 @@ def load_file(
         if n_rows is not None:
             df = df.head(n_rows)
         data.append(Source(df.lazy(), filename, filepath.stem))
-    elif fmt == "ndjson":
-        lf = pl.scan_ndjson(
-            source,
-            n_rows=n_rows,
-            infer_schema_length=infer_schema_length,
-            ignore_errors=ignore_errors,
-        )
+    elif fmt == "vortex":
+        lf = scan_vortex(source, n_rows=n_rows)
         data.append(Source(lf, filename, filepath.stem))
     else:
-        raise ValueError(f"Unsupported file format: {fmt}. Supported formats are: {SUPPORTED_FORMATS}")
+        raise ValueError(f"Unsupported file format: {fmt}. Supported formats are: {', '.join(SUPPORTED_FORMATS)}")
 
     # Attempt to collect, handling ComputeError for schema inference issues
     try:
@@ -937,7 +938,7 @@ def write_file(sources: list[Source], filename: str, fmt: str) -> None:
             sources[0].lf.sink_csv(filename, separator="|")
         elif fmt == "parquet":
             sources[0].lf.sink_parquet(filename)
-        elif fmt == "ndjson":
+        elif fmt in ("jsonl", "ndjson"):
             sources[0].lf.sink_ndjson(filename)
         elif fmt == "json":
             sources[0].lf.collect().write_json(filename)
@@ -954,7 +955,10 @@ def write_file(sources: list[Source], filename: str, fmt: str) -> None:
                         worksheet = wb.add_worksheet(source.tabname)
                         source.lf.collect().write_excel(workbook=wb, worksheet=worksheet)
         else:
-            print(f"Unsupported output format: {fmt}. Supported formats are: {SUPPORTED_FORMATS}", file=sys.stderr)
+            print(
+                f"Unsupported output format: {fmt}. Supported formats are: {', '.join(SUPPORTED_FORMATS)}",
+                file=sys.stderr,
+            )
             sys.exit(1)
     except Exception as e:
         print(f"Error writing to output file: {e}", file=sys.stderr)
