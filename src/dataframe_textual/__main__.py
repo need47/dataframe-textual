@@ -67,10 +67,15 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "-d",
         "--delimiter",
-        help="Specify the delimiter of the input files (must be a single character, e.g., `|` or `;`)",
+        help="Specify the delimiter of the input files (must be a single character, e.g., `|` or `;`). By default, the delimiter is inferred from the file extension. If reading from stdin, the delimiter must be specified unless it is tab delimited.",
     )
     parser.add_argument(
         "-f",
+        "--format",
+        help="Specify the format of the input files (e.g., `csv` or `excel`). By default, the format is inferred from the file extension. If reading from stdin, the format must be specified unless it is tab delimited.",
+    )
+    parser.add_argument(
+        "-F",
         "--fields",
         nargs="*",
         action=ConstWithMultiArgs,
@@ -166,10 +171,7 @@ def cli() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
-
-    if args.delimiter and len(args.delimiter) != 1:
-        print("Delimiter must be a single character.", file=sys.stderr)
-        sys.exit(1)
+    validate_args(args)
 
     # List available themes and exit
     if args.theme == "list":
@@ -215,17 +217,10 @@ def cli() -> argparse.Namespace:
 def main() -> None:
     args = cli()
 
-    if args.output:
-        if not (fmt := guess_file_format(args.output)):
-            print(
-                f"Unsupported output file format for `{args.output}`. Supported formats: {', '.join(SUPPORTED_FORMATS)}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
     sources = load_dataframe(
         args.files,
         delimiter=args.delimiter,
+        format=args.format,
         header=args.header,
         infer_schema=not args.no_inference,
         infer_schema_length=args.infer_schema_length,
@@ -261,11 +256,43 @@ def main() -> None:
 
     # If output file is specified, write the (optionally modified) data to the output file and exit
     if args.output:
-        return write_file(sources, args.output, fmt)
+        return write_file(sources, args.output)
 
     # Run the DataFrame Viewer application
     app = DataFrameViewer(*sources, theme=args.theme)
     handle_compute_error(app.run())
+
+
+def validate_args(args: argparse.Namespace) -> None:
+    """Validate command-line arguments and exit with an error message if invalid.
+
+    Checks for various argument conditions such as file existence, valid delimiters,
+    supported formats, and consistency between format and delimiter specifications.
+
+    Args:
+        args: The parsed command-line arguments to validate.
+    """
+    if args.delimiter and len(args.delimiter) != 1:
+        print("Delimiter must be a single character.", file=sys.stderr)
+        sys.exit(1)
+
+    if args.format and args.format not in SUPPORTED_FORMATS:
+        print(
+            f"Unsupported format: `{args.format}`. Supported formats: {', '.join(SUPPORTED_FORMATS)}", file=sys.stderr
+        )
+        sys.exit(1)
+
+    if args.delimiter and args.format:
+        print("Cannot specify both delimiter and format.", file=sys.stderr)
+        sys.exit(1)
+
+    if args.output:
+        if not guess_file_format(args.output):
+            print(
+                f"Unsupported output file format for `{args.output}`. Supported formats: {', '.join(SUPPORTED_FORMATS)}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
 
 if __name__ == "__main__":

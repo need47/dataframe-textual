@@ -1,6 +1,6 @@
 # DataFrame Textual
 
-A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet](https://parquet.apache.org/)/[Vortex](https://vortex.dev/)/JSON/NDJSON built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in terminal with multi-tab support for multiple files!
+A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet](https://parquet.apache.org/)/[Vortex](https://vortex.dev/)/JSON/[NDJSON](https://jsonlines.org/) built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in terminal with multi-tab support for multiple files!
 
 ![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshot.png)
 
@@ -68,16 +68,6 @@ pip install -e ".[dev]"
 ```bash
 # After pip install dataframe-textual
 dv pokemon.csv
-
-# Read from stdin (defaults to TSV)
-cat data.tsv | dv
-dv < data.tsv
-
-# Specify delimiter
-dv data.txt -d '|'
-
-# Gzipped files are supported
-dv data.csv.gz
 ```
 
 ### Multi-File Usage - Multiple Tabs
@@ -101,20 +91,11 @@ dv data1.tsv < data2.tsv
 dv *.parquet --all-in-one
 ```
 
-When multiple files are opened:
-- Each file appears as a separate tab. An Excel file may contain multiple tabs.
-- Move the current tab with `>` (right, wrap to first) or `<` (left, wrap to last); use `b` to cycle tabs
-- Save current tab to file with `Ctrl+T`
-- Save all tabs to file with `Ctrl+S`
-- Duplicate the current tab with `Ctrl+D`
-- Open additional files with `Ctrl+O`
-- Each file maintains its own state (edits, sort order, selections, history, etc.) and allow undo/redo.
-
 ## Command Line Options
 
 ```
-usage: dv [-h] [-V] [-d DELIMITER] [-f [FIELDS ...]] [-H [HEADER ...]] [-L [N]] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M [N]] [-N NULL [NULL ...]] [--theme [THEME]] [--all-in-one]
-          [--sql SQL] [-o OUTPUT]
+usage: dv [-h] [-V] [-d DELIMITER] [-f FORMAT] [-F [FIELDS ...]] [-H [HEADER ...]] [-L [N]] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M [N]] [-N NULL [NULL ...]] [--theme [THEME]]
+          [--all-in-one] [--sql SQL] [-o OUTPUT]
           [files ...]
 
 TUI viewer/editor for tabular data (e.g., CSV/Excel).
@@ -126,8 +107,11 @@ options:
   -h, --help            show this help message and exit
   -V, --version         show program's version number and exit
   -d, --delimiter DELIMITER
-                        Specify the delimiter of the input files (must be a single character, e.g., `|` or `;`)
-  -f, --fields [FIELDS ...]
+                        Specify the delimiter of the input files (must be a single character, e.g., `|` or `;`). By default, the delimiter is inferred from the file extension. If reading from stdin, the
+                        delimiter must be specified unless it is tab delimited.
+  -f, --format FORMAT   Specify the format of the input files (e.g., `csv` or `excel`). By default, the format is inferred from the file extension. If reading from stdin, the format must be specified
+                        unless it is tab delimited.
+  -F, --fields [FIELDS ...]
                         When used without values, list available fields. Otherwise, read only specified fields.
   -H, --header [HEADER ...]
                         Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column header (e.g., `-H col1 col2 col3`).
@@ -159,11 +143,18 @@ options:
 # Open a file
 dv data.csv
 
-# Process compressed data
+# Gzipped files are supported
 dv data.csv.gz
 
-# Read from stdin
-zcat compressed_data.csv.gz | dv -f csv
+# Read from stdin (defaults to TSV)
+cat data.tsv | dv
+dv < data.tsv
+
+# Specify delimiter
+dv data.txt -d '|'
+
+# Specify format
+dv data.json -f ndjson
 
 # View headless CSV file
 dv data_no_header.csv -H
@@ -202,10 +193,10 @@ dv data.tsv -Q
 dv data.csv --theme monokai
 
 # Show column headers
-dv data.csv -f
+dv data.csv -F
 
 # Read only specific columns: 'name', 'age', first column, and last column
-dv data.csv -f name age 1 -1
+dv data.csv -F name age 1 -1
 
 # Read all files (must be of same format and same structure) into one single table
 dv data-1.csv data-2.csv --all-in-one

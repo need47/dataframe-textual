@@ -1,5 +1,6 @@
 """Common utilities and constants for dataframe_viewer."""
 
+import json
 import os
 import re
 import sys
@@ -662,6 +663,7 @@ def guess_file_format(filename: str | Path) -> str | None:
 def load_dataframe(
     filenames: list[str],
     delimiter: str | None = None,
+    format: str | None = None,
     header: bool | list[str] = True,
     infer_schema: bool = True,
     infer_schema_length: int | None = 100,
@@ -683,7 +685,8 @@ def load_dataframe(
 
     Args:
         filenames: List of filenames to load. If single filename is "-", read from stdin.
-        delimiter: Optional delimiter specifier for input files (e.g., ';' for SSV).
+        delimiter: Optional delimiter specifier for input files (e.g., ';' for SSV). Defaults to None (infer from file extension).
+        format: Optional format specifier for input files (e.g., 'csv' or 'excel'). Defaults to None (infer from file extension).
         header: Specify header info. for CSV/TSV files. Can be True (header in first line), False (no header, auto-generate column names), or list of column names to use. Defaults to True.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
         infer_schema_length: Number of rows to use for schema inference when infer_schema is True. Defaults to 100.
@@ -727,6 +730,7 @@ def load_dataframe(
             source,
             prefix_sheet=prefix_sheet,
             delimiter=delimiter,
+            format=format,
             header=header,
             infer_schema=infer_schema,
             infer_schema_length=infer_schema_length,
@@ -758,6 +762,7 @@ def load_file(
     first_sheet: bool = False,
     prefix_sheet: bool = False,
     delimiter: str | None = None,
+    format: str | None = None,
     header: bool | list[str] = True,
     infer_schema_length: int | None = 100,
     infer_schema: bool = True,
@@ -785,6 +790,7 @@ def load_file(
         first_sheet: If True, only load first sheet for Excel files. Defaults to False.
         prefix_sheet: If True, prefix filename to sheet name as the tab name for Excel files. Defaults to False.
         delimiter: Optional delimiter specifier for input files (e.g., ';' for SSV). Defaults to None (infer from file extension).
+        format: Optional format specifier for input files (e.g., 'csv' or 'excel'). Defaults to None (infer from file extension).
         header: Specify header info. for the input file. Can be True (header in first line), False (no header, auto-generate column names), or list of column names to use.
         infer_schema: Whether to infer data types for CSV/TSV files. Defaults to True.
         infer_schema_length: Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100.
@@ -804,13 +810,8 @@ def load_file(
     """
     data: list[Source] = []
 
-    fmt = None if delimiter else guess_file_format(source)
-
-    if delimiter:
-        fmt = None
-    else:
-        # Default to TSV if format cannot be determined
-        fmt = guess_file_format(source) or "tsv"
+    fmt = format or (None if delimiter else guess_file_format(source) or "tsv")
+    if fmt:
         delimiter = SUPPORTED_FORMATS.get(fmt)
 
     filename = f"stdin.{fmt}" if isinstance(source, StringIO) else source
@@ -873,13 +874,23 @@ def load_file(
         lf = pl.scan_parquet(source, n_rows=n_rows)
         data.append(Source(lf, filename, filepath.stem))
     elif fmt in ("jsonl", "ndjson"):
+        # https://github.com/pola-rs/polars/issues/23023
+        # read_ndjson does not retain column order for 33 or more columns
+        if isinstance(source, StringIO):
+            line = source.readline()
+            ordered_columns = json.loads(line).keys()  # Get column order from the first line
+            source.seek(0)  # Reset StringIO to the beginning after validation
+        else:
+            with open(source) as f:
+                line = f.readline()
+                ordered_columns = json.loads(line).keys()  # Get column order from the first line
         lf = pl.scan_ndjson(
             source,
             n_rows=n_rows,
             infer_schema_length=infer_schema_length,
             ignore_errors=ignore_errors,
         )
-        data.append(Source(lf, filename, filepath.stem))
+        data.append(Source(lf.select(ordered_columns), filename, filepath.stem))
     elif fmt == "json":
         try:
             df = pl.read_json(source)
@@ -920,7 +931,14 @@ def load_file(
     return data
 
 
-def write_file(sources: list[Source], filename: str, fmt: str) -> None:
+def write_file(sources: list[Source], filename: str) -> None:
+    if not (fmt := guess_file_format(filename)):
+        print(
+            f"Unsupported output file format for `{filename}`. Supported formats: {', '.join(SUPPORTED_FORMATS)}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     if len(sources) > 1 and fmt not in ("xlsx", "xls"):
         print("Only Excel formats (.xlsx, .xls) support multiple tabs", file=sys.stderr)
         sys.exit(1)
