@@ -2751,9 +2751,9 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        deleted_count = old_count - len(self.df)
-        if deleted_count > 0:
-            self.notify(f"Deleted [$success]{deleted_count}[/] row(s)", title="Delete Row(s)")
+        # deleted_count = old_count - len(self.df)
+        # if deleted_count > 0:
+        #     self.notify(f"Deleted [$success]{deleted_count}[/] row(s)", title="Delete Row(s)")
 
     def do_duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""

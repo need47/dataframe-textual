@@ -1,9 +1,11 @@
 """Common utilities and constants for dataframe_viewer."""
 
+import gzip
 import json
 import os
 import re
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
@@ -615,6 +617,71 @@ def round_to_nearest_hundreds(num: int, N: int = 100) -> tuple[int, int]:
     return (lower, upper)
 
 
+@contextmanager
+def zopen(source: str | Path | StringIO):
+    """Context manager to open files, including gzip compressed files.
+
+    Args:
+        source: The file path, Path object, or StringIO to open.
+
+    Yields:
+        A file-like object for the opened source.
+    """
+    # Handle StringIO from stdin directly
+    if isinstance(source, StringIO):
+        yield source
+
+    # file-like object
+    else:
+        filepath = Path(source)
+        is_gzipped = filepath.suffix.lower() == ".gz"
+
+        if is_gzipped:
+            with gzip.open(filepath, "rt") as f:
+                yield f
+        else:
+            with open(filepath, "r") as f:
+                yield f
+
+
+def scan_ndjson(
+    source: str | Path | StringIO,
+    n_rows: int | None = None,
+    infer_schema_length: int | None = 100,
+    ignore_errors: bool = False,
+) -> pl.LazyFrame:
+    """Scan an NDJSON file into a Polars LazyFrame while preserving column order.
+
+    Args:
+        source: Path to the NDJSON file, a Path object, or a StringIO object.
+        n_rows: Number of rows to read from the file. If None, read all rows. Defaults to None.
+        infer_schema_length: Number of rows to use for schema inference. Defaults to 100.
+        ignore_errors: Whether to ignore errors during scanning. Defaults to False.
+
+    Returns:
+        A Polars LazyFrame representing the scanned NDJSON data.
+    """
+    # https://github.com/pola-rs/polars/issues/23023
+    # read_ndjson does not retain column order for 33 or more columns
+    with zopen(source) as f:
+        # Get column order from the first line
+        line = f.readline()
+        ordered_columns = json.loads(line).keys()
+
+        # Reset file to the beginning
+        f.seek(0)
+
+        lf = pl.scan_ndjson(
+            f,
+            n_rows=n_rows,
+            infer_schema_length=infer_schema_length,
+            ignore_errors=ignore_errors,
+        )
+
+    # Reorder columns to match original order
+    return lf.select(pl.col(ordered_columns))
+
+
 def scan_vortex(source: str | list[str], n_rows: int | None = None) -> pl.LazyFrame:
     """Scan a Vortex file into a Polars LazyFrame.
 
@@ -874,23 +941,8 @@ def load_file(
         lf = pl.scan_parquet(source, n_rows=n_rows)
         data.append(Source(lf, filename, filepath.stem))
     elif fmt in ("jsonl", "ndjson"):
-        # https://github.com/pola-rs/polars/issues/23023
-        # read_ndjson does not retain column order for 33 or more columns
-        if isinstance(source, StringIO):
-            line = source.readline()
-            ordered_columns = json.loads(line).keys()  # Get column order from the first line
-            source.seek(0)  # Reset StringIO to the beginning after validation
-        else:
-            with open(source) as f:
-                line = f.readline()
-                ordered_columns = json.loads(line).keys()  # Get column order from the first line
-        lf = pl.scan_ndjson(
-            source,
-            n_rows=n_rows,
-            infer_schema_length=infer_schema_length,
-            ignore_errors=ignore_errors,
-        )
-        data.append(Source(lf.select(ordered_columns), filename, filepath.stem))
+        lf = scan_ndjson(source, n_rows=n_rows, infer_schema_length=infer_schema_length, ignore_errors=ignore_errors)
+        data.append(Source(lf, filename, filepath.stem))
     elif fmt == "json":
         try:
             df = pl.read_json(source)
