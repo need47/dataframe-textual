@@ -3598,6 +3598,7 @@ class DataFrameTable(DataTable):
         """
         cidx = self.cursor_cidx
         col_name = self.cursor_col_name
+        dtype = self.df.dtypes[cidx]
 
         if result:
             self.view_rows(result)
@@ -3609,7 +3610,13 @@ class DataFrameTable(DataTable):
             else:
                 ridx = self.cursor_ridx
                 value = self.df.item(ridx, cidx)
-                term = pl.col(col_name).is_null() if value is None else pl.col(col_name) == value
+                term = (
+                    pl.col(col_name).is_null()
+                    if value is None
+                    else pl.col(col_name) == value.to_list()
+                    if isinstance(dtype, pl.List)
+                    else pl.col(col_name) == value
+                )
 
             self.view_rows(
                 {
@@ -3626,7 +3633,8 @@ class DataFrameTable(DataTable):
         """View non-null rows."""
         cidx = self.cursor_cidx
         col_name = self.cursor_col_name
-        term = pl.col(col_name).is_not_null()
+        dtype = self.df.dtypes[cidx]
+        term = pl.col(col_name).list.len() > 0 if isinstance(dtype, pl.List) else pl.col(col_name).is_not_null()
 
         self.view_rows(
             {
@@ -3643,8 +3651,9 @@ class DataFrameTable(DataTable):
         """Open the view screen to enter an expression."""
         ridx = self.cursor_ridx
         cidx = self.cursor_cidx
-        cursor_value = self.df.item(ridx, cidx)
-        term = NULL if cursor_value is None else str(cursor_value)
+        dtype = self.df.dtypes[cidx]
+        value = self.df.item(ridx, cidx)
+        term = NULL if value is None else (str(value.to_list()) if isinstance(dtype, pl.List) else str(value))
 
         self.app.push_screen(
             SearchScreen("View Rows", self.df, cidx, term),
@@ -3704,6 +3713,30 @@ class DataFrameTable(DataTable):
         else:
             if dtype == pl.String:
                 expr = handle_term(term, col_name, match_nocase, match_whole, match_literal)
+            elif dtype == pl.List and isinstance(term, str):
+                # list
+                if term.startswith("[") and term.endswith("]"):
+                    try:
+                        list_value = eval(term)
+
+                        if isinstance(list_value, list):
+                            expr = pl.col(col_name) == list_value
+                        else:
+                            expr = pl.col(col_name) == term
+                            self.notify(
+                                f"Invalid list format for column [$warning]{col_name}[/]. Cast to string.",
+                                title="View Rows",
+                            )
+                    except Exception as e:
+                        expr = pl.col(col_name) == term
+                        self.notify(
+                            f"Error evaling for column [$warning]{col_name}[/]. Cast to string.",
+                            title="View Rows",
+                        )
+                        self.log(f"Error evaling term `{term}` for list column `{col_name}`: {str(e)}")
+                # element
+                else:
+                    expr = pl.col(col_name).list.contains(term)
             else:
                 try:
                     value = DtypeConfig(dtype).convert(term)
@@ -3775,10 +3808,13 @@ class DataFrameTable(DataTable):
         else:  # Search cursor value in current column
             cidx = self.cursor_cidx if cidx is None else cidx
             col_name = self.df.columns[cidx]
+            dtype = self.df.dtypes[cidx]
             term = self.cursor_value if term is None else term
 
             if term is None:
                 filter_expr = pl.col(col_name).is_null()
+            elif isinstance(dtype, pl.List):
+                filter_expr = pl.col(col_name) == term.to_list()
             else:
                 filter_expr = pl.col(col_name) == term
 
@@ -3812,12 +3848,16 @@ class DataFrameTable(DataTable):
             term = pl.col(RID).is_in(self.matches)
         else:
             col_name = self.cursor_col_name
+            dtype = self.df.dtypes[cidx]
+            value = self.cursor_value
 
             # Get the value of the currently selected cell
-            if self.cursor_value is None:
+            if value is None:
                 term = pl.col(col_name).is_null()
+            elif isinstance(dtype, pl.List):
+                term = pl.col(col_name) == value.to_list()
             else:
-                term = pl.col(col_name) == self.cursor_value
+                term = pl.col(col_name) == value
 
         self.select_rows(
             {
@@ -3833,9 +3873,11 @@ class DataFrameTable(DataTable):
     def do_select_rows_expr(self) -> None:
         """Select rows by expression."""
         cidx = self.cursor_cidx
+        dtype = self.df.dtypes[cidx]
+        value = self.cursor_value
 
         # Use current cell value as default search term
-        term = NULL if self.cursor_value is None else str(self.cursor_value)
+        term = NULL if value is None else (str(value.to_list()) if isinstance(dtype, pl.List) else str(value))
 
         # Push the search modal screen
         self.app.push_screen(
@@ -3887,7 +3929,7 @@ class DataFrameTable(DataTable):
                 expr = validate_expr(term, self.df.columns, cidx)
             except Exception as e:
                 self.notify(
-                    f"Error validating expression [$error]{term}[/]", title="Select Row", severity="error", timeout=10
+                    f"Error validating expression [$error]{term}[/]", title="Select Rows", severity="error", timeout=10
                 )
                 self.log(f"Error validating expression `{term}`: {str(e)}")
                 return
@@ -3897,6 +3939,29 @@ class DataFrameTable(DataTable):
             dtype = self.df.dtypes[cidx]
             if dtype == pl.String:
                 expr = handle_term(term, col_name, match_nocase, match_whole, match_literal)
+            elif dtype == pl.List and isinstance(term, str):
+                # list
+                if term.startswith("[") and term.endswith("]"):
+                    try:
+                        list_value = eval(term)
+                        if isinstance(list_value, list):
+                            expr = pl.col(col_name) == list_value
+                        else:
+                            expr = pl.col(col_name) == term
+                            self.notify(
+                                f"Invalid list format for column [$warning]{col_name}[/]. Cast to string.",
+                                title="Select Rows",
+                            )
+                    except Exception as e:
+                        expr = pl.col(col_name) == term
+                        self.notify(
+                            f"Error evaling for column [$warning]{col_name}[/]. Cast to string.",
+                            title="Select Rows",
+                        )
+                        self.log(f"Error evaling term `{term}` for list column `{col_name}`: {str(e)}")
+                # element
+                else:
+                    expr = pl.col(col_name).list.contains(term)
             else:
                 try:
                     value = DtypeConfig(dtype).convert(term)
@@ -3905,7 +3970,7 @@ class DataFrameTable(DataTable):
                     expr = handle_term(term, col_name, match_nocase, match_whole, match_literal, cast_to_str=True)
                     self.notify(
                         f"Error converting [$error]{term}[/] to [$accent]{dtype}[/]. Cast to string.",
-                        title="Select Row",
+                        title="Select Rows",
                         severity="warning",
                     )
 
@@ -3930,7 +3995,7 @@ class DataFrameTable(DataTable):
         if match_count == 0:
             self.notify(
                 f"No matches found for `[$warning]{term}[/]`. Try other search options.",
-                title="Select Row",
+                title="Select Rows",
                 severity="warning",
             )
             return
