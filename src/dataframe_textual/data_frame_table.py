@@ -36,6 +36,7 @@ from .common import (
     NULL,
     NULL_DISPLAY,
     RID,
+    RID_OLD,
     SUBSCRIPT_DIGITS,
     DtypeConfig,
     format_row,
@@ -45,7 +46,7 @@ from .common import (
     tentative_expr,
     validate_expr,
 )
-from .loading_screen import LoadingScreen
+from .loading_screen import BusyScreen, LoadingScreen
 from .table_screen import FrequencyScreen, MetaColumnScreen, MetaShape, RowDetailScreen, StatisticsScreen
 from .yes_no_screen import (
     AddColumnScreen,
@@ -54,6 +55,7 @@ from .yes_no_screen import (
     ConfirmScreen,
     EditCellScreen,
     EditColumnScreen,
+    ExplodeColumnScreen,
     FindReplaceScreen,
     FreezeScreen,
     GoToRowScreen,
@@ -114,18 +116,21 @@ class ReplaceState:
     done: bool = False  # Whether the replace operation is complete
 
 
-def add_rid_column(df: pl.DataFrame, offset: int = 0) -> pl.DataFrame:
+def add_rid_column(frame: pl.DataFrame | pl.LazyFrame, offset: int = 0) -> pl.DataFrame | pl.LazyFrame:
     """Add internal row index as last column to the dataframe if not already present.
 
     Args:
-        df: The Polars DataFrame to modify.
+        frame: The Polars DataFrame or LazyFrame to modify.
         offset: The starting index for the row IDs.
     Returns:
-        The modified DataFrame with the internal row index column added.
+        The modified DataFrame or LazyFrame with the internal row index column added.
     """
-    if df is not None and RID not in df.columns:
-        df = df.lazy().with_row_index(RID, offset=offset).select(pl.exclude(RID), RID).collect()
-    return df
+    if isinstance(frame, pl.DataFrame):
+        frame = frame.lazy().with_row_index(RID, offset=offset).select(pl.exclude(RID), RID).collect()
+    elif isinstance(frame, pl.LazyFrame):
+        frame = frame.with_row_index(RID, offset=offset).select(pl.exclude(RID), RID)
+
+    return frame
 
 
 def handle_term(
@@ -222,6 +227,7 @@ class DataFrameTable(DataTable):
         - **-** - ❌ Delete current column
         - **d** - 📋 Duplicate current column
         - **D** - 📋 Duplicate current row
+        - **o** - 💥 Explode current list column into rows
 
         ## ✅ Row Selection
         - **\\\\** - ✅ Select rows with cell matches or those matching cursor value in current column
@@ -346,6 +352,9 @@ class DataFrameTable(DataTable):
         # Edit
         ("e", "edit_cell", "Edit cell"),
         ("E", "edit_column", "Edit column"),
+        # Explode
+        ("o", "explode_column", "Explode column"),
+        ("O", "explode_column_delim", "Explode column by delimiter"),
         # Add
         ("a", "add_column", "Add column"),
         ("A", "add_column_expr", "Add column with expression"),
@@ -471,19 +480,6 @@ class DataFrameTable(DataTable):
         # fully loaded the dataframe
         self.df_done = True
 
-    def check_data_ready(self, callback: callable = None) -> bool:
-        """Check if the dataframe is fully loaded.
-
-        If not ready, show LoadingScreen and execute callback when done.
-
-        Returns:
-            bool: True if already ready, False otherwise.
-        """
-        if not self.df_done:
-            self.app.push_screen(LoadingScreen(self, callback=callback))
-            return False
-        return True
-
     def wait_full_df(func):
         """Decorator to ensure the dataframe is fully loaded before executing a method.
 
@@ -492,9 +488,11 @@ class DataFrameTable(DataTable):
         """
 
         def wrapper(self, *args, **kwargs):
-            callback = partial(func, self, *args, **kwargs)
-            if self.check_data_ready(callback):
+            if self.df_done:
                 return func(self, *args, **kwargs)
+
+            callback = partial(func, self, *args, **kwargs)
+            self.app.push_screen(LoadingScreen(self, callback=callback))
 
         return wrapper
 
@@ -535,6 +533,15 @@ class DataFrameTable(DataTable):
         return self.cursor_col_key.value
 
     @property
+    def cursor_col_dtype(self) -> pl.DataType:
+        """Get the current cursor column dtype.
+
+        Returns:
+            pl.DataType: The Polars data type of the column containing the cursor.
+        """
+        return self.df.schema[self.cursor_col_name]
+
+    @property
     def cursor_ridx(self) -> int:
         """Get the current cursor row index (0-based) as in dataframe.
 
@@ -558,7 +565,7 @@ class DataFrameTable(DataTable):
         Raises:
             AssertionError: If the cursor column index is out of bounds.
         """
-        cidx = self.df.columns.index(self.cursor_col_key.value)
+        cidx = self.df.columns.index(self.cursor_col_name)
         assert 0 <= cidx < len(self.df.columns), "Cursor column index is out of bounds"
         return cidx
 
@@ -1011,6 +1018,15 @@ class DataFrameTable(DataTable):
     def action_duplicate_column(self) -> None:
         """Duplicate the current column."""
         self.do_duplicate_column()
+
+    @wait_full_df
+    def action_explode_column(self) -> None:
+        """Explode the current list column into multiple rows."""
+        self.do_explode_column()
+
+    def action_explode_column_delim(self) -> None:
+        """Explode the current column by a delimiter into multiple rows."""
+        self.do_explode_column_delim()
 
     @wait_full_df
     def action_duplicate_row(self) -> None:
@@ -1917,14 +1933,15 @@ class DataFrameTable(DataTable):
 
     def do_expand_column(self) -> None:
         """Expand the current column to show the widest cell in the loaded data."""
-        cidx = self.cursor_cidx
-        col_key = self.cursor_col_key
-        col_name = col_key.value
-        dtype = self.df.dtypes[cidx]
+        dtype = self.cursor_col_dtype
 
         # Only expand string columns
         if dtype != pl.String and dtype != pl.List:
             return
+
+        cidx = self.cursor_cidx
+        col_key = self.cursor_col_key
+        col_name = col_key.value
 
         # The column to expand/shrink
         col: Column = self.columns[col_key]
@@ -2313,8 +2330,8 @@ class DataFrameTable(DataTable):
         """Clear the current cell by setting its value to None."""
         row_key, col_key = self.cursor_key
         ridx = self.cursor_ridx
-        cidx = self.cursor_cidx
         col_name = self.cursor_col_name
+        dtype = self.cursor_col_dtype
 
         # Add to history
         self.add_history(f"Cleared cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
@@ -2344,7 +2361,6 @@ class DataFrameTable(DataTable):
                 )
 
             # Update the display
-            dtype = self.df.dtypes[cidx]
             dc = DtypeConfig(dtype)
             formatted_value = Text(NULL_DISPLAY, style=dc.style, justify=dc.justify)
 
@@ -2686,6 +2702,86 @@ class DataFrameTable(DataTable):
 
         # self.notify(f"Duplicated column [$success]{col_name}[/] as [$accent]{new_col_name}[/]", title="Duplicate Column")
 
+    def do_explode_column(self) -> None:
+        """Explode the current list column into multiple rows."""
+        dtype = self.cursor_col_dtype
+
+        # Only explode list columns
+        if not isinstance(dtype, pl.List):
+            return
+
+        self.task_done = False
+        self.app.push_screen(BusyScreen(self, task=self.explode_column))
+
+    def do_explode_column_delim(self) -> None:
+        """Open screen to explode a string column based on delimiter."""
+        col_name = self.cursor_col_name
+        dtype = self.cursor_col_dtype
+
+        # Only explode string columns
+        if not isinstance(dtype, pl.String):
+            return
+
+        self.app.push_screen(
+            ExplodeColumnScreen(self.df, col_name),
+            callback=self.explode_column_delim,
+        )
+
+    @wait_full_df
+    def explode_column_delim(self, result) -> None:
+        if result is None:
+            return
+        col_name, delimiter = result
+
+        self.task_done = False
+        self.app.push_screen(BusyScreen(self, task=partial(self.explode_column, col_name, delimiter)))
+
+    @work(thread=True)
+    def explode_column(self, col_name: str, delimiter: str | None) -> None:
+        """Explode a column based on a delimiter (if provided) or as a list column."""
+        self.add_history(f"Exploded column [$success]{col_name}[/]", dirty=True)
+
+        try:
+            if self.df_view is not None:
+                old_rids = set(self.df[RID])
+
+                # If a delimiter is provided, split the string column by the delimiter
+                if delimiter:
+                    lf_view = add_rid_column(
+                        self.df_view.lazy()
+                        .rename({RID: RID_OLD})
+                        .with_columns(pl.col(col_name).str.split(delimiter))
+                        .explode(col_name)
+                    )
+                # If no delimiter, just explode the column as is
+                else:
+                    lf_view = add_rid_column(self.df_view.lazy().rename({RID: RID_OLD}).explode(col_name))
+                self.df = lf_view.filter(pl.col(RID_OLD).is_in(old_rids)).drop(RID_OLD).collect()
+                self.df_view = lf_view.drop(RID_OLD).collect()
+            else:
+                if delimiter:
+                    self.df = add_rid_column(
+                        self.df.lazy().drop(RID).with_columns(pl.col(col_name).str.split(delimiter)).explode(col_name)
+                    ).collect()
+                else:
+                    self.df = add_rid_column(self.df.lazy().drop(RID).explode(col_name)).collect()
+
+            self.selected_rows.clear()
+            self.matches = defaultdict(set)
+
+            self.task_done = True
+            self.setup_table()
+        except Exception as e:
+            if self.histories_undo:
+                self.histories_undo.pop()
+            self.notify(
+                f"Error exploding column [$error]{col_name}[/] with delimiter [$error]{delimiter}[/]",
+                title="Explode Column with Delimiter",
+                severity="error",
+                timeout=10,
+            )
+            self.log(f"Error exploding column `{col_name}` with delimiter `{delimiter}`: {str(e)}")
+
     def do_delete_row(self, more: str = None) -> None:
         """Delete rows from the table and dataframe.
 
@@ -2948,9 +3044,8 @@ class DataFrameTable(DataTable):
         Args:
             dtype: Target data type (string representation, e.g., "pl.String", "pl.Int64")
         """
-        cidx = self.cursor_cidx
         col_name = self.cursor_col_name
-        current_dtype = self.df.dtypes[cidx]
+        current_dtype = self.cursor_col_dtype
 
         try:
             target_dtype = eval(dtype)
@@ -3596,20 +3691,19 @@ class DataFrameTable(DataTable):
 
         If there are selected rows, view those, Otherwise, view based on the cursor value.
         """
-        cidx = self.cursor_cidx
-        col_name = self.cursor_col_name
-        dtype = self.df.dtypes[cidx]
-
-        if result:
+        if result is not None:
             self.view_rows(result)
         else:
+            cidx = self.cursor_cidx
+            col_name = self.cursor_col_name
+            dtype = self.cursor_col_dtype
+
             # If there are selected rows, use those
             if self.selected_rows:
                 term = pl.col(RID).is_in(self.selected_rows)
             # Otherwise, use the current cell value
             else:
-                ridx = self.cursor_ridx
-                value = self.df.item(ridx, cidx)
+                value = self.cursor_value
                 term = (
                     pl.col(col_name).is_null()
                     if value is None
@@ -3633,7 +3727,7 @@ class DataFrameTable(DataTable):
         """View non-null rows."""
         cidx = self.cursor_cidx
         col_name = self.cursor_col_name
-        dtype = self.df.dtypes[cidx]
+        dtype = self.cursor_col_dtype
         term = pl.col(col_name).list.len() > 0 if isinstance(dtype, pl.List) else pl.col(col_name).is_not_null()
 
         self.view_rows(
@@ -3649,10 +3743,9 @@ class DataFrameTable(DataTable):
 
     def do_view_rows_expr(self) -> None:
         """Open the view screen to enter an expression."""
-        ridx = self.cursor_ridx
         cidx = self.cursor_cidx
-        dtype = self.df.dtypes[cidx]
-        value = self.df.item(ridx, cidx)
+        dtype = self.cursor_col_dtype
+        value = self.cursor_value
         term = NULL if value is None else (str(value.to_list()) if isinstance(dtype, pl.List) else str(value))
 
         self.app.push_screen(
@@ -3848,7 +3941,7 @@ class DataFrameTable(DataTable):
             term = pl.col(RID).is_in(self.matches)
         else:
             col_name = self.cursor_col_name
-            dtype = self.df.dtypes[cidx]
+            dtype = self.cursor_col_dtype
             value = self.cursor_value
 
             # Get the value of the currently selected cell
@@ -3873,7 +3966,7 @@ class DataFrameTable(DataTable):
     def do_select_rows_expr(self) -> None:
         """Select rows by expression."""
         cidx = self.cursor_cidx
-        dtype = self.df.dtypes[cidx]
+        dtype = self.cursor_col_dtype
         value = self.cursor_value
 
         # Use current cell value as default search term
@@ -3936,7 +4029,6 @@ class DataFrameTable(DataTable):
 
         # Perform type-aware search based on column dtype
         else:
-            dtype = self.df.dtypes[cidx]
             if dtype == pl.String:
                 expr = handle_term(term, col_name, match_nocase, match_whole, match_literal)
             elif dtype == pl.List and isinstance(term, str):

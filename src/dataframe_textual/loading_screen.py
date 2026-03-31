@@ -48,3 +48,41 @@ class LoadingScreen(ModalScreen):
 
     def action_cancel(self) -> None:
         self.dismiss()
+
+
+class BusyScreen(ModalScreen):
+    BINDINGS = [
+        ("q,escape", "cancel", "Cancel"),
+    ]
+
+    DEFAULT_CSS = """
+        BusyScreen {
+            align: center middle;
+        }
+
+        #loading-indicator {
+            width: 17;
+            height: 3;
+            background: $surface-lighten-2 75%; /* close to that used in TableScreen */
+        }
+    """
+
+    def __init__(self, dftable: "DataFrameTable", task: callable) -> None:
+        super().__init__()
+        self.dftable = dftable
+        self.run_task = task
+
+    def compose(self) -> ComposeResult:
+        yield LoadingIndicator(id="loading-indicator")
+
+    def on_mount(self) -> None:
+        self.run_task()
+        self.set_interval(0.1, self.check_progress)
+
+    def check_progress(self) -> None:
+        """Check the loading progress of the dataframe."""
+        if self.dftable.task_done:
+            self.dismiss()
+
+    def action_cancel(self) -> None:
+        self.dismiss()

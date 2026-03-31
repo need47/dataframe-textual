@@ -14,7 +14,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 - 🔄 **Smart Pagination** - Lazy load rows on demand for handling large datasets
 
 ### Data Manipulation
-- 📝 **Data Editing** - Edit cells, delete rows, and remove columns
+- 📝 **Data Editing** - Edit cells, delete rows, remove columns, and explode columns
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
 - ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts
 - 📈 **Sorting & Statistics** - Multi-column sorting and frequency distribution analysis
@@ -288,22 +288,24 @@ dv data.csv -o data.parquet
 
 #### Editing
 
-| Key            | Action                                            |
-| -------------- | ------------------------------------------------- |
-| `Double-click` | Edit cell or rename column header                 |
-| `Delete`       | Clear current cell (set to NULL)                  |
-| `Shift+Delete` | Clear current column (set matching cells to NULL) |
-| `e`            | Edit current cell (respects data type)            |
-| `E`            | Edit entire column with value/expression          |
-| `a`            | Add empty column after current                    |
-| `A`            | Add column with name and value/expression         |
-| `@`            | Add a link column from URL template               |
-| `-` (minus)    | Delete current column                             |
-| `x`            | Delete current row                                |
-| `X`            | Delete current row and all those below            |
-| `Ctrl+X`       | Delete current row and all those above            |
-| `d`            | Duplicate current column                          |
-| `D`            | Duplicate current row                             |
+| Key            | Action                                                        |
+| -------------- | ------------------------------------------------------------- |
+| `Double-click` | Edit cell or rename column header                             |
+| `Delete`       | Clear current cell (set to NULL)                              |
+| `Shift+Delete` | Clear current column (set matching cells to NULL)             |
+| `e`            | Edit current cell (respects data type)                        |
+| `E`            | Edit entire column with value/expression                      |
+| `a`            | Add empty column after current                                |
+| `A`            | Add column with name and value/expression                     |
+| `@`            | Add a link column from URL template                           |
+| `-` (minus)    | Delete current column                                         |
+| `x`            | Delete current row                                            |
+| `X`            | Delete current row and all those below                        |
+| `Ctrl+X`       | Delete current row and all those above                        |
+| `d`            | Duplicate current column                                      |
+| `D`            | Duplicate current row                                         |
+| `o`            | Explode current list column into multiple rows                |
+| `O`            | Explode current string column by delimiter into multiple rows |
 
 #### Row Selection
 

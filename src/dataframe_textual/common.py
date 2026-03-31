@@ -169,6 +169,7 @@ CURSOR_TYPES = ["row", "column", "cell"]
 
 # Row index mapping between filtered and original dataframe
 RID = "^_RID_^"
+RID_OLD = "^_RID_OLD_^"
 
 
 @dataclass

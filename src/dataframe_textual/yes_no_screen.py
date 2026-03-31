@@ -449,50 +449,6 @@ class EditCellScreen(YesNoScreen):
         return self.ridx, self.cidx, new_value
 
 
-class RenameColumnScreen(YesNoScreen):
-    """Modal screen to rename a column."""
-
-    def __init__(self, col_idx: int, col_name: str, existing_columns: list[str]):
-        self.col_idx = col_idx
-        self.col_name = col_name
-        self.existing_columns = [c for c in existing_columns if c != col_name]
-
-        # Label
-        content = f"Rename header [$success]{col_name}[/]"
-
-        super().__init__(
-            title="Rename Column",
-            label=content,
-            input={"value": col_name},
-            on_yes_callback=self._validate_input,
-        )
-
-    def _validate_input(self) -> None:
-        """Validate and save the new column name."""
-        new_name = self.input.value.strip()
-
-        # Check if name is empty
-        if not new_name:
-            self.notify("Column name cannot be empty", title="Rename", severity="error")
-
-        # Check if name changed
-        elif new_name == self.col_name:
-            self.notify("No changes made", title="Rename", severity="warning")
-            new_name = None
-
-        # Check if name already exists
-        elif new_name in self.existing_columns:
-            self.notify(
-                f"Column [$accent]{new_name}[/] already exists",
-                title="Rename",
-                severity="error",
-            )
-            new_name = None
-
-        # Return new name
-        return self.col_idx, self.col_name, new_name
-
-
 class SearchScreen(YesNoScreen):
     """Modal screen to search by value or expression."""
 
@@ -564,6 +520,50 @@ class FreezeScreen(YesNoScreen):
             return None
 
         return fixed_rows, fixed_cols
+
+
+class RenameColumnScreen(YesNoScreen):
+    """Modal screen to rename a column."""
+
+    def __init__(self, col_idx: int, col_name: str, existing_columns: list[str]):
+        self.col_idx = col_idx
+        self.col_name = col_name
+        self.existing_columns = [c for c in existing_columns if c != col_name]
+
+        # Label
+        content = f"Rename header [$success]{col_name}[/]"
+
+        super().__init__(
+            title="Rename Column",
+            label=content,
+            input={"value": col_name},
+            on_yes_callback=self._validate_input,
+        )
+
+    def _validate_input(self) -> None:
+        """Validate and save the new column name."""
+        new_name = self.input.value.strip()
+
+        # Check if name is empty
+        if not new_name:
+            self.notify("Column name cannot be empty", title="Rename", severity="error")
+
+        # Check if name changed
+        elif new_name == self.col_name:
+            self.notify("No changes made", title="Rename", severity="warning")
+            new_name = None
+
+        # Check if name already exists
+        elif new_name in self.existing_columns:
+            self.notify(
+                f"Column [$accent]{new_name}[/] already exists",
+                title="Rename",
+                severity="error",
+            )
+            new_name = None
+
+        # Return new name
+        return self.col_idx, self.col_name, new_name
 
 
 class EditColumnScreen(YesNoScreen):
@@ -652,6 +652,26 @@ class AddColumnScreen(YesNoScreen):
                     severity="warning",
                 )
                 return self.cidx, col_name, pl.lit(term)
+
+
+class ExplodeColumnScreen(YesNoScreen):
+    """Modal screen to explode a column by a delimiter."""
+
+    def __init__(self, df: pl.DataFrame, col_name: str):
+        self.df = df
+        self.col_name = col_name
+
+        super().__init__(
+            title="Explode Column",
+            label=f"Enter the delimiter (e.g., `,` or `;`) to split the values in [$success]{col_name}[/]",
+            input="|",
+            on_yes_callback=self._get_input,
+        )
+
+    def _get_input(self) -> tuple[str, str]:
+        """Get input."""
+        delimiter = self.input.value  # Do not strip to preserve spaces
+        return self.col_name, delimiter
 
 
 class AddLinkScreen(AddColumnScreen):
