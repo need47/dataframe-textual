@@ -542,6 +542,14 @@ def handle_compute_error(err_msg: str) -> None:
         )
         sys.exit(1)
 
+    # no data to load
+    elif "The provided LazyFrame has no data to load" in err_msg:
+        print(
+            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nNo data could be read from the input. Check if the file is empty or if the format/delimiter is correct.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     else:
         print(
             f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nUnhandled error. Try again with `-E` to ignore errors", file=sys.stderr
