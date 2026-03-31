@@ -66,7 +66,7 @@ pip install -e ".[dev]"
 ### Basic Usage - Single File
 
 ```bash
-# After pip install dataframe-textual
+# Open one file
 dv pokemon.csv
 ```
 
@@ -76,7 +76,7 @@ dv pokemon.csv
 # Open multiple files in tabs
 dv file1.csv file2.csv file3.csv
 
-# Open multiple sheets in tabs in an Excel file
+# Open multiple sheets in an Excel file as separate tabs
 dv file.xlsx
 
 # Mix files and stdin
