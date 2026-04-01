@@ -1178,27 +1178,6 @@ class DataFrameTable(DataTable):
         """Open the advanced SQL interface screen."""
         self.do_advanced_sql()
 
-    # Setup & Loading
-    def reset_df(self, new_df: pl.DataFrame, dirty: bool = True) -> None:
-        """Reset the dataframe to a new one and refresh the table.
-
-        Args:
-            new_df: The new Polars DataFrame to set.
-            dirty: Whether to mark the table as dirty (unsaved changes). Defaults to True.
-        """
-        # Set new dataframe and reset table
-        self.df = new_df
-        self.loaded_rows = 0
-        self.hidden_columns = set()
-        self.selected_rows = set()
-        self.sorted_columns = {}
-        self.fixed_rows = 0
-        self.fixed_columns = 0
-        self.matches = defaultdict(set)
-        # self.histories.clear()
-        # self.histories2.clear()
-        self.dirty = dirty  # Mark as dirty since data changed
-
     def setup_table(self) -> None:
         """Setup the table for display.
 
@@ -1823,7 +1802,19 @@ class DataFrameTable(DataTable):
 
     def do_reset(self) -> None:
         """Reset the table to the initial state."""
-        self.reset_df(self.dataframe, dirty=False)
+        self.df = self.dataframe
+        self.df_view = None
+        self.loaded_rows = 0
+        self.hidden_columns = set()
+        self.selected_rows = set()
+        self.sorted_columns = {}
+        self.fixed_rows = 0
+        self.fixed_columns = 0
+        self.matches = defaultdict(set)
+        # self.histories.clear()
+        # self.histories2.clear()
+        self.dirty = False
+
         self.setup_table()
         self.notify("Restored initial state", title="Reset")
 
