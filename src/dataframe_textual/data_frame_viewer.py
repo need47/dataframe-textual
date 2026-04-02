@@ -817,40 +817,41 @@ class DataFrameViewer(App):
         filename = str(Path(filepath))
         if not (fmt := guess_file_format(filename)):
             self.notify(
-                f"Unsupported file format [$success]{fmt}[/]. Use [$accent]TSV[/] as fallback. Supported formats are: {', '.join(SUPPORTED_FORMATS)}",
+                f"Unsupported file format [$error]{fmt}[/] for [$accent]{filename}[/]. Supported formats are: {', '.join(SUPPORTED_FORMATS)}",
                 title="Save to File",
                 severity="warning",
             )
-            fmt = "tsv"
+            return
 
         if use_df is not None:
             lf = use_df.lazy()
         else:
             lf = (table.df if table.df_view is None else table.df if use_view else table.df_view).lazy()
 
-        df = lf.select(pl.exclude(RID)).collect()
+        df: pl.DataFrame = lf.select(pl.exclude(RID)).collect()
+        compression = "gzip" if filename.endswith(".gz") else "uncompressed"
 
         try:
             if fmt == "csv":
-                df.write_csv(filename)
+                df.write_csv(filename, compression=compression)
             elif fmt == "tsv":
-                df.write_csv(filename, separator="\t")
+                df.write_csv(filename, separator="\t", compression=compression)
             elif fmt == "psv":
-                df.write_csv(filename, separator="|")
-            elif fmt in ("xlsx", "xls"):
-                self.save_excel(filename, all_tabs=all_tabs, use_view=use_view)
+                df.write_csv(filename, separator="|", compression=compression)
             elif fmt == "parquet":
                 df.write_parquet(filename)
             elif fmt in ("jsonl", "ndjson"):
-                df.write_ndjson(filename)
+                df.write_ndjson(filename, compression=compression)
             elif fmt == "json":
                 df.write_json(filename)
             elif fmt == "vortex":
                 import vortex as vx
 
                 vx.io.write(df.to_arrow(), filename)
-            else:  # Fallback to CSV
-                df.write_csv(filename)
+            elif fmt in ("xlsx", "xls"):
+                self.save_excel(filename, all_tabs=all_tabs, use_view=use_view)
+            else:
+                pass
 
             if use_view:
                 self.notify(f"Saved current view to [$success]{filename}[/]", title="Save to File")

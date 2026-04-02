@@ -995,7 +995,7 @@ def load_file(
 def write_file(sources: list[Source], filename: str) -> None:
     if not (fmt := guess_file_format(filename)):
         print(
-            f"Unsupported output file format for `{filename}`. Supported formats: {', '.join(SUPPORTED_FORMATS)}",
+            f"Unsupported output file format `{fmt}` for `{filename}`. Supported formats: {', '.join(SUPPORTED_FORMATS)}",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -1008,17 +1008,19 @@ def write_file(sources: list[Source], filename: str) -> None:
     for source in sources:
         source.lf = source.lf.select(pl.exclude(RID))
 
+    compression = "gzip" if filename.endswith(".gz") else "uncompressed"
+
     try:
         if fmt == "csv":
-            sources[0].lf.sink_csv(filename)
+            sources[0].lf.sink_csv(filename, compression=compression)
         elif fmt == "tsv":
-            sources[0].lf.sink_csv(filename, separator="\t")
+            sources[0].lf.sink_csv(filename, separator="\t", compression=compression)
         elif fmt == "psv":
-            sources[0].lf.sink_csv(filename, separator="|")
+            sources[0].lf.sink_csv(filename, separator="|", compression=compression)
         elif fmt == "parquet":
             sources[0].lf.sink_parquet(filename)
         elif fmt in ("jsonl", "ndjson"):
-            sources[0].lf.sink_ndjson(filename)
+            sources[0].lf.sink_ndjson(filename, compression=compression)
         elif fmt == "json":
             sources[0].lf.collect().write_json(filename)
         elif fmt == "vortex":
@@ -1034,11 +1036,7 @@ def write_file(sources: list[Source], filename: str) -> None:
                         worksheet = wb.add_worksheet(source.tabname)
                         source.lf.collect().write_excel(workbook=wb, worksheet=worksheet)
         else:
-            print(
-                f"Unsupported output format: {fmt}. Supported formats are: {', '.join(SUPPORTED_FORMATS)}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+            pass
     except Exception as e:
         print(f"Error writing to output file: {e}", file=sys.stderr)
         sys.exit(1)

@@ -255,8 +255,8 @@ def main() -> None:
                 sys.exit(1)
 
     # If output file is specified, write the (optionally modified) data to the output file and exit
-    if args.output:
-        return write_file(sources, args.output)
+    if filename := args.output:
+        return write_file(sources, filename)
 
     # Run the DataFrame Viewer application
     app = DataFrameViewer(*sources, theme=args.theme)

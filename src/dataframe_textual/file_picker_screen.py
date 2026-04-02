@@ -569,7 +569,7 @@ class SaveFileScreen(FilePickerScreen):
 
         if not guess_file_format(filepath):
             self.notify(
-                f"Extension '[$error]{filepath.suffix}[/]' is invalid. Supported formats are: {', '.join(SUPPORTED_FORMATS)}",
+                f"Error guessing file format based on extension `[$error]{filepath.suffix}[/]`. Supported formats are: {', '.join(SUPPORTED_FORMATS)}",
                 title="Save File",
                 severity="error",
                 timeout=10,
