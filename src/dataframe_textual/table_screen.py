@@ -449,12 +449,7 @@ class FrequencyScreen(TableScreen):
     def _calculate_frequency(self) -> None:
         """Calculate frequency."""
         col = self.dftable.df.columns[self.cidx]
-        self.df = (
-            self.dftable.df.lazy()
-            .select(pl.col(col).value_counts(sort=True, name="freq" if col == "count" else col))
-            .unnest(col)
-            .collect()
-        )
+        self.df = self.dftable.df.lazy().select(pl.col(col).value_counts(sort=True)).unnest(col).collect()
         self.app.call_from_thread(self._on_calc_ready)
 
     def on_key(self, event):
