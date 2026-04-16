@@ -79,7 +79,7 @@ class FilePickerScreen(ModalScreen):
         }
 
         #file-type {
-            width: 30;
+            width: 35;
         }
 
         #file-action {
@@ -134,9 +134,9 @@ class FilePickerScreen(ModalScreen):
                         ("All Files (*)", "*"),
                         ("CSV (*.csv)", "csv"),
                         ("TSV (*.tsv)", "tsv"),
-                        ("Excel (*.xlsx, *.xls)", "excel"),
+                        ("Excel (*.xlsx)", "xlsx"),
                         ("Parquet (*.parquet)", "parquet"),
-                        ("NDJSON (*.ndjson)", "ndjson"),
+                        ("NDJSON (*.ndjson, *.jsonl)", "ndjson,jsonl"),
                         ("JSON (*.json)", "json"),
                     ],
                     id="file-type",
@@ -298,7 +298,7 @@ class FilePickerScreen(ModalScreen):
             return True
 
         fmt = guess_file_format(path)
-        return fmt == file_type or (file_type == "excel" and fmt in {"xlsx", "xls"})
+        return fmt == file_type or fmt in file_type.split(",")
 
     def _folder_label(self, name: str) -> Text:
         """Build a label for a folder option.

@@ -21,7 +21,6 @@ SUPPORTED_FORMATS = {
     "csv": ",",
     "psv": "|",
     "xlsx": None,
-    "xls": None,
     "parquet": None,
     "ndjson": None,
     "jsonl": None,
@@ -923,7 +922,7 @@ def load_file(
             new_columns=new_columns,
         )
         data.append(Source(lf, filename, filepath.stem))
-    elif fmt in ("xlsx", "xls"):
+    elif fmt == "xlsx":
         if first_sheet:
             # Read only the first sheet for multiple files
             try:
@@ -1000,8 +999,8 @@ def write_file(sources: list[Source], filename: str) -> None:
         )
         sys.exit(1)
 
-    if len(sources) > 1 and fmt not in ("xlsx", "xls"):
-        print("Only Excel formats (.xlsx, .xls) support multiple tabs", file=sys.stderr)
+    if len(sources) > 1 and fmt != "xlsx":
+        print("Only Excel format (.xlsx) support multiple tabs", file=sys.stderr)
         sys.exit(1)
 
     # Get rid of the RID column
@@ -1027,7 +1026,7 @@ def write_file(sources: list[Source], filename: str) -> None:
             import vortex as vx
 
             vx.io.write(sources[0].lf.collect().to_arrow(), filename)
-        elif fmt in ("xlsx", "xls"):
+        elif fmt == "xlsx":
             if len(sources) == 1:
                 sources[0].lf.collect().write_excel(filename)
             else:

@@ -848,7 +848,7 @@ class DataFrameViewer(App):
                 import vortex as vx
 
                 vx.io.write(df.to_arrow(), filename)
-            elif fmt in ("xlsx", "xls"):
+            elif fmt == "xlsx":
                 self.save_excel(filename, all_tabs=all_tabs, use_view=use_view)
             else:
                 pass
