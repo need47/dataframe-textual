@@ -804,6 +804,49 @@ class GoToRowScreen(YesNoScreen):
         return None
 
 
+class CustomBinScreen(YesNoScreen):
+    """Modal screen to specify custom bins for histogram."""
+
+    def __init__(self, min_value: float, max_value: float):
+        self.min_value = min_value
+        self.max_value = max_value
+        super().__init__(
+            title="Custom Bins",
+            label="Enter number of bins or bin breakpoints (e.g., 5 or 0 10 20 30)",
+            input={"value": "10"},
+            on_yes_callback=self._get_input,
+        )
+
+    def _get_input(self) -> tuple[int | None, list[float] | None] | None:
+        """Get and validate the row index input."""
+        row_str = self.input.value.strip()
+
+        bin_count, bins = None, None
+
+        try:
+            bin_count = int(row_str)
+        except ValueError:
+            try:
+                bins = [float(b) for b in row_str.split()]
+                if len(bins) < 2:
+                    raise ValueError("At least two bin breakpoints are required")
+                bins = sorted(bins)
+                if bins[0] > self.min_value:
+                    bins = [self.min_value] + bins
+                if bins[-1] < self.max_value:
+                    bins = bins + [self.max_value]
+            except ValueError:
+                self.notify(
+                    "Please enter a valid integer for bin count or space-separated numbers for bin breakpoints",
+                    title="Custom Bins",
+                    severity="error",
+                    timeout=10,
+                )
+                return None
+
+        return (bin_count, bins)
+
+
 class SimpleSqlScreen(YMNScreen):
     """Simple SQL query screen."""
 

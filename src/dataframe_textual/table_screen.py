@@ -591,6 +591,108 @@ class FrequencyScreen(TableScreen):
         )
 
 
+class HistogramScreen(TableScreen):
+    """Modal screen to display histogram of values in a column."""
+
+    def __init__(self, dftable: "DataFrameTable", bins: list[float] = None, bin_count: int = None) -> None:
+        super().__init__(dftable)
+        self.cidx = dftable.cursor_cidx
+        self.bins = bins
+        self.bin_count = bin_count
+        self.total_count = len(dftable.df)
+        self.df: pl.DataFrame = None
+
+    def on_mount(self) -> None:
+        """Start histogram calculation."""
+        self.table.loading = True
+        self._calculate_histogram()
+
+    @work(thread=True)
+    def _calculate_histogram(self) -> None:
+        """Calculate histogram."""
+        col = self.dftable.df.columns[self.cidx]
+        self.df = self.dftable.df.lazy().select(col).collect()[col].hist(bins=self.bins, bin_count=self.bin_count)
+        self.app.call_from_thread(self._on_calc_ready)
+
+    def on_key(self, event):
+        if event.key == "ctrl+s":
+            # Save the histogram table to file
+            self.save_histogram_table()
+            event.stop()
+
+    def build_table(self) -> None:
+        """Build the histogram table."""
+        self.table.clear(columns=True)
+
+        # Create histogram table
+        column = self.dftable.df.columns[self.cidx]
+        dtype = self.dftable.df.dtypes[self.cidx]
+        dc = DtypeConfig(dtype)
+
+        # Add column headers with sort indicators
+        columns = [
+            (column, "Value", 0),
+            ("Count", "Count", 1),
+            ("%", "%", 2),
+            ("Histogram", "Histogram", 3),
+        ]
+
+        for display_name, key, col_idx_num in columns:
+            header_text = display_name
+
+            justify = dc.justify if col_idx_num == 0 else ("right" if col_idx_num in (1, 2) else "left")
+            self.table.add_column(Text(header_text, justify=justify), key=key)
+
+        # Get style config for Int64 and Float64
+        dc_int = DtypeConfig(pl.Int64)
+        dc_float = DtypeConfig(pl.Float64)
+
+        # Add rows to the histogram table
+        for row_idx, row in enumerate(self.df.rows()):
+            _breakpoint, column, count = row
+            percentage = (count / self.total_count) * 100
+
+            self.table.add_row(
+                dc.format(column),
+                dc_int.format(count, thousand_separator=self.thousand_separator),
+                dc_float.format(percentage, thousand_separator=self.thousand_separator),
+                Bar(
+                    highlight_range=(0.0, percentage / 100 * 10),
+                    width=10,
+                ),
+                label=str(row_idx + 1),
+            )
+
+        # Add a total row
+        self.table.add_row(
+            Text("Total", style="bold", justify=dc.justify),
+            Text(
+                f"{self.total_count:,}" if self.thousand_separator else str(self.total_count),
+                style="bold",
+                justify="right",
+            ),
+            Text(
+                format_float(100.0, self.thousand_separator, precision=-2 if len(self.df) > 1 else 2),
+                style="bold",
+                justify="right",
+            ),
+            Bar(
+                highlight_range=(0.0, 10),
+                width=10,
+            ),
+        )
+
+    def save_histogram_table(self) -> None:
+        """Save the histogram table to file."""
+        column = self.dftable.df.columns[self.cidx]
+        filename = f"{column}_hist.csv"
+
+        self.app.push_screen(
+            SaveFileScreen(filename=filename),
+            callback=partial(self.app.save_to_file, all_tabs=False, use_df=self.df),
+        )
+
+
 class MetaShape(TableScreen):
     """Modal screen to display metadata about the dataframe."""
 

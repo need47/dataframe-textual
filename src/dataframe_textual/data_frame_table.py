@@ -47,12 +47,20 @@ from .common import (
     validate_expr,
 )
 from .loading_screen import BusyScreen, LoadingScreen
-from .table_screen import FrequencyScreen, MetaColumnScreen, MetaShape, RowDetailScreen, StatisticsScreen
+from .table_screen import (
+    FrequencyScreen,
+    HistogramScreen,
+    MetaColumnScreen,
+    MetaShape,
+    RowDetailScreen,
+    StatisticsScreen,
+)
 from .yes_no_screen import (
     AddColumnScreen,
     AddLinkScreen,
     AdvancedSqlScreen,
     ConfirmScreen,
+    CustomBinScreen,
     EditCellScreen,
     EditColumnScreen,
     ExplodeColumnScreen,
@@ -198,7 +206,9 @@ class DataFrameTable(DataTable):
 
         ## 👁️ Display
         - **Enter** - 📋 Show row details in modal
-        - **F** - 📊 Show frequency distribution
+        - **F** - 📊 Show frequency distribution for current column
+        - **i** - 📊 Show histogram for current column
+        - **I** - 📊 Show histogram for current column with custom bins
         - **s** - 📈 Show statistics for current column
         - **S** - 📊 Show statistics for entire dataframe
         - **m** - 📐 Show dataframe metadata (row/column counts)
@@ -311,8 +321,10 @@ class DataFrameTable(DataTable):
         ("m", "metadata_shape", "Show metadata for row count and column count"),
         ("M", "metadata_column", "Show metadata for column"),
         ("enter", "view_row_detail", "View row details"),
-        ("F", "show_frequency", "Show frequency"),
-        ("s", "show_statistics", "Show statistics for column"),
+        ("F", "show_frequency", "Show frequency for current column"),
+        ("i", "show_histogram", "Show histogram for current column"),
+        ("I", "show_histogram(0)", "Show histogram for current column with custom bins"),
+        ("s", "show_statistics", "Show statistics for current column"),
         ("S", "show_statistics(-1)", "Show statistics for dataframe"),
         # Sort
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
@@ -895,6 +907,11 @@ class DataFrameTable(DataTable):
     def action_show_frequency(self, cidx: int | None = None) -> None:
         """Show frequency distribution for the current column."""
         self.do_show_frequency(cidx)
+
+    @wait_full_df
+    def action_show_histogram(self, default: int = 1) -> None:
+        """Show histogram for the current column."""
+        self.do_show_histogram(default=default)
 
     @wait_full_df
     def action_show_statistics(self, cidx: int | None = None) -> None:
@@ -1840,6 +1857,39 @@ class DataFrameTable(DataTable):
         # Push the frequency modal screen
         self.app.push_screen(FrequencyScreen(cidx, self))
 
+    def do_show_histogram(self, default: int = 1) -> None:
+        """Show histogram for a given columnn."""
+        cidx = self.cursor_cidx
+        dtype = self.df.dtypes[cidx]
+        dc = DtypeConfig(dtype)
+
+        if dc.gtype not in ("integer", "float"):
+            self.notify(
+                f"Cannot show histogram for non-numeric column [$error]{self.cursor_col_name}[/] of type [$accent]{dtype}[/]",
+                title="Show Histogram",
+                severity="warning",
+            )
+            return
+
+        if default:
+            self.show_histogram((None, None))
+        else:
+            min_value = self.df[self.cursor_col_name].min()
+            max_value = self.df[self.cursor_col_name].max()
+            self.app.push_screen(CustomBinScreen(min_value, max_value), callback=self.show_histogram)
+
+    def show_histogram(self, result) -> None:
+        """Show histogram with the given parameters.
+
+        Args:
+            result: Tuple of (column index, bin count) from the histogram settings screen.
+        """
+        if result is None:
+            return
+
+        bin_count, bins = result
+        self.app.push_screen(HistogramScreen(self, bins=bins, bin_count=bin_count))
+
     def do_show_statistics(self, cidx: int | None = None) -> None:
         """Show statistics for the current column or entire dataframe.
 
@@ -2778,7 +2828,7 @@ class DataFrameTable(DataTable):
 
         Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.
         """
-        old_count = len(self.df)
+        # old_count = len(self.df)
         rids_to_delete = set()
 
         # Delete all selected rows

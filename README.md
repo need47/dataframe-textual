@@ -17,7 +17,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 - 📝 **Data Editing** - Edit cells, delete rows, remove columns, and explode columns
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
 - ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts
-- 📈 **Sorting & Statistics** - Multi-column sorting and frequency distribution analysis
+- 📈 **Sorting & Statistics** - Multi-column sorting, frequency distribution, and histogram analysis
 - 💾 **Save & Undo** - Save edits back to file with full undo/redo support
 
 ### Advanced Features
@@ -269,22 +269,24 @@ dv data.csv -o data.parquet
 
 #### Display
 
-| Key              | Action                                         |
-| ---------------- | ---------------------------------------------- |
-| `Enter`          | Record view of current row transposed          |
-| `F`              | Show frequency distribution for current column |
-| `s`              | Show statistics for current column             |
-| `S`              | Show statistics for entire dataframe           |
-| `m`              | Show metadata for row count and column count   |
-| `M`              | Show metadata for current column               |
-| `K`              | Cycle cursor types: cell → row → column → cell |
-| `~`              | Toggle row labels                              |
-| `_` (underscore) | Toggle column full width                       |
-| `f`              | Toggle freeze rows and/or columns              |
-| `,`              | Toggle thousand separator for numeric display  |
-| `&`              | Set current row as the new header row          |
-| `h`              | Hide current column                            |
-| `H`              | Show all hidden columns                        |
+| Key              | Action                                             |
+| ---------------- | -------------------------------------------------- |
+| `Enter`          | Record view of current row transposed              |
+| `F`              | Show frequency distribution for current column     |
+| `i`              | Show histogram for current column                  |
+| `I`              | Show histogram for current column with custom bins |
+| `s`              | Show statistics for current column                 |
+| `S`              | Show statistics for entire dataframe               |
+| `m`              | Show metadata for row count and column count       |
+| `M`              | Show metadata for current column                   |
+| `K`              | Cycle cursor types: cell → row → column → cell     |
+| `~`              | Toggle row labels                                  |
+| `_` (underscore) | Toggle column full width                           |
+| `f`              | Toggle freeze rows and/or columns                  |
+| `,`              | Toggle thousand separator for numeric display      |
+| `&`              | Set current row as the new header row              |
+| `h`              | Hide current column                                |
+| `H`              | Show all hidden columns                            |
 
 #### Editing
 
