@@ -612,12 +612,7 @@ class HistogramScreen(TableScreen):
     def _calculate_histogram(self) -> None:
         """Calculate histogram."""
         col = self.dftable.df.columns[self.cidx]
-        try:
-            self.df = self.dftable.df.lazy().select(col).collect()[col].hist(bins=self.bins, bin_count=self.bin_count)
-        except pl.exceptions.ComputeError as e:
-            self.notify(f"Error calculating histogram: {e}", title="Histogram", severity="error")
-            self.dismiss()
-
+        self.df = self.dftable.df.lazy().select(col).collect()[col].hist(bins=self.bins, bin_count=self.bin_count)
         self.app.call_from_thread(self._on_calc_ready)
 
     def on_key(self, event):

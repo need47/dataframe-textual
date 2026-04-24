@@ -827,10 +827,33 @@ class CustomBinScreen(YesNoScreen):
             bin_count = int(row_str)
         except ValueError:
             try:
-                bins = [float(b) for b in row_str.split()]
+                bins = set()
+
+                for b in row_str.split():
+                    # 0:10 -> 0, 1, 2, ..., 10
+                    # 0:100:10 -> 0, 10, 20, ..., 100
+                    if ":" in b:
+                        toks = [float(t) for t in b.split(":")]
+                        start = self.min_value if toks[0] < self.min_value else toks[0]
+                        end = self.max_value if toks[1] > self.max_value else toks[1]
+                        step = 1 if len(toks) == 2 else toks[2]
+
+                        while start <= end:
+                            bins.add(start)
+                            start += step
+
+                            if start > end:
+                                bins.add(end)
+                                break
+                    else:
+                        val = float(b)
+                        if self.min_value <= val <= self.max_value:
+                            bins.add(val)
+
+                bins = sorted(bins)
                 if len(bins) < 2:
                     raise ValueError("At least two bin breakpoints are required")
-                bins = sorted(bins)
+
                 if bins[0] > self.min_value:
                     bins = [self.min_value] + bins
                 if bins[-1] < self.max_value:
