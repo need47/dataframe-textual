@@ -506,6 +506,7 @@ class FrequencyScreen(TableScreen):
         # Get style config for Int64 and Float64
         dc_int = DtypeConfig(pl.Int64)
         dc_float = DtypeConfig(pl.Float64)
+        bar_width = 10
 
         # Add rows to the frequency table
         for row_idx, row in enumerate(self.df.rows()):
@@ -517,8 +518,8 @@ class FrequencyScreen(TableScreen):
                 dc_int.format(count, thousand_separator=self.thousand_separator),
                 dc_float.format(percentage, thousand_separator=self.thousand_separator),
                 Bar(
-                    highlight_range=(0.0, percentage / 100 * 10),
-                    width=10,
+                    highlight_range=(0.0, percentage / 100 * bar_width),
+                    width=bar_width,
                 ),
                 label=str(row_idx + 1),
             )
@@ -537,8 +538,8 @@ class FrequencyScreen(TableScreen):
                 justify="right",
             ),
             Bar(
-                highlight_range=(0.0, 10),
-                width=10,
+                highlight_range=(0.0, bar_width),
+                width=bar_width,
             ),
         )
 
@@ -611,7 +612,12 @@ class HistogramScreen(TableScreen):
     def _calculate_histogram(self) -> None:
         """Calculate histogram."""
         col = self.dftable.df.columns[self.cidx]
-        self.df = self.dftable.df.lazy().select(col).collect()[col].hist(bins=self.bins, bin_count=self.bin_count)
+        try:
+            self.df = self.dftable.df.lazy().select(col).collect()[col].hist(bins=self.bins, bin_count=self.bin_count)
+        except pl.exceptions.ComputeError as e:
+            self.notify(f"Error calculating histogram: {e}", title="Histogram", severity="error")
+            self.dismiss()
+
         self.app.call_from_thread(self._on_calc_ready)
 
     def on_key(self, event):
@@ -646,6 +652,7 @@ class HistogramScreen(TableScreen):
         # Get style config for Int64 and Float64
         dc_int = DtypeConfig(pl.Int64)
         dc_float = DtypeConfig(pl.Float64)
+        bar_width = 10
 
         # Add rows to the histogram table
         for row_idx, row in enumerate(self.df.rows()):
@@ -653,12 +660,12 @@ class HistogramScreen(TableScreen):
             percentage = (count / self.total_count) * 100
 
             self.table.add_row(
-                dc.format(column),
+                Text(column, style=dc.style, justify=dc.justify),
                 dc_int.format(count, thousand_separator=self.thousand_separator),
                 dc_float.format(percentage, thousand_separator=self.thousand_separator),
                 Bar(
-                    highlight_range=(0.0, percentage / 100 * 10),
-                    width=10,
+                    highlight_range=(0.0, percentage / 100 * bar_width),
+                    width=bar_width,
                 ),
                 label=str(row_idx + 1),
             )
@@ -677,8 +684,8 @@ class HistogramScreen(TableScreen):
                 justify="right",
             ),
             Bar(
-                highlight_range=(0.0, 10),
-                width=10,
+                highlight_range=(0.0, bar_width),
+                width=bar_width,
             ),
         )
 
