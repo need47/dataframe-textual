@@ -858,6 +858,8 @@ class CustomBinScreen(YesNoScreen):
                     bins = [self.min_value] + bins
                 if bins[-1] < self.max_value:
                     bins = bins + [self.max_value]
+
+                bins = [float(b) for b in bins]
             except ValueError:
                 self.notify(
                     "Please enter a valid integer for bin count or space-separated numbers for bin breakpoints",
