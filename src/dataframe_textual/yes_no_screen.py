@@ -847,8 +847,7 @@ class CustomBinScreen(YesNoScreen):
                                 break
                     else:
                         val = float(b)
-                        if self.min_value <= val <= self.max_value:
-                            bins.add(val)
+                        bins.add(val)
 
                 bins = sorted(bins)
                 if len(bins) < 2:
