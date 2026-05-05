@@ -56,6 +56,7 @@ class TableScreen(ModalScreen):
         self.dftable = dftable  # DataFrameTable
         self.df: pl.DataFrame = None  # DataFrame for this screen, to be set by subclasses
         self.thousand_separator = False  # Whether to use thousand separators in numbers
+        self.sorted_columns: dict[int, bool] = {}  # Track sorted columns and their sort order
 
     def compose(self) -> ComposeResult:
         """Compose the table screen widget structure.
@@ -98,6 +99,22 @@ class TableScreen(ModalScreen):
             event.stop()
         elif event.key == "G":
             self.table.action_scroll_bottom()
+            event.stop()
+        elif event.key == "left_square_bracket":  # '['
+            cell_key = self.table.coordinate_to_cell_key(self.table.cursor_coordinate)
+            # Sort by current column in ascending order
+            try:
+                self.table.sort(cell_key.column_key, key=lambda c: c.plain if isinstance(c, Text) else c)
+            except TypeError as e:
+                self.notify(f"Cannot sort column: {e}", title="Sort", severity="error")
+            event.stop()
+        elif event.key == "right_square_bracket":  # ']'
+            cell_key = self.table.coordinate_to_cell_key(self.table.cursor_coordinate)
+            # Sort by current column in descending order
+            try:
+                self.table.sort(cell_key.column_key, reverse=True, key=lambda c: c.plain if isinstance(c, Text) else c)
+            except TypeError as e:
+                self.notify(f"Cannot sort column: {e}", title="Sort", severity="error")
             event.stop()
 
     def filter_or_view_selected_value(self, cidx_name_value: tuple[int, str, Any] | None, action: str = "view") -> None:
@@ -205,7 +222,7 @@ class TableScreen(ModalScreen):
 class RowDetailScreen(TableScreen):
     """Modal screen to display a single row's details."""
 
-    def __init__(self, ridx: int, dftable):
+    def __init__(self, ridx: int, dftable: "DataFrameTable") -> None:
         super().__init__(dftable)
         self.ridx = ridx
 
@@ -283,6 +300,9 @@ class RowDetailScreen(TableScreen):
         elif event.key == "s":
             # Show statistics for the selected value
             self.show_statistics(self.get_cidx_name_value())
+            event.stop()
+        elif event.key == "enter":
+            self.app.push_screen(CellDetailScreen(self.dftable, self.ridx, self.table.cursor_row))
             event.stop()
 
     def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
@@ -436,7 +456,7 @@ class FrequencyScreen(TableScreen):
     def __init__(self, cidx: int, dftable: "DataFrameTable") -> None:
         super().__init__(dftable)
         self.cidx = cidx
-        self.sorted_columns = {1: True}  # Count sort by default
+        self.sorted_columns[1] = True  # Count sort by default
         self.total_count = len(dftable.df)
         self.df: pl.DataFrame = None
 
@@ -796,3 +816,45 @@ class MetaColumnScreen(TableScreen):
         col_value = None
 
         return cidx, col_name, col_value
+
+
+class CellDetailScreen(TableScreen):
+    """Modal screen to display details of a cell value, including support for nested structures like lists and dicts."""
+
+    def __init__(self, dftable: "DataFrameTable", ridx: int, cidx: int, delimiter: str | None = "|") -> None:
+        super().__init__(dftable)
+        self.cidx = cidx
+        self.ridx = ridx
+        self.delimiter = delimiter
+
+    def on_mount(self) -> None:
+        """Initialize the list screen."""
+        self.build_table()
+
+    def build_table(self) -> None:
+        """Build the list table."""
+        self.table.clear(columns=True)
+
+        # Get the column values as a list
+        col_name = self.dftable.df.columns[self.cidx]
+        dtype = self.dftable.df.dtypes[self.cidx]
+        cell_value = self.dftable.df.item(self.ridx, self.cidx)
+
+        if isinstance(cell_value, pl.Series) and not cell_value.is_empty():
+            self.table.add_column(col_name)
+            for idx, value in enumerate(cell_value):
+                self.table.add_row(value, label=str(idx + 1))
+        elif isinstance(cell_value, dict) and cell_value:
+            self.table.add_column(f"{col_name} (Key)")
+            self.table.add_column(f"{col_name} (Value)")
+            for idx, (key, value) in enumerate(cell_value.items()):
+                self.table.add_row(Text(str(key), justify="right"), Text(str(value)), label=str(idx + 1))
+        elif dtype == pl.String and cell_value:
+            self.table.add_column(col_name)
+            for idx, value in enumerate(cell_value.split(self.delimiter)):
+                self.table.add_row(value, label=str(idx + 1))
+        else:
+            self.table.add_column(col_name)
+            self.table.add_row(str(cell_value))
+
+        self.table.cursor_type = "row"

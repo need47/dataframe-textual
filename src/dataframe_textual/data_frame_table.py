@@ -48,6 +48,7 @@ from .common import (
 )
 from .loading_screen import BusyScreen, LoadingScreen
 from .table_screen import (
+    CellDetailScreen,
     FrequencyScreen,
     HistogramScreen,
     MetaColumnScreen,
@@ -206,6 +207,7 @@ class DataFrameTable(DataTable):
 
         ## 👁️ Display
         - **Enter** - 📋 Show row details in modal
+        - **Tab** - 🔍 Show current cell details in modal
         - **F** - 📊 Show frequency distribution for current column
         - **i** - 📊 Show histogram for current column
         - **I** - 📊 Show histogram for current column with custom bins
@@ -214,10 +216,9 @@ class DataFrameTable(DataTable):
         - **m** - 📐 Show dataframe metadata (row/column counts)
         - **M** - 📋 Show column metadata (ID, name, type)
         - **h** - 👁️ Hide current column
-        - **H** - 👀 Show all hidden rows/columns
+        - **H** - 👀 Show all hidden columns
         - **_** - 📏 Toggle column full width
-        - **z** - 📌 Freeze rows and/or columns
-        - **Z** - 🧊 Unfreeze all rows and columns
+        - **f** - 📌 Freeze rows and/or columns
         - **~** - 🏷️ Toggle row labels
         - **,** - 🔢 Toggle thousand separator for numeric display
         - **K** - 🔄 Cycle cursor (cell → row → column → cell)
@@ -238,6 +239,7 @@ class DataFrameTable(DataTable):
         - **d** - 📋 Duplicate current column
         - **D** - 📋 Duplicate current row
         - **o** - 💥 Explode current list column into rows
+        - **O** - 💥 Explode current string column by delimiter into rows
 
         ## ✅ Row Selection
         - **\\\\** - ✅ Select rows with cell matches or those matching cursor value in current column
@@ -321,6 +323,7 @@ class DataFrameTable(DataTable):
         ("m", "metadata_shape", "Show metadata for row count and column count"),
         ("M", "metadata_column", "Show metadata for column"),
         ("enter", "view_row_detail", "View row details"),
+        ("tab", "view_cell_detail", "View cell details"),
         ("F", "show_frequency", "Show frequency for current column"),
         ("i", "show_histogram", "Show histogram for current column"),
         ("I", "show_histogram(0)", "Show histogram for current column with custom bins"),
@@ -866,6 +869,10 @@ class DataFrameTable(DataTable):
     def action_view_row_detail(self) -> None:
         """View details of the current row."""
         self.do_view_row_detail()
+
+    def action_view_cell_detail(self) -> None:
+        """View details of the current cell."""
+        self.do_view_cell_detail()
 
     @wait_full_df
     def action_delete_column(self) -> None:
@@ -1850,6 +1857,14 @@ class DataFrameTable(DataTable):
         # Push the modal screen
         self.app.push_screen(RowDetailScreen(ridx, self))
 
+    def do_view_cell_detail(self) -> None:
+        """Open a modal screen to view the selected cell's details."""
+        ridx = self.cursor_ridx
+        cidx = self.cursor_cidx
+
+        # Push the modal screen
+        self.app.push_screen(CellDetailScreen(self, ridx, cidx))
+
     def do_show_frequency(self, cidx: int | None = None) -> None:
         """Show frequency distribution for a given columnn."""
         cidx = self.cursor_cidx if cidx is None else cidx
@@ -2745,14 +2760,15 @@ class DataFrameTable(DataTable):
 
     def do_explode_column(self) -> None:
         """Explode the current list column into multiple rows."""
+        col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
 
-        # Only explode list columns
-        if not isinstance(dtype, pl.List):
+        # Only explode list or string columns (string columns will be split by delimiter)
+        if dtype not in (pl.List, pl.String):
             return
 
         self.task_done = False
-        self.app.push_screen(BusyScreen(self, task=self.explode_column))
+        self.app.push_screen(BusyScreen(self, task=partial(self.explode_column, col_name)))
 
     def do_explode_column_delim(self) -> None:
         """Open screen to explode a string column based on delimiter."""
@@ -2778,34 +2794,41 @@ class DataFrameTable(DataTable):
         self.app.push_screen(BusyScreen(self, task=partial(self.explode_column, col_name, delimiter)))
 
     @work(thread=True)
-    def explode_column(self, col_name: str, delimiter: str | None) -> None:
+    def explode_column(self, col_name: str, delimiter: str | None = "|") -> None:
         """Explode a column based on a delimiter (if provided) or as a list column."""
         self.add_history(f"Exploded column [$success]{col_name}[/]", dirty=True)
+
+        dtype = self.df.schema[col_name]
 
         try:
             if self.df_view is not None:
                 old_rids = set(self.df[RID])
 
+                # If it's already a list column, just explode it
+                if dtype == pl.List:
+                    lf_view = add_rid_column(self.df_view.lazy().rename({RID: RID_OLD}).explode(col_name))
                 # If a delimiter is provided, split the string column by the delimiter
-                if delimiter:
+                elif dtype == pl.String and delimiter:
                     lf_view = add_rid_column(
                         self.df_view.lazy()
                         .rename({RID: RID_OLD})
                         .with_columns(pl.col(col_name).str.split(delimiter))
                         .explode(col_name)
                     )
-                # If no delimiter, just explode the column as is
                 else:
-                    lf_view = add_rid_column(self.df_view.lazy().rename({RID: RID_OLD}).explode(col_name))
+                    return
+
                 self.df = lf_view.filter(pl.col(RID_OLD).is_in(old_rids)).drop(RID_OLD).collect()
                 self.df_view = lf_view.drop(RID_OLD).collect()
             else:
-                if delimiter:
+                if dtype == pl.List:
+                    self.df = add_rid_column(self.df.lazy().drop(RID).explode(col_name)).collect()
+                elif dtype == pl.String and delimiter:
                     self.df = add_rid_column(
                         self.df.lazy().drop(RID).with_columns(pl.col(col_name).str.split(delimiter)).explode(col_name)
                     ).collect()
                 else:
-                    self.df = add_rid_column(self.df.lazy().drop(RID).explode(col_name)).collect()
+                    return
 
             self.selected_rows.clear()
             self.matches = defaultdict(set)

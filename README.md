@@ -272,6 +272,7 @@ dv data.csv -o data.parquet
 | Key              | Action                                             |
 | ---------------- | -------------------------------------------------- |
 | `Enter`          | Record view of current row transposed              |
+| `Tab`            | Show details for the current cell                  |
 | `F`              | Show frequency distribution for current column     |
 | `i`              | Show histogram for current column                  |
 | `I`              | Show histogram for current column with custom bins |
@@ -405,9 +406,19 @@ Useful for examining wide datasets where columns don't fit well on screen.
 - Press `}` to move to the next row
 - Press `F` to show the frequency table for the selected column
 - Press `s` to show the statistics table for the selected column
+- Press `Enter` to open a cell-detail modal for the selected field
 - Press `q` or `Escape` to close the modal
 
-### 3. Row Selection
+### 3. Cell Detail View
+
+Press `Tab` in the main table to inspect the current cell in its own modal.
+
+- Scalar values are shown directly
+- String values are split into multiple rows using `|` by default
+- Lists and structs are expanded into a readable table layout
+- Press `q` or `Escape` to close the modal
+
+### 4. Row Selection
 
 The application provides multiple modes for selecting rows (marks it for filtering or viewing):
 
@@ -433,7 +444,7 @@ These options work with plain text searches. Use Polars regex patterns in expres
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 - Use `u` to undo any search or filter
 
-### 4. Find & Replace
+### 5. Find & Replace
 Find by value/expression and highlight matching cells:
 - `/` - Find cursor value across all columns (global search)
 - `?` - Open dialog to search all columns with expression (global search)
@@ -467,7 +478,7 @@ When you press `r` or `R`, enter:
 - Use `Match Whole` to avoid partial replacements
 - Support undo (`u`)
 
-### 5. View vs. Filter
+### 6. View vs. Filter
 
 Both operations show selected rows but with fundamentally different effects:
 
@@ -487,7 +498,7 @@ Both operations show selected rows but with fundamentally different effects:
 - If currently there are no selected rows and no matching cells, the `v` (View) and `"` (Filter) will use cursor value for search.
 - Both support full undo with `u`.
 
-### 6. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
+### 7. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
 
 Complex values or filters can be specified via Polars expressions, with the following adaptions for convenience:
 
@@ -544,14 +555,14 @@ Complex values or filters can be specified via Polars expressions, with the foll
 - Use column names that match exactly (case-sensitive)
 - Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
 
-### 7. Sorting
+### 8. Sorting
 
 - Press `[` to sort current column ascending
 - Press `]` to sort current column descending
 - Multi-column sorting supported (press multiple times on different columns)
 - Press same key twice to remove the column from sorting
 
-### 8. Dataframe & Column Metadata
+### 9. Dataframe & Column Metadata
 
 View quick metadata about your dataframe and columns to understand their structure and content.
 
@@ -572,7 +583,7 @@ View quick metadata about your dataframe and columns to understand their structu
 **In Metadata Modals**:
 - Press `q` or `Escape` to close
 
-### 9. Frequency Distribution
+### 10. Frequency Distribution
 
 Press `F` to see value distributions of the current column. The modal shows:
 - Value, Count, Percentage, Histogram
@@ -594,7 +605,7 @@ This is useful for:
 - Identifying rare or common values
 - Finding the most/least frequent entries
 
-### 10. Column & Dataframe Statistics
+### 11. Column & Dataframe Statistics
 
 Show summary statistics (count, null count, mean, median, std, min, max, etc.) using Polars' `describe()` method.
 - `s` for the current column
@@ -612,7 +623,7 @@ This is useful for:
 - Quick statistical summaries without external tools
 - Comparing statistics across columns
 
-### 11. Editing
+### 12. Editing
 
 **Edit Cell** (`e` or **Double-click**):
 - Opens modal for editing current cell
@@ -660,7 +671,7 @@ This is useful for:
 - `h` - Temporarily hide current column (data preserved)
 - `H` - Restore all hidden columns
 
-### 12. Column & Row Reordering
+### 13. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
 - Swaps adjacent columns
@@ -670,12 +681,12 @@ This is useful for:
 - Swaps adjacent rows
 - Reorder is preserved when saving
 
-### 13. Freeze Rows and Columns
+### 14. Freeze Rows and Columns
 
-Press `z` to open the dialog:
+Press `f` to open the dialog:
 - Enter number of fixed rows and/or columns to keep top rows/columns visible while scrolling
 
-### 14. Thousand Separator Toggle
+### 15. Thousand Separator Toggle
 
 Press `,` to toggle thousand separator formatting for numeric data:
 - Applies to **integer** and **float** columns
@@ -685,11 +696,11 @@ Press `,` to toggle thousand separator formatting for numeric data:
 - Display-only: does not modify underlying data in the dataframe
 - State persists during the session
 
-### 15. Save File
+### 16. Save File
 
 Press `Ctrl+S` to save filtered, edited, or sorted data back to file. The output format is automatically determined by the file extension, making it easy to convert between different formats (e.g., CSV to TSV).
 
-### 16. Undo/Redo/Reset
+### 17. Undo/Redo/Reset
 
 **Undo** (`u`):
 - Reverts last action with full state restoration
@@ -707,7 +718,7 @@ Press `Ctrl+S` to save filtered, edited, or sorted data back to file. The output
 - Clears all edits, deletions, selections, filters, and sorts
 - Useful for starting fresh without reloading the file
 
-### 17. Column Type Conversion
+### 18. Column Type Conversion
 
 Press the type conversion keys to instantly cast the current column to a different data type:
 
@@ -724,14 +735,14 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 **Note**: Type conversion attempts to preserve data where possible. Conversions may lose data (e.g., float to int rounding).
 
-### 18. Cursor Type Cycling
+### 19. Cursor Type Cycling
 
 Press `K` to cycle through selection modes:
 1. **Cell mode**: Highlight individual cell (and its row/column headers)
 2. **Row mode**: Highlight entire row
 3. **Column mode**: Highlight entire column
 
-### 19. SQL Interface
+### 20. SQL Interface
 
 The SQL interface provides two modes for querying your dataframe:
 
@@ -761,7 +772,7 @@ FROM self
 WHERE `product id` = 7
 ```
 
-### 20. Clipboard Operations
+### 21. Clipboard Operations
 
 Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 
@@ -772,7 +783,7 @@ Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 - Press `Ctrl+R` to copy row values (delimited by tab)
 - Hold `Shift` to select with mouse
 
-### 21. Link Column Creation
+### 22. Link Column Creation
 
 Press `@` to create a new column containing dynamically generated URLs using template.
 
@@ -794,7 +805,7 @@ The link template supports multiple placeholder types for maximum flexibility:
 - Use full undo (`u`) if template produces unexpected URLs
 - For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
 
-### 22. Tab Management
+### 23. Tab Management
 
 Manage multiple files and dataframes simultaneously with tabs.
 
