@@ -301,7 +301,7 @@ class RowDetailScreen(TableScreen):
             # Show statistics for the selected value
             self.show_statistics(self.get_cidx_name_value())
             event.stop()
-        elif event.key == "enter":
+        elif event.key == "tab":
             self.app.push_screen(CellDetailScreen(self.dftable, self.ridx, self.table.cursor_row))
             event.stop()
 

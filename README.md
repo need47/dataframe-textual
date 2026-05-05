@@ -271,7 +271,7 @@ dv data.csv -o data.parquet
 
 | Key              | Action                                             |
 | ---------------- | -------------------------------------------------- |
-| `Enter`          | Record view of current row transposed              |
+| `Enter`          | Show details for the current row                   |
 | `Tab`            | Show details for the current cell                  |
 | `F`              | Show frequency distribution for current column     |
 | `i`              | Show histogram for current column                  |
@@ -406,12 +406,14 @@ Useful for examining wide datasets where columns don't fit well on screen.
 - Press `}` to move to the next row
 - Press `F` to show the frequency table for the selected column
 - Press `s` to show the statistics table for the selected column
-- Press `Enter` to open a cell-detail modal for the selected field
+- Press `Tab` to open a cell-detail modal for the selected field
 - Press `q` or `Escape` to close the modal
 
 ### 3. Cell Detail View
 
 Press `Tab` in the main table to inspect the current cell in its own modal.
+
+You can also press `Tab` from the row-detail modal to drill into the selected field.
 
 - Scalar values are shown directly
 - String values are split into multiple rows using `|` by default
@@ -811,10 +813,11 @@ Manage multiple files and dataframes simultaneously with tabs.
 
 **Tab Operations:**
 - **`Ctrl+O`** - Open file in a new tab
-- **`>`** - Move to next tab
-- **`<`** - Move to previous tab
-- **`b`** - Cycle through tabs
-- **`B`** - Toggle tab bar visibility
+- **`b`** - Go to the next tab
+- **`B`** - Go to the previous tab
+- **`space`** - Toggle the tab bar visibility
+- **`>`** - Move the current tab right
+- **`<`** - Move the current tab left
 - **`Double-click`** - Rename the tab
 - **`Ctrl+D`** - Duplicate current tab (creates a copy with same data and state)
 - **`Ctrl+T`** - Save current tab to file
