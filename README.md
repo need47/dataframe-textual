@@ -15,6 +15,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 
 ### Data Manipulation
 - 📝 **Data Editing** - Edit cells, delete rows, remove columns, and explode columns
+- 🧹 **Duplicate Removal** - Remove duplicate rows while keeping the first occurrence
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
 - ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts
 - 📈 **Sorting & Statistics** - Multi-column sorting, frequency distribution, and histogram analysis
@@ -307,6 +308,7 @@ dv data.csv -o data.parquet
 | `Ctrl+X`       | Delete current row and all those above                        |
 | `d`            | Duplicate current column                                      |
 | `D`            | Duplicate current row                                         |
+| `=`            | Remove duplicate rows (keep first occurrence)                 |
 | `o`            | Explode current list column into multiple rows                |
 | `O`            | Explode current string column by delimiter into multiple rows |
 

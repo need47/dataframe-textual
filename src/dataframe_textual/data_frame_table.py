@@ -238,6 +238,7 @@ class DataFrameTable(DataTable):
         - **-** - ❌ Delete current column
         - **d** - 📋 Duplicate current column
         - **D** - 📋 Duplicate current row
+        - **=** - 🧹 Remove duplicate rows (keep first occurrence)
         - **o** - 💥 Explode current list column into rows
         - **O** - 💥 Explode current string column by delimiter into rows
 
@@ -364,6 +365,7 @@ class DataFrameTable(DataTable):
         # Duplicate
         ("d", "duplicate_column", "Duplicate column"),
         ("D", "duplicate_row", "Duplicate row"),
+        ("equals_sign", "uniq_rows", "Remove duplicated rows"),
         # Edit
         ("e", "edit_cell", "Edit cell"),
         ("E", "edit_column", "Edit column"),
@@ -1056,6 +1058,11 @@ class DataFrameTable(DataTable):
     def action_duplicate_row(self) -> None:
         """Duplicate the current row."""
         self.do_duplicate_row()
+
+    @wait_full_df
+    def action_uniq_rows(self) -> None:
+        """Remove duplicate rows while keeping the first occurrence."""
+        self.do_uniq_rows()
 
     @wait_full_df
     def action_undo(self) -> None:
@@ -2949,6 +2956,35 @@ class DataFrameTable(DataTable):
         self.move_cursor(row=ridx + 1)
 
         # self.notify(f"Duplicated row [$success]{ridx + 1}[/]", title="Duplicate Row")
+
+    def do_uniq_rows(self) -> None:
+        """Remove duplicate rows from the current dataframe, keeping the first occurrence."""
+        subset = [col for col in self.df.columns if col != RID]
+
+        if not subset:
+            return
+
+        unique_df = self.df.unique(subset=subset, keep="first", maintain_order=True)
+        removed_count = len(self.df) - len(unique_df)
+
+        if removed_count <= 0:
+            return
+
+        self.add_history(f"Removed [$success]{removed_count}[/] duplicate row(s)", dirty=True)
+
+        ok_rids = set(unique_df[RID])
+        self.df = unique_df
+
+        if self.selected_rows:
+            self.selected_rows.intersection_update(ok_rids)
+
+        if self.matches:
+            self.matches = {rid: cols for rid, cols in self.matches.items() if rid in ok_rids}
+
+        if self.df_view is not None:
+            self.df_view = self.df_view.lazy().filter(pl.col(RID).is_in(ok_rids)).collect()
+
+        self.setup_table()
 
     def do_move_column(self, direction: str) -> None:
         """Move the current column left or right.
