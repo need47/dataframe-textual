@@ -116,7 +116,7 @@ class DtypeClass:
 
         return Text(
             text_val,
-            style=style or self.style,
+            style="" if style == "" else (style or self.style),
             justify=justify or self.justify,
             overflow="ellipsis",
             no_wrap=True,
