@@ -43,14 +43,14 @@ class TableScreen(ModalScreen):
         }
     """
 
-    def __init__(self, dftable: "DataFrameTable") -> None:
+    def __init__(self, dftable: "DataFrameTable | None") -> None:
         """Initialize the table screen.
 
         Sets up the base modal screen with reference to the main DataFrameTable widget
         and stores the DataFrame for display.
 
         Args:
-            dftable: Reference to the parent DataFrameTable widget.
+            dftable: Reference to the parent DataFrameTable widget, if applicable.
         """
         super().__init__()
         self.dftable = dftable  # DataFrameTable
@@ -302,7 +302,7 @@ class RowDetailScreen(TableScreen):
             self.show_statistics(self.get_cidx_name_value())
             event.stop()
         elif event.key == "tab":
-            self.app.push_screen(CellDetailScreen(self.dftable, self.ridx, self.table.cursor_row))
+            self.app.push_screen(CellDetailScreen(self.dftable.df, self.ridx, self.table.cursor_row))
             event.stop()
 
     def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
@@ -821,8 +821,9 @@ class MetaColumnScreen(TableScreen):
 class CellDetailScreen(TableScreen):
     """Modal screen to display details of a cell value, including support for nested structures like lists and dicts."""
 
-    def __init__(self, dftable: "DataFrameTable", ridx: int, cidx: int, delimiter: str | None = "|") -> None:
-        super().__init__(dftable)
+    def __init__(self, dfsrc: pl.DataFrame, ridx: int, cidx: int, delimiter: str | None = "|") -> None:
+        super().__init__(None)
+        self.dfsrc = dfsrc
         self.cidx = cidx
         self.ridx = ridx
         self.delimiter = delimiter
@@ -834,18 +835,21 @@ class CellDetailScreen(TableScreen):
     def build_table(self) -> None:
         """Build the list table."""
         # Get the column values as a list
-        col_name = self.dftable.df.columns[self.cidx]
-        dtype = self.dftable.df.dtypes[self.cidx]
-        cell_value = self.dftable.df.item(self.ridx, self.cidx)
+        col_name = self.dfsrc.columns[self.cidx]
+        dtype = self.dfsrc.dtypes[self.cidx]
+        cell_value = self.dfsrc.item(self.ridx, self.cidx)
 
         if isinstance(cell_value, pl.Series) and not cell_value.is_empty():
             self.df = pl.DataFrame({col_name: cell_value})
             df2table(self.df, table=self.table)
         elif isinstance(cell_value, dict) and cell_value:
-            self.table.add_column(f"{col_name} (Key)")
-            self.table.add_column(f"{col_name} (Value)")
-            for idx, (key, value) in enumerate(cell_value.items()):
-                self.table.add_row(str(key), str(value), label=str(idx + 1))
+            self.df = pl.DataFrame(
+                {
+                    f"{col_name} (Key)": pl.Series(cell_value.keys(), strict=False),
+                    f"{col_name} (Value)": pl.Series(cell_value.values(), strict=False),
+                }
+            )
+            df2table(self.df, table=self.table)
         elif dtype == pl.String and cell_value:
             self.df = pl.DataFrame({col_name: cell_value.split(self.delimiter)})
             df2table(self.df, table=self.table)
@@ -853,4 +857,17 @@ class CellDetailScreen(TableScreen):
             self.df = pl.DataFrame({col_name: [cell_value]})
             df2table(self.df, table=self.table)
 
-        self.table.cursor_type = "row"
+    def on_key(self, event) -> None:
+        """Handle key press events on the column metadata screen.
+
+        Supports keys:
+          - 'tab': Show cell details for the selected value.
+
+        Args:
+            event: The key event object.
+        """
+        if event.key == "tab":
+            cidx = self.table.cursor_column
+            ridx = self.table.cursor_row
+            self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
+            event.stop()

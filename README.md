@@ -270,25 +270,25 @@ dv data.csv -o data.parquet
 
 #### Display
 
-| Key              | Action                                             |
-| ---------------- | -------------------------------------------------- |
-| `Enter`          | Show details for the current row                   |
-| `Tab`            | Show details for the current cell                  |
-| `F`              | Show frequency distribution for current column     |
-| `i`              | Show histogram for current column                  |
-| `I`              | Show histogram for current column with custom bins |
-| `s`              | Show statistics for current column                 |
-| `S`              | Show statistics for entire dataframe               |
-| `m`              | Show metadata for row count and column count       |
-| `M`              | Show metadata for current column                   |
-| `K`              | Cycle cursor types: cell → row → column → cell     |
-| `~`              | Toggle row labels                                  |
-| `_` (underscore) | Toggle column full width                           |
-| `f`              | Toggle freeze rows and/or columns                  |
-| `,`              | Toggle thousand separator for numeric display      |
-| `&`              | Set current row as the new header row              |
-| `h`              | Hide current column                                |
-| `H`              | Show all hidden columns                            |
+| Key              | Action                                                             |
+| ---------------- | ------------------------------------------------------------------ |
+| `Enter`          | Show details for the current row                                   |
+| `Tab`            | Show current cell details; press `Tab` again there to drill deeper |
+| `F`              | Show frequency distribution for current column                     |
+| `i`              | Show histogram for current column                                  |
+| `I`              | Show histogram for current column with custom bins                 |
+| `s`              | Show statistics for current column                                 |
+| `S`              | Show statistics for entire dataframe                               |
+| `m`              | Show metadata for row count and column count                       |
+| `M`              | Show metadata for current column                                   |
+| `K`              | Cycle cursor types: cell → row → column → cell                     |
+| `~`              | Toggle row labels                                                  |
+| `_` (underscore) | Toggle column full width                                           |
+| `f`              | Toggle freeze rows and/or columns                                  |
+| `,`              | Toggle thousand separator for numeric display                      |
+| `&`              | Set current row as the new header row                              |
+| `h`              | Hide current column                                                |
+| `H`              | Show all hidden columns                                            |
 
 #### Editing
 
@@ -417,9 +417,12 @@ Press `Tab` in the main table to inspect the current cell in its own modal.
 
 You can also press `Tab` from the row-detail modal to drill into the selected field.
 
+Inside the cell-detail modal, press `Tab` again on the selected row/column to keep drilling into nested values.
+
 - Scalar values are shown directly
 - String values are split into multiple rows using `|` by default
-- Lists and structs are expanded into a readable table layout
+- List-like values are expanded into a one-column table
+- Dict-like values are shown as key/value columns
 - Press `q` or `Escape` to close the modal
 
 ### 4. Row Selection

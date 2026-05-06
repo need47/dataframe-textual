@@ -207,7 +207,7 @@ class DataFrameTable(DataTable):
 
         ## 👁️ Display
         - **Enter** - 📋 Show row details in modal
-        - **Tab** - 🔍 Show current cell details in modal
+        - **Tab** - 🔍 Show current cell details in modal; use `Tab` again there to drill deeper
         - **F** - 📊 Show frequency distribution for current column
         - **i** - 📊 Show histogram for current column
         - **I** - 📊 Show histogram for current column with custom bins
@@ -1870,7 +1870,7 @@ class DataFrameTable(DataTable):
         cidx = self.cursor_cidx
 
         # Push the modal screen
-        self.app.push_screen(CellDetailScreen(self, ridx, cidx))
+        self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
 
     def do_show_frequency(self, cidx: int | None = None) -> None:
         """Show frequency distribution for a given columnn."""
