@@ -2959,7 +2959,7 @@ class DataFrameTable(DataTable):
 
     def do_uniq_rows(self) -> None:
         """Remove duplicate rows from the current dataframe, keeping the first occurrence."""
-        subset = [col for col in self.df.columns if col != RID]
+        subset = [col for col in self.df.columns if col != RID and col not in self.hidden_columns]
 
         if not subset:
             return
