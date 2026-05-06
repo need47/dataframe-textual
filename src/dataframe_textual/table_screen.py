@@ -16,7 +16,7 @@ from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
-from .common import NULL, NULL_DISPLAY, RID, DtypeConfig, format_float
+from .common import NULL, NULL_DISPLAY, RID, DtypeConfig, df2table, format_float
 from .file_picker_screen import SaveFileScreen
 
 
@@ -250,7 +250,7 @@ class RowDetailScreen(TableScreen):
             formatted_row.append(col)
 
             dc = DtypeConfig(dtype)
-            formatted_row.append(dc.format(val, justify="", thousand_separator=self.thousand_separator))
+            formatted_row.append(dc.format(val, justify="left", thousand_separator=self.thousand_separator))
             self.table.add_row(*formatted_row, label=str(idx + 1))
 
         self.table.cursor_type = "row"
@@ -833,28 +833,24 @@ class CellDetailScreen(TableScreen):
 
     def build_table(self) -> None:
         """Build the list table."""
-        self.table.clear(columns=True)
-
         # Get the column values as a list
         col_name = self.dftable.df.columns[self.cidx]
         dtype = self.dftable.df.dtypes[self.cidx]
         cell_value = self.dftable.df.item(self.ridx, self.cidx)
 
         if isinstance(cell_value, pl.Series) and not cell_value.is_empty():
-            self.table.add_column(col_name)
-            for idx, value in enumerate(cell_value):
-                self.table.add_row(value, label=str(idx + 1))
+            self.df = pl.DataFrame({col_name: cell_value})
+            df2table(self.df, table=self.table)
         elif isinstance(cell_value, dict) and cell_value:
             self.table.add_column(f"{col_name} (Key)")
             self.table.add_column(f"{col_name} (Value)")
             for idx, (key, value) in enumerate(cell_value.items()):
-                self.table.add_row(Text(str(key), justify="right"), Text(str(value)), label=str(idx + 1))
+                self.table.add_row(str(key), str(value), label=str(idx + 1))
         elif dtype == pl.String and cell_value:
-            self.table.add_column(col_name)
-            for idx, value in enumerate(cell_value.split(self.delimiter)):
-                self.table.add_row(value, label=str(idx + 1))
+            self.df = pl.DataFrame({col_name: cell_value.split(self.delimiter)})
+            df2table(self.df, table=self.table)
         else:
-            self.table.add_column(col_name)
-            self.table.add_row(str(cell_value))
+            self.df = pl.DataFrame({col_name: [cell_value]})
+            df2table(self.df, table=self.table)
 
         self.table.cursor_type = "row"

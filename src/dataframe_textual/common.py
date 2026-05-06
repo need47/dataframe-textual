@@ -14,6 +14,7 @@ from typing import Any
 import polars as pl
 import xlsxwriter
 from rich.text import Text
+from textual.widgets import DataTable
 
 # Supported file formats
 SUPPORTED_FORMATS = {
@@ -96,6 +97,9 @@ class DtypeClass:
 
         Args:
             val: The value to format.
+            style: Optional style override for display. Defaults to None.
+            justify: Optional justification (e.g., left, right, center) override for display. Defaults to None.
+            thousand_separator: Whether to include thousand separators for numeric values. Defaults to False.
 
         Returns:
             The formatted value as a Text.
@@ -112,8 +116,8 @@ class DtypeClass:
 
         return Text(
             text_val,
-            style="" if style == "" else (style or self.style),
-            justify="" if justify == "" else (justify or self.justify),
+            style=style or self.style,
+            justify=justify or self.justify,
             overflow="ellipsis",
             no_wrap=True,
         )
@@ -145,7 +149,7 @@ STYLES = {
     pl.Datetime: DtypeClass(gtype="temporal", style="magenta", justify="center", itype="text", convert=str),
     pl.Time: DtypeClass(gtype="temporal", style="magenta", justify="center", itype="text", convert=str),
     # unknown
-    pl.Unknown: DtypeClass(gtype="unknown", style="", justify="", itype="text", convert=str),
+    pl.Unknown: DtypeClass(gtype="unknown", style="", justify=None, itype="text", convert=str),
 }
 # fmt: on
 
@@ -1039,3 +1043,41 @@ def write_file(sources: list[Source], filename: str) -> None:
     except Exception as e:
         print(f"Error writing to output file: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+def df2table(
+    df: pl.DataFrame,
+    table: DataTable | None = None,
+    hidden_columns: list[str] | None = None,
+    thousand_separator: bool = False,
+) -> DataTable:
+    """Convert a Polars DataFrame to a DataTable for display.
+
+    Args:
+        df: The Polars DataFrame to convert.
+        table: An optional DataTable to populate. If None, a new DataTable is created.
+        hidden_columns: An optional list of columns to hide in the DataTable.
+        thousand_separator: Whether to use a thousand separator for numeric values.
+
+    Returns:
+        A DataTable representing the DataFrame.
+    """
+
+    if table is None:
+        table = DataTable(zebra_stripes=True)
+    else:
+        table.clear(columns=True)
+
+    # Add columns with proper justification based on data types
+    for col, dtype in zip(df.columns, df.dtypes):
+        if col == RID or (hidden_columns and col in hidden_columns):
+            continue
+        dc = DtypeConfig(dtype)
+        table.add_column(Text(col, justify=dc.justify), key=col)
+
+    # Add rows with proper formatting based on data types
+    for idx, row in enumerate(df.iter_rows()):
+        formatted_row = format_row(row, df.dtypes, thousand_separator=thousand_separator)
+        table.add_row(*formatted_row, label=str(idx + 1))
+
+    return table
