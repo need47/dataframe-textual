@@ -16,11 +16,11 @@ from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
-from .common import NULL, NULL_DISPLAY, RID, DtypeConfig, df2table, format_float
+from .common import NULL, NULL_DISPLAY, RID, DtypeConfig, format_float, format_row
 from .file_picker_screen import SaveFileScreen
 
 
-class TableScreen(ModalScreen):
+class TableModalScreen(ModalScreen):
     """Base class for modal screens displaying data in a DataTable.
 
     Provides common functionality for screens that show tabular data with
@@ -28,11 +28,11 @@ class TableScreen(ModalScreen):
     """
 
     DEFAULT_CSS = """
-        TableScreen {
+        TableModalScreen {
             align: center middle;
         }
 
-        TableScreen > DataTable {
+        TableModalScreen > DataTable {
             width: auto;
             max-width: 100%;
             height: auto;
@@ -43,18 +43,17 @@ class TableScreen(ModalScreen):
         }
     """
 
-    def __init__(self, dftable: "DataFrameTable | None") -> None:
+    def __init__(self, df: pl.DataFrame | None = None) -> None:
         """Initialize the table screen.
 
         Sets up the base modal screen with reference to the main DataFrameTable widget
         and stores the DataFrame for display.
 
         Args:
-            dftable: Reference to the parent DataFrameTable widget, if applicable.
+            df: The DataFrame to display in this screen.
         """
         super().__init__()
-        self.dftable = dftable  # DataFrameTable
-        self.df: pl.DataFrame = None  # DataFrame for this screen, to be set by subclasses
+        self.df = df  # DataFrame for this screen, to be set by subclasses
         self.thousand_separator = False  # Whether to use thousand separators in numbers
         self.sorted_columns: dict[int, bool] = {}  # Track sorted columns and their sort order
 
@@ -69,14 +68,6 @@ class TableScreen(ModalScreen):
         """
         self.table = DataTable(zebra_stripes=True)
         yield self.table
-
-    def build_table(self) -> None:
-        """Build the table content.
-
-        Subclasses should implement this method to populate the DataTable
-        with appropriate columns and rows based on the specific screen's purpose.
-        """
-        raise NotImplementedError("Subclasses must implement build_table method.")
 
     def on_key(self, event) -> None:
         """Handle key press events in the table screen.
@@ -101,21 +92,133 @@ class TableScreen(ModalScreen):
             self.table.action_scroll_bottom()
             event.stop()
         elif event.key == "left_square_bracket":  # '['
-            cell_key = self.table.coordinate_to_cell_key(self.table.cursor_coordinate)
-            # Sort by current column in ascending order
-            try:
-                self.table.sort(cell_key.column_key, key=lambda c: c.plain if isinstance(c, Text) else c)
-            except TypeError as e:
-                self.notify(f"Cannot sort column: {e}", title="Sort", severity="error")
+            self.sort_by_column(descending=False)
             event.stop()
         elif event.key == "right_square_bracket":  # ']'
-            cell_key = self.table.coordinate_to_cell_key(self.table.cursor_coordinate)
-            # Sort by current column in descending order
-            try:
-                self.table.sort(cell_key.column_key, reverse=True, key=lambda c: c.plain if isinstance(c, Text) else c)
-            except TypeError as e:
-                self.notify(f"Cannot sort column: {e}", title="Sort", severity="error")
+            self.sort_by_column(descending=True)
             event.stop()
+
+    def build_table(self) -> None:
+        """Build the table content.
+
+        Subclasses should implement this method to populate the DataTable
+        with appropriate columns and rows based on the specific screen's purpose.
+        """
+        raise NotImplementedError("Subclasses must implement build_table method.")
+
+    def df2table(self) -> None:
+        """Convert a Polars DataFrame to a DataTable for display."""
+        if self.df is None:
+            return
+
+        self.table.clear(columns=True)
+
+        # Add columns with proper justification based on data types
+        for col, dtype in zip(self.df.columns, self.df.dtypes):
+            if col == RID:
+                continue
+
+            for c in self.sorted_columns:
+                if c == col:
+                    # Add sort indicator to column header
+                    descending = self.sorted_columns[col]
+                    sort_indicator = " ▼" if descending else " ▲"
+                    cell_value = col + sort_indicator
+                    break
+            else:  # No break occurred, so column is not sorted
+                cell_value = col
+
+            dc = DtypeConfig(dtype)
+            self.table.add_column(Text(cell_value, justify=dc.justify), key=col)
+
+        # Add rows with proper formatting based on data types
+        for ridx, row in enumerate(self.df.iter_rows()):
+            if row[0] == RID:
+                continue
+
+            formatted_row = []
+            for cidx, c in enumerate(row):
+                if self.df.columns[cidx] == RID:
+                    continue
+
+                # If the value is already a Text object (e.g. with styling), keep it as is. Otherwise, format based on dtype.
+                if isinstance(c, Text):
+                    formatted_row.append(c)
+                else:
+                    dtype = self.df.dtypes[cidx]
+                    dc = DtypeConfig(dtype)
+                    formatted_row.append(dc.format(c, thousand_separator=self.thousand_separator))
+
+            self.table.add_row(*formatted_row, label=str(ridx + 1))
+
+    def sort_by_column(self, descending: bool = False) -> None:
+        """Sort the table by the current column.
+
+        Args:
+            descending: Whether to sort in descending order. Defaults to False (ascending).
+        """
+        # Get the current column index and name
+        ridx, cidx = self.table.cursor_coordinate
+        col_key = self.table.coordinate_to_cell_key((ridx, cidx)).column_key
+        col_name = col_key.value
+
+        # Already sorted by this column in the same order, do nothing
+        if self.sorted_columns.get(col_name) == descending:
+            return
+
+        # Update sorted columns tracking and sort the dataframe
+        self.sorted_columns.clear()
+        self.sorted_columns[col_name] = descending
+
+        # If no DataFrame is available (e.g., not yet populated), sort the table directly
+        if self.df is None:
+            self.table.sort(col_key, key=lambda c: c.plain if isinstance(c, Text) else c, reverse=descending)
+            return
+
+        if self.df.is_empty():
+            return
+
+        try:
+            self.df = self.df.sort(col_name, descending=descending, nulls_last=True)
+        except Exception as e:
+            self.log(f"Error sorting by column '{col_name}': {e}")
+
+            # Fallback to sorting the table directly if dataframe sorting fails (e.g. due to unsupported data types)
+            self.table.sort(col_key, key=lambda c: c.plain if isinstance(c, Text) else c, reverse=descending)
+            return
+
+        # Rebuild the table
+        self.df2table()
+
+        # Move cursor back to the same column and approximate row position after sorting
+        self.table.move_cursor(row=ridx, column=cidx)
+
+    def _on_calc_ready(self) -> None:
+        self.build_table()
+        self.table.loading = False
+        self.table.focus()
+
+
+class TableScreen(TableModalScreen):
+    """Base class for modal screens displaying data in a DataTable.
+
+    Provides common functionality for screens that show tabular data with
+    keyboard shortcuts and styling.
+    """
+
+    DEFAULT_CSS = TableModalScreen.DEFAULT_CSS.replace("TableModalScreen", "TableScreen")
+
+    def __init__(self, dftable: "DataFrameTable") -> None:
+        """Initialize the table screen.
+
+        Sets up the base modal screen with reference to the main DataFrameTable widget
+        and stores the DataFrame for display.
+
+        Args:
+            dftable: Reference to the parent DataFrameTable widget, if applicable.
+        """
+        super().__init__()
+        self.dftable = dftable
 
     def filter_or_view_selected_value(self, cidx_name_value: tuple[int, str, Any] | None, action: str = "view") -> None:
         """Apply filter or view action by the selected value.
@@ -213,16 +316,11 @@ class TableScreen(ModalScreen):
         # Show statistics screen
         self.dftable.action_show_statistics(cidx)
 
-    def _on_calc_ready(self) -> None:
-        self.build_table()
-        self.table.loading = False
-        self.table.focus()
-
 
 class RowDetailScreen(TableScreen):
     """Modal screen to display a single row's details."""
 
-    def __init__(self, ridx: int, dftable: "DataFrameTable") -> None:
+    def __init__(self, dftable: "DataFrameTable", ridx: int) -> None:
         super().__init__(dftable)
         self.ridx = ridx
 
@@ -233,27 +331,6 @@ class RowDetailScreen(TableScreen):
         of the main DataFrame. Sets the table cursor type to "row".
         """
         self.build_table()
-
-    def build_table(self) -> None:
-        """Build the row detail table."""
-        self.table.clear(columns=True)
-        self.table.add_column("Column")
-        self.table.add_column("Value")
-
-        # Get all columns and values from the dataframe row
-        for idx, (col, val, dtype) in enumerate(
-            zip(self.dftable.df.columns, self.dftable.df.row(self.ridx), self.dftable.df.dtypes)
-        ):
-            if col in self.dftable.hidden_columns or col == RID:
-                continue  # Skip RID column
-            formatted_row = []
-            formatted_row.append(col)
-
-            dc = DtypeConfig(dtype)
-            formatted_row.append(dc.format(val, justify="left", thousand_separator=self.thousand_separator))
-            self.table.add_row(*formatted_row, label=str(idx + 1))
-
-        self.table.cursor_type = "row"
 
     def on_key(self, event) -> None:
         """Handle key press events on the row detail screen.
@@ -318,6 +395,27 @@ class RowDetailScreen(TableScreen):
                 self.app.push_screen(CellDetailScreen(self.dftable.df, ridx, cidx))
             event.stop()
 
+    def build_table(self) -> None:
+        """Build the row detail table."""
+        self.df = pl.DataFrame(
+            {
+                "Column": self.dftable.df.columns,
+                "Value": format_row(
+                    self.dftable.df.row(self.ridx),
+                    self.dftable.df.dtypes,
+                    justify="left",
+                    thousand_separator=self.thousand_separator,
+                ),
+            }
+        )
+
+        self.df2table()
+        self.table.cursor_type = "row"
+
+    def sort_by_column(self, descending=False):
+        # Override to disable sorting in row detail screen
+        pass
+
     def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
         """Get the current column info."""
         cidx = self.table.cursor_row
@@ -335,7 +433,6 @@ class StatisticsScreen(TableScreen):
     def __init__(self, dftable: "DataFrameTable", cidx: int | None = None):
         super().__init__(dftable)
         self.cidx = cidx  # None for dataframe statistics, otherwise column index
-        self.df: pl.DataFrame = None
 
     def on_mount(self) -> None:
         """Create the statistics table."""
@@ -414,13 +511,13 @@ class StatisticsScreen(TableScreen):
         dc = DtypeConfig(col_dtype)
 
         # Add statistics label column
-        self.table.add_column(Text("Statistic", justify="left"), key="statistic")
+        self.table.add_column("Statistic", key="statistic")
 
         # Add value column with appropriate styling
         self.table.add_column(Text(col_name, justify=dc.justify), key=col_name)
 
         # Add rows
-        for idx, row in enumerate(self.df.rows()):
+        for idx, row in enumerate(self.df.iter_rows()):
             stat_label, stat_value = row
             if idx < 4 and col_dtype == pl.String and self.thousand_separator:
                 stat_value = f"{int(stat_value):,}"
@@ -442,7 +539,7 @@ class StatisticsScreen(TableScreen):
             self.table.add_column(Text(col_name, justify=dc.justify), key=col_name)
 
         # Add rows
-        for ridx, row in enumerate(self.df.rows()):
+        for ridx, row in enumerate(self.df.iter_rows()):
             formatted_row = []
 
             # Format remaining values with appropriate styling
@@ -462,11 +559,15 @@ class StatisticsScreen(TableScreen):
 
             self.table.add_row(*formatted_row)
 
+    def sort_by_column(self, descending=False):
+        # Override to disable sorting in statistics screen
+        pass
+
 
 class FrequencyScreen(TableScreen):
     """Modal screen to display frequency of values in a column."""
 
-    def __init__(self, cidx: int, dftable: "DataFrameTable") -> None:
+    def __init__(self, dftable: "DataFrameTable", cidx: int) -> None:
         super().__init__(dftable)
         self.cidx = cidx
         self.sorted_columns[1] = True  # Count sort by default
@@ -542,7 +643,7 @@ class FrequencyScreen(TableScreen):
         bar_width = 10
 
         # Add rows to the frequency table
-        for row_idx, row in enumerate(self.df.rows()):
+        for row_idx, row in enumerate(self.df.iter_rows()):
             column, count = row
             percentage = (count / self.total_count) * 100
 
@@ -683,7 +784,7 @@ class HistogramScreen(TableScreen):
         bar_width = 10
 
         # Add rows to the histogram table
-        for row_idx, row in enumerate(self.df.rows()):
+        for row_idx, row in enumerate(self.df.iter_rows()):
             _breakpoint, column, count = row
             percentage = (count / self.total_count) * 100
 
@@ -717,6 +818,10 @@ class HistogramScreen(TableScreen):
             ),
         )
 
+    def sort_by_column(self, descending=False):
+        # Sorting is not supported for histogram screen
+        pass
+
     def save_histogram_table(self) -> None:
         """Save the histogram table to file."""
         column = self.dftable.df.columns[self.cidx]
@@ -748,8 +853,8 @@ class MetaShape(TableScreen):
     def build_table(self) -> None:
         """Build the metadata table."""
         self.table.clear(columns=True)
-        self.table.add_column("")
-        self.table.add_column(Text("Value", justify="right"))
+        self.table.add_column("", key="metadata")
+        self.table.add_column(Text("Value", justify="right"), key="value")
 
         # Get shape information
         num_rows, num_cols = self.dftable.df.shape
@@ -763,6 +868,10 @@ class MetaShape(TableScreen):
         self.table.add_row("Column Count", dc_int.format(num_cols, thousand_separator=self.thousand_separator))
 
         self.table.cursor_type = "none"
+
+    def sort_by_column(self, descending=False):
+        # Sorting is not supported for metadata screen
+        pass
 
 
 class MetaColumnScreen(TableScreen):
@@ -798,8 +907,8 @@ class MetaColumnScreen(TableScreen):
     def build_table(self) -> None:
         """Build the column metadata table."""
         self.table.clear(columns=True)
-        self.table.add_column("Column")
-        self.table.add_column("Type")
+        self.table.add_column("Column", key="column")
+        self.table.add_column("Type", key="type")
 
         # Get schema information
         schema = self.dftable.df.schema
@@ -819,6 +928,10 @@ class MetaColumnScreen(TableScreen):
 
         self.table.cursor_type = "row"
 
+    def sort_by_column(self, descending=False):
+        # Sorting is not supported for column metadata screen
+        pass
+
     def get_cidx_name_value(self) -> int | None:
         """Get the current column info."""
         cidx = self.table.cursor_row
@@ -831,44 +944,19 @@ class MetaColumnScreen(TableScreen):
         return cidx, col_name, col_value
 
 
-class CellDetailScreen(TableScreen):
+class CellDetailScreen(TableModalScreen):
     """Modal screen to display details of a cell value, including support for nested structures like lists and dicts."""
 
     def __init__(self, dfsrc: pl.DataFrame, ridx: int, cidx: int, delimiter: str | None = "|") -> None:
-        super().__init__(None)
+        super().__init__()
         self.dfsrc = dfsrc
         self.cidx = cidx
         self.ridx = ridx
         self.delimiter = delimiter
 
     def on_mount(self) -> None:
-        """Initialize the list screen."""
+        """Initialize the cell detail screen."""
         self.build_table()
-
-    def build_table(self) -> None:
-        """Build the list table."""
-        # Get the column values as a list
-        col_name = self.dfsrc.columns[self.cidx]
-        dtype = self.dfsrc.dtypes[self.cidx]
-        cell_value = self.dfsrc.item(self.ridx, self.cidx)
-
-        if isinstance(cell_value, pl.Series) and not cell_value.is_empty():
-            self.df = pl.DataFrame({col_name: cell_value})
-            df2table(self.df, table=self.table)
-        elif isinstance(cell_value, dict) and cell_value:
-            self.df = pl.DataFrame(
-                {
-                    f"{col_name} (Key)": pl.Series(cell_value.keys(), strict=False),
-                    f"{col_name} (Value)": pl.Series(cell_value.values(), strict=False),
-                }
-            )
-            df2table(self.df, table=self.table)
-        elif dtype == pl.String and cell_value:
-            self.df = pl.DataFrame({col_name: cell_value.split(self.delimiter)})
-            df2table(self.df, table=self.table)
-        else:
-            self.df = pl.DataFrame({col_name: [cell_value]})
-            df2table(self.df, table=self.table)
 
     def on_key(self, event) -> None:
         """Handle key press events on the column metadata screen.
@@ -895,3 +983,28 @@ class CellDetailScreen(TableScreen):
             ):
                 self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
             event.stop()
+
+    def build_table(self) -> None:
+        """Build the list table."""
+        # Get the column values as a list
+        col_name = self.dfsrc.columns[self.cidx]
+        dtype = self.dfsrc.dtypes[self.cidx]
+        cell_value = self.dfsrc.item(self.ridx, self.cidx)
+
+        if isinstance(cell_value, pl.Series) and not cell_value.is_empty():
+            self.df = pl.DataFrame({col_name: cell_value})
+            self.df2table()
+        elif isinstance(cell_value, dict) and cell_value:
+            self.df = pl.DataFrame(
+                {
+                    f"{col_name} (Key)": pl.Series(cell_value.keys(), strict=False),
+                    f"{col_name} (Value)": pl.Series(cell_value.values(), strict=False),
+                }
+            )
+            self.df2table()
+        elif dtype == pl.String and cell_value:
+            self.df = pl.DataFrame({col_name: cell_value.split(self.delimiter)})
+            self.df2table()
+        else:
+            self.df = pl.DataFrame({col_name: [cell_value]})
+            self.df2table()

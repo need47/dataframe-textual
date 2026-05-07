@@ -39,6 +39,7 @@ from .common import (
     RID_OLD,
     SUBSCRIPT_DIGITS,
     DtypeConfig,
+    add_rid_column,
     format_row,
     get_next_item,
     parse_placeholders,
@@ -123,23 +124,6 @@ class ReplaceState:
     replaced_occurrence: int  # Number of occurrences already replaced
     skipped_occurrence: int  # Number of occurrences skipped
     done: bool = False  # Whether the replace operation is complete
-
-
-def add_rid_column(frame: pl.DataFrame | pl.LazyFrame, offset: int = 0) -> pl.DataFrame | pl.LazyFrame:
-    """Add internal row index as last column to the dataframe if not already present.
-
-    Args:
-        frame: The Polars DataFrame or LazyFrame to modify.
-        offset: The starting index for the row IDs.
-    Returns:
-        The modified DataFrame or LazyFrame with the internal row index column added.
-    """
-    if isinstance(frame, pl.DataFrame):
-        frame = frame.lazy().with_row_index(RID, offset=offset).select(pl.exclude(RID), RID).collect()
-    elif isinstance(frame, pl.LazyFrame):
-        frame = frame.with_row_index(RID, offset=offset).select(pl.exclude(RID), RID)
-
-    return frame
 
 
 def handle_term(
@@ -1468,7 +1452,7 @@ class DataFrameTable(DataTable):
         df_slice = self.df.slice(segment_start, segment_stop - segment_start)
 
         # Load each row at the correct position
-        for (ridx, row), rid in zip(enumerate(df_slice.rows(), segment_start), df_slice[RID]):
+        for (ridx, row), rid in zip(enumerate(df_slice.iter_rows(), segment_start), df_slice[RID]):
             is_selected = rid in self.selected_rows
             match_cols = self.matches.get(rid, set())
 
@@ -1483,7 +1467,12 @@ class DataFrameTable(DataTable):
                 # Highlight entire row with selection or cells with matches
                 styles.append(HIGHLIGHT_COLOR if is_selected or col in match_cols else None)
 
-            formatted_row = format_row(vals, dtypes, styles=styles, thousand_separator=self.thousand_separator)
+            formatted_row = format_row(
+                vals,
+                dtypes,
+                style=styles,
+                thousand_separator=self.thousand_separator,
+            )
 
             # Find correct insertion position and insert
             insert_pos = self._find_insert_position_for_row(ridx)
@@ -1862,7 +1851,7 @@ class DataFrameTable(DataTable):
         ridx = self.cursor_ridx
 
         # Push the modal screen
-        self.app.push_screen(RowDetailScreen(ridx, self))
+        self.app.push_screen(RowDetailScreen(self, ridx))
 
     def do_view_cell_detail(self) -> None:
         """Open a modal screen to view the selected cell's details."""
@@ -1886,7 +1875,7 @@ class DataFrameTable(DataTable):
         cidx = self.cursor_cidx if cidx is None else cidx
 
         # Push the frequency modal screen
-        self.app.push_screen(FrequencyScreen(cidx, self))
+        self.app.push_screen(FrequencyScreen(self, cidx))
 
     def do_show_histogram(self, default: int = 1) -> None:
         """Show histogram for a given columnn."""

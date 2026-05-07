@@ -14,7 +14,6 @@ from typing import Any
 import polars as pl
 import xlsxwriter
 from rich.text import Text
-from textual.widgets import DataTable
 
 # Supported file formats
 SUPPORTED_FORMATS = {
@@ -214,7 +213,13 @@ def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
         return STYLES[pl.Unknown]
 
 
-def format_row(vals, dtypes, styles: list[str | None] | None = None, thousand_separator=False) -> list[Text]:
+def format_row(
+    vals,
+    dtypes,
+    style: str | list[str] = "",
+    justify: str | list[str] = "",
+    thousand_separator=False,
+) -> list[Text]:
     """Format a single row with proper styling and justification.
 
     Converts raw row values to formatted Rich Text objects with appropriate
@@ -223,7 +228,9 @@ def format_row(vals, dtypes, styles: list[str | None] | None = None, thousand_se
     Args:
         vals: The list of values in the row.
         dtypes: The list of data types corresponding to each value.
-        styles: Optional list of style overrides for each value. Defaults to None.
+        style: Optional list of style overrides for each value. Defaults to an empty string.
+        justify: Optional list of justification overrides for each value. Defaults to an empty string.
+        thousand_separator: Whether to include thousand separators for numeric values. Defaults to False.
 
     Returns:
         A list of Rich Text objects with proper formatting applied.
@@ -232,10 +239,31 @@ def format_row(vals, dtypes, styles: list[str | None] | None = None, thousand_se
 
     for idx, (val, dtype) in enumerate(zip(vals, dtypes, strict=True)):
         dc = DtypeConfig(dtype)
+        if style:
+            if isinstance(style, str):
+                style = style
+            elif isinstance(style, list) and idx < len(style):
+                style = style[idx]
+            else:
+                style = None
+        else:
+            style = None
+
+        if justify:
+            if isinstance(justify, str):
+                justify = justify
+            elif isinstance(justify, list) and idx < len(justify):
+                justify = justify[idx]
+            else:
+                justify = None
+        else:
+            justify = None
+
         formatted_row.append(
             dc.format(
                 val,
-                style=styles[idx] if styles and styles[idx] else None,
+                style=style,
+                justify=justify,
                 thousand_separator=thousand_separator,
             )
         )
@@ -1045,39 +1073,18 @@ def write_file(sources: list[Source], filename: str) -> None:
         sys.exit(1)
 
 
-def df2table(
-    df: pl.DataFrame,
-    table: DataTable | None = None,
-    hidden_columns: list[str] | None = None,
-    thousand_separator: bool = False,
-) -> DataTable:
-    """Convert a Polars DataFrame to a DataTable for display.
+def add_rid_column(frame: pl.DataFrame | pl.LazyFrame, offset: int = 0) -> pl.DataFrame | pl.LazyFrame:
+    """Add internal row index as last column to the dataframe if not already present.
 
     Args:
-        df: The Polars DataFrame to convert.
-        table: An optional DataTable to populate. If None, a new DataTable is created.
-        hidden_columns: An optional list of columns to hide in the DataTable.
-        thousand_separator: Whether to use a thousand separator for numeric values.
-
+        frame: The Polars DataFrame or LazyFrame to modify.
+        offset: The starting index for the row IDs.
     Returns:
-        A DataTable representing the DataFrame.
+        The modified DataFrame or LazyFrame with the internal row index column added.
     """
+    if isinstance(frame, pl.DataFrame) and RID not in frame.columns:
+        frame = frame.lazy().with_row_index(RID, offset=offset).select(pl.exclude(RID), RID).collect()
+    elif isinstance(frame, pl.LazyFrame) and RID not in frame.collect_schema():
+        frame = frame.with_row_index(RID, offset=offset).select(pl.exclude(RID), RID)
 
-    if table is None:
-        table = DataTable(zebra_stripes=True)
-    else:
-        table.clear(columns=True)
-
-    # Add columns with proper justification based on data types
-    for col, dtype in zip(df.columns, df.dtypes):
-        if col == RID or (hidden_columns and col in hidden_columns):
-            continue
-        dc = DtypeConfig(dtype)
-        table.add_column(Text(col, justify=dc.justify), key=col)
-
-    # Add rows with proper formatting based on data types
-    for idx, row in enumerate(df.iter_rows()):
-        formatted_row = format_row(row, df.dtypes, thousand_separator=thousand_separator)
-        table.add_row(*formatted_row, label=str(idx + 1))
-
-    return table
+    return frame
