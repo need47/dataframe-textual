@@ -442,21 +442,45 @@ class StatisticsScreen(TableScreen):
     @work(thread=True)
     def calculate_statistics(self) -> None:
         """Calculate statistics."""
-        self.df = self.build_df()
+        self.build_df()
         self.app.call_from_thread(self._on_calc_ready)
 
     def build_table(self) -> None:
         """Build the statistics table."""
         self.table.clear(columns=True)
 
-        if self.cidx is None:
-            # Dataframe statistics
-            self.build_dataframe_stats()
-            self.table.cursor_type = "column"
-        else:
-            # Column statistics
-            self.build_column_stats()
-            self.table.cursor_type = "row"
+        # Add columns
+        for col_name, col_dtype in zip(self.df.columns, self.df.dtypes):
+            if col_name == "statistic":  # no styling
+                self.table.add_column("Statistic", key=col_name)
+                continue
+
+            dc = DtypeConfig(col_dtype)
+            self.table.add_column(Text(col_name, justify=dc.justify), key=col_name)
+
+        # Add rows
+        for ridx, row in enumerate(self.df.iter_rows()):
+            formatted_row = []
+
+            # Format remaining values with appropriate styling
+            for idx, stat_value in enumerate(row):
+                # First element is the statistic label, no styling needed
+                if idx == 0:
+                    formatted_row.append(stat_value)
+                    continue
+
+                col_dtype = self.df.dtypes[idx]
+                dc = DtypeConfig(col_dtype)
+
+                if ridx < 4 and col_dtype == pl.String and self.thousand_separator:
+                    stat_value = f"{int(stat_value):,}"
+
+                formatted_row.append(dc.format(stat_value, thousand_separator=self.thousand_separator))
+
+            self.table.add_row(*formatted_row)
+
+        # Set cursor type based on whether this is dataframe stats (column cursor) or column stats (row cursor)
+        self.table.cursor_type = "column" if self.cidx is None else "row"
 
     def build_df(self) -> pl.DataFrame:
         """Get the dataframe to use for statistics, applying any necessary filters."""
@@ -481,7 +505,7 @@ class StatisticsScreen(TableScreen):
             df_n_unique = df_n_unique.cast(stats_df.schema)
 
             # total first, then n_unique, then describe stats
-            stats_df = df_n_total.vstack(df_n_unique).vstack(stats_df)
+            self.df = df_n_total.vstack(df_n_unique).vstack(stats_df)
         else:
             col_name = self.dftable.df.columns[self.cidx]
             lf = self.dftable.df.lazy()
@@ -500,64 +524,7 @@ class StatisticsScreen(TableScreen):
             df_n_total = pl.DataFrame({"statistic": ["n_total"], col_name: n_total}, schema=stats_df.schema)
 
             # total first, then n_unique, then describe stats
-            stats_df = df_n_total.vstack(df_n_unique).vstack(stats_df)
-
-        return stats_df
-
-    def build_column_stats(self) -> None:
-        """Build statistics for a single column."""
-        col_name = self.dftable.df.columns[self.cidx]
-        col_dtype = self.df.dtypes[1]  # 'value' column
-        dc = DtypeConfig(col_dtype)
-
-        # Add statistics label column
-        self.table.add_column("Statistic", key="statistic")
-
-        # Add value column with appropriate styling
-        self.table.add_column(Text(col_name, justify=dc.justify), key=col_name)
-
-        # Add rows
-        for idx, row in enumerate(self.df.iter_rows()):
-            stat_label, stat_value = row
-            if idx < 4 and col_dtype == pl.String and self.thousand_separator:
-                stat_value = f"{int(stat_value):,}"
-            self.table.add_row(
-                stat_label,
-                dc.format(stat_value, thousand_separator=self.thousand_separator),
-            )
-
-    def build_dataframe_stats(self) -> None:
-        """Build statistics for the entire dataframe."""
-        # Add columns for each dataframe column with appropriate styling
-        for idx, (col_name, col_dtype) in enumerate(zip(self.df.columns, self.df.dtypes), 0):
-            if idx == 0:
-                # Add statistics label column (first column, no styling)
-                self.table.add_column("Statistic", key="statistic")
-                continue
-
-            dc = DtypeConfig(col_dtype)
-            self.table.add_column(Text(col_name, justify=dc.justify), key=col_name)
-
-        # Add rows
-        for ridx, row in enumerate(self.df.iter_rows()):
-            formatted_row = []
-
-            # Format remaining values with appropriate styling
-            for idx, stat_value in enumerate(row):
-                # First element is the statistic label
-                if idx == 0:
-                    formatted_row.append(stat_value)
-                    continue
-
-                col_dtype = self.df.dtypes[idx]
-                dc = DtypeConfig(col_dtype)
-
-                if ridx < 4 and col_dtype == pl.String and self.thousand_separator:
-                    stat_value = f"{int(stat_value):,}"
-
-                formatted_row.append(dc.format(stat_value, thousand_separator=self.thousand_separator))
-
-            self.table.add_row(*formatted_row)
+            self.df = df_n_total.vstack(df_n_unique).vstack(stats_df)
 
     def sort_by_column(self, descending=False):
         # Override to disable sorting in statistics screen
