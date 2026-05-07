@@ -308,7 +308,7 @@ def tentative_expr(expr: str) -> bool:
     return False
 
 
-def validate_expr(expr: str, columns: list[str], current_col_idx: int) -> pl.Expr | None:
+def validate_expr(expr: str, columns: list[str], current_col_idx: int = 0) -> pl.Expr | None:
     """Validate and return the expression.
 
     Parses a user-provided expression string and validates it as a valid Polars expression.

@@ -8,7 +8,15 @@ import polars as pl
 from textual.theme import BUILTIN_THEMES
 
 from . import __version__
-from .common import SUPPORTED_FORMATS, guess_file_format, handle_compute_error, load_dataframe, write_file
+from .common import (
+    SUPPORTED_FORMATS,
+    guess_file_format,
+    handle_compute_error,
+    load_dataframe,
+    tentative_expr,
+    validate_expr,
+    write_file,
+)
 from .data_frame_viewer import DataFrameViewer
 
 
@@ -160,6 +168,8 @@ def cli() -> argparse.Namespace:
         help="Read all files (must be of same format and same structure) into one single table.",
     )
 
+    parser.add_argument("--expr", help="Specify a Polars expression to filter data (e.g., $age > 30)")
+
     parser.add_argument(
         "--sql", help="Specify a SQL query to execute on the input file (e.g., to select and filter data)"
     )
@@ -245,7 +255,21 @@ def main() -> None:
 
         return
 
-    if args.sql:
+    if args.expr:
+        for source in sources:
+            columns = source.lf.collect_schema().names()
+            try:
+                expr = validate_expr(args.expr, columns)
+            except Exception as e:
+                print(f"Error validating expression [$error]{args.expr}[/]", file=sys.stderr)
+                sys.exit(1)
+
+            try:
+                source.lf = source.lf.filter(expr)
+            except pl.exceptions.ComputeError as e:
+                print(f"Error applying expression `{args.expr}`: {e}", file=sys.stderr)
+                sys.exit(1)
+    elif args.sql:
         for source in sources:
             ctx = pl.SQLContext(frames={"self": source.lf})
             try:
@@ -290,6 +314,14 @@ def validate_args(args: argparse.Namespace) -> None:
         if not guess_file_format(args.output):
             print(
                 f"Unsupported output file format for `{args.output}`. Supported formats: {', '.join(SUPPORTED_FORMATS)}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    if args.expr:
+        if not tentative_expr(args.expr):
+            print(
+                f"Invalid expression: `{args.expr}`. Did you forget the `$` prefix for column references?",
                 file=sys.stderr,
             )
             sys.exit(1)

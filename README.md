@@ -96,7 +96,7 @@ dv *.parquet --all-in-one
 
 ```
 usage: dv [-h] [-V] [-d DELIMITER] [-f FORMAT] [-F [FIELDS ...]] [-H [HEADER ...]] [-L [N]] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M [N]] [-N NULL [NULL ...]] [--theme [THEME]]
-          [--all-in-one] [--sql SQL] [-o OUTPUT]
+          [--all-in-one] [--expr EXPR] [--sql SQL] [-o OUTPUT]
           [files ...]
 
 TUI viewer/editor for tabular data (e.g., CSV/Excel).
@@ -134,6 +134,7 @@ options:
   --theme [THEME]       Set the theme for the application. If used without value, show available themes.
   --all-in-one, --aio, --one
                         Read all files (must be of same format and same structure) into one single table.
+  --expr EXPR           Specify a Polars expression to filter data (e.g., $age > 30)
   --sql SQL             Specify a SQL query to execute on the input file (e.g., to select and filter data)
   -o, --output OUTPUT   Output file (optionally modified) with specified format, which is inferred from file extension (e.g., .csv, .xlsx).
 ```
@@ -201,6 +202,9 @@ dv data.csv -F name age 1 -1
 
 # Read all files (must be of same format and same structure) into one single table
 dv data-1.csv data-2.csv --all-in-one
+
+# Filter rows before opening the viewer using a Polars expression
+dv data.csv --expr '$age > 30'
 
 # Filter data using SQL query (use 'self' as the table name)
 dv data.csv --sql 'SELECT * FROM self WHERE age > 30'
