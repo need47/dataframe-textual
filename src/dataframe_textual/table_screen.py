@@ -302,7 +302,20 @@ class RowDetailScreen(TableScreen):
             self.show_statistics(self.get_cidx_name_value())
             event.stop()
         elif event.key == "tab":
-            self.app.push_screen(CellDetailScreen(self.dftable.df, self.ridx, self.table.cursor_row))
+            ridx = self.ridx
+            cidx = self.table.cursor_row
+            dtype = self.dftable.df.dtypes[cidx]
+            cell_value = self.dftable.df.item(ridx, cidx)
+
+            # Only show cell detail screen if the value is a non-empty list, non-empty dict,
+            # or string containing the delimiter (indicating a potential list of values).
+            # This prevents unnecessary screens for simple scalar values.
+            if (
+                (dtype == pl.List and not cell_value.is_empty())
+                or (dtype == pl.Struct and cell_value)
+                or (dtype == pl.String and "|" in cell_value)
+            ):
+                self.app.push_screen(CellDetailScreen(self.dftable.df, ridx, cidx))
             event.stop()
 
     def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
@@ -869,5 +882,16 @@ class CellDetailScreen(TableScreen):
         if event.key == "tab":
             cidx = self.table.cursor_column
             ridx = self.table.cursor_row
-            self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
+            dtype = self.df.dtypes[cidx]
+            cell_value = self.df.item(ridx, cidx)
+
+            # Only show cell detail screen if the value is a non-empty list, non-empty dict,
+            # or string containing the delimiter (indicating a potential list of values).
+            # This prevents unnecessary screens for simple scalar values.
+            if (
+                (dtype == pl.List and not cell_value.is_empty())
+                or (dtype == pl.Struct and cell_value)
+                or (dtype == pl.String and "|" in cell_value)
+            ):
+                self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
             event.stop()

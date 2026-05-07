@@ -1868,9 +1868,18 @@ class DataFrameTable(DataTable):
         """Open a modal screen to view the selected cell's details."""
         ridx = self.cursor_ridx
         cidx = self.cursor_cidx
+        dtype = self.df.dtypes[cidx]
+        cell_value = self.df.item(ridx, cidx)
 
-        # Push the modal screen
-        self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
+        # Only show cell detail screen if the value is a non-empty list, non-empty dict,
+        # or string containing the delimiter (indicating a potential list of values).
+        # This prevents unnecessary screens for simple scalar values.
+        if (
+            (dtype == pl.List and not cell_value.is_empty())
+            or (dtype == pl.Struct and cell_value)
+            or (dtype == pl.String and "|" in cell_value)
+        ):
+            self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
 
     def do_show_frequency(self, cidx: int | None = None) -> None:
         """Show frequency distribution for a given columnn."""
