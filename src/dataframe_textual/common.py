@@ -147,8 +147,10 @@ STYLES = {
     pl.Date: DtypeClass(gtype="temporal", style="magenta", justify="center", itype="text", convert=str),
     pl.Datetime: DtypeClass(gtype="temporal", style="magenta", justify="center", itype="text", convert=str),
     pl.Time: DtypeClass(gtype="temporal", style="magenta", justify="center", itype="text", convert=str),
+    # object
+    pl.Object: DtypeClass(gtype="object", style="", justify="", itype="text", convert=str),
     # unknown
-    pl.Unknown: DtypeClass(gtype="unknown", style="", justify=None, itype="text", convert=str),
+    pl.Unknown: DtypeClass(gtype="unknown", style="", justify="", itype="text", convert=str),
 }
 # fmt: on
 
@@ -215,7 +217,7 @@ def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
 
 def format_row(
     vals,
-    dtypes,
+    dtypes: pl.DataType | list[pl.DataType] = pl.Unknown,
     style: str | list[str] = "",
     justify: str | list[str] = "",
     thousand_separator=False,
@@ -236,6 +238,9 @@ def format_row(
         A list of Rich Text objects with proper formatting applied.
     """
     formatted_row = []
+
+    if not isinstance(dtypes, list):
+        dtypes = [dtypes] * len(vals)
 
     for idx, (val, dtype) in enumerate(zip(vals, dtypes, strict=True)):
         dc = DtypeConfig(dtype)

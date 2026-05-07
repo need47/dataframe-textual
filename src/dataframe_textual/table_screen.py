@@ -133,7 +133,8 @@ class TableModalScreen(ModalScreen):
 
         # Add rows with proper formatting based on data types
         for ridx, row in enumerate(self.df.iter_rows()):
-            if row[0] == RID:
+            # Skip the row containing the RID value
+            if row[0] == RID or (isinstance(row[0], Text) and row[0].plain == RID):
                 continue
 
             formatted_row = []
@@ -220,6 +221,10 @@ class TableScreen(TableModalScreen):
         super().__init__()
         self.dftable = dftable
 
+    def sort_by_column(self, descending=False):
+        # Override to disable sorting in TableScreen, but subclasses can still implement their own sorting if desired.
+        pass
+
     def filter_or_view_selected_value(self, cidx_name_value: tuple[int, str, Any] | None, action: str = "view") -> None:
         """Apply filter or view action by the selected value.
 
@@ -279,6 +284,8 @@ class TableScreen(TableModalScreen):
         while len(self.app._screen_stack) > 1:
             self.app.pop_screen()
             break
+
+        self.dftable.move_cursor(column=cidx)
 
     def show_frequency(self, cidx_name_value: tuple[int, str, Any] | None) -> None:
         """Show frequency by the selected value.
@@ -399,7 +406,7 @@ class RowDetailScreen(TableScreen):
         """Build the row detail table."""
         self.df = pl.DataFrame(
             {
-                "Column": self.dftable.df.columns,
+                "Column": format_row(self.dftable.df.columns),
                 "Value": format_row(
                     self.dftable.df.row(self.ridx),
                     self.dftable.df.dtypes,
@@ -411,10 +418,6 @@ class RowDetailScreen(TableScreen):
 
         self.df2table()
         self.table.cursor_type = "row"
-
-    def sort_by_column(self, descending=False):
-        # Override to disable sorting in row detail screen
-        pass
 
     def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
         """Get the current column info."""
@@ -525,10 +528,6 @@ class StatisticsScreen(TableScreen):
 
             # total first, then n_unique, then describe stats
             self.df = df_n_total.vstack(df_n_unique).vstack(stats_df)
-
-    def sort_by_column(self, descending=False):
-        # Override to disable sorting in statistics screen
-        pass
 
 
 class FrequencyScreen(TableScreen):
@@ -785,10 +784,6 @@ class HistogramScreen(TableScreen):
             ),
         )
 
-    def sort_by_column(self, descending=False):
-        # Sorting is not supported for histogram screen
-        pass
-
     def save_histogram_table(self) -> None:
         """Save the histogram table to file."""
         column = self.dftable.df.columns[self.cidx]
@@ -835,10 +830,6 @@ class MetaShape(TableScreen):
         self.table.add_row("Column Count", dc_int.format(num_cols, thousand_separator=self.thousand_separator))
 
         self.table.cursor_type = "none"
-
-    def sort_by_column(self, descending=False):
-        # Sorting is not supported for metadata screen
-        pass
 
 
 class MetaColumnScreen(TableScreen):
@@ -894,10 +885,6 @@ class MetaColumnScreen(TableScreen):
             )
 
         self.table.cursor_type = "row"
-
-    def sort_by_column(self, descending=False):
-        # Sorting is not supported for column metadata screen
-        pass
 
     def get_cidx_name_value(self) -> int | None:
         """Get the current column info."""
