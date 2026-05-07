@@ -90,7 +90,11 @@ class DtypeClass:
     convert: Any
 
     def format(
-        self, val: Any, style: str | None = None, justify: str | None = None, thousand_separator: bool = False
+        self,
+        val: Any,
+        style: str | None = None,
+        justify: str | None = None,
+        thousand_separator: bool = False,
     ) -> str:
         """Format the value according to its data type.
 
@@ -115,7 +119,7 @@ class DtypeClass:
 
         return Text(
             text_val,
-            style="" if style == "" else (style or self.style),
+            style=style or self.style,
             justify=justify or self.justify,
             overflow="ellipsis",
             no_wrap=True,
@@ -217,7 +221,7 @@ def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
 
 def format_row(
     vals,
-    dtypes: pl.DataType | list[pl.DataType] = pl.Unknown,
+    dtypes,
     style: str | list[str] = "",
     justify: str | list[str] = "",
     thousand_separator=False,
@@ -238,37 +242,13 @@ def format_row(
         A list of Rich Text objects with proper formatting applied.
     """
     formatted_row = []
-
-    if not isinstance(dtypes, list):
-        dtypes = [dtypes] * len(vals)
-
     for idx, (val, dtype) in enumerate(zip(vals, dtypes, strict=True)):
         dc = DtypeConfig(dtype)
-        if style:
-            if isinstance(style, str):
-                style = style
-            elif isinstance(style, list) and idx < len(style):
-                style = style[idx]
-            else:
-                style = None
-        else:
-            style = None
-
-        if justify:
-            if isinstance(justify, str):
-                justify = justify
-            elif isinstance(justify, list) and idx < len(justify):
-                justify = justify[idx]
-            else:
-                justify = None
-        else:
-            justify = None
-
         formatted_row.append(
             dc.format(
                 val,
-                style=style,
-                justify=justify,
+                style=style[idx] if isinstance(style, list) else style,
+                justify=justify[idx] if isinstance(justify, list) else justify,
                 thousand_separator=thousand_separator,
             )
         )

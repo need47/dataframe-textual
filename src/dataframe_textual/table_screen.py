@@ -406,7 +406,11 @@ class RowDetailScreen(TableScreen):
         """Build the row detail table."""
         self.df = pl.DataFrame(
             {
-                "Column": format_row(self.dftable.df.columns),
+                # Use pl.Unknown dtype to disable styling for the column names.
+                "Column": format_row(
+                    self.dftable.df.columns,
+                    dtypes=[pl.Unknown] * len(self.dftable.df.columns),
+                ),
                 "Value": format_row(
                     self.dftable.df.row(self.ridx),
                     self.dftable.df.dtypes,
