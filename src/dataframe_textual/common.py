@@ -241,14 +241,17 @@ def format_row(
     Returns:
         A list of Rich Text objects with proper formatting applied.
     """
+    is_style_list = isinstance(style, list)
+    is_justify_list = isinstance(justify, list)
     formatted_row = []
+
     for idx, (val, dtype) in enumerate(zip(vals, dtypes, strict=True)):
         dc = DtypeConfig(dtype)
         formatted_row.append(
             dc.format(
                 val,
-                style=style[idx] if isinstance(style, list) else style,
-                justify=justify[idx] if isinstance(justify, list) else justify,
+                style=style[idx] if is_style_list else style,
+                justify=justify[idx] if is_justify_list else justify,
                 thousand_separator=thousand_separator,
             )
         )
