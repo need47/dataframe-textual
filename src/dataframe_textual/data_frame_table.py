@@ -349,7 +349,7 @@ class DataFrameTable(DataTable):
         # Duplicate
         ("d", "duplicate_column", "Duplicate column"),
         ("D", "duplicate_row", "Duplicate row"),
-        ("equals_sign", "uniq_rows", "Remove duplicated rows"),
+        ("equals_sign", "uniq_rows", "Remove duplicate rows"),
         # Edit
         ("e", "edit_cell", "Edit cell"),
         ("E", "edit_column", "Edit column"),
@@ -2983,6 +2983,11 @@ class DataFrameTable(DataTable):
             self.df_view = self.df_view.lazy().filter(pl.col(RID).is_in(ok_rids)).collect()
 
         self.setup_table()
+
+        self.notify(
+            f"Removed [$success]{removed_count}[/] duplicate row(s), now [$success]{len(self.df)}[/] row(s) remaining",
+            title="Unique Rows",
+        )
 
     def do_move_column(self, direction: str) -> None:
         """Move the current column left or right.
