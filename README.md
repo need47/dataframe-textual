@@ -274,25 +274,26 @@ dv data.csv -o data.parquet
 
 #### Display
 
-| Key              | Action                                                             |
-| ---------------- | ------------------------------------------------------------------ |
-| `Enter`          | Show details for the current row                                   |
-| `Tab`            | Show current cell details; press `Tab` again there to drill deeper |
-| `F`              | Show frequency distribution for current column                     |
-| `i`              | Show histogram for current column                                  |
-| `I`              | Show histogram for current column with custom bins                 |
-| `s`              | Show statistics for current column                                 |
-| `S`              | Show statistics for entire dataframe                               |
-| `m`              | Show metadata for row count and column count                       |
-| `M`              | Show metadata for current column                                   |
-| `K`              | Cycle cursor types: cell → row → column → cell                     |
-| `~`              | Toggle row labels                                                  |
-| `_` (underscore) | Toggle column full width                                           |
-| `f`              | Toggle freeze rows and/or columns                                  |
-| `,`              | Toggle thousand separator for numeric display                      |
-| `&`              | Set current row as the new header row                              |
-| `h`              | Hide current column                                                |
-| `H`              | Show all hidden columns                                            |
+| Key              | Action                                                                 |
+| ---------------- | ---------------------------------------------------------------------- |
+| `Enter`          | Show details for the current row                                       |
+| `Tab`            | Show current cell details; press `Tab` again there to drill deeper     |
+| `F`              | Show frequency distribution for current column                         |
+| `i`              | Show histogram for current column                                      |
+| `I`              | Show histogram for current column with custom bins                     |
+| `s`              | Show statistics for current column                                     |
+| `S`              | Show statistics for entire dataframe                                   |
+| `=`              | Show histogram using first column as label and current column as value |
+| `m`              | Show metadata for row count and column count                           |
+| `M`              | Show metadata for current column                                       |
+| `K`              | Cycle cursor types: cell → row → column → cell                         |
+| `~`              | Toggle row labels                                                      |
+| `_` (underscore) | Toggle column full width                                               |
+| `f`              | Toggle freeze rows and/or columns                                      |
+| `,`              | Toggle thousand separator for numeric display                          |
+| `&`              | Set current row as the new header row                                  |
+| `h`              | Hide current column                                                    |
+| `H`              | Show all hidden columns                                                |
 
 #### Editing
 
@@ -312,7 +313,7 @@ dv data.csv -o data.parquet
 | `Ctrl+X`       | Delete current row and all those above                        |
 | `d`            | Duplicate current column                                      |
 | `D`            | Duplicate current row                                         |
-| `=`            | Remove duplicate rows (keep first occurrence)                 |
+| `Ctrl+Delete`  | Remove duplicate rows (keep first occurrence)                 |
 | `o`            | Explode current list column into multiple rows                |
 | `O`            | Explode current string column by delimiter into multiple rows |
 

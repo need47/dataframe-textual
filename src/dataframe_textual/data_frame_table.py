@@ -49,6 +49,7 @@ from .common import (
 )
 from .loading_screen import BusyScreen, LoadingScreen
 from .table_screen import (
+    BarScreen,
     CellDetailScreen,
     FrequencyScreen,
     HistogramScreen,
@@ -197,6 +198,7 @@ class DataFrameTable(DataTable):
         - **I** - 📊 Show histogram for current column with custom bins
         - **s** - 📈 Show statistics for current column
         - **S** - 📊 Show statistics for entire dataframe
+        - **=** - 📊 Show histogram using first column as label and current column as value
         - **m** - 📐 Show dataframe metadata (row/column counts)
         - **M** - 📋 Show column metadata (ID, name, type)
         - **h** - 👁️ Hide current column
@@ -222,7 +224,7 @@ class DataFrameTable(DataTable):
         - **-** - ❌ Delete current column
         - **d** - 📋 Duplicate current column
         - **D** - 📋 Duplicate current row
-        - **=** - 🧹 Remove duplicate rows (keep first occurrence)
+        - **Ctrl+Delete** - 🧹 Remove duplicate rows (keep first occurrence)
         - **o** - 💥 Explode current list column into rows
         - **O** - 💥 Explode current string column by delimiter into rows
 
@@ -314,6 +316,7 @@ class DataFrameTable(DataTable):
         ("I", "show_histogram(0)", "Show histogram for current column with custom bins"),
         ("s", "show_statistics", "Show statistics for current column"),
         ("S", "show_statistics(-1)", "Show statistics for dataframe"),
+        ("equals_sign", "show_bar", "Show histogram using first column as label and current column as value"),  # `=`
         # Sort
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
@@ -349,7 +352,7 @@ class DataFrameTable(DataTable):
         # Duplicate
         ("d", "duplicate_column", "Duplicate column"),
         ("D", "duplicate_row", "Duplicate row"),
-        ("equals_sign", "uniq_rows", "Remove duplicate rows"),
+        ("ctrl+delete", "uniq_rows", "Remove duplicate rows"),
         # Edit
         ("e", "edit_cell", "Edit cell"),
         ("E", "edit_column", "Edit column"),
@@ -905,6 +908,11 @@ class DataFrameTable(DataTable):
     def action_show_histogram(self, default: int = 1) -> None:
         """Show histogram for the current column."""
         self.do_show_histogram(default=default)
+
+    @wait_full_df
+    def action_show_bar(self) -> None:
+        """Show histogram using first column as label and current column as value."""
+        self.do_show_bar()
 
     @wait_full_df
     def action_show_statistics(self, cidx: int | None = None) -> None:
@@ -1909,6 +1917,24 @@ class DataFrameTable(DataTable):
 
         bin_count, bins = result
         self.app.push_screen(HistogramScreen(self, bins=bins, bin_count=bin_count))
+
+    @wait_full_df
+    def do_show_bar(self) -> None:
+        """Show histogram using first column as label and current column as value."""
+        cidx = self.cursor_cidx
+        col_name = self.df.columns[cidx]
+        dtype = self.df.dtypes[cidx]
+        dc = DtypeConfig(dtype)
+
+        if dc.gtype not in ("integer", "float"):
+            self.notify(
+                f"Cannot show bar chart for non-numeric column [$error]{col_name}[/] of type [$accent]{dtype}[/]",
+                title="Show Bar Chart",
+                severity="warning",
+            )
+            return
+
+        self.app.push_screen(BarScreen(self.df, cidx))
 
     def do_show_statistics(self, cidx: int | None = None) -> None:
         """Show statistics for the current column or entire dataframe.

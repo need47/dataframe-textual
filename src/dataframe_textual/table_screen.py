@@ -966,3 +966,84 @@ class CellDetailScreen(TableModalScreen):
         else:
             self.df = pl.DataFrame({col_name: [cell_value]})
             self.df2table()
+
+
+class BarScreen(TableModalScreen):
+    """Modal screen to display labels and values of a DataFrame as bars."""
+
+    def __init__(self, df: pl.DataFrame, cidx: int) -> None:
+        super().__init__()
+        self.df = df
+        self.cidx = cidx
+
+    def on_mount(self) -> None:
+        """Start bar calculation."""
+        self.table.loading = True
+        self._calculate_bar()
+
+    @work(thread=True)
+    def _calculate_bar(self) -> None:
+        """Calculate bar."""
+        self.app.call_from_thread(self._on_calc_ready)
+
+    def build_table(self) -> None:
+        """Build the bar table."""
+        self.table.clear(columns=True)
+
+        # Create bar table
+        label_col = self.df.columns[0]
+        data_col = self.df.columns[self.cidx]
+        dtype = self.df.dtypes[self.cidx]
+        dc = DtypeConfig(dtype)
+
+        # Add column headers with sort indicators
+        columns = [
+            (label_col, "Value", 0, dc.justify),
+            (data_col, "Count", 1, "right"),
+            ("%", "%", 2, "right"),
+            ("Histogram", "Histogram", 3, "left"),
+        ]
+
+        for display_name, key, col_idx_num, justify in columns:
+            header_text = display_name
+            self.table.add_column(Text(header_text, justify=justify), key=key)
+
+        # Get style config for Int64 and Float64
+        dc_int = DtypeConfig(pl.Int64)
+        dc_float = DtypeConfig(pl.Float64)
+        bar_width = 10
+        total = self.df[data_col].sum()
+
+        # Add rows to the histogram table
+        for row_idx, (column, count) in enumerate(zip(self.df[label_col], self.df[data_col])):
+            percentage = (count / total) * 100
+
+            self.table.add_row(
+                dc.format(column),
+                dc_int.format(count, thousand_separator=self.thousand_separator),
+                dc_float.format(percentage, thousand_separator=self.thousand_separator),
+                Bar(
+                    highlight_range=(0.0, percentage / 100 * bar_width),
+                    width=bar_width,
+                ),
+                label=str(row_idx + 1),
+            )
+
+        # Add a total row
+        self.table.add_row(
+            Text("Total", style="bold", justify=dc.justify),
+            Text(
+                f"{total:,}" if self.thousand_separator else str(total),
+                style="bold",
+                justify="right",
+            ),
+            Text(
+                format_float(100.0, self.thousand_separator, precision=-2 if len(self.df) > 1 else 2),
+                style="bold",
+                justify="right",
+            ),
+            Bar(
+                highlight_range=(0.0, bar_width),
+                width=bar_width,
+            ),
+        )
