@@ -206,6 +206,7 @@ class DataFrameTable(DataTable):
         - **_** - 📏 Toggle column full width
         - **f** - 📌 Freeze rows and/or columns
         - **~** - 🏷️ Toggle row labels
+        - **^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for numeric display
         - **K** - 🔄 Cycle cursor (cell → row → column → cell)
 
@@ -300,7 +301,7 @@ class DataFrameTable(DataTable):
         ("f", "toggle_freeze_row_column", "Freeze rows/columns"),
         ("comma", "toggle_thousand_separator", "Toggle thousand separator"),  # `,`
         ("underscore", "expand_column", "Expand column to full width"),  # `_`
-        ("circumflex_accent", "toggle_rid", "Toggle internal row index"),  # `^`
+        ("circumflex_accent", "toggle_rid", "Toggle internal row index (RID)"),  # `^`
         ("ampersand", "set_cursor_row_as_header", "Set cursor row as the new header row"),  # `&`
         # Copy
         ("c", "copy_cell", "Copy cell to clipboard"),
@@ -2303,7 +2304,7 @@ class DataFrameTable(DataTable):
         # Check if term is a valid expression
         elif tentative_expr(term):
             try:
-                expr = validate_expr(term, self.df.columns, cidx)
+                expr = validate_expr(term, self.df.columns, cidx, self.df)
             except Exception as e:
                 self.notify(
                     f"Error validating expression [$error]{term}[/]", title="Edit Column", severity="error", timeout=10
@@ -3271,7 +3272,7 @@ class DataFrameTable(DataTable):
                     expr = pl.col(col_name).is_null()
             elif tentative_expr(term):
                 try:
-                    expr = validate_expr(term, self.df.columns, col_idx)
+                    expr = validate_expr(term, self.df.columns, col_idx, self.df)
                 except Exception as e:
                     self.notify(
                         f"Error validating expression [$error]{term}[/]", title="Find", severity="error", timeout=10
@@ -3923,7 +3924,7 @@ class DataFrameTable(DataTable):
         # Support for polars expression in string form
         elif tentative_expr(term):
             try:
-                expr = validate_expr(term, self.df.columns, cidx)
+                expr = validate_expr(term, self.df.columns, cidx, self.df)
             except Exception as e:
                 self.notify(
                     f"Error validating expression [$error]{term}[/]", title="View Rows", severity="error", timeout=10
@@ -4148,7 +4149,7 @@ class DataFrameTable(DataTable):
         # Expression in string form
         elif tentative_expr(term):
             try:
-                expr = validate_expr(term, self.df.columns, cidx)
+                expr = validate_expr(term, self.df.columns, cidx, self.df)
             except Exception as e:
                 self.notify(
                     f"Error validating expression [$error]{term}[/]", title="Select Rows", severity="error", timeout=10

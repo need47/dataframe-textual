@@ -291,6 +291,7 @@ dv data.csv -o data.parquet
 | `_` (underscore) | Toggle column full width                                               |
 | `f`              | Toggle freeze rows and/or columns                                      |
 | `,`              | Toggle thousand separator for numeric display                          |
+| `^`              | Toggle internal row index column (RID)                                 |
 | `&`              | Set current row as the new header row                                  |
 | `h`              | Hide current column                                                    |
 | `H`              | Show all hidden columns                                                |
@@ -523,6 +524,9 @@ Complex values or filters can be specified via Polars expressions, with the foll
 **Row References:**
 - `$#` - Current row index (1-based)
 
+**DataFrame References:**
+- `self` - Current dataframe
+
 **Basic Comparisons:**
 - `$_ > 50` - Current column greater than 50
 - `$salary >= 100000` - Salary at least 100,000
@@ -545,6 +549,7 @@ Complex values or filters can be specified via Polars expressions, with the foll
 - `~($status == 'inactive')` - Status is not inactive
 - `$revenue > $expenses` - Revenue exceeds expenses
 - ``$`product id` > 100`` - Product ID with spaces in column name greater than 100
+- `self.drop(RID).is_duplicated()` - Duplicate rows (note: the internal RID column must be excluded)
 
 **String Matching:** ([Polars string API reference](https://docs.pola.rs/api/python/stable/reference/series/string.html))
 - `$name.str.contains("John")` - Name contains "John" (case-sensitive)

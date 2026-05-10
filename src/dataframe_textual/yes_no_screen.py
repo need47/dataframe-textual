@@ -634,7 +634,7 @@ class AddColumnScreen(YesNoScreen):
             return self.cidx, col_name, term
         elif tentative_expr(term):
             try:
-                expr = validate_expr(term, self.df.columns, self.cidx)
+                expr = validate_expr(term, self.df.columns, self.cidx, self.df)
                 return self.cidx, col_name, expr
             except ValueError as e:
                 self.notify(f"Invalid expression [$error]{term}[/]: {str(e)}", title="Add Column", severity="error")

@@ -261,7 +261,7 @@ def main() -> None:
             try:
                 expr = validate_expr(args.expr, columns)
             except Exception as e:
-                print(f"Error validating expression [$error]{args.expr}[/]", file=sys.stderr)
+                print(f"Error validating expression `{args.expr}`: {e}", file=sys.stderr)
                 sys.exit(1)
 
             try:

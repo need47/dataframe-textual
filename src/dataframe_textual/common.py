@@ -259,28 +259,6 @@ def format_row(
     return formatted_row
 
 
-def rindex(lst: list, value, pos: int | None = None) -> int:
-    """Return the last index of value in a list. Return -1 if not found.
-
-    Searches through the list in reverse order to find the last occurrence
-    of the given value.
-
-    Args:
-        lst: The list to search through.
-        value: The value to find.
-
-    Returns:
-        The index (0-based) of the last occurrence, or -1 if not found.
-    """
-    n = len(lst)
-    for i, item in enumerate(reversed(lst)):
-        if pos is not None and (n - 1 - i) > pos:
-            continue
-        if item == value:
-            return n - 1 - i
-    return -1
-
-
 def get_next_item(lst: list[Any], current, offset=1) -> Any:
     """Return the next item in the list after the current item, cycling if needed.
 
@@ -321,10 +299,14 @@ def tentative_expr(expr: str) -> bool:
         return True
     if "pl." in expr:
         return True
+    if "self" in expr:
+        return True
     return False
 
 
-def validate_expr(expr: str, columns: list[str], current_col_idx: int = 0) -> pl.Expr | None:
+def validate_expr(
+    expr: str, columns: list[str], current_col_idx: int = 0, df: pl.DataFrame = None
+) -> pl.Expr | pl.Series | None:
     """Validate and return the expression.
 
     Parses a user-provided expression string and validates it as a valid Polars expression.
@@ -334,6 +316,7 @@ def validate_expr(expr: str, columns: list[str], current_col_idx: int = 0) -> pl
         expr: The input expression as a string.
         columns: The list of column names in the DataFrame.
         current_col_idx: The index of the currently selected column (0-based). Used for $_ reference.
+        df: The current DataFrame used for evaluating expressions involving `self`.
 
     Returns:
         A valid Polars expression object if validation succeeds.
@@ -349,9 +332,11 @@ def validate_expr(expr: str, columns: list[str], current_col_idx: int = 0) -> pl
 
         # Validate by evaluating it
         try:
-            expr_pl = eval(expr_str, {"pl": pl})
-            if not isinstance(expr_pl, pl.Expr):
-                raise ValueError(f"Expression evaluated to `{type(expr_pl).__name__}` instead of a Polars expression")
+            expr_pl = eval(expr_str, {"pl": pl, "self": df, "RID": RID})
+            if not isinstance(expr_pl, (pl.Expr, pl.Series)):
+                raise ValueError(
+                    f"Expression evaluated to `{type(expr_pl).__name__}` instead of a Polars expression or Series"
+                )
 
             # Expression is valid
             return expr_pl
@@ -395,6 +380,9 @@ def parse_expr(expr: str, columns: list[str], current_cidx: int) -> str:
         if "pl." in expr:
             # This may be valid Polars expression already
             return expr
+        elif "self" in expr:
+            # self reference for current dataframe
+            return expr
         else:
             # Return as a literal string
             return f"pl.lit({expr})"
@@ -410,7 +398,7 @@ def parse_expr(expr: str, columns: list[str], current_cidx: int) -> str:
                 result.append(f"(pl.col('{col}') + 1)")
             else:
                 result.append(f"pl.col('{col}')")
-        else:
+        else:  # Literal string part
             result.append(part)
 
     return "".join(result)
