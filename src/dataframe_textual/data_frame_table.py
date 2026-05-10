@@ -204,7 +204,7 @@ class DataFrameTable(DataTable):
         - **h** - 👁️ Hide current column
         - **H** - 👀 Show all hidden columns
         - **_** - 📏 Toggle column full width
-        - **f** - 📌 Freeze rows and/or columns
+        - **grave accent (\`)** - 📌 Freeze rows and/or columns
         - **~** - 🏷️ Toggle row labels
         - **^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for numeric display
@@ -298,7 +298,7 @@ class DataFrameTable(DataTable):
         ("H", "show_hidden_columns", "Show hidden column(s)"),
         ("tilde", "toggle_row_labels", "Toggle row labels"),  # `~`
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
-        ("f", "toggle_freeze_row_column", "Freeze rows/columns"),
+        ("grave_accent", "toggle_freeze_row_column", "Freeze rows/columns"), # '`'
         ("comma", "toggle_thousand_separator", "Toggle thousand separator"),  # `,`
         ("underscore", "expand_column", "Expand column to full width"),  # `_`
         ("circumflex_accent", "toggle_rid", "Toggle internal row index (RID)"),  # `^`
