@@ -982,7 +982,7 @@ class AdvancedSqlScreen(YMNScreen):
         with Container(id="sql-container") as container:
             container.border_title = "Advanced SQL Query Builder"
             yield TextArea.code_editor(
-                placeholder="Enter SQL query, e.g., \n\nSELECT * \nFROM self \nWHERE age > 30\n\n- use 'self' as the table name\n- use backticks (`) for column names with spaces.",
+                placeholder="Enter SQL query, e.g., \n\nSELECT * \nFROM self \nWHERE age > 30\n\n* use 'self' as the table name\n* use backticks (`) for column names with spaces.",
                 id="sql-textarea",
                 language="sql",
                 tab_behavior="focus",  # Tab to focus next and allow Esc to exit
@@ -992,3 +992,41 @@ class AdvancedSqlScreen(YMNScreen):
     def handle_advanced(self, new_tab: bool = False) -> None:
         """Handle Yes button/Enter key press."""
         return self.query_one(TextArea).text.strip(), new_tab
+
+
+class NewTabScreen(YMNScreen):
+    """A screen for creating a new tab based on an input Polars expression."""
+
+    CSS = """
+        NewTabScreen TextArea {
+            width: auto;
+            height: auto;
+            min-width: 60;
+            min-height: 14;
+        }
+    """
+
+    def __init__(self) -> None:
+        """Initialize the new tab screen."""
+
+        super().__init__(
+            yes="Create",
+            no="Cancel",
+            on_yes_callback=self._get_input,
+        )
+
+    def compose(self) -> ComposeResult:
+        """Compose the new tab screen widget structure."""
+        with Container(id="sql-container") as container:
+            container.border_title = "New Tab from Polars expression"
+            yield TextArea.code_editor(
+                placeholder="Enter expression, e.g., \n\n- $2 > 30\n\n- self.select('name', 'age')\n\n- self.filter($age > 30)\n\n* use $1, $2, ... for column references by index\n* use $column_name for column references by name\n* use 'self' to reference the current data frame",
+                id="polars-textarea",
+                language="python",
+                tab_behavior="focus",  # Tab to focus next and allow Esc to exit
+            )
+            yield from super().compose()
+
+    def _get_input(self) -> None:
+        """Handle Yes button/Enter key press."""
+        return self.query_one(TextArea).text.strip()

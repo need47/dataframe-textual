@@ -306,7 +306,7 @@ def tentative_expr(expr: str) -> bool:
 
 def validate_expr(
     expr: str, columns: list[str], current_col_idx: int = 0, df: pl.DataFrame = None
-) -> pl.Expr | pl.Series | None:
+) -> pl.Expr | pl.DataFrame | pl.Series | None:
     """Validate and return the expression.
 
     Parses a user-provided expression string and validates it as a valid Polars expression.
@@ -333,9 +333,9 @@ def validate_expr(
         # Validate by evaluating it
         try:
             expr_pl = eval(expr_str, {"pl": pl, "self": df, "RID": RID})
-            if not isinstance(expr_pl, (pl.Expr, pl.Series)):
+            if not isinstance(expr_pl, (pl.Expr, pl.DataFrame, pl.Series)):
                 raise ValueError(
-                    f"Expression evaluated to `{type(expr_pl).__name__}` instead of a Polars expression or Series"
+                    f"Expression evaluated to `{type(expr_pl).__name__}` instead of a Polars expression, DataFrame, or Series"
                 )
 
             # Expression is valid

@@ -13,11 +13,11 @@ from textual.widgets.tabbed_content import ContentTab, ContentTabs
 
 from dataframe_textual.theme_screen import ThemeScreen
 
-from .common import RID, SUPPORTED_FORMATS, Source, get_next_item, guess_file_format, load_file
+from .common import RID, SUPPORTED_FORMATS, Source, get_next_item, guess_file_format, load_file, validate_expr
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
 from .file_picker_screen import OpenFileScreen, SaveFileScreen
-from .yes_no_screen import ConfirmScreen, RenameTabScreen
+from .yes_no_screen import ConfirmScreen, NewTabScreen, RenameTabScreen
 
 
 class DataFrameViewer(App):
@@ -41,6 +41,7 @@ class DataFrameViewer(App):
         - **W** - 💾 Save all tabs to file (overwrite without prompt)
         - **Ctrl+D** - 📋 Duplicate current tab
         - **Ctrl+O** - 📁 Open a file
+        - **Ctrl+N** - 📋 Create new tab from Polars expression
         - **Double-click** - ✏️ Rename tab
 
         ## 🎨 View & Settings
@@ -73,6 +74,7 @@ class DataFrameViewer(App):
         ("ctrl+v", "save_current_view", "Save Current View"),
         ("ctrl+t", "save_current_tab", "Save Current Tab"),
         ("ctrl+s", "save_all_tabs", "Save All Tabs"),
+        ("ctrl+n", "new_tab", "New Tab"),
         ("w", "save_current_tab_overwrite", "Save Current Tab (overwrite)"),
         ("W", "save_all_tabs_overwrite", "Save All Tabs (overwrite)"),
         ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
@@ -304,6 +306,66 @@ class DataFrameViewer(App):
         The new tab is named with '_copy' suffix and inserted after the current tab.
         """
         self.do_duplicate_tab()
+
+    def action_new_tab(self) -> None:
+        """Open screen to create a new tab from a Polars expression.
+
+        Opens NewTabScreen to allow the user to input a Polars expression.
+        The expression is evaluated on the active table's data to create a new tab.
+        """
+        if not (table := self.active_table):
+            self.notify("No active table found", title="New Tab", severity="error", timeout=10)
+            return
+
+        self.push_screen(NewTabScreen(), callback=partial(self.new_tab, dftable=table))
+
+    def new_tab(self, result: str | None, dftable: "DataFrameTable") -> None:
+        """Handle result from NewTabScreen.
+
+        Args:
+            result: The Polars expression string provided by the user, or None if cancelled.
+            dftable: Reference to the active DataFrameTable.
+        """
+        if not result:
+            return
+
+        try:
+            # Validate and evaluate the expression
+            expr = validate_expr(result, dftable.df.columns, dftable.cursor_cidx, df=dftable.df)
+
+            if isinstance(expr, pl.Expr):
+                df = dftable.df.filter(expr)
+            elif isinstance(expr, pl.DataFrame):
+                df = expr
+            elif isinstance(expr, pl.Series):
+                df = expr.to_frame()
+            else:
+                self.notify(
+                    f"Expression returned [$error]{type(expr).__name__}[/], expected DataFrame or Series",
+                    title="New Tab",
+                    severity="error",
+                    timeout=10,
+                )
+                return
+
+            # Add the new tab
+            self.add_tab(
+                df.lazy(),
+                filename="expr_result.csv",
+                tabname="expr-result",
+                after=self.tabbed.active_pane,
+            )
+            self.notify(
+                f"Created new tab with [$accent]{len(df)}[/] rows and [$accent]{len(df.columns)}[/] columns",
+                title="New Tab",
+            )
+        except ValueError as e:
+            self.notify(
+                f"Invalid expression [$error]{result}[/]: {str(e)}",
+                title="New Tab",
+                severity="error",
+                timeout=10,
+            )
 
     def action_select_theme(self) -> None:
         """Open the theme selection screen."""

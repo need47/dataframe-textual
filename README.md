@@ -236,6 +236,7 @@ dv data.csv -o data.parquet
 | `W`            | Save all tabs to file (overwrite without prompt)              |
 | `Ctrl+D`       | Duplicate current tab                                         |
 | `Ctrl+O`       | Open file in a new tab                                        |
+| `Ctrl+N`       | Create new tab from Polars expression                         |
 | `Double-click` | Rename tab                                                    |
 
 #### View & Settings
