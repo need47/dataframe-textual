@@ -67,6 +67,8 @@ from .yes_no_screen import (
     EditCellScreen,
     EditColumnScreen,
     ExplodeColumnScreen,
+    FilterBooleanColumn,
+    FilterNumericColumn,
     FindReplaceScreen,
     FreezeScreen,
     GoToRowScreen,
@@ -204,7 +206,7 @@ class DataFrameTable(DataTable):
         - **h** - 👁️ Hide current column
         - **H** - 👀 Show all hidden columns
         - **_** - 📏 Toggle column full width
-        - **grave accent (\`)** - 📌 Freeze rows and/or columns
+        - **`** - 📌 Freeze rows and/or columns
         - **~** - 🏷️ Toggle row labels
         - **^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for numeric display
@@ -255,6 +257,7 @@ class DataFrameTable(DataTable):
         - **V** - 🔧 View selected rows matching expression
         - **.** - 👁️ View rows with non-null values in current column
         - **"** - 📍 Filter selected rows to a new tab
+        - **f** - 🔢 Filter rows by numeric column value (integer/float columns only)
 
         ## 🔀 Sorting
         - **[** - 🔼 Sort column ascending
@@ -326,6 +329,7 @@ class DataFrameTable(DataTable):
         ("V", "view_rows_expr", "View selected rows matching expression"),
         ("full_stop", "view_rows_non_null", "View rows with non-null values in current column"),
         ("quotation_mark", "filter_rows", "Filter selected rows"),  # `"`
+        ("f", "filter_rows_value", "Filter rows by value"),  # `f`
         # Row Selection
         ("backslash", "select_rows", "Select rows with cell matches or those matching cursor value in current column"),  # `\`
         ("vertical_line", "select_rows_expr", "Select rows with expression"),  # `|`
@@ -1017,6 +1021,11 @@ class DataFrameTable(DataTable):
     def action_filter_rows(self, cidx: int = None, term: Any = None) -> None:
         """Filter to show only selected rows."""
         self.do_filter_rows(cidx=cidx, term=term)
+
+    @wait_full_df
+    def action_filter_rows_value(self) -> None:
+        """Filter rows by value for the current column."""
+        self.do_filter_rows_value()
 
     @wait_full_df
     def action_delete_row(self) -> None:
@@ -4055,6 +4064,91 @@ class DataFrameTable(DataTable):
             filename="filtered_results.csv",
             tabname="filtered-results",
             after=self.app.tabbed.active_pane,
+        )
+
+    def do_filter_rows_value(self) -> None:
+        """Filter current dataframe rows by a condition on the current numeric column.
+
+        For integer/float columns, opens FilterNumericColumn to collect conditions.
+        The filtered result replaces self.df; the original is saved in self.df_view.
+        For other dtypes, a warning is shown.
+        """
+        cidx = self.cursor_cidx
+        col = self.df.columns[cidx]
+        dtype = self.cursor_col_dtype
+        dc = DtypeConfig(dtype)
+
+        if dc.gtype in ("integer", "float"):
+            self.app.push_screen(
+                FilterNumericColumn(self.df[col], cidx, dc, self.cursor_value),
+                callback=self.filter_row_value,
+            )
+        elif dc.gtype == "string":
+            return
+            # self.app.push_screen(
+            #     FilterStringColumn(self.df[col], cidx, dc, self.cursor_value),
+            #     callback=self.filter_row_value,
+            # )
+        elif dc.gtype == "boolean":
+            self.app.push_screen(
+                FilterBooleanColumn(self.df[col], cidx, dc, self.cursor_value),
+                callback=self.filter_row_value,
+            )
+        else:
+            self.notify(
+                f"Filter by value not implemented for [$warning]{col}[/] with type of [$accent]{dtype}[/].",
+                title="Filter Rows",
+                severity="warning",
+            )
+
+    @wait_full_df
+    def filter_row_value(self, result: tuple[pl.Expr, int] | None) -> None:
+        """Apply the filter expression returned by FilterNumericColumn.
+
+        Args:
+            result: A tuple containing a Polars expression to filter rows and the column index, or None if cancelled.
+        """
+        if result is None:
+            return
+        expr, cidx = result
+
+        try:
+            df_filtered = self.df.lazy().filter(expr).collect()
+        except Exception as e:
+            self.notify(
+                f"Error applying filter: [$error]{e}[/]",
+                title="Filter Rows",
+                severity="error",
+                timeout=10,
+            )
+            return
+
+        if len(df_filtered) == 0:
+            self.notify("Filter results in zero rows. No changes applied.", title="Filter Rows", severity="warning")
+            return
+
+        col_name = self.cursor_col_name
+        self.add_history(f"Filtered rows on column [$success]{col_name}[/] by expression")
+
+        # Store original dataframe in df_view if not already in a view
+        if self.df_view is None:
+            self.df_view = self.df
+
+        ok_rids = set(df_filtered[RID])
+        self.df = df_filtered
+
+        if self.selected_rows:
+            self.selected_rows.intersection_update(ok_rids)
+
+        if self.matches:
+            self.matches = {rid: cols for rid, cols in self.matches.items() if rid in ok_rids}
+
+        self.setup_table()
+        self.move_cursor(column=cidx)
+
+        self.notify(
+            f"Showing [$accent]{len(df_filtered)}[/] matching row(s) in column [$success]{col_name}[/]",
+            title="Filter Rows",
         )
 
     # Row selection

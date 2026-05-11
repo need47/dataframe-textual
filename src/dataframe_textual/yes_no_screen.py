@@ -11,11 +11,11 @@ import polars as pl
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Button, Checkbox, Input, Label, SelectionList, TabPane, TextArea
+from textual.widgets import Button, Checkbox, Input, Label, RadioButton, RadioSet, SelectionList, TabPane, TextArea
 from textual.widgets.selection_list import Selection
 from textual.widgets.tabbed_content import ContentTab
 
-from .common import NULL, RID, DtypeConfig, tentative_expr, validate_expr
+from .common import NULL, NULL_DISPLAY, RID, DtypeClass, DtypeConfig, tentative_expr, validate_expr
 
 
 class YMNScreen(ModalScreen):
@@ -1017,11 +1017,11 @@ class NewTabScreen(YMNScreen):
 
     def compose(self) -> ComposeResult:
         """Compose the new tab screen widget structure."""
-        with Container(id="sql-container") as container:
+        with Container(id="new-tab-container") as container:
             container.border_title = "New Tab from Polars expression"
             yield TextArea.code_editor(
                 placeholder="Enter expression, e.g., \n\n- $2 > 30\n\n- self.select('name', 'age')\n\n- self.filter($age > 30)\n\n* use $1, $2, ... for column references by index\n* use $column_name for column references by name\n* use 'self' to reference the current data frame",
-                id="polars-textarea",
+                id="new-tab-textarea",
                 language="python",
                 tab_behavior="focus",  # Tab to focus next and allow Esc to exit
             )
@@ -1030,3 +1030,184 @@ class NewTabScreen(YMNScreen):
     def _get_input(self) -> None:
         """Handle Yes button/Enter key press."""
         return self.query_one(TextArea).text.strip()
+
+
+class FilterNumericColumn(YMNScreen):
+    """A screen for filtering a numeric column."""
+
+    CSS = """
+        FilterNumericColumn .condition-row {
+            width: auto;
+            height: auto;
+            min-width: 50;
+        }
+
+        FilterNumericColumn .condition-row Label {
+            width: 2;
+            margin: 1;
+        }
+
+        FilterNumericColumn .condition-row Input {
+            width: auto;
+            min-width: 48;
+        }
+    """
+
+    def __init__(self, s: pl.Series, cidx: int, dc: DtypeClass, cursor_value: int | float | None) -> None:
+        """Initialize the filter numeric column screen."""
+        super().__init__(
+            yes="Filter",
+            no="Cancel",
+            on_yes_callback=self._get_input,
+        )
+        self.s = s
+        self.cidx = cidx
+        self.dc = dc
+        self.cursor_value = cursor_value
+
+    def compose(self) -> ComposeResult:
+        """Compose the filter numeric column screen widget structure."""
+        cursor_value = NULL_DISPLAY if self.cursor_value is None else self.cursor_value
+        min_value = self.s.min()
+        max_value = self.s.max()
+
+        with Container(id="filter-numeric-column-container") as container:
+            container.border_title = "Filter Numeric Column"
+            yield Horizontal(
+                Label("="),
+                Input(placeholder=f"{cursor_value}", id="condition-eq"),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label("!="),
+                Input(placeholder=f"{cursor_value}", id="condition-neq"),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label("<"),
+                Input(placeholder=f"{max_value}", id="condition-lt", type=self.dc.itype, valid_empty=True),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label("<="),
+                Input(placeholder=f"{max_value}", id="condition-lte", type=self.dc.itype, valid_empty=True),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label(">="),
+                Input(placeholder=f"{min_value}", id="condition-gte", type=self.dc.itype, valid_empty=True),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label(">"),
+                Input(placeholder=f"{min_value}", id="condition-gt", type=self.dc.itype, valid_empty=True),
+                classes="condition-row",
+            )
+            yield from super().compose()
+
+    def _get_input(self) -> pl.Expr | None:
+        """Handle Yes button/Enter key press."""
+        col = self.s.name
+        expr: pl.Expr | None = None
+
+        eq = self.query_one("#condition-eq", Input).value.strip()
+        if eq:
+            expr = pl.col(col).is_null() if eq == NULL else pl.col(col) == self.dc.convert(eq)
+        else:
+            neq = self.query_one("#condition-neq", Input).value.strip()
+            if neq:
+                e = pl.col(col).is_not_null() if neq == NULL else pl.col(col) != self.dc.convert(neq)
+                expr = e if expr is None else expr & e
+
+            lt = self.query_one("#condition-lt", Input).value.strip()
+            if lt:
+                e = pl.col(col) < self.dc.convert(lt)
+                expr = e if expr is None else expr & e
+
+            lte = self.query_one("#condition-lte", Input).value.strip()
+            if lte:
+                e = pl.col(col) <= self.dc.convert(lte)
+                expr = e if expr is None else expr & e
+
+            gte = self.query_one("#condition-gte", Input).value.strip()
+            if gte:
+                e = pl.col(col) >= self.dc.convert(gte)
+                expr = e if expr is None else expr & e
+
+            gt = self.query_one("#condition-gt", Input).value.strip()
+            if gt:
+                e = pl.col(col) > self.dc.convert(gt)
+                expr = e if expr is None else expr & e
+
+        return expr, self.cidx
+
+
+class FilterBooleanColumn(YMNScreen):
+    """A screen for filtering a boolean column."""
+
+    CSS = """
+        FilterBooleanColumn > #filter-boolean-column-container {
+            width: auto;
+            height: auto;
+            max-width: 50;
+        }
+
+        FilterBooleanColumn #radio-container {
+            height: auto;
+        }
+
+        FilterBooleanColumn #boolean-radio-set {
+            height: auto;
+        }
+    """
+
+    def __init__(self, s: pl.Series, cidx: int, dc: DtypeClass, cursor_value: bool | None) -> None:
+        """Initialize the filter boolean column screen."""
+        super().__init__(
+            yes="Filter",
+            no="Cancel",
+            on_yes_callback=self._get_input,
+        )
+        self.s = s
+        self.cidx = cidx
+        self.dc = dc
+        self.cursor_value = cursor_value
+
+    def compose(self) -> ComposeResult:
+        """Compose the filter boolean column screen widget structure."""
+        has_null = self.s.null_count() > 0
+
+        with Container(id="filter-boolean-column-container") as container:
+            container.border_title = "Filter Boolean Column"
+            with RadioSet(id="boolean-radio-set"):
+                yield RadioButton("True", id="radio-true")
+                yield RadioButton("False", id="radio-false")
+                if has_null:
+                    yield RadioButton(NULL_DISPLAY, id="radio-null", value=NULL)
+            yield from super().compose()
+
+    def _get_input(self) -> tuple[pl.Expr | None, int]:
+        """Handle Yes button/Enter key press."""
+        col = self.s.name
+        radio_set = self.query_one("#boolean-radio-set", RadioSet)
+
+        pressed = radio_set.pressed_button
+        if pressed is None:
+            return None, self.cidx
+
+        # RadioButton.value is the checked state, not a payload; map from id.
+        if pressed.id == "radio-true":
+            selected_value = True
+        elif pressed.id == "radio-false":
+            selected_value = False
+        elif pressed.id == "radio-null":
+            selected_value = NULL
+        else:
+            return None, self.cidx
+
+        if selected_value == NULL:
+            expr = pl.col(col).is_null()
+        else:
+            expr = pl.col(col) == selected_value
+
+        return expr, self.cidx

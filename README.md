@@ -345,12 +345,13 @@ dv data.csv -o data.parquet
 | `R` | Find and replace across all columns (interactive or replace all)       |
 
 #### View & Filter
-| Key         | Action                                           |
-| ----------- | ------------------------------------------------ |
-| `v`         | View selected rows                               |
-| `V`         | View selected by expression                      |
-| `.`         | View rows with non-null values in current column |
-| `"` (quote) | Filter selected rows to a new tab                |
+| Key         | Action                                                           |
+| ----------- | ---------------------------------------------------------------- |
+| `v`         | View selected rows                                               |
+| `V`         | View selected by expression                                      |
+| `.`         | View rows with non-null values in current column                 |
+| `"` (quote) | Filter selected rows to a new tab                                |
+| `f`         | Filter rows by numeric column value (integer/float columns only) |
 
 #### Sorting (supporting multiple columns)
 
