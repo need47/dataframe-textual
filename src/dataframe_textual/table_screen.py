@@ -392,21 +392,25 @@ class RowDetailScreen(TableScreen):
             dtype = self.dftable.df.dtypes[cidx]
             cell_value = self.dftable.df.item(ridx, cidx)
 
-            # Show long string in a text screen for better readability.
-            if isinstance(cell_value, str) and len(cell_value) > COLUMN_WIDTH_CAP:
-                self.app.push_screen(TextScreen(cell_value))
-            elif isinstance(cell_value, pl.Series) and len(cell_value) == 1 and isinstance(cell_value[0], str):
-                if len(cell_value[0]) > COLUMN_WIDTH_CAP:
+            if dtype == pl.String:
+                # String contains the delimiter '|' (indicating a potential list of values)
+                if "|" in cell_value:
+                    self.app.push_screen(CellDetailScreen(self.dftable.df, ridx, cidx))
+                # Show long string in a text screen for better readability
+                elif len(cell_value) > COLUMN_WIDTH_CAP:
+                    self.app.push_screen(TextScreen(cell_value))
+
+            # Show cell detail screen if the value is a non-empty list
+            elif dtype == pl.List and not cell_value.is_empty():
+                if len(cell_value) == 1 and isinstance(cell_value[0], str) and len(cell_value[0]) > COLUMN_WIDTH_CAP:
                     self.app.push_screen(TextScreen(cell_value[0]))
-            # Show cell detail screen if the value is a non-empty list, non-empty dict,
-            # or string containing the delimiter (indicating a potential list of values).
-            # This prevents unnecessary screens for simple scalar values.
-            elif (
-                (dtype == pl.List and not cell_value.is_empty())
-                or (dtype == pl.Struct and cell_value)
-                or (dtype == pl.String and "|" in cell_value)
-            ):
+                else:
+                    self.app.push_screen(CellDetailScreen(self.dftable.df, ridx, cidx))
+
+            # or a non-empty dict (struct)
+            elif dtype == pl.Struct and cell_value:
                 self.app.push_screen(CellDetailScreen(self.dftable.df, ridx, cidx))
+
             event.stop()
 
     def build_table(self) -> None:
@@ -936,21 +940,25 @@ class CellDetailScreen(TableModalScreen):
             dtype = self.df.dtypes[cidx]
             cell_value = self.df.item(ridx, cidx)
 
-            # Show long string in a text screen for better readability.
-            if isinstance(cell_value, str) and len(cell_value) > COLUMN_WIDTH_CAP:
-                self.app.push_screen(TextScreen(cell_value))
-            elif isinstance(cell_value, pl.Series) and len(cell_value) == 1 and isinstance(cell_value[0], str):
-                if len(cell_value[0]) > COLUMN_WIDTH_CAP:
+            if dtype == pl.String:
+                # String contains the delimiter '|' (indicating a potential list of values)
+                if "|" in cell_value:
+                    self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
+                # Show long string in a text screen for better readability
+                elif len(cell_value) > COLUMN_WIDTH_CAP:
+                    self.app.push_screen(TextScreen(cell_value))
+
+            # Show cell detail screen if the value is a non-empty list
+            elif dtype == pl.List and not cell_value.is_empty():
+                if len(cell_value) == 1 and isinstance(cell_value[0], str) and len(cell_value[0]) > COLUMN_WIDTH_CAP:
                     self.app.push_screen(TextScreen(cell_value[0]))
-            # Show cell detail screen if the value is a non-empty list, non-empty dict,
-            # or string containing the delimiter (indicating a potential list of values).
-            # This prevents unnecessary screens for simple scalar values.
-            elif (
-                (dtype == pl.List and not cell_value.is_empty())
-                or (dtype == pl.Struct and cell_value)
-                or (dtype == pl.String and "|" in cell_value)
-            ):
+                else:
+                    self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
+
+            # or a non-empty dict (struct)
+            elif dtype == pl.Struct and cell_value:
                 self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
+
             event.stop()
 
     def build_table(self) -> None:
