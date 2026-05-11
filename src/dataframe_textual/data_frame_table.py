@@ -253,12 +253,12 @@ class DataFrameTable(DataTable):
         - **R** - 🔄 Replace across all columns (interactive or all)
         - *(Supports case-insensitive & whole-word matching)*
 
-        ## 👁️ View & Filter
-        - **v** - 👁️ View selected rows
-        - **V** - 🔧 View selected rows matching expression
-        - **.** - 👁️ View rows with non-null values in current column
-        - **"** - 📍 Filter selected rows to a new tab
-        - **f** - 🔢 Filter rows by numeric column value (integer/float columns only)
+        ## ⏬ Filter & Send
+        - **v** - ⏬ Filter rows with cursor value in current column
+        - **V** - ⏬ Filter rows with expression
+        - **.** - ⏬ Filter rows with non-null values in current column
+        - **f** - ⏬ Filter rows by column value
+        - **"** - 📤 Send rows to a new tab
 
         ## 🔀 Sorting
         - **[** - 🔼 Sort column ascending
@@ -325,12 +325,12 @@ class DataFrameTable(DataTable):
         # Sort
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
-        # View & Filter
-        ("v", "view_rows", "View selected rows"),
-        ("V", "view_rows_expr", "View selected rows matching expression"),
-        ("full_stop", "view_rows_non_null", "View rows with non-null values in current column"),
-        ("quotation_mark", "filter_rows", "Filter selected rows"),  # `"`
+        # Filter & Send
+        ("v", "filter_rows", "Filter rows with cursor value in current column"),
+        ("V", "filter_rows_expr", "Filter rows with expression"),
+        ("full_stop", "filter_rows_non_null", "Filter rows with non-null values in current column"),
         ("f", "filter_rows_value", "Filter rows by value"),  # `f`
+        ("quotation_mark", "send_rows", "Send rows to a new tab"),  # `"`
         # Row Selection
         ("backslash", "select_rows", "Select rows with cell matches or those matching cursor value in current column"),  # `\`
         ("vertical_line", "select_rows_expr", "Select rows with expression"),  # `|`
@@ -941,17 +941,27 @@ class DataFrameTable(DataTable):
         """Show metadata for the current column."""
         self.do_metadata_column()
 
-    def action_view_rows(self, result: dict | None = None) -> None:
-        """View rows."""
-        self.do_view_rows(result)
+    def action_filter_rows(self, result: dict | None = None) -> None:
+        """Filter rows."""
+        self.do_filter_rows(result)
 
-    def action_view_rows_non_null(self) -> None:
-        """View rows with non-null values in the current column."""
-        self.do_view_rows_non_null()
+    def action_filter_rows_non_null(self) -> None:
+        """Filter rows with non-null values in the current column."""
+        self.do_filter_rows_non_null()
 
-    def action_view_rows_expr(self) -> None:
+    def action_filter_rows_expr(self) -> None:
         """Open the advanced filter screen."""
-        self.do_view_rows_expr()
+        self.do_filter_rows_expr()
+
+    @wait_full_df
+    def action_filter_rows_value(self) -> None:
+        """Filter rows by value for the current column."""
+        self.do_filter_rows_value()
+
+    @wait_full_df
+    def action_send_rows(self, cidx: int = None, term: Any = None) -> None:
+        """Send rows to a new tab based on the current selection or value."""
+        self.do_send_rows(cidx=cidx, term=term)
 
     def action_edit_cell(self) -> None:
         """Edit the current cell."""
@@ -1017,16 +1027,6 @@ class DataFrameTable(DataTable):
     def action_toggle_selections(self) -> None:
         """Toggle all row selections."""
         self.do_toggle_selections()
-
-    @wait_full_df
-    def action_filter_rows(self, cidx: int = None, term: Any = None) -> None:
-        """Filter to show only selected rows."""
-        self.do_filter_rows(cidx=cidx, term=term)
-
-    @wait_full_df
-    def action_filter_rows_value(self) -> None:
-        """Filter rows by value for the current column."""
-        self.do_filter_rows_value()
 
     @wait_full_df
     def action_delete_row(self) -> None:
@@ -3825,14 +3825,14 @@ class DataFrameTable(DataTable):
         # Show next confirmation
         self.show_next_replace_confirmation()
 
-    # View & Filter
-    def do_view_rows(self, result: dict | None = None) -> None:
-        """View rows.
+    # Filter & Send
+    def do_filter_rows(self, result: dict | None = None) -> None:
+        """Filter rows.
 
         If there are selected rows, view those, Otherwise, view based on the cursor value.
         """
         if result is not None:
-            self.view_rows(result)
+            self.filter_rows(result)
         else:
             cidx = self.cursor_cidx
             col_name = self.cursor_col_name
@@ -3852,7 +3852,7 @@ class DataFrameTable(DataTable):
                     else pl.col(col_name) == value
                 )
 
-            self.view_rows(
+            self.filter_rows(
                 {
                     "term": term,
                     "cidx": cidx,
@@ -3863,14 +3863,14 @@ class DataFrameTable(DataTable):
                 }
             )
 
-    def do_view_rows_non_null(self) -> None:
-        """View non-null rows."""
+    def do_filter_rows_non_null(self) -> None:
+        """Filter non-null rows."""
         cidx = self.cursor_cidx
         col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
         term = pl.col(col_name).list.len() > 0 if isinstance(dtype, pl.List) else pl.col(col_name).is_not_null()
 
-        self.view_rows(
+        self.filter_rows(
             {
                 "term": term,
                 "cidx": cidx,
@@ -3881,21 +3881,21 @@ class DataFrameTable(DataTable):
             }
         )
 
-    def do_view_rows_expr(self) -> None:
-        """Open the view screen to enter an expression."""
+    def do_filter_rows_expr(self) -> None:
+        """Open the filter screen to enter an expression."""
         cidx = self.cursor_cidx
         dtype = self.cursor_col_dtype
         value = self.cursor_value
         term = NULL if value is None else (str(value.to_list()) if isinstance(dtype, pl.List) else str(value))
 
         self.app.push_screen(
-            SearchScreen("View Rows", self.df, cidx, term),
-            callback=self.view_rows,
+            SearchScreen("Filter Rows", self.df, cidx, term),
+            callback=self.filter_rows,
         )
 
     @wait_full_df
-    def view_rows(self, result) -> None:
-        """View selected rows and hide others. Do not modify the dataframe.
+    def filter_rows(self, result) -> None:
+        """Filter selected rows and hide others. Do not modify the dataframe.
 
         Args:
             result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse"
@@ -4030,43 +4030,6 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Showing [$success]{matched_count}[/] matching row(s)", title="View Rows")
 
-    def do_filter_rows(self, cidx: int | None = None, term: Any = None) -> None:
-        """Filter rows.
-
-        If there are selected rows, use those.
-        Otherwise, filter based on the value provided or the current cell value.
-        """
-        if self.selected_rows:
-            filter_expr = pl.col(RID).is_in(self.selected_rows)
-        else:  # Search cursor value in current column
-            cidx = self.cursor_cidx if cidx is None else cidx
-            col_name = self.df.columns[cidx]
-            dtype = self.df.dtypes[cidx]
-            term = self.cursor_value if term is None else term
-
-            if term is None:
-                filter_expr = pl.col(col_name).is_null()
-            elif isinstance(dtype, pl.List):
-                filter_expr = pl.col(col_name) == term.to_list()
-            else:
-                filter_expr = pl.col(col_name) == term
-
-        # Apply filter to dataframe with row indices
-        df_filtered = self.df.lazy().filter(filter_expr).collect()
-        if len(df_filtered) == len(self.df):
-            self.notify("Filter does not reduce any rows. No new tab created.", title="Filter Rows", severity="warning")
-            return
-        elif len(df_filtered) == 0:
-            self.notify("Filter results in zero rows. No new tab created.", title="Filter Rows", severity="warning")
-            return
-
-        self.app.add_tab(
-            df_filtered.lazy(),
-            filename="filtered_results.csv",
-            tabname="filtered-results",
-            after=self.app.tabbed.active_pane,
-        )
-
     def do_filter_rows_value(self) -> None:
         """Filter current dataframe rows by a condition on the current numeric column.
 
@@ -4149,6 +4112,43 @@ class DataFrameTable(DataTable):
         self.notify(
             f"Showing [$accent]{len(df_filtered)}[/] matching row(s) in column [$success]{col_name}[/]",
             title="Filter Rows",
+        )
+
+    def do_send_rows(self, cidx: int | None = None, term: Any = None) -> None:
+        """Send rows to a new tab.
+
+        If there are selected rows, use those.
+        Otherwise, move based on the value provided or the current cell value.
+        """
+        if self.selected_rows:
+            filter_expr = pl.col(RID).is_in(self.selected_rows)
+        else:  # Search cursor value in current column
+            cidx = self.cursor_cidx if cidx is None else cidx
+            col_name = self.df.columns[cidx]
+            dtype = self.df.dtypes[cidx]
+            term = self.cursor_value if term is None else term
+
+            if term is None or term == NULL:
+                filter_expr = pl.col(col_name).is_null()
+            elif isinstance(dtype, pl.List):
+                filter_expr = pl.col(col_name) == term.to_list()
+            else:
+                filter_expr = pl.col(col_name) == term
+
+        # Apply filter to dataframe with row indices
+        df_filtered = self.df.lazy().filter(filter_expr).collect()
+        if len(df_filtered) == len(self.df):
+            self.notify("Filter does not reduce any rows. No new tab created.", title="Filter Rows", severity="warning")
+            return
+        elif len(df_filtered) == 0:
+            self.notify("Filter results in zero rows. No new tab created.", title="Filter Rows", severity="warning")
+            return
+
+        self.app.add_tab(
+            df_filtered.lazy(),
+            filename="filtered_results.csv",
+            tabname="filtered-results",
+            after=self.app.tabbed.active_pane,
         )
 
     # Row selection

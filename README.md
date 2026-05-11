@@ -203,7 +203,7 @@ dv data.csv -F name age 1 -1
 # Read all files (must be of same format and same structure) into one single table
 dv data-1.csv data-2.csv --all-in-one
 
-# Filter rows before opening the viewer using a Polars expression
+# Filter rows before opening the TUI using a Polars expression
 dv data.csv --expr '$age > 30'
 
 # Filter data using SQL query (use 'self' as the table name)
@@ -344,14 +344,14 @@ dv data.csv -o data.parquet
 | `r` | Find and replace in current column (interactive or replace all)        |
 | `R` | Find and replace across all columns (interactive or replace all)       |
 
-#### View & Filter
-| Key         | Action                                                           |
-| ----------- | ---------------------------------------------------------------- |
-| `v`         | View selected rows                                               |
-| `V`         | View selected by expression                                      |
-| `.`         | View rows with non-null values in current column                 |
-| `"` (quote) | Filter selected rows to a new tab                                |
-| `f`         | Filter rows by numeric column value (integer/float columns only) |
+#### Filter & Send
+| Key         | Action                                                      |
+| ----------- | ----------------------------------------------------------- |
+| `v`         | Filter rows Filter rows with cursor value in current column |
+| `V`         | Filter rows with expression                                 |
+| `.`         | Filter rows with non-null values in current column          |
+| `f`         | Filter rows by column value                                 |
+| `"` (quote) | Send rows to a new tab                                      |
 
 #### Sorting (supporting multiple columns)
 
@@ -435,7 +435,7 @@ Inside the cell-detail modal, press `Tab` again on the selected row/column to ke
 
 ### 4. Row Selection
 
-The application provides multiple modes for selecting rows (marks it for filtering or viewing):
+The application provides multiple modes for selecting rows (marks it for filtering or sending):
 
 - `\` - Select rows with cell matches or those matching cursor value in current column (respects data type)
 - `|` - Opens dialog to select rows with custom expression
@@ -493,24 +493,24 @@ When you press `r` or `R`, enter:
 - Use `Match Whole` to avoid partial replacements
 - Support undo (`u`)
 
-### 6. View vs. Filter
+### 6. Filter & Send
 
 Both operations show selected rows but with fundamentally different effects:
 
-**When to use View** (`v` or `V`):
-- Exploring or analyzing data safely
+**When to use Filter** (`v` or `V`):
+- Exploring or analyzing data safely in view mode
 - Switching between different perspectives
 - Edits made in view mode are applied to the original dataframe
 - Press `q` to return to main table
 - Press `Ctrl+V` to save current view to a file. This does not affect the main table.
 
-**When to use Filter** (`"`):
+**When to use Send** (`"`):
 - Cleaning data (removing unwanted rows)
 - Creating a trimmed dataset for export in a new tab
 - Edits are independent and do not affect the source dataframe
 
 **Note**:
-- If currently there are no selected rows and no matching cells, the `v` (View) and `"` (Filter) will use cursor value for search.
+- If currently there are no selected rows and no matching cells, the `v` (Filter) and `"` (Send) will use cursor value for search.
 - Both support full undo with `u`.
 
 ### 7. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)

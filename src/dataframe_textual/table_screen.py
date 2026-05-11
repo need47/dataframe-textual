@@ -225,24 +225,26 @@ class TableScreen(TableModalScreen):
         # Override to disable sorting in TableScreen, but subclasses can still implement their own sorting if desired.
         pass
 
-    def filter_or_view_selected_value(self, cidx_name_value: tuple[int, str, Any] | None, action: str = "view") -> None:
-        """Apply filter or view action by the selected value.
+    def filter_or_send_selected_value(
+        self, cidx_name_value: tuple[int, str, Any] | None, action: str = "filter"
+    ) -> None:
+        """Apply filter or send action by the selected value.
 
-        Filters or views rows in the main table based on a selected value from
+        Filter or send rows in the main table based on a selected value from
         this table (typically frequency or row detail). Updates the main table's display
         and notifies the user of the action.
 
         Args:
-            col_name_value: Tuple of (column_name, column_value) to filter/view by, or None.
-            action: Either "filter" to hide non-matching rows, or "view" to show matching rows. Defaults to "view".
+            col_name_value: Tuple of (column_index, column_name, column_value) to filter/send by, or None.
+            action: Either "filter" to filter rows, or "send" to send rows. Defaults to "filter".
         """
         if cidx_name_value is None:
             return
         cidx, col_name, col_value = cidx_name_value
-        # self.log(f"Filtering or viewing by `{col_name} == {col_value}`")
+        # self.log(f"Filtering or sending by `{col_name} == {col_value}`")
 
         # Handle NULL values
-        if col_value == NULL:
+        if col_value is None or col_value == NULL:
             # Create expression for NULL values
             expr = pl.col(col_name).is_null()
             value_display = f"[$success]{NULL_DISPLAY}[/]"
@@ -263,13 +265,13 @@ class TableScreen(TableModalScreen):
             )
             return
 
-        # Action filter
-        if action == "filter":
-            self.dftable.action_filter_rows(cidx, col_value)
+        # Action send
+        if action == "send":
+            self.dftable.action_send_rows(cidx, col_value)
 
-        # Action view
+        # Action filter
         else:
-            self.dftable.action_view_rows(
+            self.dftable.action_filter_rows(
                 {
                     "term": expr,
                     "cidx": cidx,
@@ -291,7 +293,7 @@ class TableScreen(TableModalScreen):
         """Show frequency by the selected value.
 
         Args:
-            col_name_value: Tuple of (column_name, column_value) to filter/view by, or None.
+            col_name_value: Tuple of (column_index, column_name, column_value).
         """
         if cidx_name_value is None:
             return
@@ -309,7 +311,7 @@ class TableScreen(TableModalScreen):
         """Show frequency by the selected value.
 
         Args:
-            col_name_value: Tuple of (column_name, column_value) to filter/view by, or None.
+            col_name_value: Tuple of (column_index, column_name, column_value).
         """
         if cidx_name_value is None:
             return
@@ -343,8 +345,8 @@ class RowDetailScreen(TableScreen):
         """Handle key press events on the row detail screen.
 
         Supported keys:
-          - 'v': View the main table by the selected value.
-          - '"': Filter the main table by the selected value.
+          - 'v': Filter the main table by the selected value.
+          - '"': Move the selected value in the main table to a new tab.
           - '{': Move to the previous row.
           - '}': Move to the next row.
           - 'F': Show frequency for the selected value.
@@ -354,12 +356,10 @@ class RowDetailScreen(TableScreen):
             event: The key event object.
         """
         if event.key == "v":
-            # View the main table by the selected value
-            self.filter_or_view_selected_value(self.get_cidx_name_value(), action="view")
+            self.filter_or_send_selected_value(self.get_cidx_name_value(), action="filter")
             event.stop()
         elif event.key == "quotation_mark":  # '"'
-            # Filter the main table by the selected value
-            self.filter_or_view_selected_value(self.get_cidx_name_value(), action="filter")
+            self.filter_or_send_selected_value(self.get_cidx_name_value(), action="send")
             event.stop()
         elif event.key == "right_curly_bracket":  # '}'
             # Move to the next row
@@ -566,12 +566,10 @@ class FrequencyScreen(TableScreen):
             self.sort_by_column(descending=True)
             event.stop()
         elif event.key == "v":
-            # Filter the main table by the selected value
-            self.filter_or_view_selected_value(self.get_cidx_name_value(), action="view")
+            self.filter_or_send_selected_value(self.get_cidx_name_value(), action="filter")
             event.stop()
         elif event.key == "quotation_mark":  # '"'
-            # Highlight the main table by the selected value
-            self.filter_or_view_selected_value(self.get_cidx_name_value(), action="filter")
+            self.filter_or_send_selected_value(self.get_cidx_name_value(), action="send")
             event.stop()
         elif event.key == "ctrl+s":
             # Save the frequency table to file
