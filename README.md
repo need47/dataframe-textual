@@ -409,6 +409,8 @@ Columns are automatically styled based on their data type:
 Press `Enter` on any row to open a modal showing all column values for that row.
 Useful for examining wide datasets where columns don't fit well on screen.
 
+![Row detail](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/row-detail.png)
+
 **In the Row Detail Modal**:
 - Press `v` to **view** all rows containing the selected column value
 - Press `"` to **filter** all rows containing the selected column value to a new tab
