@@ -438,7 +438,6 @@ class DataFrameViewer(App):
         # Activate and focus the new tab
         self.tabbed.active = new_pane.id
         new_table.focus()
-        new_table.dirty = True  # Mark as dirty since it's a new unsaved tab
 
     def do_next_tab(self, offset: int = 1) -> None:
         """Switch to the next tab or previous tab.
