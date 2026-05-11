@@ -290,7 +290,7 @@ dv data.csv -o data.parquet
 | `K`              | Cycle cursor types: cell → row → column → cell                         |
 | `~`              | Toggle row labels                                                      |
 | `_` (underscore) | Toggle column full width                                               |
-| `` ` ``          | Toggle freeze rows and/or columns                                      |
+| `+`              | Toggle freeze rows and/or columns                                      |
 | `,`              | Toggle thousand separator for numeric display                          |
 | `^`              | Toggle internal row index column (RID)                                 |
 | `&`              | Set current row as the new header row                                  |

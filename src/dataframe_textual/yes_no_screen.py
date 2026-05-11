@@ -1032,7 +1032,7 @@ class NewTabScreen(YMNScreen):
         return self.query_one(TextArea).text.strip()
 
 
-class FilterNumericColumn(YMNScreen):
+class FilterNumericScreen(YMNScreen):
     """A screen for filtering a numeric column."""
 
     CSS = """
@@ -1142,7 +1142,7 @@ class FilterNumericColumn(YMNScreen):
         return expr, self.cidx
 
 
-class FilterStringColumn(YMNScreen):
+class FilterStringScreen(YMNScreen):
     """A screen for filtering a string column."""
 
     CSS = """
@@ -1307,7 +1307,7 @@ class FilterStringColumn(YMNScreen):
         return expr, self.cidx
 
 
-class FilterBooleanColumn(YMNScreen):
+class FilterBooleanScreen(YMNScreen):
     """A screen for filtering a boolean column."""
 
     CSS = """

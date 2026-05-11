@@ -16,8 +16,9 @@ from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
-from .common import NULL, NULL_DISPLAY, RID, DtypeConfig, format_float, format_row
+from .common import COLUMN_WIDTH_CAP, NULL, NULL_DISPLAY, RID, DtypeConfig, format_float, format_row
 from .file_picker_screen import SaveFileScreen
+from .text_screen import TextScreen
 
 
 class TableModalScreen(ModalScreen):
@@ -391,10 +392,16 @@ class RowDetailScreen(TableScreen):
             dtype = self.dftable.df.dtypes[cidx]
             cell_value = self.dftable.df.item(ridx, cidx)
 
-            # Only show cell detail screen if the value is a non-empty list, non-empty dict,
+            # Show long string in a text screen for better readability.
+            if isinstance(cell_value, str) and len(cell_value) > COLUMN_WIDTH_CAP:
+                self.app.push_screen(TextScreen(cell_value))
+            elif isinstance(cell_value, pl.Series) and len(cell_value) == 1 and isinstance(cell_value[0], str):
+                if len(cell_value[0]) > COLUMN_WIDTH_CAP:
+                    self.app.push_screen(TextScreen(cell_value[0]))
+            # Show cell detail screen if the value is a non-empty list, non-empty dict,
             # or string containing the delimiter (indicating a potential list of values).
             # This prevents unnecessary screens for simple scalar values.
-            if (
+            elif (
                 (dtype == pl.List and not cell_value.is_empty())
                 or (dtype == pl.Struct and cell_value)
                 or (dtype == pl.String and "|" in cell_value)
@@ -929,10 +936,16 @@ class CellDetailScreen(TableModalScreen):
             dtype = self.df.dtypes[cidx]
             cell_value = self.df.item(ridx, cidx)
 
-            # Only show cell detail screen if the value is a non-empty list, non-empty dict,
+            # Show long string in a text screen for better readability.
+            if isinstance(cell_value, str) and len(cell_value) > COLUMN_WIDTH_CAP:
+                self.app.push_screen(TextScreen(cell_value))
+            elif isinstance(cell_value, pl.Series) and len(cell_value) == 1 and isinstance(cell_value[0], str):
+                if len(cell_value[0]) > COLUMN_WIDTH_CAP:
+                    self.app.push_screen(TextScreen(cell_value[0]))
+            # Show cell detail screen if the value is a non-empty list, non-empty dict,
             # or string containing the delimiter (indicating a potential list of values).
             # This prevents unnecessary screens for simple scalar values.
-            if (
+            elif (
                 (dtype == pl.List and not cell_value.is_empty())
                 or (dtype == pl.Struct and cell_value)
                 or (dtype == pl.String and "|" in cell_value)

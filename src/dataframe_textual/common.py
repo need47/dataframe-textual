@@ -47,6 +47,9 @@ BOOLS = {
 NULL = "NULL"
 NULL_DISPLAY = "-"
 
+# Maximum width for columns before truncation
+COLUMN_WIDTH_CAP = 35
+
 
 def format_float(value: float, thousand_separator: bool = False, precision: int = 2) -> str:
     """Format a float value, keeping integers without decimal point.

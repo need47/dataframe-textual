@@ -32,6 +32,7 @@ from textual.widgets._data_table import (
 )
 
 from .common import (
+    COLUMN_WIDTH_CAP,
     CURSOR_TYPES,
     NULL,
     NULL_DISPLAY,
@@ -58,6 +59,7 @@ from .table_screen import (
     RowDetailScreen,
     StatisticsScreen,
 )
+from .text_screen import TextScreen
 from .yes_no_screen import (
     AddColumnScreen,
     AddLinkScreen,
@@ -67,9 +69,9 @@ from .yes_no_screen import (
     EditCellScreen,
     EditColumnScreen,
     ExplodeColumnScreen,
-    FilterBooleanColumn,
-    FilterNumericColumn,
-    FilterStringColumn,
+    FilterBooleanScreen,
+    FilterNumericScreen,
+    FilterStringScreen,
     FindReplaceScreen,
     FreezeScreen,
     GoToRowScreen,
@@ -86,9 +88,6 @@ BUFFER_SIZE = 5
 
 # Warning threshold for loading rows
 WARN_ROWS_THRESHOLD = 50_000
-
-# Maximum width for columns before truncation
-COLUMN_WIDTH_CAP = 35
 
 
 @dataclass
@@ -302,7 +301,7 @@ class DataFrameTable(DataTable):
         ("H", "show_hidden_columns", "Show hidden column(s)"),
         ("tilde", "toggle_row_labels", "Toggle row labels"),  # `~`
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
-        ("grave_accent", "toggle_freeze_row_column", "Freeze rows/columns"), # '`'
+        ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
         ("comma", "toggle_thousand_separator", "Toggle thousand separator"),  # `,`
         ("underscore", "expand_column", "Expand column to full width"),  # `_`
         ("circumflex_accent", "toggle_rid", "Toggle internal row index (RID)"),  # `^`
@@ -1879,10 +1878,16 @@ class DataFrameTable(DataTable):
         dtype = self.df.dtypes[cidx]
         cell_value = self.df.item(ridx, cidx)
 
-        # Only show cell detail screen if the value is a non-empty list, non-empty dict,
+        # Show long string in a text screen for better readability.
+        if isinstance(cell_value, str) and len(cell_value) > COLUMN_WIDTH_CAP:
+            self.app.push_screen(TextScreen(cell_value))
+        elif isinstance(cell_value, pl.Series) and len(cell_value) == 1 and isinstance(cell_value[0], str):
+            if len(cell_value[0]) > COLUMN_WIDTH_CAP:
+                self.app.push_screen(TextScreen(cell_value[0]))
+        # Show cell detail screen if the value is a non-empty list, non-empty dict,
         # or string containing the delimiter (indicating a potential list of values).
         # This prevents unnecessary screens for simple scalar values.
-        if (
+        elif (
             (dtype == pl.List and not cell_value.is_empty())
             or (dtype == pl.Struct and cell_value)
             or (dtype == pl.String and "|" in cell_value)
@@ -4044,17 +4049,17 @@ class DataFrameTable(DataTable):
 
         if dc.gtype in ("integer", "float"):
             self.app.push_screen(
-                FilterNumericColumn(self.df[col], cidx, dc, self.cursor_value),
+                FilterNumericScreen(self.df[col], cidx, dc, self.cursor_value),
                 callback=self.filter_row_value,
             )
         elif dc.gtype == "string":
             self.app.push_screen(
-                FilterStringColumn(self.df[col], cidx, self.cursor_value),
+                FilterStringScreen(self.df[col], cidx, self.cursor_value),
                 callback=self.filter_row_value,
             )
         elif dc.gtype == "boolean":
             self.app.push_screen(
-                FilterBooleanColumn(self.df[col], cidx, self.cursor_value),
+                FilterBooleanScreen(self.df[col], cidx, self.cursor_value),
                 callback=self.filter_row_value,
             )
         else:
