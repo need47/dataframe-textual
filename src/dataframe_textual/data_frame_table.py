@@ -69,6 +69,7 @@ from .yes_no_screen import (
     ExplodeColumnScreen,
     FilterBooleanColumn,
     FilterNumericColumn,
+    FilterStringColumn,
     FindReplaceScreen,
     FreezeScreen,
     GoToRowScreen,
@@ -4084,11 +4085,10 @@ class DataFrameTable(DataTable):
                 callback=self.filter_row_value,
             )
         elif dc.gtype == "string":
-            return
-            # self.app.push_screen(
-            #     FilterStringColumn(self.df[col], cidx, dc, self.cursor_value),
-            #     callback=self.filter_row_value,
-            # )
+            self.app.push_screen(
+                FilterStringColumn(self.df[col], cidx, self.cursor_value),
+                callback=self.filter_row_value,
+            )
         elif dc.gtype == "boolean":
             self.app.push_screen(
                 FilterBooleanColumn(self.df[col], cidx, self.cursor_value),

@@ -1072,7 +1072,7 @@ class FilterNumericColumn(YMNScreen):
         max_value = self.s.max()
 
         with Container(id="filter-numeric-column-container") as container:
-            container.border_title = "Filter Numeric Column"
+            container.border_title = "Filter Column"
             yield Horizontal(
                 Label("="),
                 Input(placeholder=f"{cursor_value}", id="condition-eq"),
@@ -1142,6 +1142,171 @@ class FilterNumericColumn(YMNScreen):
         return expr, self.cidx
 
 
+class FilterStringColumn(YMNScreen):
+    """A screen for filtering a string column."""
+
+    CSS = """
+        FilterStringColumn Label {
+            width: auto;
+            min-width: 12;
+        }
+
+        FilterStringColumn Label#match-options-label {
+            margin: 1 0 0 0;
+        }
+
+        FilterStringColumn .condition-row {
+            width: auto;
+            height: auto;
+            min-width: 50;
+        }
+
+        FilterStringColumn .condition-row Label {
+            width: 2;
+            margin: 1;
+        }
+
+        FilterStringColumn .condition-row Input {
+            width: auto;
+            min-width: 48;
+        }
+
+        FilterStringColumn #checkbox-container {
+            margin: 0 0 1 0;
+            height: auto;
+            align: left middle;
+            width: auto;
+        }
+
+        FilterStringColumn Checkbox {
+            margin: 0;
+        }
+
+        FilterStringColumn Checkbox:blur {
+            border: solid $secondary;
+        }
+    """
+
+    def __init__(self, s: pl.Series, cidx: int, cursor_value: int | float | None) -> None:
+        """Initialize the filter string column screen."""
+        super().__init__(
+            yes="Filter",
+            no="Cancel",
+            on_yes_callback=self._get_input,
+        )
+        self.s = s
+        self.cidx = cidx
+        self.cursor_value = cursor_value
+
+    def compose(self) -> ComposeResult:
+        """Compose the filter string column screen widget structure."""
+        cursor_value = NULL_DISPLAY if self.cursor_value is None else self.cursor_value
+
+        with Container(id="filter-string-column-container") as container:
+            container.border_title = "Filter Column"
+            yield Horizontal(
+                Label("Equals to"),
+                Input(placeholder=f"{cursor_value}", id="condition-eq"),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label("Not equal to"),
+                Input(placeholder=f"{cursor_value}", id="condition-neq"),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label("Starts with"),
+                Input(placeholder=f"{cursor_value}", id="condition-startswith"),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label("Ends with"),
+                Input(placeholder=f"{cursor_value}", id="condition-endswith"),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label("Contains"),
+                Input(placeholder=f"{cursor_value}", id="condition-contains"),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label("Regex"),
+                Input(id="condition-regex"),
+                classes="condition-row",
+            )
+            yield Label("Match options:", id="match-options-label")
+            with Horizontal(id="checkbox-container"):
+                yield Checkbox("Nocase", id="checkbox-nocase")
+                yield Checkbox("Literal", id="checkbox-literal")
+                yield Checkbox("Reverse", id="checkbox-reverse")
+            yield from super().compose()
+
+    def _get_input(self) -> pl.Expr | None:
+        """Handle Yes button/Enter key press."""
+        col = self.s.name
+        expr: pl.Expr | None = None
+
+        match_nocase = self.query_one("#checkbox-nocase", Checkbox).value
+        match_literal = self.query_one("#checkbox-literal", Checkbox).value
+        match_reverse = self.query_one("#checkbox-reverse", Checkbox).value
+
+        eq = self.query_one("#condition-eq", Input).value
+        if eq:
+            if match_nocase:
+                eq = f"(?i)^{eq}$"
+            expr = (
+                pl.col(col).is_null()
+                if eq == NULL
+                else pl.col(col).str.contains(eq, literal=match_literal)
+                if match_nocase
+                else pl.col(col) == eq
+            )
+        else:
+            neq = self.query_one("#condition-neq", Input).value
+            if neq:
+                if match_nocase:
+                    neq = f"(?i)^{neq}$"
+                e = (
+                    pl.col(col).is_not_null()
+                    if neq == NULL
+                    else ~pl.col(col).str.contains(neq, literal=match_literal)
+                    if match_nocase
+                    else pl.col(col) != neq
+                )
+                expr = e if expr is None else expr & e
+
+            startswith = self.query_one("#condition-startswith", Input).value
+            if startswith:
+                if match_nocase:
+                    startswith = f"(?i)^{startswith}"
+                e = pl.col(col).str.contains(startswith, literal=match_literal)
+                expr = e if expr is None else expr & e
+
+            endswith = self.query_one("#condition-endswith", Input).value
+            if endswith:
+                if match_nocase:
+                    endswith = f"(?i){endswith}$"
+                e = pl.col(col).str.contains(endswith, literal=match_literal)
+                expr = e if expr is None else expr & e
+
+            contains = self.query_one("#condition-contains", Input).value
+            if contains:
+                if match_nocase:
+                    contains = f"(?i){contains}"
+                e = pl.col(col).str.contains(contains, literal=match_literal)
+                expr = e if expr is None else expr & e
+
+            regex = self.query_one("#condition-regex", Input).value
+            if regex:
+                e = pl.col(col).str.contains(regex, literal=match_literal)
+                expr = e if expr is None else expr & e
+
+        if match_reverse and expr is not None:
+            expr = ~expr
+
+        return expr, self.cidx
+
+
 class FilterBooleanColumn(YMNScreen):
     """A screen for filtering a boolean column."""
 
@@ -1177,7 +1342,7 @@ class FilterBooleanColumn(YMNScreen):
         has_null = self.s.null_count() > 0
 
         with Container(id="filter-boolean-column-container") as container:
-            container.border_title = "Filter Boolean Column"
+            container.border_title = "Filter Column"
             with RadioSet(id="boolean-radio-set"):
                 yield RadioButton("True", id="radio-true", value=self.cursor_value is True)
                 yield RadioButton("False", id="radio-false", value=self.cursor_value is False)
