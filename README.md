@@ -427,7 +427,7 @@ You can also press `Tab` from the row-detail modal to drill into the selected fi
 
 Inside the cell-detail modal, press `Tab` again on the selected row/column to keep drilling into nested values.
 
-- Scalar values are shown directly
+- Scalar values are displayed inline. For long text, press `Tab` again to view the full content in a multi-line modal.
 - String values are split into multiple rows using `|` by default
 - List-like values are expanded into a one-column table
 - Dict-like values are shown as key/value columns

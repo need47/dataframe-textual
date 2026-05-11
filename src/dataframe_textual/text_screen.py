@@ -13,7 +13,7 @@ class TextScreen(ModalScreen):
 
         #text-area {
             width: auto;
-            min-width: 40;
+            min-width: 48;
             max-width: 50%;
             height: auto;
             border: solid $primary;
