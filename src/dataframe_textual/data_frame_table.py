@@ -4091,7 +4091,7 @@ class DataFrameTable(DataTable):
             # )
         elif dc.gtype == "boolean":
             self.app.push_screen(
-                FilterBooleanColumn(self.df[col], cidx, dc, self.cursor_value),
+                FilterBooleanColumn(self.df[col], cidx, self.cursor_value),
                 callback=self.filter_row_value,
             )
         else:

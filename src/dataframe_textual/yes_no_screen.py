@@ -1161,7 +1161,7 @@ class FilterBooleanColumn(YMNScreen):
         }
     """
 
-    def __init__(self, s: pl.Series, cidx: int, dc: DtypeClass, cursor_value: bool | None) -> None:
+    def __init__(self, s: pl.Series, cidx: int, cursor_value: bool | None) -> None:
         """Initialize the filter boolean column screen."""
         super().__init__(
             yes="Filter",
@@ -1170,7 +1170,6 @@ class FilterBooleanColumn(YMNScreen):
         )
         self.s = s
         self.cidx = cidx
-        self.dc = dc
         self.cursor_value = cursor_value
 
     def compose(self) -> ComposeResult:
@@ -1180,10 +1179,10 @@ class FilterBooleanColumn(YMNScreen):
         with Container(id="filter-boolean-column-container") as container:
             container.border_title = "Filter Boolean Column"
             with RadioSet(id="boolean-radio-set"):
-                yield RadioButton("True", id="radio-true")
-                yield RadioButton("False", id="radio-false")
+                yield RadioButton("True", id="radio-true", value=self.cursor_value is True)
+                yield RadioButton("False", id="radio-false", value=self.cursor_value is False)
                 if has_null:
-                    yield RadioButton(NULL_DISPLAY, id="radio-null", value=NULL)
+                    yield RadioButton(NULL_DISPLAY, id="radio-null", value=self.cursor_value is None)
             yield from super().compose()
 
     def _get_input(self) -> tuple[pl.Expr | None, int]:
