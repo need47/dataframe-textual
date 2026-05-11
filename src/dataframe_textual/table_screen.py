@@ -980,7 +980,7 @@ class CellDetailScreen(TableModalScreen):
             )
             self.df2table()
         elif dtype == pl.String and cell_value:
-            self.df = pl.DataFrame({col_name: cell_value.split(self.delimiter)})
+            self.df = pl.DataFrame({col_name: [c for c in cell_value.split(self.delimiter) if c]})
             self.df2table()
         else:
             self.df = pl.DataFrame({col_name: [cell_value]})
