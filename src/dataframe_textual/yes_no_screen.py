@@ -1036,18 +1036,18 @@ class FilterNumericScreen(YMNScreen):
     """A screen for filtering a numeric column."""
 
     CSS = """
-        FilterNumericColumn .condition-row {
+        FilterNumericScreen .condition-row {
             width: auto;
             height: auto;
             min-width: 50;
         }
 
-        FilterNumericColumn .condition-row Label {
+        FilterNumericScreen .condition-row Label {
             width: 2;
             margin: 1;
         }
 
-        FilterNumericColumn .condition-row Input {
+        FilterNumericScreen .condition-row Input {
             width: auto;
             min-width: 48;
         }
@@ -1146,43 +1146,43 @@ class FilterStringScreen(YMNScreen):
     """A screen for filtering a string column."""
 
     CSS = """
-        FilterStringColumn Label {
+        FilterStringScreen Label {
             width: auto;
             min-width: 12;
         }
 
-        FilterStringColumn Label#match-options-label {
+        FilterStringScreen Label#match-options-label {
             margin: 1 0 0 0;
         }
 
-        FilterStringColumn .condition-row {
+        FilterStringScreen .condition-row {
             width: auto;
             height: auto;
             min-width: 50;
         }
 
-        FilterStringColumn .condition-row Label {
+        FilterStringScreen .condition-row Label {
             width: 2;
             margin: 1;
         }
 
-        FilterStringColumn .condition-row Input {
+        FilterStringScreen .condition-row Input {
             width: auto;
             min-width: 48;
         }
 
-        FilterStringColumn #checkbox-container {
+        FilterStringScreen #checkbox-container {
             margin: 0 0 1 0;
             height: auto;
             align: left middle;
             width: auto;
         }
 
-        FilterStringColumn Checkbox {
+        FilterStringScreen Checkbox {
             margin: 0;
         }
 
-        FilterStringColumn Checkbox:blur {
+        FilterStringScreen Checkbox:blur {
             border: solid $secondary;
         }
     """
@@ -1311,17 +1311,17 @@ class FilterBooleanScreen(YMNScreen):
     """A screen for filtering a boolean column."""
 
     CSS = """
-        FilterBooleanColumn > #filter-boolean-column-container {
+        FilterBooleanScreen > #filter-boolean-column-container {
             width: auto;
             height: auto;
             max-width: 50;
         }
 
-        FilterBooleanColumn #radio-container {
+        FilterBooleanScreen #radio-container {
             height: auto;
         }
 
-        FilterBooleanColumn #boolean-radio-set {
+        FilterBooleanScreen #boolean-radio-set {
             height: auto;
         }
     """
