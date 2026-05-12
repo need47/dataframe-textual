@@ -57,8 +57,7 @@ class TableModalScreen(ModalScreen):
     def __init__(self, df: pl.DataFrame | None = None) -> None:
         """Initialize the table screen.
 
-        Sets up the base modal screen with reference to the main DataFrameTable widget
-        and stores the DataFrame for display.
+        Sets up the base modal screen and stores the DataFrame for display.
 
         Args:
             df: The DataFrame to display in this screen.

@@ -350,7 +350,7 @@ class DataFrameViewer(App):
 
             # Add the new tab
             self.add_tab(
-                df.lazy(),
+                df,
                 filename="expr_result.csv",
                 tabname="expr-result",
                 after=self.tabbed.active_pane,
@@ -416,9 +416,9 @@ class DataFrameViewer(App):
         new_tabname = f"{current_tabname}_copy"
         new_tabname = self.get_unique_tabname(new_tabname)
 
-        # Create new table with the same LazyFrame and filename
+        # Create new table with the same DataFrame and filename
         new_table = DataFrameTable(
-            table.lf.clone(),  # Clone the LazyFrame to ensure independent state
+            table.df.clone(),  # Clone the DataFrame to ensure independent state
             filename=Path(table.filename).with_stem(new_tabname),  # Update filename stem to match new tab name
             tabname=new_tabname,
             zebra_stripes=True,
@@ -551,20 +551,20 @@ class DataFrameViewer(App):
 
     def add_tab(
         self,
-        lf: pl.LazyFrame,
+        frame: pl.DataFrame | pl.LazyFrame,
         filename: str,
         tabname: str,
         before: TabPane | str | None = None,
         after: TabPane | str | None = None,
     ) -> None:
-        """Add new tab for the given LazyFrame.
+        """Add new tab for the given DataFrame or LazyFrame.
 
-        Creates and adds a new tab with the provided LazyFrame and configuration.
+        Creates and adds a new tab with the provided DataFrame or LazyFrame and configuration.
         Ensures unique tab names by appending an index if needed. Shows the tab bar
         if this is no longer the only tab.
 
         Args:
-            lf: The LazyFrame to add in the new tab.
+            frame: The DataFrame or LazyFrame to add in the new tab.
             filename: The source filename for this data (used in table metadata).
             tabname: The display name for the tab.
             before: Optional; If specified, insert the new tab before this tab.
@@ -582,7 +582,7 @@ class DataFrameViewer(App):
             tab_idx = pending_tab_idx
             break
 
-        table = DataFrameTable(lf, filename, tabname=tabname, zebra_stripes=True, id=tab_idx)
+        table = DataFrameTable(frame, filename, tabname=tabname, zebra_stripes=True, id=tab_idx)
         tab = TabPane(tabname, table, id=tab_idx)
         self.tabbed.add_pane(tab, before=before, after=after)
 

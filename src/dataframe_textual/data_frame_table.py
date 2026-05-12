@@ -388,7 +388,7 @@ class DataFrameTable(DataTable):
     # Track if dataframe has unsaved changes
     dirty: reactive[bool] = reactive(False)
 
-    def __init__(self, lf: pl.LazyFrame, filename: str = "", tabname: str = "", **kwargs) -> None:
+    def __init__(self, frame: pl.DataFrame | pl.LazyFrame, filename: str = "", tabname: str = "", **kwargs) -> None:
         """Initialize the DataFrameTable with a dataframe and manage all state.
 
         Sets up the table widget with display configuration, loads the dataframe, and
@@ -403,10 +403,16 @@ class DataFrameTable(DataTable):
         super().__init__(**kwargs)
 
         # DataFrame state
-        self.lf = lf  # Original LazyFrame for reference
+        if isinstance(frame, pl.LazyFrame):
+            self.lf = frame  # Original LazyFrame for reference
+            self.df = None  # Internal/working dataframe that gets loaded in batches
+            self.df_done = False  # Whether the entire dataframe has been loaded
+        else:
+            self.lf = frame.lazy()  # Convert DataFrame to LazyFrame
+            self.df = frame  # Internal/working dataframe
+            self.df_done = True  # Whether the entire dataframe has been loaded
+
         self.dataframe = None  # Original dataframe
-        self.df = None  # Internal/working dataframe
-        self.df_done = False  # Whether the entire dataframe has been loaded
         self.filename = filename or "untitled.csv"  # Current filename
         self.tabname = tabname or Path(filename).stem  # Tab name
 
@@ -445,9 +451,18 @@ class DataFrameTable(DataTable):
     def init_table(self) -> None:
         """Initial load of the dataframe and setup of the table display.
 
-        Loads the dataframe in batches if it's large, sets up the initial table display,
-        and then continues loading the rest of the dataframe in the background.
+        - If a DataFrame is provided, set up the table immediately.
+        - If a LazyFrame is provided, set up the table with the first batch of rows
+          while the remaining rows continue to load in the background.
         """
+        # If we already have a loaded DataFrame, use it directly
+        if self.df is not None:
+            self.dataframe = add_rid_column(self.df)
+            self.df = self.dataframe
+            self.setup_table()
+            return
+
+        # Otherwise, we have a LazyFrame that needs to be loaded in batches
         batch_gen = self.lf.collect_batches()
 
         try:
@@ -1249,7 +1264,7 @@ class DataFrameTable(DataTable):
         col_widths, col_label_widths = {}, {}
 
         # Get available width for the table (with some padding for borders/scrollbar)
-        available_width = self.scrollable_content_region.width
+        available_width = self.scrollable_content_region.width or self.app.size.width
 
         # Check if there are any string or list columns to determine if we need to calculate widths
         has_string_or_list_col = any(dtype == pl.String or dtype == pl.List for dtype in self.df.dtypes)
