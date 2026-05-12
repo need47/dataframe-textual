@@ -239,6 +239,10 @@ dv data.csv -o data.parquet
 | `Ctrl+N`       | Create new tab from Polars expression                         |
 | `Double-click` | Rename tab                                                    |
 
+**Tips:**
+- Tabs with unsaved changes are indicated with a bright background
+- Closing or quitting a tab with unsaved changes triggers a save prompt
+
 #### View & Settings
 
 | Key                      | Action                               |
@@ -395,7 +399,7 @@ dv data.csv -o data.parquet
 
 ## Features in Detail
 
-### 1. Color-Coded Data Types
+### 1. Display & UI
 
 Columns are automatically styled based on their data types:
 
@@ -406,6 +410,24 @@ Columns are automatically styled based on their data types:
 | string    | Green      | left      |
 | boolean   | Blue       | centered  |
 | temporal  | Magenta    | centered  |
+
+**Hide/Show Columns** (`h` / `H`):
+- `h` - Temporarily hide current column (data preserved)
+- `H` - Restore all hidden columns
+
+**Freeze Rows and Columns** (`+`):
+- Toggle frozen rows and/or columns to keep important headers and fields visible while scrolling
+
+**Thousand Separator Toggle** (`,`):
+- Applies to **integer** and **float** columns
+- Formats large numbers with commas for readability (e.g., `1000000` → `1,000,000`)
+- Works across all numeric columns in the table
+- Toggle on/off as needed for different viewing preferences
+- Display-only: does not modify underlying data in the dataframe
+
+**Cursor Type Cycling** (`K`):
+- Cycles through cell, row, and column selection modes
+- Use it to switch between inspecting a single cell, an entire row, or an entire column
 
 ### 2. Row Detail View
 
@@ -560,12 +582,12 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - ``$`product id` > 100`` - Product ID with spaces in column name greater than 100
 - `self.drop(RID).is_duplicated()` - Duplicate rows (note: the internal RID column must be excluded)
 
-**String Matching:** ([Polars string API reference](https://docs.pola.rs/api/python/stable/reference/series/string.html))
+**String Operations:** ([Polars string API reference](https://docs.pola.rs/api/python/stable/reference/series/string.html))
 - `$name.str.contains("John")` - Name contains "John" (case-sensitive)
 - `$name.str.contains("(?i)john")` - Name contains "john" (case-insensitive)
 - `$email.str.ends_with("@company.com")` - Email ends with domain
 - `$code.str.starts_with("ABC")` - Code starts with "ABC"
-- `$age.cast(pl.String).str.starts_with("7")` - Age (cast to string first) starts with "7"
+- `$name.str.len_chars() < 7` - Length of name shorter than 7
 
 **Number Operations:**
 - `$age * 2 > 100` - Double age greater than 100
@@ -578,6 +600,7 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - `NULL` - a value to represent null for convenience
 
 **Tips:**
+- Use column indices (e.g., `$1`, `$2`) for faster column access.
 - Use column names that match exactly (case-sensitive)
 - Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
 
@@ -594,8 +617,9 @@ View quick metadata about your dataframe and columns to understand their structu
 
 **Dataframe Metadata** (`m`):
 - Press `m` to open a modal displaying:
-  - **Row** - Total number of rows in the dataframe
-  - **Column** - Total number of columns in the dataframe
+  - **File Name** - File name of current file
+  - **Row Count** - Total number of rows in the dataframe
+  - **Column Count** - Total number of columns in the dataframe
 
 **Column Metadata** (`M`):
 - Press `M` to open a modal displaying details for all columns:
@@ -615,15 +639,15 @@ Press `F` to see value distributions of the current column. The modal shows:
 - Value, Count, Percentage, Histogram
 - **Total row** at the bottom
 
-**In the Frequency Table**:
+**In the Frequency Modal**:
 - Press `[` and `]` to sort by any column (value, count, or percentage)
-- Press `v` to **view** all rows containing the selected value
-- Press `"` to **filter** all rows containing the selected value to a new tab
-- Press `,` to toggle thousand separator
+- Press `v` to **filter** all rows containing the selected value
+- Press `"` to **collect** all rows containing the selected value to a new tab
+- Press `,` to toggle thousand separator for numeric values
 - Press `g` to scroll to top
 - Press `G` to scroll to bottom
 - Press `Ctrl+S` to save the frequency table to file
-- Press `q` or `Escape` to close the frequency table
+- Press `q` or `Escape` to close the modal
 
 This is useful for:
 - Understanding value distributions
@@ -638,9 +662,8 @@ Show summary statistics (count, null count, mean, median, std, min, max, etc.) u
 - `S` for all columns across the entire dataframe
 
 **In the Statistics Modal**:
-- Press `q` or `Escape` to close the statistics table
 - Use arrow keys to navigate
-- Useful for quick data validation and summary reviews
+- Press `q` or `Escape` to close the modal
 
 This is useful for:
 - Understanding data distributions and characteristics
@@ -693,9 +716,11 @@ This is useful for:
 - Duplicate preserves all data from original row
 - Useful for batch adding similar records
 
-**Hide/Show Columns** (`h` / `H`):
-- `h` - Temporarily hide current column (data preserved)
-- `H` - Restore all hidden columns
+**Remove Duplicate Rows** (`Ctrl+Delete`):
+- Removes duplicated rows while keeping the first occurrence
+- Compares row values across the visible columns 
+- Useful for quick deduplication before further editing, collecting, or exporting
+- Supports undo with `u`
 
 ### 13. Column & Row Reordering
 
@@ -707,26 +732,25 @@ This is useful for:
 - Swaps adjacent rows
 - Reorder is preserved when saving
 
-### 14. Freeze Rows and Columns
+### 14. Save File
 
-Press `f` to open the dialog:
-- Enter number of fixed rows and/or columns to keep top rows/columns visible while scrolling
+The application provides separate save actions for the current tab, all tabs, and the current filtered view.
 
-### 15. Thousand Separator Toggle
+**Save Current Tab** (`Ctrl+T`):
+- Saves the active tab to file
+- Useful when you want to export only the dataframe you are currently working on
 
-Press `,` to toggle thousand separator formatting for numeric data:
-- Applies to **integer** and **float** columns
-- Formats large numbers with commas for readability (e.g., `1000000` → `1,000,000`)
-- Works across all numeric columns in the table
-- Toggle on/off as needed for different viewing preferences
-- Display-only: does not modify underlying data in the dataframe
-- State persists during the session
+**Save All Tabs** (`Ctrl+S`):
+- Saves every open tab to file
+- Useful after editing multiple datasets in the same session
 
-### 16. Save File
+**Save Current View** (`Ctrl+V`):
+- Saves only the current filtered or derived view to file
+- Useful for exporting a subset without replacing the source dataframe
 
-Press `Ctrl+S` to save filtered, edited, or sorted data back to file. The output format is automatically determined by the file extension, making it easy to convert between different formats (e.g., CSV to TSV).
+The output format is determined by the file extension, making it easy to convert between formats such as CSV, TSV, Parquet, or Excel.
 
-### 17. Undo/Redo/Reset
+### 15. Undo/Redo/Reset
 
 **Undo** (`u`):
 - Reverts last action with full state restoration
@@ -744,7 +768,7 @@ Press `Ctrl+S` to save filtered, edited, or sorted data back to file. The output
 - Clears all edits, deletions, selections, filters, and sorts
 - Useful for starting fresh without reloading the file
 
-### 18. Column Type Conversion
+### 16. Column Type Conversion
 
 Press the type conversion keys to instantly cast the current column to a different data type:
 
@@ -761,14 +785,7 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 **Note**: Type conversion attempts to preserve data where possible. Conversions may lose data (e.g., float to int rounding).
 
-### 19. Cursor Type Cycling
-
-Press `K` to cycle through selection modes:
-1. **Cell mode**: Highlight individual cell (and its row/column headers)
-2. **Row mode**: Highlight entire row
-3. **Column mode**: Highlight entire column
-
-### 20. SQL Interface
+### 17. SQL Interface
 
 The SQL interface provides two modes for querying your dataframe:
 
@@ -798,7 +815,7 @@ FROM self
 WHERE `product id` = 7
 ```
 
-### 21. Clipboard Operations
+### 18. Clipboard Operations
 
 Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 
@@ -809,9 +826,9 @@ Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 - Press `Ctrl+R` to copy row values (delimited by tab)
 - Hold `Shift` to select with mouse
 
-### 22. Link Column Creation
+### 19. Link Column Creation
 
-Press `@` to create a new column containing dynamically generated URLs using template.
+Press `@` to create a new column containing dynamically generated URLs using template. Links are typically clickable in a terminal emulator using Ctrl+Click.
 
 **Template Placeholders:**
 
@@ -831,30 +848,56 @@ The link template supports multiple placeholder types for maximum flexibility:
 - Use full undo (`u`) if template produces unexpected URLs
 - For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
 
-### 23. Tab Management
+### 20. Handling Loading Errors
 
-Manage multiple files and dataframes simultaneously with tabs.
+Most loading failures come from malformed CSV/TSV input, quoting issues, or mixed column types. When this happens, the application prints a hint with a suggested retry option.
 
-**Tab Operations:**
-- **`Ctrl+O`** - Open file in a new tab
-- **`b`** - Go to the next tab
-- **`B`** - Go to the previous tab
-- **`space`** - Toggle the tab bar visibility
-- **`>`** - Move the current tab right
-- **`<`** - Move the current tab left
-- **`Double-click`** - Rename the tab
-- **`Ctrl+D`** - Duplicate current tab (creates a copy with same data and state)
-- **`Ctrl+T`** - Save current tab to file
-- **`Ctrl+S`** - Save all tabs to file
-- **`w`** - Save current tab to file (overwrite without prompt)
-- **`W`** - Save all tabs to file (overwrite without prompt)
-- **`q`** - Close current tab (closes tab, prompts to save if unsaved changes)
-- **`Q`** - Close all tabs and exit app (prompts to save tabs with unsaved changes)
-- **`Ctrl+Q`** - Force to quit app regardless of unsaved changes
+**Common fixes:**
+- Use `-Q` if quote characters are mismatched, improperly escaped, or should be ignored entirely
+- Use `-T` when rows contain more fields than expected and you want to truncate ragged lines
+- Use `-L` to increase the number of rows used for schema inference when early rows do not represent the full column types
+- Use `-I` to disable type inference and read CSV/TSV values as strings
+- Check the delimiter and format options if the input appears empty or unreadable
+- Use `-E` as a last resort to ignore recoverable parsing errors
 
-**Tips:**
-- Tabs with unsaved changes are indicated with a bright background
-- Closing or quitting a tab with unsaved changes triggers a save prompt
+**Typical cases:**
+
+**Malformed CSV or broken quoting**:
+- Symptom: errors mentioning malformed CSV, mismatched quotes, or improperly escaped fields
+- Try: `-Q` to disable quoting or choose a different quote character
+
+**Ragged lines or inconsistent field counts**:
+- Symptom: errors saying the input has more fields than defined in the schema
+- Try: `-T` to truncate ragged lines
+
+**Mixed data types in one column**:
+- Symptom: errors saying a value could not be parsed as an integer, float, or other inferred type at a specific column
+- Try: `-L` first, then `-I` if the column is genuinely mixed
+
+**No data could be loaded**:
+- Symptom: errors indicating that no data was available to load
+- Check: whether the file is empty, the format is correct, and the delimiter matches the input
+
+**Fallback option**:
+- If none of the above helps and the file is mostly usable, retry with `-E` to ignore parsing errors
+
+**Examples:**
+```bash
+# Disable quote handling when CSV quoting is broken
+dv bad.csv -Q
+
+# Truncate ragged lines
+dv messy.tsv -T
+
+# Increase schema inference depth
+dv mixed_types.csv -L 1000
+
+# Disable type inference entirely
+dv mixed_types.csv -I
+
+# Ignore recoverable parsing errors
+dv partially_broken.csv -E
+```
 
 ## Dependencies
 

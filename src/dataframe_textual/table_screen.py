@@ -16,7 +16,17 @@ from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
-from .common import COLUMN_WIDTH_CAP, NULL, NULL_DISPLAY, RID, DtypeConfig, format_float, format_row
+from .common import (
+    COLUMN_WIDTH_CAP,
+    CURSOR_TYPES,
+    NULL,
+    NULL_DISPLAY,
+    RID,
+    DtypeConfig,
+    format_float,
+    format_row,
+    get_next_item,
+)
 from .file_picker_screen import SaveFileScreen
 from .text_screen import TextScreen
 
@@ -97,6 +107,10 @@ class TableModalScreen(ModalScreen):
             event.stop()
         elif event.key == "right_square_bracket":  # ']'
             self.sort_by_column(descending=True)
+            event.stop()
+        elif event.key == "K":
+            next_type = get_next_item(CURSOR_TYPES, self.table.cursor_type)
+            self.table.cursor_type = next_type
             event.stop()
 
     def build_table(self) -> None:
