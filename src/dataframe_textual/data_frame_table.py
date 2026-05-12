@@ -72,6 +72,7 @@ from .yes_no_screen import (
     FilterBooleanScreen,
     FilterNumericScreen,
     FilterStringScreen,
+    FilterTemporalScreen,
     FindReplaceScreen,
     FreezeScreen,
     GoToRowScreen,
@@ -4065,6 +4066,11 @@ class DataFrameTable(DataTable):
                 FilterBooleanScreen(self.df[col], cidx, self.cursor_value),
                 callback=self.filter_row_value,
             )
+        elif dc.gtype == "temporal":
+            self.app.push_screen(
+                FilterTemporalScreen(self.df[col], cidx, dc, self.cursor_value),
+                callback=self.filter_row_value,
+            )
         else:
             self.notify(
                 f"Filter by value not implemented for [$warning]{col}[/] with type of [$accent]{dtype}[/].",
@@ -4082,6 +4088,10 @@ class DataFrameTable(DataTable):
         if result is None:
             return
         expr, cidx = result
+
+        if expr is None:
+            self.notify("No filter expression provided.", title="Filter Rows", severity="warning")
+            return
 
         try:
             df_filtered = self.df.lazy().filter(expr).collect()

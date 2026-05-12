@@ -1,7 +1,7 @@
 """Modal screens with Yes/No buttons and their specialized variants."""
 
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .data_frame_table import DataFrameTable
@@ -1137,6 +1137,142 @@ class FilterNumericScreen(YMNScreen):
             gt = self.query_one("#condition-gt", Input).value.strip()
             if gt:
                 e = pl.col(col) > self.dc.convert(gt)
+                expr = e if expr is None else expr & e
+
+        return expr, self.cidx
+
+
+class FilterTemporalScreen(YMNScreen):
+    """A screen for filtering a temporal column."""
+
+    CSS = """
+        FilterTemporalScreen .condition-row {
+            width: auto;
+            height: auto;
+            min-width: 50;
+        }
+
+        FilterTemporalScreen .condition-row Label {
+            width: 2;
+            margin: 1;
+        }
+
+        FilterTemporalScreen .condition-row Input {
+            width: auto;
+            min-width: 48;
+        }
+    """
+
+    def __init__(self, s: pl.Series, cidx: int, dc: DtypeClass, cursor_value: Any | None) -> None:
+        """Initialize the filter temporal column screen.
+
+        Args:
+            s: The source series for the selected temporal column.
+            cidx: The selected column index.
+            dc: Data type configuration for the temporal column.
+            cursor_value: The current cell value used as the default placeholder.
+        """
+        super().__init__(
+            yes="Filter",
+            no="Cancel",
+            on_yes_callback=self._get_input,
+        )
+        self.s = s
+        self.cidx = cidx
+        self.dc = dc
+        self.cursor_value = cursor_value
+
+    def compose(self) -> ComposeResult:
+        """Compose the filter temporal column screen widget structure."""
+        cursor_value = NULL_DISPLAY if self.cursor_value is None else self.cursor_value
+        min_value = self.s.min()
+        max_value = self.s.max()
+
+        with Container(id="filter-temporal-column-container") as container:
+            container.border_title = "Filter Column"
+            yield Horizontal(
+                Label("="),
+                Input(placeholder=f"{cursor_value}", id="condition-eq"),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label("!="),
+                Input(placeholder=f"{cursor_value}", id="condition-neq"),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label("<"),
+                Input(placeholder=f"{max_value}", id="condition-lt", valid_empty=True),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label("<="),
+                Input(placeholder=f"{max_value}", id="condition-lte", valid_empty=True),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label(">="),
+                Input(placeholder=f"{min_value}", id="condition-gte", valid_empty=True),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label(">"),
+                Input(placeholder=f"{min_value}", id="condition-gt", valid_empty=True),
+                classes="condition-row",
+            )
+            yield from super().compose()
+
+    def _temporal_literal(self, value: str) -> pl.Expr:
+        """Build a typed temporal literal for comparisons.
+
+        Args:
+            value: User-provided temporal value as text.
+
+        Returns:
+            A Polars expression parsed to the same dtype as the source series.
+        """
+        if self.s.dtype == pl.Date:
+            return pl.lit(value).str.to_date()
+        elif self.s.dtype == pl.Time:
+            return pl.lit(value).str.to_time()
+        elif self.s.dtype == pl.Datetime:
+            return pl.lit(value).str.to_datetime()
+        else:
+            self.notify(f"Unsupported temporal dtype: {self.s.dtype}")
+            return None
+
+    def _get_input(self) -> tuple[pl.Expr | None, int]:
+        """Handle Yes button/Enter key press."""
+        col = self.s.name
+        expr: pl.Expr | None = None
+
+        eq = self.query_one("#condition-eq", Input).value.strip()
+        if eq and (t := self._temporal_literal(eq)) is not None:
+            expr = pl.col(col).is_null() if eq == NULL else pl.col(col) == t
+        else:
+            neq = self.query_one("#condition-neq", Input).value.strip()
+            if neq and (t := self._temporal_literal(neq)) is not None:
+                e = pl.col(col).is_not_null() if neq == NULL else pl.col(col) != t
+                expr = e if expr is None else expr & e
+
+            lt = self.query_one("#condition-lt", Input).value.strip()
+            if lt and (t := self._temporal_literal(lt)) is not None:
+                e = pl.col(col) < t
+                expr = e if expr is None else expr & e
+
+            lte = self.query_one("#condition-lte", Input).value.strip()
+            if lte and (t := self._temporal_literal(lte)) is not None:
+                e = pl.col(col) <= t
+                expr = e if expr is None else expr & e
+
+            gte = self.query_one("#condition-gte", Input).value.strip()
+            if gte and (t := self._temporal_literal(gte)) is not None:
+                e = pl.col(col) >= t
+                expr = e if expr is None else expr & e
+
+            gt = self.query_one("#condition-gt", Input).value.strip()
+            if gt and (t := self._temporal_literal(gt)) is not None:
+                e = pl.col(col) > t
                 expr = e if expr is None else expr & e
 
         return expr, self.cidx
