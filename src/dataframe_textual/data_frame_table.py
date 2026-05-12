@@ -4178,7 +4178,7 @@ class DataFrameTable(DataTable):
             return
 
         self.app.add_tab(
-            df_filtered.lazy(),
+            df_filtered,
             filename="filtered_results.csv",
             tabname="filtered-results",
             after=self.app.tabbed.active_pane,
@@ -4525,7 +4525,7 @@ class DataFrameTable(DataTable):
         # Show results in new tab if requested
         if new_tab:
             return self.app.add_tab(
-                df_filtered.lazy(),
+                df_filtered,
                 filename="query_results.csv",
                 tabname="query-results",
                 after=self.app.tabbed.active_pane,
