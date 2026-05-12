@@ -226,23 +226,23 @@ class TableScreen(TableModalScreen):
         # Override to disable sorting in TableScreen, but subclasses can still implement their own sorting if desired.
         pass
 
-    def filter_or_send_selected_value(
+    def filter_or_collect_selected_value(
         self, cidx_name_value: tuple[int, str, Any] | None, action: str = "filter"
     ) -> None:
-        """Apply filter or send action by the selected value.
+        """Apply filter or collect action by the selected value.
 
-        Filter or send rows in the main table based on a selected value from
+        Filter or collect rows in the main table based on a selected value from
         this table (typically frequency or row detail). Updates the main table's display
         and notifies the user of the action.
 
         Args:
-            col_name_value: Tuple of (column_index, column_name, column_value) to filter/send by, or None.
-            action: Either "filter" to filter rows, or "send" to send rows. Defaults to "filter".
+            col_name_value: Tuple of (column_index, column_name, column_value) to filter/collect by, or None.
+            action: Either "filter" to filter rows, or "collect" to collect rows. Defaults to "filter".
         """
         if cidx_name_value is None:
             return
         cidx, col_name, col_value = cidx_name_value
-        # self.log(f"Filtering or sending by `{col_name} == {col_value}`")
+        # self.log(f"Filtering or collecting by `{col_name} == {col_value}`")
 
         # Handle NULL values
         if col_value is None or col_value == NULL:
@@ -266,9 +266,9 @@ class TableScreen(TableModalScreen):
             )
             return
 
-        # Action send
-        if action == "send":
-            self.dftable.action_send_rows(cidx, col_value)
+        # Action collect
+        if action == "collect":
+            self.dftable.action_collect_rows(cidx, col_value)
 
         # Action filter
         else:
@@ -347,7 +347,7 @@ class RowDetailScreen(TableScreen):
 
         Supported keys:
           - 'v': Filter the main table by the selected value.
-          - '"': Move the selected value in the main table to a new tab.
+          - '"': Collect the selected value in the main table to a new tab.
           - '{': Move to the previous row.
           - '}': Move to the next row.
           - 'F': Show frequency for the selected value.
@@ -357,10 +357,10 @@ class RowDetailScreen(TableScreen):
             event: The key event object.
         """
         if event.key == "v":
-            self.filter_or_send_selected_value(self.get_cidx_name_value(), action="filter")
+            self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="filter")
             event.stop()
         elif event.key == "quotation_mark":  # '"'
-            self.filter_or_send_selected_value(self.get_cidx_name_value(), action="send")
+            self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="collect")
             event.stop()
         elif event.key == "right_curly_bracket":  # '}'
             # Move to the next row
@@ -577,10 +577,10 @@ class FrequencyScreen(TableScreen):
             self.sort_by_column(descending=True)
             event.stop()
         elif event.key == "v":
-            self.filter_or_send_selected_value(self.get_cidx_name_value(), action="filter")
+            self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="filter")
             event.stop()
         elif event.key == "quotation_mark":  # '"'
-            self.filter_or_send_selected_value(self.get_cidx_name_value(), action="send")
+            self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="collect")
             event.stop()
         elif event.key == "ctrl+s":
             # Save the frequency table to file

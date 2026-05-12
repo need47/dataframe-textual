@@ -109,7 +109,10 @@ def cli() -> argparse.Namespace:
         help="Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100. When used without value, uses all rows for schema inference (can be slow for large files).",
     )
     parser.add_argument(
-        "-I", "--no-inference", action="store_true", help="Do not infer data types when reading CSV/TSV"
+        "-I",
+        "--no-inference",
+        action="store_true",
+        help="Do not infer data types when reading CSV/TSV. All values will be of string type.",
     )
     parser.add_argument(
         "-T", "--truncate-ragged-lines", action="store_true", help="Truncate ragged lines when reading CSV/TSV"
@@ -118,10 +121,10 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "-C",
         "--comment-prefix",
-        metavar="PREFIX",
+        metavar="C",
         nargs="?",
         const="#",
-        help="Skip comment lines starting with `PREFIX` when reading CSV/TSV",
+        help="Skip comment lines starting with `C` when reading CSV/TSV",
     )
     parser.add_argument(
         "-Q",

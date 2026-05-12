@@ -252,12 +252,12 @@ class DataFrameTable(DataTable):
         - **R** - 🔄 Replace across all columns (interactive or all)
         - *(Supports case-insensitive & whole-word matching)*
 
-        ## ⏬ Filter & Send
+        ## ⏬ Filter & Collect
         - **v** - ⏬ Filter rows with cursor value in current column
         - **V** - ⏬ Filter rows with expression
         - **.** - ⏬ Filter rows with non-null values in current column
         - **f** - ⏬ Filter rows by column value
-        - **"** - 📤 Send rows to a new tab
+        - **"** - 📤 Collect rows to a new tab
 
         ## 🔀 Sorting
         - **[** - 🔼 Sort column ascending
@@ -324,12 +324,12 @@ class DataFrameTable(DataTable):
         # Sort
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
-        # Filter & Send
+        # Filter & Collect
         ("v", "filter_rows", "Filter rows with cursor value in current column"),
         ("V", "filter_rows_expr", "Filter rows with expression"),
         ("full_stop", "filter_rows_non_null", "Filter rows with non-null values in current column"),
         ("f", "filter_rows_value", "Filter rows by value"),  # `f`
-        ("quotation_mark", "send_rows", "Send rows to a new tab"),  # `"`
+        ("quotation_mark", "collect_rows", "Collect rows to a new tab"),  # `"`
         # Row Selection
         ("backslash", "select_rows", "Select rows with cell matches or those matching cursor value in current column"),  # `\`
         ("vertical_line", "select_rows_expr", "Select rows with expression"),  # `|`
@@ -958,9 +958,9 @@ class DataFrameTable(DataTable):
         self.do_filter_rows_value()
 
     @wait_full_df
-    def action_send_rows(self, cidx: int = None, term: Any = None) -> None:
-        """Send rows to a new tab based on the current selection or value."""
-        self.do_send_rows(cidx=cidx, term=term)
+    def action_collect_rows(self, cidx: int = None, term: Any = None) -> None:
+        """Collect rows to a new tab based on the current selection or value."""
+        self.do_collect_rows(cidx=cidx, term=term)
 
     def action_edit_cell(self) -> None:
         """Edit the current cell."""
@@ -3833,7 +3833,7 @@ class DataFrameTable(DataTable):
         # Show next confirmation
         self.show_next_replace_confirmation()
 
-    # Filter & Send
+    # Filter & Collect
     def do_filter_rows(self, result: dict | None = None) -> None:
         """Filter rows.
 
@@ -4122,8 +4122,8 @@ class DataFrameTable(DataTable):
             title="Filter Rows",
         )
 
-    def do_send_rows(self, cidx: int | None = None, term: Any = None) -> None:
-        """Send rows to a new tab.
+    def do_collect_rows(self, cidx: int | None = None, term: Any = None) -> None:
+        """Collect rows to a new tab.
 
         If there are selected rows, use those.
         Otherwise, move based on the value provided or the current cell value.

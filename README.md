@@ -15,7 +15,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 
 ### Data Manipulation
 - 📝 **Data Editing** - Edit cells, delete rows, remove columns, and explode columns
-- 🧹 **Duplicate Removal** - Remove duplicate rows while keeping the first occurrence
+- 🧹 **Duplicate Removal** - Remove duplicate rows
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
 - ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts
 - 📈 **Sorting & Statistics** - Multi-column sorting, frequency distribution, and histogram analysis
@@ -95,8 +95,8 @@ dv *.parquet --all-in-one
 ## Command Line Options
 
 ```
-usage: dv [-h] [-V] [-d DELIMITER] [-f FORMAT] [-F [FIELDS ...]] [-H [HEADER ...]] [-L [N]] [-I] [-T] [-E] [-C [PREFIX]] [-Q [C]] [-K N] [-A N] [-M [N]] [-N NULL [NULL ...]] [--theme [THEME]]
-          [--all-in-one] [--expr EXPR] [--sql SQL] [-o OUTPUT]
+usage: dv [-h] [-V] [-d DELIMITER] [-f FORMAT] [-F [FIELDS ...]] [-H [HEADER ...]] [-L [N]] [-I] [-T] [-E] [-C [C]] [-Q [C]] [-K N] [-A N] [-M [N]] [-N NULL [NULL ...]] [--theme [THEME]] [--all-in-one]
+          [--expr EXPR] [--sql SQL] [-o OUTPUT]
           [files ...]
 
 TUI viewer/editor for tabular data (e.g., CSV/Excel).
@@ -118,12 +118,12 @@ options:
                         Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column header (e.g., `-H col1 col2 col3`).
   -L, --infer_schema_length [N]
                         Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100. When used without value, uses all rows for schema inference (can be slow for large files).
-  -I, --no-inference    Do not infer data types when reading CSV/TSV
+  -I, --no-inference    Do not infer data types when reading CSV/TSV. All values will be of string type.
   -T, --truncate-ragged-lines
                         Truncate ragged lines when reading CSV/TSV
   -E, --ignore-errors   Ignore errors when reading CSV/TSV
-  -C, --comment-prefix [PREFIX]
-                        Skip comment lines starting with `PREFIX` when reading CSV/TSV
+  -C, --comment-prefix [C]
+                        Skip comment lines starting with `C` when reading CSV/TSV
   -Q, --quote-char [C]  Use `C` as quote character for reading CSV/TSV. When used without value, disables special handling of quote characters.
   -K, --skip-lines N    Skip first N lines when reading CSV/TSV
   -A, --skip-rows-after-header N
@@ -164,13 +164,13 @@ dv data_no_header.csv -H
 # View headless CSV file with provided header
 dv data_no_header.csv -H country ip requests
 
-# Skip first 3 lines of file (e.g., metadata)
+# Skip first 3 rows (e.g., metadata)
 dv data_with_meta.csv -K 3
 
 # Skip 1 row after header (e.g., units row)
 dv data_with_units.csv -A 1
 
-# Complex CSV with comments and units row
+# Skip 3 rows before header and 1 row after
 dv messy_scientific_data.csv -K 3 -A 1
 
 # Skip comment lines (or just -C)
@@ -182,7 +182,7 @@ dv large_data.csv -I
 # Ignore parsing errors in malformed CSV
 dv data_with_errors.csv -E
 
-# Treat specific values as null/missing (e.g., 'NA', 'N/A')
+# Treat specific values as null (e.g., 'NA', 'N/A')
 dv data.csv -N NA N/A
 
 # Use different quote character (e.g., single quote for CSV)
@@ -223,15 +223,15 @@ dv data.csv -o data.parquet
 | -------------- | ------------------------------------------------------------- |
 | `q`            | Close current tab (prompts to save unsaved changes)           |
 | `Q`            | Close all tabs and quit app (prompts to save unsaved changes) |
+| `Ctrl+Q`       | Force to quit app (regardless of unsaved changes)             |
 | `space`        | Toggle tab bar visibility                                     |
 | `b`            | Next tab                                                      |
 | `B`            | Previous tab                                                  |
 | `>`            | Move current tab right (wrap to first)                        |
 | `<`            | Move current tab left (wrap to last)                          |
-| `Ctrl+Q`       | Force to quit app (regardless of unsaved changes)             |
-| `Ctrl+V`       | Save current view to file                                     |
 | `Ctrl+T`       | Save current tab to file                                      |
 | `Ctrl+S`       | Save all tabs to file                                         |
+| `Ctrl+V`       | Save current view to file                                     |
 | `w`            | Save current tab to file (overwrite without prompt)           |
 | `W`            | Save all tabs to file (overwrite without prompt)              |
 | `Ctrl+D`       | Duplicate current tab                                         |
@@ -257,7 +257,7 @@ dv data.csv -o data.parquet
 | ---------------------------- | -------------------------- |
 | `g`                          | Go to first row            |
 | `G`                          | Go to last row             |
-| `Ctrl + G`                   | Go to row                  |
+| `Ctrl + G`                   | Go to specific row         |
 | `↑` / `↓`                    | Move up/down one row       |
 | `←` / `→`                    | Move left/right one column |
 | `Home` / `End`               | Go to first/last column    |
@@ -277,7 +277,7 @@ dv data.csv -o data.parquet
 
 | Key              | Action                                                                 |
 | ---------------- | ---------------------------------------------------------------------- |
-| `Enter`          | Show details for the current row                                       |
+| `Enter`          | Show details for the current row as two-column key–value pairs         |
 | `Tab`            | Show current cell details; press `Tab` again there to drill deeper     |
 | `F`              | Show frequency distribution for current column                         |
 | `i`              | Show histogram for current column                                      |
@@ -285,8 +285,8 @@ dv data.csv -o data.parquet
 | `s`              | Show statistics for current column                                     |
 | `S`              | Show statistics for entire dataframe                                   |
 | `=`              | Show histogram using first column as label and current column as value |
-| `m`              | Show metadata for row count and column count                           |
-| `M`              | Show metadata for current column                                       |
+| `m`              | Show metadata for file name, row count, and column count               |
+| `M`              | Show metadata for columns (e.g., data types)                           |
 | `K`              | Cycle cursor types: cell → row → column → cell                         |
 | `~`              | Toggle row labels                                                      |
 | `_` (underscore) | Toggle column full width                                               |
@@ -344,14 +344,14 @@ dv data.csv -o data.parquet
 | `r` | Find and replace in current column (interactive or replace all)        |
 | `R` | Find and replace across all columns (interactive or replace all)       |
 
-#### Filter & Send
+#### Filter & Collect
 | Key         | Action                                                      |
 | ----------- | ----------------------------------------------------------- |
 | `v`         | Filter rows Filter rows with cursor value in current column |
 | `V`         | Filter rows with expression                                 |
 | `.`         | Filter rows with non-null values in current column          |
 | `f`         | Filter rows by column value                                 |
-| `"` (quote) | Send rows to a new tab                                      |
+| `"` (quote) | Collect rows to a new tab                                   |
 
 #### Sorting (supporting multiple columns)
 
@@ -397,23 +397,26 @@ dv data.csv -o data.parquet
 
 ### 1. Color-Coded Data Types
 
-Columns are automatically styled based on their data type:
-- **integer**: Cyan text, right-aligned
-- **float**: Yellow text, right-aligned
-- **string**: Green text, left-aligned
-- **boolean**: Blue text, centered
-- **temporal**: Magenta text, centered
+Columns are automatically styled based on their data types:
+
+| Data Type | Text Color | Alignment |
+| --------- | ---------- | --------- |
+| integer   | Cyan       | right     |
+| float     | Yellow     | right     |
+| string    | Green      | left      |
+| boolean   | Blue       | centered  |
+| temporal  | Magenta    | centered  |
 
 ### 2. Row Detail View
 
 Press `Enter` on any row to open a modal showing all column values for that row.
-Useful for examining wide datasets where columns don't fit well on screen.
+Useful for examining wide table where columns don't fit well on screen.
 
 ![Row detail](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/row-detail.png)
 
 **In the Row Detail Modal**:
-- Press `v` to **view** all rows containing the selected column value
-- Press `"` to **filter** all rows containing the selected column value to a new tab
+- Press `v` to **filter** all rows containing the selected column value
+- Press `"` to **collect** all rows containing the selected column value to a new tab
 - Press `{` to move to the previous row
 - Press `}` to move to the next row
 - Press `F` to show the frequency table for the selected column
@@ -425,7 +428,7 @@ Useful for examining wide datasets where columns don't fit well on screen.
 
 Press `Tab` in the main table to inspect the current cell in its own modal.
 
-You can also press `Tab` from the row-detail modal to drill into the selected field.
+You can also press `Tab` from the Row Detail modal to drill into the selected field.
 
 Inside the cell-detail modal, press `Tab` again on the selected row/column to keep drilling into nested values.
 
@@ -437,7 +440,7 @@ Inside the cell-detail modal, press `Tab` again on the selected row/column to ke
 
 ### 4. Row Selection
 
-The application provides multiple modes for selecting rows (marks it for filtering or sending):
+The application provides multiple modes for selecting rows (marks it for filtering or collecting):
 
 - `\` - Select rows with cell matches or those matching cursor value in current column (respects data type)
 - `|` - Opens dialog to select rows with custom expression
@@ -450,8 +453,10 @@ The application provides multiple modes for selecting rows (marks it for filteri
 **Advanced Options**:
 
 When searching or finding, you can use checkboxes in the dialog to enable:
-- **Match Nocase**: Ignore case differences
-- **Match Whole**: Match complete value, not partial substrings or words
+- Match option `Nocase` for case-insensitive matching
+- Match option `Whole` to match full text
+- Match option `Literal` to ignore special regex characters
+- Match option `Reverse` to perform reverse match
 
 These options work with plain text searches. Use Polars regex patterns in expressions for more control. For example, use `(?i)` prefix in regex (e.g., `(?i)john`) for case-insensitive matching.
 
@@ -477,7 +482,11 @@ Replace values in current column (`r`) or across all columns (`R`).
 When you press `r` or `R`, enter:
 1. **Find term**: Value or expression to search for (done by string value)
 2. **Replace term**: Replacement value
-3. **Matching options**: Match Nocase (ignore case), Match Whole (complete match only)
+3. **Matching options**:
+   - `Nocase` for case-insensitive matching
+   - `Whole` to match full text
+   - `Literal` to ignore special regex characters
+   - `Reverse` to perform reverse match
 4. **Replace mode**: All at once or interactive review
 
 **Replace All**:
@@ -490,34 +499,30 @@ When you press `r` or `R`, enter:
 
 **Tips:**
 - Search are done by string value (i.e., ignoring data type)
-- Type `NULL` to replace null/missing values
-- Use `Match Nocase` for case-insensitive matching
-- Use `Match Whole` to avoid partial replacements
+- Type `NULL` to find or replace null values
 - Support undo (`u`)
 
-### 6. Filter & Send
+### 6. Filter & Collect
 
-Both operations show selected rows but with fundamentally different effects:
+Filter and Collect can start from the same set of rows, but they produce different outcomes.
 
-**When to use Filter** (`v` or `V`):
-- Exploring or analyzing data safely in view mode
-- Switching between different perspectives
-- Edits made in view mode are applied to the original dataframe
-- Press `q` to return to main table
-- Press `Ctrl+V` to save current view to a file. This does not affect the main table.
+**Filter** (`v` or `V`) opens a derived view of the current dataframe.
+- Use it to inspect a subset without leaving your current workflow
+- Changes made in the filtered view still apply to the original dataframe
+- Press `q` to leave the filtered view and return to the main table
+- Press `Ctrl+V` to save the current view without replacing the source table
+- Support undo (`u`)
 
-**When to use Send** (`"`):
-- Cleaning data (removing unwanted rows)
-- Creating a trimmed dataset for export in a new tab
-- Edits are independent and do not affect the source dataframe
+**Collect** (`"`) creates a separate tab containing only the chosen rows.
+- Use it when you want a standalone subset for cleanup, export, or comparison
+- The collected tab is independent from the source dataframe
+- Edits in the collected tab do not modify the original table
 
-**Note**:
-- If currently there are no selected rows and no matching cells, the `v` (Filter) and `"` (Send) will use cursor value for search.
-- Both support full undo with `u`.
+If there are no selected rows and no active matches, both Filter and Collect fall back to use the current cell value to search in the current column.
 
 ### 7. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
 
-Complex values or filters can be specified via Polars expressions, with the following adaptions for convenience:
+Complex values, filters, and advanced operations can be specified via Polars expressions, with the following adaptions for convenience:
 
 **Column References:**
 - `$_` - Current column (based on cursor position)
@@ -568,7 +573,7 @@ Complex values or filters can be specified via Polars expressions, with the foll
 - `$percentage >= 50` - Percentage at least 50%
 
 **Null Handling:**
-- `$column.is_null()` - Find null/missing values
+- `$column.is_null()` - Find null values
 - `$column.is_not_null()` - Find non-null values
 - `NULL` - a value to represent null for convenience
 
@@ -581,7 +586,7 @@ Complex values or filters can be specified via Polars expressions, with the foll
 - Press `[` to sort current column ascending
 - Press `]` to sort current column descending
 - Multi-column sorting supported (press multiple times on different columns)
-- Press same key twice to remove the column from sorting
+- Press same key twice to remove the current column from sorting
 
 ### 9. Dataframe & Column Metadata
 
