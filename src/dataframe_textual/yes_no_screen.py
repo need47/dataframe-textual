@@ -1278,6 +1278,136 @@ class FilterTemporalScreen(YMNScreen):
         return expr, self.cidx
 
 
+class FilterListScreen(YMNScreen):
+    """A screen for filtering a list column."""
+
+    CSS = """
+        FilterListScreen Label {
+            width: auto;
+            min-width: 12;
+        }
+
+        FilterListScreen .condition-row {
+            width: auto;
+            height: auto;
+            min-width: 50;
+        }
+
+        FilterListScreen .condition-row Label {
+            width: 10;
+            margin: 1;
+        }
+
+        FilterListScreen .condition-row Input {
+            width: auto;
+            min-width: 40;
+        }
+    """
+
+    def __init__(self, s: pl.Series, cidx: int, cursor_value: Any | None) -> None:
+        """Initialize the filter list column screen.
+
+        Args:
+            s: The source series for the selected list column.
+            cidx: The selected column index.
+            cursor_value: The current cell value used as the default placeholder.
+        """
+        super().__init__(
+            yes="Filter",
+            no="Cancel",
+            on_yes_callback=self._get_input,
+        )
+        self.s = s
+        self.cidx = cidx
+        self.cursor_value = cursor_value
+
+    def compose(self) -> ComposeResult:
+        """Compose the filter list column screen widget structure."""
+        with Container(id="filter-list-column-container") as container:
+            container.border_title = "Filter Column"
+            yield Horizontal(Label("Equals to"), Input(id="condition-eq"), classes="condition-row")
+            yield Horizontal(Label("Not equal"), Input(id="condition-neq"), classes="condition-row")
+            yield Horizontal(Label("Contains"), Input(id="condition-contains"), classes="condition-row")
+            yield Horizontal(Label("Not contains"), Input(id="condition-not-contains"), classes="condition-row")
+            yield from super().compose()
+
+    def _convert_list_item(self, value: str) -> Any:
+        """Convert user input to the list item dtype when possible.
+
+        Args:
+            value: User-provided text value.
+
+        Returns:
+            The converted value, or the original string if no stronger conversion applies.
+        """
+        inner_dtype = getattr(self.s.dtype, "inner", None)
+        if inner_dtype is None:
+            return value
+
+        try:
+            if inner_dtype == pl.Date:
+                return pl.Series([value]).str.to_date().item()
+            if inner_dtype == pl.Time:
+                return pl.Series([value]).str.to_time().item()
+            if inner_dtype == pl.Datetime:
+                return pl.Series([value]).str.to_datetime().item()
+            return DtypeConfig(inner_dtype).convert(value)
+        except Exception:
+            return value
+
+    def _parse_list_literal(self, value: str) -> Any:
+        """Parse a bracketed list literal for exact-list comparisons.
+
+        Args:
+            value: User-provided string expected to look like a Python list.
+
+        Returns:
+            Parsed list value, or the original string if parsing fails.
+        """
+        try:
+            parsed_value = eval(value)
+        except Exception:
+            return value
+
+        return parsed_value if isinstance(parsed_value, list) else value
+
+    def _get_input(self) -> tuple[pl.Expr | None, int]:
+        """Handle Yes button/Enter key press."""
+        col = self.s.name
+        expr: pl.Expr | None = None
+
+        eq = self.query_one("#condition-eq", Input).value.strip()
+        if eq:
+            if eq == NULL:
+                expr = pl.col(col).is_null()
+            elif eq.startswith("[") and eq.endswith("]"):
+                expr = pl.col(col) == self._parse_list_literal(eq)
+            else:
+                expr = pl.col(col).list.contains(self._convert_list_item(eq))
+        else:
+            neq = self.query_one("#condition-neq", Input).value.strip()
+            if neq:
+                if neq == NULL:
+                    e = pl.col(col).is_not_null()
+                elif neq.startswith("[") and neq.endswith("]"):
+                    e = pl.col(col) != self._parse_list_literal(neq)
+                else:
+                    e = ~pl.col(col).list.contains(self._convert_list_item(neq))
+                expr = e if expr is None else expr & e
+
+            contains = self.query_one("#condition-contains", Input).value.strip()
+            if contains:
+                e = pl.col(col).list.contains(self._convert_list_item(contains))
+                expr = e if expr is None else expr & e
+
+            not_contains = self.query_one("#condition-not-contains", Input).value.strip()
+            if not_contains:
+                e = ~pl.col(col).list.contains(self._convert_list_item(not_contains))
+                expr = e if expr is None else expr & e
+
+        return expr, self.cidx
+
+
 class FilterStringScreen(YMNScreen):
     """A screen for filtering a string column."""
 

@@ -70,6 +70,7 @@ from .yes_no_screen import (
     EditColumnScreen,
     ExplodeColumnScreen,
     FilterBooleanScreen,
+    FilterListScreen,
     FilterNumericScreen,
     FilterStringScreen,
     FilterTemporalScreen,
@@ -4084,6 +4085,11 @@ class DataFrameTable(DataTable):
         elif dc.gtype == "temporal":
             self.app.push_screen(
                 FilterTemporalScreen(self.df[col], cidx, dc, self.cursor_value),
+                callback=self.filter_row_value,
+            )
+        elif dtype == pl.List:
+            self.app.push_screen(
+                FilterListScreen(self.df[col], cidx, self.cursor_value),
                 callback=self.filter_row_value,
             )
         else:
