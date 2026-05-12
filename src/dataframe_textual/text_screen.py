@@ -13,11 +13,10 @@ class TextScreen(ModalScreen):
 
         #text-area {
             width: auto;
-            min-width: 48;
-            max-width: 50%;
             height: auto;
+            min-width: 60;
+            max-height: 100%;
             border: solid $primary;
-            border-title-color: $primary;
         }
     """
 
