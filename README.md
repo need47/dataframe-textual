@@ -349,13 +349,13 @@ dv data.csv -o data.parquet
 | `R` | Find and replace across all columns (interactive or replace all)       |
 
 #### Filter & Collect
-| Key         | Action                                                      |
-| ----------- | ----------------------------------------------------------- |
-| `v`         | Filter rows Filter rows with cursor value in current column |
-| `V`         | Filter rows with expression                                 |
-| `.`         | Filter rows with non-null values in current column          |
-| `f`         | Filter rows by column value                                 |
-| `"` (quote) | Collect rows to a new tab                                   |
+| Key         | Action                                                 |
+| ----------- | ------------------------------------------------------ |
+| `v`         | Basic filter using the current cell value              |
+| `V`         | Advanced filter with value or expression               |
+| `.`         | Filter rows with non-null values in the current column |
+| `f`         | Filter rows using values in the current column         |
+| `"` (quote) | Collect rows to a new tab                              |
 
 #### Sorting (supporting multiple columns)
 
@@ -526,21 +526,39 @@ When you press `r` or `R`, enter:
 
 ### 6. Filter & Collect
 
-Filter and Collect can start from the same set of rows, but they produce different outcomes.
+Both actions work on a subset of the original dataframe, but they serve different workflows.
 
-**Filter** (`v` or `V`) opens a derived view of the current dataframe.
-- Use it to inspect a subset without leaving your current workflow
-- Changes made in the filtered view still apply to the original dataframe
+**Filtering options**:
+
+**Basic Filter** (`v`):
+- Opens the chose subset as a derived view inside the current workflow
+- Edits made in the filtered view still apply to the original dataframe
+- Press `Ctrl+V` to save the current view to a file
 - Press `q` to leave the filtered view and return to the main table
-- Press `Ctrl+V` to save the current view without replacing the source table
-- Support undo (`u`)
+- Supports undo with `u`
 
-**Collect** (`"`) creates a separate tab containing only the chosen rows.
-- Use it when you want a standalone subset for cleanup, export, or comparison
+**Advanced Filter** (`V`):
+- Opens a dialog for value-based or expression-based filtering
+- Useful when you want to define the subset directly 
+
+**Column Filter** (`f`):
+- Opens a type-aware filter dialog for the current column
+- Numeric columns support `=`, `!=`, `<`, `<=`, `>=`, and `>`
+- String columns support exact match, prefix, suffix, contains, and regex matching
+- Boolean columns support true, false, and null filtering
+- Temporal columns support the same comparison operators as numeric columns
+- List columns support exact-list matching and item membership checks such as "contains"
+
+**Collect** (`"`):
+- Creates a separate tab containing only the chosen rows
 - The collected tab is independent from the source dataframe
 - Edits in the collected tab do not modify the original table
 
-If there are no selected rows and no active matches, both Filter and Collect fall back to use the current cell value to search in the current column.
+For **Basic Filter** (`v`) and **Collect** (`"`), rows are chosen in this order:
+
+- Use selected rows if any are present
+- Otherwise, use rows with active matches from search or find
+- Otherwise, use rows whose current-column value matches the current cell
 
 ### 7. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
 
