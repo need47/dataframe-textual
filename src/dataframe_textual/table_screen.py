@@ -362,8 +362,8 @@ class RowDetailScreen(TableScreen):
         Supported keys:
           - 'v': Filter the main table by the selected value.
           - '"': Collect the selected value in the main table to a new tab.
-          - 'N': Move to the previous row.
-          - 'n': Move to the next row.
+          - '{': Move to the previous row.
+          - '}': Move to the next row.
           - 'F': Show frequency for the selected value.
           - 's': Show statistics for the selected value.
 
@@ -376,18 +376,18 @@ class RowDetailScreen(TableScreen):
         elif event.key == "quotation_mark":  # '"'
             self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="collect")
             event.stop()
-        elif event.key == "n":  # 'n'
-            # Move to the next row
-            ridx = self.ridx + 1
-            if ridx < len(self.dftable.df):
+        elif event.key == "left_curly_bracket":  # '{'
+            # Move to the previous row
+            ridx = self.ridx - 1
+            if ridx >= 0:
                 self.ridx = ridx
                 self.dftable.move_cursor_to(self.ridx)
                 self.build_table()
             event.stop()
-        elif event.key == "N":  # 'N'
-            # Move to the previous row
-            ridx = self.ridx - 1
-            if ridx >= 0:
+        elif event.key == "right_curly_bracket":  # '}'
+            # Move to the next row
+            ridx = self.ridx + 1
+            if ridx < len(self.dftable.df):
                 self.ridx = ridx
                 self.dftable.move_cursor_to(self.ridx)
                 self.build_table()
