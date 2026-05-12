@@ -439,8 +439,8 @@ Useful for examining wide table where columns don't fit well on screen.
 **In the Row Detail Modal**:
 - Press `v` to **filter** all rows containing the selected column value
 - Press `"` to **collect** all rows containing the selected column value to a new tab
-- Press `{` to move to the previous row
-- Press `}` to move to the next row
+- Press `N` to move to the previous row
+- Press `n` to move to the next row
 - Press `F` to show the frequency table for the selected column
 - Press `s` to show the statistics table for the selected column
 - Press `Tab` to open a cell-detail modal for the selected field
