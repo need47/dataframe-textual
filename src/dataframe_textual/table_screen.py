@@ -165,7 +165,7 @@ class TableModalScreen(ModalScreen):
                     dc = DtypeConfig(dtype)
                     formatted_row.append(dc.format(c, thousand_separator=self.thousand_separator))
 
-            self.table.add_row(*formatted_row, label=str(ridx + 1))
+            self.table.add_row(*formatted_row, key=str(ridx), label=str(ridx + 1))
 
     def sort_by_column(self, descending: bool = False) -> None:
         """Sort the table by the current column.
@@ -403,13 +403,14 @@ class RowDetailScreen(TableScreen):
         elif event.key == "tab":
             ridx = self.ridx
             cidx = self.table.cursor_row
+            col_name = self.dftable.df.columns[cidx]
             dtype = self.dftable.df.dtypes[cidx]
             cell_value = self.dftable.df.item(ridx, cidx)
 
             if dtype == pl.String:
                 # String contains the delimiter '|' (indicating a potential list of values)
                 if "|" in cell_value:
-                    self.app.push_screen(CellDetailScreen(self.dftable.df, ridx, cidx))
+                    self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
                 # Show long string in a text screen for better readability
                 elif len(cell_value) > COLUMN_WIDTH_CAP:
                     self.app.push_screen(TextScreen(cell_value))
@@ -419,11 +420,11 @@ class RowDetailScreen(TableScreen):
                 if len(cell_value) == 1 and isinstance(cell_value[0], str) and len(cell_value[0]) > COLUMN_WIDTH_CAP:
                     self.app.push_screen(TextScreen(cell_value[0]))
                 else:
-                    self.app.push_screen(CellDetailScreen(self.dftable.df, ridx, cidx))
+                    self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
 
             # or a non-empty dict (struct)
             elif dtype == pl.Struct and cell_value:
-                self.app.push_screen(CellDetailScreen(self.dftable.df, ridx, cidx))
+                self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
 
             event.stop()
 
@@ -648,6 +649,7 @@ class FrequencyScreen(TableScreen):
                     highlight_range=(0.0, percentage / 100 * bar_width),
                     width=bar_width,
                 ),
+                key=str(row_idx),
                 label=str(row_idx + 1),
             )
 
@@ -668,6 +670,7 @@ class FrequencyScreen(TableScreen):
                 highlight_range=(0.0, bar_width),
                 width=bar_width,
             ),
+            key="total",
         )
 
     def sort_by_column(self, descending: bool) -> None:
@@ -789,6 +792,7 @@ class HistogramScreen(TableScreen):
                     highlight_range=(0.0, percentage / 100 * bar_width),
                     width=bar_width,
                 ),
+                key=str(row_idx),
                 label=str(row_idx + 1),
             )
 
@@ -809,6 +813,7 @@ class HistogramScreen(TableScreen):
                 highlight_range=(0.0, bar_width),
                 width=bar_width,
             ),
+            key="total",
         )
 
     def save_histogram_table(self) -> None:
@@ -908,6 +913,7 @@ class MetaColumnScreen(TableScreen):
             self.table.add_row(
                 col_name,
                 dc_str.format("Datetime" if str(col_type).startswith("Datetime") else col_type, style=dc.style),
+                key=str(idx),
                 label=str(idx + 1),
             )
 
@@ -928,11 +934,11 @@ class MetaColumnScreen(TableScreen):
 class CellDetailScreen(TableModalScreen):
     """Modal screen to display details of a cell value, including support for nested structures like lists and dicts."""
 
-    def __init__(self, dfsrc: pl.DataFrame, ridx: int, cidx: int, delimiter: str | None = "|") -> None:
+    def __init__(self, col_name: str, dtype: pl.DataType, cell_value: Any, delimiter: str | None = "|") -> None:
         super().__init__()
-        self.dfsrc = dfsrc
-        self.cidx = cidx
-        self.ridx = ridx
+        self.col_name = col_name
+        self.dtype = dtype
+        self.cell_value = cell_value
         self.delimiter = delimiter
 
     def on_mount(self) -> None:
@@ -951,13 +957,14 @@ class CellDetailScreen(TableModalScreen):
         if event.key == "tab":
             cidx = self.table.cursor_column
             ridx = self.table.cursor_row
+            col_name = self.df.columns[cidx]
             dtype = self.df.dtypes[cidx]
             cell_value = self.df.item(ridx, cidx)
 
             if dtype == pl.String:
                 # String contains the delimiter '|' (indicating a potential list of values)
                 if "|" in cell_value:
-                    self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
+                    self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
                 # Show long string in a text screen for better readability
                 elif len(cell_value) > COLUMN_WIDTH_CAP:
                     self.app.push_screen(TextScreen(cell_value))
@@ -967,21 +974,21 @@ class CellDetailScreen(TableModalScreen):
                 if len(cell_value) == 1 and isinstance(cell_value[0], str) and len(cell_value[0]) > COLUMN_WIDTH_CAP:
                     self.app.push_screen(TextScreen(cell_value[0]))
                 else:
-                    self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
+                    self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
 
             # or a non-empty dict (struct)
             elif dtype == pl.Struct and cell_value:
-                self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
+                self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
 
             event.stop()
 
     def build_table(self) -> None:
         """Build the list table."""
-        # Get the column values as a list
-        col_name = self.dfsrc.columns[self.cidx]
-        dtype = self.dfsrc.dtypes[self.cidx]
-        cell_value = self.dfsrc.item(self.ridx, self.cidx)
+        col_name = self.col_name
+        dtype = self.dtype
+        cell_value = self.cell_value
 
+        # Get the column values as a list
         if isinstance(cell_value, pl.Series) and not cell_value.is_empty():
             self.df = pl.DataFrame({col_name: cell_value})
             self.df2table()
@@ -1059,6 +1066,7 @@ class BarScreen(TableModalScreen):
                     highlight_range=(0.0, percentage / 100 * bar_width),
                     width=bar_width,
                 ),
+                key=str(row_idx),
                 label=str(row_idx + 1),
             )
 
@@ -1079,4 +1087,5 @@ class BarScreen(TableModalScreen):
                 highlight_range=(0.0, bar_width),
                 width=bar_width,
             ),
+            key="total",
         )

@@ -1873,15 +1873,15 @@ class DataFrameTable(DataTable):
 
     def do_view_cell_detail(self) -> None:
         """Open a modal screen to view the selected cell's details."""
-        ridx = self.cursor_ridx
         cidx = self.cursor_cidx
+        col_name = self.df.columns[cidx]
         dtype = self.df.dtypes[cidx]
-        cell_value = self.df.item(ridx, cidx)
+        cell_value = self.cursor_value
 
         if dtype == pl.String:
             # String contains the delimiter '|' (indicating a potential list of values)
             if "|" in cell_value:
-                self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
+                self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
             # Show long string in a text screen for better readability
             elif len(cell_value) > COLUMN_WIDTH_CAP:
                 self.app.push_screen(TextScreen(cell_value))
@@ -1891,11 +1891,11 @@ class DataFrameTable(DataTable):
             if len(cell_value) == 1 and isinstance(cell_value[0], str) and len(cell_value[0]) > COLUMN_WIDTH_CAP:
                 self.app.push_screen(TextScreen(cell_value[0]))
             else:
-                self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
+                self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
 
         # or a non-empty dict (struct)
         elif dtype == pl.Struct and cell_value:
-            self.app.push_screen(CellDetailScreen(self.df, ridx, cidx))
+            self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
 
     def do_show_frequency(self, cidx: int | None = None) -> None:
         """Show frequency distribution for a given columnn."""
