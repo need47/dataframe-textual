@@ -636,8 +636,8 @@ class AddColumnScreen(YesNoScreen):
             try:
                 expr = validate_expr(term, self.df.columns, self.cidx, self.df)
                 return self.cidx, col_name, expr
-            except ValueError as e:
-                self.notify(f"Invalid expression [$error]{term}[/]: {str(e)}", title="Add Column", severity="error")
+            except Exception as e:
+                self.notify(f"Invalid expression [$error]{term}[/]: {e}", title="Add Column", severity="error")
             return None
         else:
             # Treat as literal value
@@ -645,9 +645,9 @@ class AddColumnScreen(YesNoScreen):
             try:
                 value = DtypeConfig(dtype).convert(term)
                 return self.cidx, col_name, pl.lit(value)
-            except Exception:
+            except Exception as e:
                 self.notify(
-                    f"Unable to convert [$accent]{term}[/] to [$warning]{dtype}[/]. Cast to string.",
+                    f"Unable to convert [$accent]{term}[/] to [$warning]{dtype}[/]: {e}. Cast to string.",
                     title="Add Column",
                     severity="warning",
                 )

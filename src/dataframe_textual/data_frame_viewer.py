@@ -359,7 +359,7 @@ class DataFrameViewer(App):
                 f"Created new tab with [$accent]{len(df)}[/] rows and [$accent]{len(df.columns)}[/] columns",
                 title="New Tab",
             )
-        except ValueError as e:
+        except Exception as e:
             self.notify(
                 f"Invalid expression [$error]{result}[/]: {str(e)}",
                 title="New Tab",
