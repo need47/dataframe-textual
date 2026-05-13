@@ -548,12 +548,19 @@ class StatisticsScreen(TableScreen):
                 return
 
             # unique count
-            n_unique = lf.select(pl.col(col_name)).collect().n_unique()
+            n_unique = self.dftable.df[col_name].n_unique()
             df_n_unique = pl.DataFrame({"statistic": ["n_unique"], col_name: n_unique}, schema=stats_df.schema)
 
             # total count
             n_total = len(self.dftable.df[col_name])
             df_n_total = pl.DataFrame({"statistic": ["n_total"], col_name: n_total}, schema=stats_df.schema)
+
+            # sum
+            dc = DtypeConfig(self.dftable.df.dtypes[self.cidx])
+            if dc.gtype in ("integer", "float"):
+                sum_value = self.dftable.df[col_name].sum()
+                df_sum = pl.DataFrame({"statistic": ["sum"], col_name: sum_value}, schema=stats_df.schema)
+                stats_df = stats_df.vstack(df_sum)
 
             # total first, then n_unique, then describe stats
             self.df = df_n_total.vstack(df_n_unique).vstack(stats_df)
