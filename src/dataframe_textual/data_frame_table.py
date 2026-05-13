@@ -1264,15 +1264,16 @@ class DataFrameTable(DataTable):
         """
         col_widths, col_label_widths = {}, {}
 
-        # Get available width for the table (with some padding for borders/scrollbar)
-        available_width = self.scrollable_content_region.width or self.app.size.width
-
         # Check if there are any string or list columns to determine if we need to calculate widths
         has_string_or_list_col = any(dtype == pl.String or dtype == pl.List for dtype in self.df.dtypes)
 
         # No string columns, let Textual auto-size all columns
         if not has_string_or_list_col:
             return col_widths
+
+        # Get available width for the table (with some padding for borders/scrollbar)
+        init_available_width = self.scrollable_content_region.width or self.app.size.width
+        available_width = init_available_width
 
         # Sample a reasonable number of rows to calculate widths (don't scan entire dataframe)
         sample_size = min(self.BATCH_SIZE, len(self.df))
@@ -1321,9 +1322,21 @@ class DataFrameTable(DataTable):
 
         # If there's no more available width, auto-size remaining columns
         if available_width < 0:
+            # Recalculate available width after capping wide columns
+            available_width = init_available_width
             for col in col_widths:
                 if col_widths[col] > COLUMN_WIDTH_CAP and col_label_widths[col] < COLUMN_WIDTH_CAP:
                     col_widths[col] = COLUMN_WIDTH_CAP  # Cap width to prevent extremely wide columns
+                available_width -= col_widths[col]
+
+        # If there's still available width, distribute it proportionally to columns that are above the cap
+        if available_width > BUFFER_SIZE:
+            flexible_cols = [col for col in col_widths if col_widths[col] >= COLUMN_WIDTH_CAP]
+            if flexible_cols:
+                extra_width_per_col = (available_width - BUFFER_SIZE) // len(flexible_cols)
+                for col in flexible_cols:
+                    new_width = col_widths[col] + extra_width_per_col
+                    col_widths[col] = max(new_width, COLUMN_WIDTH_CAP)
 
         return col_widths
 
