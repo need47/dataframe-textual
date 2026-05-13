@@ -675,20 +675,20 @@ This is useful for:
 
 ### 11. Column & Dataframe Statistics
 
-Show summary statistics (count, null count, mean, median, std, min, max, etc.) using Polars' `describe()` method.
-- `s` for the current column
-- `S` for all columns across the entire dataframe
+Show summary statistics such as count, null count, mean, median, standard deviation, min, and max using Polars' `describe()` method.
+- `s` shows statistics for the current column, with an additional `sum` field for numeric columns
+- `S` shows statistics for all columns in the dataframe
 
 **In the Statistics Modal**:
 - Use arrow keys to navigate
 - Press `q` or `Escape` to close the modal
 
 This is useful for:
-- Understanding data distributions and characteristics
+- Understanding data distributions and overall column behavior
 - Identifying outliers and anomalies
-- Data quality assessment
-- Quick statistical summaries without external tools
-- Comparing statistics across columns
+- Checking data quality quickly
+- Reviewing summary statistics without leaving the TUI
+- Comparing columns at a glance
 
 ### 12. Editing
 
