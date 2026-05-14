@@ -835,7 +835,8 @@ def load_dataframe(
         )
 
         if all_in_one:
-            lfs_aio.extend([src.lf for src in ds])
+            # For all-in-one, add a column to keep track of the source filename for each row
+            lfs_aio.extend([src.lf.with_columns(pl.lit(src.filename).alias("^_FILE_^")) for src in ds])
         else:
             data.extend(ds)
 
