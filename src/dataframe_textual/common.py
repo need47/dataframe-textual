@@ -792,6 +792,8 @@ def load_dataframe(
     data: list[Source] = []
     lfs_aio = []
     prefix_sheet = len(filenames) > 1
+    # If all_in_one, only load first sheet for each file to ensure consistent structure
+    first_sheet = all_in_one
 
     # Read files individually
     for filename in filenames:
@@ -814,6 +816,7 @@ def load_dataframe(
         # Load the file
         ds = load_file(
             source,
+            first_sheet=first_sheet,
             prefix_sheet=prefix_sheet,
             delimiter=delimiter,
             format=format,
