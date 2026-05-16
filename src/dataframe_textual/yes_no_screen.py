@@ -15,7 +15,7 @@ from textual.widgets import Button, Checkbox, Input, Label, RadioButton, RadioSe
 from textual.widgets.selection_list import Selection
 from textual.widgets.tabbed_content import ContentTab
 
-from .common import NULL, NULL_DISPLAY, RID, DtypeClass, DtypeConfig, tentative_expr, validate_expr
+from .common import NULL, RID, DtypeClass, DtypeConfig, tentative_expr, validate_expr
 
 
 class YMNScreen(ModalScreen):
@@ -1063,11 +1063,10 @@ class FilterNumericScreen(YMNScreen):
         self.s = s
         self.cidx = cidx
         self.dc = dc
-        self.cursor_value = cursor_value
+        self.placeholder = NULL if cursor_value is None else str(cursor_value)
 
     def compose(self) -> ComposeResult:
         """Compose the filter numeric column screen widget structure."""
-        cursor_value = NULL_DISPLAY if self.cursor_value is None else self.cursor_value
         min_value = self.s.min()
         max_value = self.s.max()
 
@@ -1075,12 +1074,12 @@ class FilterNumericScreen(YMNScreen):
             container.border_title = "Filter Column"
             yield Horizontal(
                 Label("="),
-                Input(placeholder=f"{cursor_value}", id="condition-eq"),
+                Input(placeholder=self.placeholder, id="condition-eq"),
                 classes="condition-row",
             )
             yield Horizontal(
                 Label("!="),
-                Input(placeholder=f"{cursor_value}", id="condition-neq"),
+                Input(placeholder=self.placeholder, id="condition-neq"),
                 classes="condition-row",
             )
             yield Horizontal(
@@ -1180,11 +1179,10 @@ class FilterTemporalScreen(YMNScreen):
         self.s = s
         self.cidx = cidx
         self.dc = dc
-        self.cursor_value = cursor_value
+        self.placeholder = NULL if cursor_value is None else str(cursor_value)
 
     def compose(self) -> ComposeResult:
         """Compose the filter temporal column screen widget structure."""
-        cursor_value = NULL_DISPLAY if self.cursor_value is None else self.cursor_value
         min_value = self.s.min()
         max_value = self.s.max()
 
@@ -1192,12 +1190,12 @@ class FilterTemporalScreen(YMNScreen):
             container.border_title = "Filter Column"
             yield Horizontal(
                 Label("="),
-                Input(placeholder=f"{cursor_value}", id="condition-eq"),
+                Input(placeholder=self.placeholder, id="condition-eq"),
                 classes="condition-row",
             )
             yield Horizontal(
                 Label("!="),
-                Input(placeholder=f"{cursor_value}", id="condition-neq"),
+                Input(placeholder=self.placeholder, id="condition-neq"),
                 classes="condition-row",
             )
             yield Horizontal(
@@ -1462,42 +1460,40 @@ class FilterStringScreen(YMNScreen):
         )
         self.s = s
         self.cidx = cidx
-        self.cursor_value = cursor_value
+        self.placeholder = NULL if cursor_value is None else str(cursor_value)
 
     def compose(self) -> ComposeResult:
         """Compose the filter string column screen widget structure."""
-        cursor_value = NULL_DISPLAY if self.cursor_value is None else self.cursor_value
-
         with Container(id="filter-string-column-container") as container:
             container.border_title = "Filter Column"
             yield Horizontal(
                 Label("Equals to"),
-                Input(placeholder=f"{cursor_value}", id="condition-eq"),
+                Input(placeholder=self.placeholder, id="condition-eq"),
                 classes="condition-row",
             )
             yield Horizontal(
                 Label("Not equal to"),
-                Input(placeholder=f"{cursor_value}", id="condition-neq"),
+                Input(placeholder=self.placeholder, id="condition-neq"),
                 classes="condition-row",
             )
             yield Horizontal(
                 Label("Starts with"),
-                Input(placeholder=f"{cursor_value}", id="condition-startswith"),
+                Input(placeholder=self.placeholder, id="condition-startswith"),
                 classes="condition-row",
             )
             yield Horizontal(
                 Label("Ends with"),
-                Input(placeholder=f"{cursor_value}", id="condition-endswith"),
+                Input(placeholder=self.placeholder, id="condition-endswith"),
                 classes="condition-row",
             )
             yield Horizontal(
                 Label("Contains"),
-                Input(placeholder=f"{cursor_value}", id="condition-contains"),
+                Input(placeholder=self.placeholder, id="condition-contains"),
                 classes="condition-row",
             )
             yield Horizontal(
                 Label("Regex"),
-                Input(id="condition-regex"),
+                Input(placeholder=self.placeholder, id="condition-regex"),
                 classes="condition-row",
             )
             yield Label("Match options:", id="match-options-label")
@@ -1613,7 +1609,7 @@ class FilterBooleanScreen(YMNScreen):
                 yield RadioButton("True", id="radio-true", value=self.cursor_value is True)
                 yield RadioButton("False", id="radio-false", value=self.cursor_value is False)
                 if has_null:
-                    yield RadioButton(NULL_DISPLAY, id="radio-null", value=self.cursor_value is None)
+                    yield RadioButton(NULL, id="radio-null", value=self.cursor_value is None)
             yield from super().compose()
 
     def _get_input(self) -> tuple[pl.Expr | None, int]:
