@@ -465,10 +465,10 @@ class SearchScreen(YesNoScreen):
             label=label,
             input=term,
             label2="Match options:",
-            checkbox="Nocase",
-            checkbox2="Whole",
-            checkbox3="Literal",
-            checkbox4="Reverse",
+            checkbox=Checkbox("Nocase", id="checkbox-nocase", tooltip="Ignore letter case when matching"),
+            checkbox2=Checkbox("Whole", id="checkbox-whole", tooltip="Match whole words only"),
+            checkbox3=Checkbox("Literal", id="checkbox-literal", tooltip="Treat input as plain text instead of regex"),
+            checkbox4=Checkbox("Reverse", id="checkbox-reverse", tooltip="Invert the match result"),
             on_yes_callback=self._get_input,
         )
 
@@ -702,9 +702,9 @@ class FindReplaceScreen(YesNoScreen):
             label2="Replace with",
             input2="new value or expression",
             label3="Match options:",
-            checkbox="Nocase",
-            checkbox2="Whole",
-            checkbox3="Literal",
+            checkbox=Checkbox("Nocase", id="checkbox-nocase", tooltip="Ignore letter case when matching"),
+            checkbox2=Checkbox("Whole", id="checkbox-whole", tooltip="Match whole words only"),
+            checkbox3=Checkbox("Literal", id="checkbox-literal", tooltip="Treat input as plain text instead of regex"),
             yes="Replace",
             maybe="Replace All",
             no="Cancel",
@@ -1071,7 +1071,7 @@ class FilterNumericScreen(YMNScreen):
         max_value = self.s.max()
 
         with Container(id="filter-numeric-column-container") as container:
-            container.border_title = "Filter Column"
+            container.border_title = "Filter Rows by Column Value"
             yield Horizontal(
                 Label("="),
                 Input(
@@ -1195,7 +1195,7 @@ class FilterTemporalScreen(YMNScreen):
         max_value = self.s.max()
 
         with Container(id="filter-temporal-column-container") as container:
-            container.border_title = "Filter Column"
+            container.border_title = "Filter Rows by Column Value"
             yield Horizontal(
                 Label("="),
                 Input(
@@ -1338,7 +1338,7 @@ class FilterListScreen(YMNScreen):
     def compose(self) -> ComposeResult:
         """Compose the filter list column screen widget structure."""
         with Container(id="filter-list-column-container") as container:
-            container.border_title = "Filter Column"
+            container.border_title = "Filter Rows by Column Value"
             yield Horizontal(
                 Label("Equals to"),
                 Input(
@@ -1468,7 +1468,6 @@ class FilterStringScreen(YMNScreen):
         FilterStringScreen #checkbox-container {
             margin: 0 0 1 0;
             height: auto;
-            align: left middle;
             width: auto;
         }
 
@@ -1495,7 +1494,7 @@ class FilterStringScreen(YMNScreen):
     def compose(self) -> ComposeResult:
         """Compose the filter string column screen widget structure."""
         with Container(id="filter-string-column-container") as container:
-            container.border_title = "Filter Column"
+            container.border_title = "Filter Rows by Column Value"
             yield Horizontal(
                 Label("Equals to"),
                 Input(
@@ -1536,9 +1535,9 @@ class FilterStringScreen(YMNScreen):
             )
             yield Label("Match options:", id="match-options-label")
             with Horizontal(id="checkbox-container"):
-                yield Checkbox("Nocase", id="checkbox-nocase")
-                yield Checkbox("Literal", id="checkbox-literal")
-                yield Checkbox("Reverse", id="checkbox-reverse")
+                yield Checkbox("Nocase", id="checkbox-nocase", tooltip="Ignore letter case when matching")
+                yield Checkbox("Literal", id="checkbox-literal", tooltip="Treat input as plain text instead of regex")
+                yield Checkbox("Reverse", id="checkbox-reverse", tooltip="Invert the match result")
             yield from super().compose()
 
     def _get_input(self) -> pl.Expr | None:
@@ -1642,7 +1641,7 @@ class FilterBooleanScreen(YMNScreen):
         has_null = self.s.null_count() > 0
 
         with Container(id="filter-boolean-column-container") as container:
-            container.border_title = "Filter Column"
+            container.border_title = "Filter Rows by Column Value"
             with RadioSet(id="boolean-radio-set"):
                 yield RadioButton("True", id="radio-true", value=self.cursor_value is True)
                 yield RadioButton("False", id="radio-false", value=self.cursor_value is False)
