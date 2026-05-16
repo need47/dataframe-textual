@@ -1074,12 +1074,20 @@ class FilterNumericScreen(YMNScreen):
             container.border_title = "Filter Column"
             yield Horizontal(
                 Label("="),
-                Input(placeholder=self.placeholder, id="condition-eq"),
+                Input(
+                    placeholder=self.placeholder,
+                    id="condition-eq",
+                    tooltip="Enter a value to filter rows where the column is equal to that value. Use NULL to filter null values.",
+                ),
                 classes="condition-row",
             )
             yield Horizontal(
                 Label("!="),
-                Input(placeholder=self.placeholder, id="condition-neq"),
+                Input(
+                    placeholder=self.placeholder,
+                    id="condition-neq",
+                    tooltip="Enter a value to filter rows where the column is not equal to that value. Use NULL to filter null values.",
+                ),
                 classes="condition-row",
             )
             yield Horizontal(
@@ -1190,12 +1198,20 @@ class FilterTemporalScreen(YMNScreen):
             container.border_title = "Filter Column"
             yield Horizontal(
                 Label("="),
-                Input(placeholder=self.placeholder, id="condition-eq"),
+                Input(
+                    placeholder=self.placeholder,
+                    id="condition-eq",
+                    tooltip="Enter a value to filter rows where the column is equal to that value. Use NULL to filter null values.",
+                ),
                 classes="condition-row",
             )
             yield Horizontal(
                 Label("!="),
-                Input(placeholder=self.placeholder, id="condition-neq"),
+                Input(
+                    placeholder=self.placeholder,
+                    id="condition-neq",
+                    tooltip="Enter a value to filter rows where the column is not equal to that value. Use NULL to filter null values.",
+                ),
                 classes="condition-row",
             )
             yield Horizontal(
@@ -1323,8 +1339,22 @@ class FilterListScreen(YMNScreen):
         """Compose the filter list column screen widget structure."""
         with Container(id="filter-list-column-container") as container:
             container.border_title = "Filter Column"
-            yield Horizontal(Label("Equals to"), Input(id="condition-eq"), classes="condition-row")
-            yield Horizontal(Label("Not equal"), Input(id="condition-neq"), classes="condition-row")
+            yield Horizontal(
+                Label("Equals to"),
+                Input(
+                    id="condition-eq",
+                    tooltip="Enter a value to filter rows where the column is equal to that value. Use NULL to filter null values.",
+                ),
+                classes="condition-row",
+            )
+            yield Horizontal(
+                Label("Not equal"),
+                Input(
+                    id="condition-neq",
+                    tooltip="Enter a value to filter rows where the column is not equal to that value. Use NULL to filter null values.",
+                ),
+                classes="condition-row",
+            )
             yield Horizontal(Label("Contains"), Input(id="condition-contains"), classes="condition-row")
             yield Horizontal(Label("Not contains"), Input(id="condition-not-contains"), classes="condition-row")
             yield from super().compose()
@@ -1468,12 +1498,20 @@ class FilterStringScreen(YMNScreen):
             container.border_title = "Filter Column"
             yield Horizontal(
                 Label("Equals to"),
-                Input(placeholder=self.placeholder, id="condition-eq"),
+                Input(
+                    placeholder=self.placeholder,
+                    id="condition-eq",
+                    tooltip="Enter a value to filter rows where the column is equal to that value. Use NULL to filter null values.",
+                ),
                 classes="condition-row",
             )
             yield Horizontal(
                 Label("Not equal to"),
-                Input(placeholder=self.placeholder, id="condition-neq"),
+                Input(
+                    placeholder=self.placeholder,
+                    id="condition-neq",
+                    tooltip="Enter a value to filter rows where the column is not equal to that value. Use NULL to filter null values.",
+                ),
                 classes="condition-row",
             )
             yield Horizontal(
