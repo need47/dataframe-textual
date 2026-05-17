@@ -515,13 +515,15 @@ class StatisticsScreen(TableScreen):
         self.table.cursor_type = "column" if self.cidx is None else "row"
 
     def build_df(self) -> pl.DataFrame:
-        """Get the dataframe to use for statistics, applying any necessary filters."""
+        """Get the dataframe to use for statistics."""
         if self.cidx is None:
             lf = self.dftable.df.lazy().select(pl.exclude(RID))
 
             # Apply only to non-hidden columns
             if self.dftable.hidden_columns:
                 lf = lf.select(pl.exclude(self.dftable.hidden_columns))
+
+            source_schema = lf.collect_schema()
 
             # Get dataframe statistics
             stats_df = lf.describe()
@@ -536,8 +538,52 @@ class StatisticsScreen(TableScreen):
             df_n_unique.insert_column(0, pl.Series("statistic", ["n_unique"]))
             df_n_unique = df_n_unique.cast(stats_df.schema)
 
-            # total first, then n_unique, then describe stats
-            self.df = df_n_total.vstack(df_n_unique).vstack(stats_df)
+            # sum
+            sum_exprs: list[pl.Expr] = [pl.lit("sum").alias("statistic")]
+            for col_name, dtype in source_schema.items():
+                dc = DtypeConfig(dtype)
+                if dc.gtype in ("integer", "float"):
+                    sum_exprs.append(pl.col(col_name).sum().alias(col_name))
+                else:
+                    sum_exprs.append(pl.lit(None).alias(col_name))
+
+            df_sum = lf.select(sum_exprs).collect().cast(stats_df.schema)
+
+            # fill rate
+            fill_exprs: list[pl.Expr] = [pl.lit("fill%").alias("statistic")]
+            for col_name, dtype in source_schema.items():
+                fill_expr = pl.col(col_name).count().truediv(pl.len()) * 100
+                dc = DtypeConfig(dtype)
+                if dc.gtype in ("integer", "float"):
+                    fill_exprs.append(fill_expr.alias(col_name))
+                else:
+                    fill_exprs.append(fill_expr.round(1).cast(pl.String).alias(col_name))
+
+            df_fill = lf.select(fill_exprs).collect().cast(stats_df.schema)
+
+            # min_length and max_length
+            min_length_exprs: list[pl.Expr] = [pl.lit("min_length").alias("statistic")]
+            max_length_exprs: list[pl.Expr] = [pl.lit("max_length").alias("statistic")]
+            for col_name, dtype in source_schema.items():
+                min_length_exprs.append(pl.col(col_name).cast(pl.String).str.len_chars().min().alias(col_name))
+                max_length_exprs.append(pl.col(col_name).cast(pl.String).str.len_chars().max().alias(col_name))
+
+            df_min_length = lf.select(min_length_exprs).collect().cast(stats_df.schema)
+            df_max_length = lf.select(max_length_exprs).collect().cast(stats_df.schema)
+
+            # vstack
+            self.df = pl.concat(
+                [
+                    df_n_unique,
+                    df_n_total,
+                    stats_df,
+                    df_sum,
+                    df_fill,
+                    df_min_length,
+                    df_max_length,
+                ]
+            )
+
         else:
             col_name = self.dftable.df.columns[self.cidx]
             lf = self.dftable.df.lazy()
@@ -560,10 +606,37 @@ class StatisticsScreen(TableScreen):
             if dc.gtype in ("integer", "float"):
                 sum_value = self.dftable.df[col_name].sum()
                 df_sum = pl.DataFrame({"statistic": ["sum"], col_name: sum_value}, schema=stats_df.schema)
-                stats_df = stats_df.vstack(df_sum)
+            else:
+                df_sum = pl.DataFrame({"statistic": ["sum"], col_name: None}, schema=stats_df.schema)
+
+            # fill rate
+            fill_rate = self.dftable.df[col_name].count() / n_total * 100
+            if dc.gtype in ("integer", "float"):
+                df_fill = pl.DataFrame({"statistic": ["fill%"], col_name: fill_rate}, schema=stats_df.schema)
+            else:
+                df_fill = pl.DataFrame(
+                    {"statistic": ["fill%"], col_name: str(round(fill_rate, 1))}, schema=stats_df.schema
+                )
+
+            # min_length and max_length
+            min_length = self.dftable.df[col_name].cast(pl.String).str.len_chars().min()
+            max_length = self.dftable.df[col_name].cast(pl.String).str.len_chars().max()
+
+            df_min_length = pl.DataFrame({"statistic": ["min_length"], col_name: min_length}, schema=stats_df.schema)
+            df_max_length = pl.DataFrame({"statistic": ["max_length"], col_name: max_length}, schema=stats_df.schema)
 
             # total first, then n_unique, then describe stats
-            self.df = df_n_total.vstack(df_n_unique).vstack(stats_df)
+            self.df = pl.concat(
+                [
+                    df_n_unique,
+                    df_n_total,
+                    stats_df,
+                    df_sum,
+                    df_fill,
+                    df_min_length,
+                    df_max_length,
+                ]
+            )
 
 
 class FrequencyScreen(TableScreen):
