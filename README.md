@@ -1,6 +1,6 @@
 # DataFrame Textual
 
-A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet](https://parquet.apache.org/)/[Vortex](https://vortex.dev/)/JSON/[NDJSON](https://jsonlines.org/) built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring tabular data directly in terminal with multi-tab support for multiple files!
+A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet](https://parquet.apache.org/)/[Vortex](https://vortex.dev/)/JSON/[NDJSON](https://jsonlines.org/) built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring and analyzing tabular data directly in terminal with multi-tab support for multiple files!
 
 ![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshot.png)
 
@@ -539,7 +539,7 @@ Both actions work on a subset of the original dataframe, but they serve differen
 
 **Advanced Filter** (`V`):
 - Opens a dialog for value-based or expression-based filtering
-- Useful when you want to define the subset directly 
+- Useful when you want to define the subset directly
 
 **Column Filter** (`f`):
 - Opens a type-aware filter dialog for the current column
@@ -736,7 +736,7 @@ This is useful for:
 
 **Remove Duplicate Rows** (`Ctrl+Delete`):
 - Removes duplicated rows while keeping the first occurrence
-- Compares row values across the visible columns 
+- Compares row values across the visible columns
 - Useful for quick deduplication before further editing, collecting, or exporting
 - Supports undo with `u`
 
@@ -923,6 +923,7 @@ dv partially_broken.csv -E
 - **textual**: Terminal UI framework
 - **fastexcel**: Read Excel files
 - **xlsxwriter**: Write Excel files
+- **vortex-data**: Read/Write Vortex files
 
 ## Requirements
 

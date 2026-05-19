@@ -37,7 +37,7 @@ dependencies = [
     "fastexcel>=0.16.0",
     "xlsxwriter>=3.2.9",
     "textual[syntax]>=8.0.2",
-    "vortex-data>=0.60.0",
+    "vortex-data>=0.71.0",
 ]
 
 [project.urls]
