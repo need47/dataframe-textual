@@ -1514,6 +1514,11 @@ class FilterStringScreen(YMNScreen):
                 classes="condition-row",
             )
             yield Horizontal(
+                Label("Contains"),
+                Input(placeholder=self.placeholder, id="condition-contains"),
+                classes="condition-row",
+            )
+            yield Horizontal(
                 Label("Starts with"),
                 Input(placeholder=self.placeholder, id="condition-startswith"),
                 classes="condition-row",
@@ -1521,11 +1526,6 @@ class FilterStringScreen(YMNScreen):
             yield Horizontal(
                 Label("Ends with"),
                 Input(placeholder=self.placeholder, id="condition-endswith"),
-                classes="condition-row",
-            )
-            yield Horizontal(
-                Label("Contains"),
-                Input(placeholder=self.placeholder, id="condition-contains"),
                 classes="condition-row",
             )
             yield Horizontal(
@@ -1574,6 +1574,13 @@ class FilterStringScreen(YMNScreen):
                 )
                 expr = e if expr is None else expr & e
 
+            contains = self.query_one("#condition-contains", Input).value
+            if contains:
+                if match_nocase:
+                    contains = f"(?i){contains}"
+                e = pl.col(col).str.contains(contains, literal=match_literal)
+                expr = e if expr is None else expr & e
+
             startswith = self.query_one("#condition-startswith", Input).value
             if startswith:
                 if match_nocase:
@@ -1586,13 +1593,6 @@ class FilterStringScreen(YMNScreen):
                 if match_nocase:
                     endswith = f"(?i){endswith}$"
                 e = pl.col(col).str.contains(endswith, literal=match_literal)
-                expr = e if expr is None else expr & e
-
-            contains = self.query_one("#condition-contains", Input).value
-            if contains:
-                if match_nocase:
-                    contains = f"(?i){contains}"
-                e = pl.col(col).str.contains(contains, literal=match_literal)
                 expr = e if expr is None else expr & e
 
             regex = self.query_one("#condition-regex", Input).value
