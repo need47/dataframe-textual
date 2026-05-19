@@ -4520,7 +4520,7 @@ class DataFrameTable(DataTable):
         """
 
         sql = sql.replace("$#", f"(`{RID}` + 1)")
-        if RID not in sql and "*" not in sql:
+        if RID not in sql and "*" not in sql and "group by" not in sql.lower():
             # Ensure RID is selected
             import re
 
@@ -4529,7 +4529,7 @@ class DataFrameTable(DataTable):
 
         # Execute the SQL query
         try:
-            df_filtered = self.df.lazy().sql(sql).collect()
+            df_filtered = add_rid_column(self.df.lazy().sql(sql)).collect()
             if len(df_filtered) == 0:
                 self.notify(
                     f"SQL query returned no results for [$warning]{sql}[/]", title="SQL Query", severity="warning"
