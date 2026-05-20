@@ -1848,7 +1848,7 @@ class DataFrameTable(DataTable):
         # Restore state
         self.apply_history(history)
 
-        self.notify(f"Reverted: {history.description}", title="Undo")
+        self.notify(history.description, title="Undo", markup=False)
 
     def do_redo(self) -> None:
         """Redo the last undone action."""
@@ -1866,7 +1866,7 @@ class DataFrameTable(DataTable):
         # Restore state
         self.apply_history(history)
 
-        self.notify(f"Reapplied: {description}", title="Redo")
+        self.notify(description, title="Redo", markup=False)
 
     def do_reset(self) -> None:
         """Reset the table to the initial state."""
@@ -2025,11 +2025,11 @@ class DataFrameTable(DataTable):
         fixed_rows, fixed_columns = result
 
         if fixed_rows > 0 and fixed_columns > 0:
-            descr = f"Freezed [$success]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns"
+            descr = f"Freeze [$success]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns"
         elif fixed_rows > 0:
-            descr = f"Freezed [$success]{fixed_rows}[/] rows"
+            descr = f"Freeze [$success]{fixed_rows}[/] rows"
         elif fixed_columns > 0:
-            descr = f"Freezed [$success]{fixed_columns}[/] columns"
+            descr = f"Freeze [$success]{fixed_columns}[/] columns"
         else:
             return
 
@@ -2051,7 +2051,7 @@ class DataFrameTable(DataTable):
         col_idx = self.cursor_column
 
         # Add to history
-        self.add_history(f"Hid column [$success]{col_name}[/]")
+        self.add_history(f"Hide column [$success]{col_name}[/]")
 
         # Remove the column from the table display (but keep in dataframe)
         self.remove_column(col_key)
@@ -2182,7 +2182,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self.add_history("Showed hidden column(s)")
+        self.add_history("Show hidden column(s)")
 
         # Clear hidden columns tracking
         self.hidden_columns.clear()
@@ -2190,7 +2190,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        # self.notify("Showed hidden column(s)", title="Show Hidden Column(s)")
+        # self.notify("Show hidden column(s)", title="Show Hidden Column(s)")
 
     # Sort
     def do_sort_by_column(self, descending: bool = False) -> None:
@@ -2210,7 +2210,7 @@ class DataFrameTable(DataTable):
         old_desc = self.sorted_columns.get(col_name)
 
         # Add to history
-        self.add_history(f"Sorted on column [$success]{col_name}[/]", dirty=True)
+        self.add_history(f"Sort on column [$success]{col_name}[/]", dirty=True)
 
         # New column - add to sort
         if old_desc is None:
@@ -2281,7 +2281,7 @@ class DataFrameTable(DataTable):
         col_name = self.df.columns[cidx]
 
         # Add to history
-        self.add_history(f"Edited cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
+        self.add_history(f"Edit cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
 
         # Update the cell in the dataframe
         try:
@@ -2375,7 +2375,7 @@ class DataFrameTable(DataTable):
                 expr = pl.lit(str(term))
 
         # Add to history
-        self.add_history(f"Edited column [$success]{col_name}[/] with expression", dirty=True)
+        self.add_history(f"Edit column [$success]{col_name}[/] with expression", dirty=True)
 
         try:
             # Apply the expression to the column
@@ -2429,7 +2429,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self.add_history(f"Renamed column [$success]{col_name}[/] to [$accent]{new_name}[/]", dirty=True)
+        self.add_history(f"Rename column [$success]{col_name}[/] to [$accent]{new_name}[/]", dirty=True)
 
         # Rename the column in the dataframe
         self.df = self.df.rename({col_name: new_name})
@@ -2470,7 +2470,7 @@ class DataFrameTable(DataTable):
         dtype = self.cursor_col_dtype
 
         # Add to history
-        self.add_history(f"Cleared cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
+        self.add_history(f"Clear cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
 
         # Update the cell to None in the dataframe
         try:
@@ -2519,7 +2519,7 @@ class DataFrameTable(DataTable):
         value = self.cursor_value
 
         # Add to history
-        self.add_history(f"Cleared column [$success]{col_name}[/]", dirty=True)
+        self.add_history(f"Clear column [$success]{col_name}[/]", dirty=True)
 
         try:
             # Update the entire column to None in the dataframe
@@ -2565,7 +2565,7 @@ class DataFrameTable(DataTable):
             new_col_name = col_name
 
         # Add to history
-        self.add_history(f"Added column [$success]{new_col_name}[/] after column [$accent]{cidx + 1}[/]", dirty=True)
+        self.add_history(f"Add column [$success]{new_col_name}[/] after column [$accent]{cidx + 1}[/]", dirty=True)
 
         try:
             # Create an empty column (all None values)
@@ -2614,7 +2614,7 @@ class DataFrameTable(DataTable):
         cidx, new_col_name, expr = result
 
         # Add to history
-        self.add_history(f"Added column [$success]{new_col_name}[/] with expression [$accent]{expr}[/].", dirty=True)
+        self.add_history(f"Add column [$success]{new_col_name}[/] with expression [$accent]{expr}[/].", dirty=True)
 
         try:
             # Create the column
@@ -2675,7 +2675,7 @@ class DataFrameTable(DataTable):
         cidx, new_col_name, link_template = result
 
         self.add_history(
-            f"Added link column [$success]{new_col_name}[/] with template [$accent]{link_template}[/].", dirty=True
+            f"Add link column [$success]{new_col_name}[/] with template [$accent]{link_template}[/].", dirty=True
         )
 
         try:
@@ -2745,7 +2745,7 @@ class DataFrameTable(DataTable):
                 col_names_to_remove.append(col_key.value)
                 col_keys_to_remove.append(col_key)
 
-            message = f"Removed column [$success]{col_name}[/] and all columns before"
+            message = f"Remove column [$success]{col_name}[/] and all columns before"
 
         # Remove all columns after the current column
         elif more == "after":
@@ -2754,13 +2754,13 @@ class DataFrameTable(DataTable):
                 col_names_to_remove.append(col_key.value)
                 col_keys_to_remove.append(col_key)
 
-            message = f"Removed column [$success]{col_name}[/] and all columns after"
+            message = f"Remove column [$success]{col_name}[/] and all columns after"
 
         # Remove only the current column
         else:
             col_names_to_remove.append(col_name)
             col_keys_to_remove.append(col_key)
-            message = f"Removed column [$success]{col_name}[/]"
+            message = f"Remove column [$success]{col_name}[/]"
 
         # Add to history
         self.add_history(message, dirty=True)
@@ -2814,7 +2814,7 @@ class DataFrameTable(DataTable):
             counter += 1
 
         # Add to history
-        self.add_history(f"Duplicated column [$success]{col_name}[/]", dirty=True)
+        self.add_history(f"Duplicate column [$success]{col_name}[/]", dirty=True)
 
         # Create new column and reorder columns to insert after current column
         cols_before = self.df.columns[: cidx + 1]
@@ -2876,7 +2876,7 @@ class DataFrameTable(DataTable):
     @work(thread=True)
     def explode_column(self, col_name: str, delimiter: str | None = "|") -> None:
         """Explode a column based on a delimiter (if provided) or as a list column."""
-        self.add_history(f"Exploded column [$success]{col_name}[/]", dirty=True)
+        self.add_history(f"Explode column [$success]{col_name}[/]", dirty=True)
 
         dtype = self.df.schema[col_name]
 
@@ -2936,27 +2936,27 @@ class DataFrameTable(DataTable):
 
         # Delete all selected rows
         if selected_count := len(self.selected_rows):
-            history_desc = f"Deleted {selected_count} selected row(s)"
+            history_desc = f"Delete {selected_count} selected row(s)"
             rids_to_delete.update(self.selected_rows)
 
         # Delete current row and those above
         elif more == "above":
             ridx = self.cursor_ridx
-            history_desc = f"Deleted current row [$success]{ridx + 1}[/] and those above"
+            history_desc = f"Delete current row [$success]{ridx + 1}[/] and those above"
             for rid in self.df[RID][: ridx + 1]:
                 rids_to_delete.add(rid)
 
         # Delete current row and those below
         elif more == "below":
             ridx = self.cursor_ridx
-            history_desc = f"Deleted current row [$success]{ridx + 1}[/] and those below"
+            history_desc = f"Delete current row [$success]{ridx + 1}[/] and those below"
             for rid in self.df[RID][ridx:]:
                 rids_to_delete.add(rid)
 
         # Delete the row at the cursor
         else:
             ridx = self.cursor_ridx
-            history_desc = f"Deleted row [$success]{ridx + 1}[/]"
+            history_desc = f"Delete row [$success]{ridx + 1}[/]"
             rids_to_delete.add(self.df[RID][ridx])
 
         # Add to history
@@ -3006,7 +3006,7 @@ class DataFrameTable(DataTable):
         row_to_duplicate = lf.slice(ridx, 1).with_columns(pl.col(RID) + 1)
 
         # Add to history
-        self.add_history(f"Duplicated row [$success]{ridx + 1}[/]", dirty=True)
+        self.add_history(f"Duplicate row [$success]{ridx + 1}[/]", dirty=True)
 
         # Concatenate: rows before + duplicated row + rows after
         lf_before = lf.slice(0, ridx + 1)
@@ -3043,7 +3043,7 @@ class DataFrameTable(DataTable):
         if removed_count <= 0:
             return
 
-        self.add_history(f"Removed [$success]{removed_count}[/] duplicate row(s)", dirty=True)
+        self.add_history(f"Remove [$success]{removed_count}[/] duplicate row(s)", dirty=True)
 
         ok_rids = set(unique_df[RID])
         self.df = unique_df
@@ -3094,7 +3094,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self.add_history(
-            f"Moved column [$success]{col_name}[/] [$accent]{direction}[/] (swapped with [$success]{swap_name}[/])",
+            f"Move column [$success]{col_name}[/] [$accent]{direction}[/] (swapped with [$success]{swap_name}[/])",
             dirty=True,
         )
 
@@ -3151,7 +3151,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self.add_history(
-            f"Moved row [$success]{curr_row_idx}[/] [$accent]{direction}[/] (swapped with row [$success]{swap_row_idx}[/])",
+            f"Move row [$success]{curr_row_idx}[/] [$accent]{direction}[/] (swapped with row [$success]{swap_row_idx}[/])",
             dirty=True,
         )
 
@@ -3428,7 +3428,7 @@ class DataFrameTable(DataTable):
             return
 
         # Add to history
-        self.add_history(f"Found [$success]{term}[/] in [$accent]{col_name}[/]")
+        self.add_history(f"Find [$success]{term}[/] in [$accent]{col_name}[/]")
 
         # Update matches and count total
         match_count = sum(len(cols) for cols in matches.values())
@@ -3583,7 +3583,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self.add_history(
-            f"Replaced [$success]{term_find}[/] with [$accent]{term_replace}[/] in column [$success]{col_name}[/]"
+            f"Replace [$success]{term_find}[/] with [$accent]{term_replace}[/] in column [$success]{col_name}[/]"
         )
 
         # Update matches
@@ -4029,7 +4029,7 @@ class DataFrameTable(DataTable):
         expr_str = "boolean list or series" if isinstance(expr, (list, pl.Series)) else str(expr)
 
         # Add to history
-        self.add_history(f"Viewed rows by expression [$success]{expr_str}[/]")
+        self.add_history(f"View rows by expression [$success]{expr_str}[/]")
 
         # Apply the filter expression
         try:
@@ -4143,7 +4143,7 @@ class DataFrameTable(DataTable):
             return
 
         col_name = self.cursor_col_name
-        self.add_history(f"Filtered rows on column [$success]{col_name}[/] by expression")
+        self.add_history(f"Filter rows on column [$success]{col_name}[/] by expression")
 
         # Store original dataframe in df_view if not already in a view
         if self.df_view is None:
@@ -4366,16 +4366,14 @@ class DataFrameTable(DataTable):
             )
             return
 
-        message = f"Found [$success]{match_count}[/] matching row(s)"
-
         # Add to history
-        self.add_history(message)
+        self.add_history("Select rows by expression")
 
         # Update selected rows
         self.selected_rows = ok_rids
 
         # Show notification immediately, then start highlighting
-        self.notify(message, title="Select Rows")
+        self.notify(f"Found [$success]{match_count}[/] matching row(s)", title="Select Rows")
 
         # Recreate table for display
         self.setup_table()
@@ -4383,7 +4381,7 @@ class DataFrameTable(DataTable):
     def do_toggle_selections(self) -> None:
         """Toggle selected rows highlighting on/off."""
         # Add to history
-        self.add_history("Toggled row selection")
+        self.add_history("Toggle row selection")
 
         # Invert all selected rows
         self.selected_rows = {rid for rid in self.df[RID] if rid not in self.selected_rows}
@@ -4398,7 +4396,7 @@ class DataFrameTable(DataTable):
     def do_toggle_selection_current_row(self) -> None:
         """Select/deselect current row."""
         # Add to history
-        self.add_history("Toggled row selection")
+        self.add_history("Toggle row selection")
 
         # Get current row RID
         ridx = self.cursor_ridx
@@ -4438,7 +4436,7 @@ class DataFrameTable(DataTable):
         # row_count = len(self.selected_rows | set(self.matches.keys()))
 
         # Add to history
-        self.add_history("Cleared all selections and matches")
+        self.add_history("Clear all selections and matches")
 
         # Clear all selections
         self.selected_rows = set()
@@ -4549,7 +4547,7 @@ class DataFrameTable(DataTable):
             )
 
         # Add to history
-        self.add_history(f"SQL Query:\n[$success]{sql}[/]")
+        self.add_history(f"Run SQL Query:\n[$success]{sql}[/]")
 
         # Create a view of self.df as a copy
         if self.df_view is None:
