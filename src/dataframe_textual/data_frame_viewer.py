@@ -168,7 +168,7 @@ class DataFrameViewer(App):
                         severity="error",
                         timeout=10,
                     )
-                    self.log(f"Error loading `{filename}`: {str(e)}")
+                    self.log(f"Error loading `{filename}`: {e}")
 
     def on_mount(self) -> None:
         """Set up the application when it starts.
@@ -203,7 +203,7 @@ class DataFrameViewer(App):
                 if isinstance(content_tab, ContentTab):
                     self.do_rename_tab(content_tab)
             except Exception as e:
-                self.log(f"Error handling tab rename click: {str(e)}")
+                self.log(f"Error handling tab rename click: {e}")
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         """Handle tab activation events.
@@ -361,7 +361,7 @@ class DataFrameViewer(App):
             )
         except Exception as e:
             self.notify(
-                f"Invalid expression [$error]{result}[/]: {str(e)}",
+                f"Invalid expression [$error]{result}[/]: {e}",
                 title="New Tab",
                 severity="error",
                 timeout=10,
@@ -544,7 +544,7 @@ class DataFrameViewer(App):
                 # self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open File")
             except Exception as e:
                 self.notify(
-                    f"Error loading [$error]{filename}[/]: {str(e)}", title="Open File", severity="error", timeout=10
+                    f"Error loading [$error]{filename}[/]: {e}", title="Open File", severity="error", timeout=10
                 )
         else:
             self.notify(f"File does not exist: [$warning]{filename}[/]", title="Open File", severity="warning")
@@ -727,7 +727,7 @@ class DataFrameViewer(App):
             )
 
         except Exception as e:
-            self.log(f"Error quitting all tabs: {str(e)}")
+            self.log(f"Error quitting all tabs: {e}")
 
     def do_rename_tab(self, content_tab: ContentTab) -> None:
         """Open the rename tab screen.
@@ -942,7 +942,7 @@ class DataFrameViewer(App):
 
         except Exception as e:
             self.notify(f"Error saving [$error]{filename}[/]", title="Save to File", severity="error", timeout=10)
-            self.log(f"Error saving file `{filename}`: {str(e)}")
+            self.log(f"Error saving file `{filename}`: {e}")
 
     def save_excel(self, filename: str, all_tabs: bool = True, use_view: bool = False) -> None:
         """Save to an Excel file."""

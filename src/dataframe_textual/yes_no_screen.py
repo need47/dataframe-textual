@@ -439,7 +439,7 @@ class EditCellScreen(YesNoScreen):
                 new_value = DtypeConfig(self.dtype).convert(new_value_str)
             except Exception as e:
                 self.notify(
-                    f"Failed to convert [$accent]{new_value_str}[/] to [$error]{self.dtype}[/]: {str(e)}",
+                    f"Failed to convert [$accent]{new_value_str}[/] to [$error]{self.dtype}[/]: {e}",
                     title="Edit Cell",
                     severity="error",
                 )

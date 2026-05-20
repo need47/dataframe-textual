@@ -1000,7 +1000,7 @@ def load_file(
 
         data = ds
     except Exception as e:
-        print(f"Error loading file `{filename}`: {str(e)}", file=sys.stderr)
+        print(f"Error loading file `{filename}`: {e}", file=sys.stderr)
         sys.exit(1)
 
     return data

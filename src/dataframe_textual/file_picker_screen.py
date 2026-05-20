@@ -280,7 +280,7 @@ class FilePickerScreen(ModalScreen):
             file_type_select_value = self.query_one("#file-type", Select).value
         except Exception as e:
             file_type_select_value = "*"
-            self.log(f"Error retrieving file type selection: {str(e)}")
+            self.log(f"Error retrieving file type selection: {e}")
 
         return file_type_select_value
 
@@ -365,7 +365,7 @@ class FilePickerScreen(ModalScreen):
         try:
             filename = self.query_one("#filename", Input).value.strip()
         except Exception as e:
-            self.log(f"Error retrieving filename from input: {str(e)}")
+            self.log(f"Error retrieving filename from input: {e}")
             return None
 
         filepath = Path(filename)
