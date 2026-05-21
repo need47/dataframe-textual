@@ -169,6 +169,7 @@ class DataFrameViewer(App):
             # Remove Rich-style markup tags
             plain_message = (
                 message.replace("[/]", "")
+                .replace("[b]", "")
                 .replace("[$error]", "")
                 .replace("[$success]", "")
                 .replace("[$warning]", "")
@@ -198,8 +199,7 @@ class DataFrameViewer(App):
             context = f"{Path(table.filename).name} | {row_count} rows x {column_count:,} cols"
 
         self.status_context = context
-        if self.status_context_bar is not None:
-            self.status_context_bar.update(context)
+        self.status_context_bar.update(context)
 
     def _set_status(self, message: str, *, title: str = "", severity: str = "information") -> None:
         """Update the persistent bottom status bar.
@@ -213,9 +213,6 @@ class DataFrameViewer(App):
         self.status_message = full_message
         self.status_severity = severity
         self._set_status_context()
-
-        if self.status_message_bar is None:
-            return
 
         status_message, effective_markup = self._normalize_message(full_message, markup=True)
         if effective_markup:
