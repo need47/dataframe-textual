@@ -4102,7 +4102,7 @@ class DataFrameTable(DataTable):
 
     @wait_full_df
     def filter_row_value(self, result: tuple[pl.Expr, int] | None) -> None:
-        """Apply the filter expression returned by FilterNumericColumn.
+        """Apply the filter expression in the current column.
 
         Args:
             result: A tuple containing a Polars expression to filter rows and the column index, or None if cancelled.

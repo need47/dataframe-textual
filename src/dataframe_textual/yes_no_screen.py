@@ -1583,15 +1583,17 @@ class FilterStringScreen(YMNScreen):
 
             startswith = self.query_one("#condition-startswith", Input).value
             if startswith:
+                startswith = f"^{startswith}"
                 if match_nocase:
-                    startswith = f"(?i)^{startswith}"
+                    startswith = f"(?i){startswith}"
                 e = pl.col(col).str.contains(startswith, literal=match_literal)
                 expr = e if expr is None else expr & e
 
             endswith = self.query_one("#condition-endswith", Input).value
             if endswith:
+                endswith = f"{endswith}$"
                 if match_nocase:
-                    endswith = f"(?i){endswith}$"
+                    endswith = f"(?i){endswith}"
                 e = pl.col(col).str.contains(endswith, literal=match_literal)
                 expr = e if expr is None else expr & e
 
