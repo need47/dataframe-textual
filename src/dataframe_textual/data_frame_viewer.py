@@ -6,11 +6,12 @@ from textwrap import dedent
 
 import polars as pl
 from textual.app import App, ComposeResult
+from textual.containers import Horizontal
 from textual.content import Content
 from textual.css.query import NoMatches
 from textual.events import Click
 from textual.markup import MarkupError
-from textual.widgets import TabbedContent, TabPane
+from textual.widgets import Static, TabbedContent, TabPane
 from textual.widgets.tabbed_content import ContentTab, ContentTabs
 
 from dataframe_textual.theme_screen import ThemeScreen
@@ -97,6 +98,33 @@ class DataFrameViewer(App):
         ContentTab.dirty {
             background: $warning-darken-3;
         }
+        #status_bar {
+            dock: bottom;
+            height: 1;
+            background: $panel;
+            color: $text-muted;
+        }
+        #status_context {
+            width: auto;
+            min-width: 24;
+            padding: 0 1;
+            /* background: $panel-darken-1; */
+        }
+        #status_message {
+            width: 1fr;
+            padding: 0 1;
+            content-align: right middle;
+            text-align: right;
+        }
+        #status_message.is-success {
+            background: $success-darken-2;
+        }
+        #status_message.is-warning {
+            background: $warning-darken-2;
+        }
+        #status_message.is-error {
+            background: $error-darken-2;
+        }
     """
 
     def __init__(self, *sources: Source, theme: str | None = None) -> None:
@@ -114,6 +142,97 @@ class DataFrameViewer(App):
         self.theme = theme
         self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel = None
+        self.status_context_bar: Static | None = None
+        self.status_message_bar: Static | None = None
+        self.status_context = "No file | 0 rows x 0 cols"
+        self.status_message = "Ready"
+        self.status_severity = "information"
+
+    def _normalize_message(self, message: str, markup: bool) -> tuple[str, bool]:
+        """Normalize notification text for the status bar and toast display.
+
+        Args:
+            message: Notification message.
+            markup: Whether the message should be parsed as Rich markup.
+
+        Returns:
+            A tuple of plain-text status text, toast text, and effective markup flag.
+        """
+        if not markup:
+            return message, False
+
+        self.log(f"Attempting to show notification with markup: {message!r}")
+        try:
+            Content.from_markup(message)
+        except MarkupError as error:
+            self.log(f"Invalid notification markup; falling back to plain text: {error}; message={message!r}")
+            # Remove Rich-style markup tags
+            plain_message = (
+                message.replace("[/]", "")
+                .replace("[$error]", "")
+                .replace("[$success]", "")
+                .replace("[$warning]", "")
+                .replace("[$accent]", "")
+            )
+            return plain_message, False
+
+        return message, True
+
+    def _set_status_context(self, table: DataFrameTable | None = None) -> None:
+        """Update the fixed left-side status context.
+
+        Args:
+            table: Optional active table to render context from.
+        """
+        table = table or self.active_table
+        if table is None:
+            context = "No file | 0 rows x 0 cols"
+        else:
+            if table.df is not None:
+                row_count = f"{len(table.df):,}"
+                column_count = len(table.df.columns)
+            else:
+                row_count = f"{table.loaded_rows:,}+"
+                column_count = len(table.lf.collect_schema().names())
+
+            context = f"{Path(table.filename).name} | {row_count} rows x {column_count:,} cols"
+
+        self.status_context = context
+        if self.status_context_bar is not None:
+            self.status_context_bar.update(context)
+
+    def _set_status(self, message: str, *, title: str = "", severity: str = "information") -> None:
+        """Update the persistent bottom status bar.
+
+        Args:
+            message: Plain-text message to display.
+            title: Optional title prefix.
+            severity: Severity used for styling.
+        """
+        full_message = f"[b]{title}[/]: {message}" if title else message
+        self.status_message = full_message
+        self.status_severity = severity
+        self._set_status_context()
+
+        if self.status_message_bar is None:
+            return
+
+        status_message, effective_markup = self._normalize_message(full_message, markup=True)
+        if effective_markup:
+            self.status_message_bar.update(Content.from_markup(status_message))
+        else:
+            self.status_message_bar.update(Content(status_message))
+
+        self.status_message_bar.remove_class("is-success")
+        self.status_message_bar.remove_class("is-warning")
+        self.status_message_bar.remove_class("is-error")
+
+        if severity == "success":
+            self.status_message_bar.add_class("is-success")
+        elif severity == "warning":
+            self.status_message_bar.add_class("is-warning")
+        elif severity == "error":
+            self.status_message_bar.add_class("is-error")
 
     def notify(
         self,
@@ -133,24 +252,17 @@ class DataFrameViewer(App):
             timeout: Optional notification timeout in seconds.
             markup: Whether the message should be interpreted as Rich markup.
         """
+        status_message, effective_markup = self._normalize_message(message, markup)
+        self._set_status(status_message, title=title, severity=severity)
 
-        if markup:
-            self.log(f"Attempting to show notification with markup: {message!r}")
-            try:
-                Content.from_markup(message)
-            except MarkupError as error:
-                self.log(f"Invalid notification markup; falling back to plain text: {error}; message={message!r}")
-                message = (
-                    message.replace("[/]", "")
-                    .replace("[$error]", "")
-                    .replace("[$success]", "")
-                    .replace("[$warning]", "")
-                    .replace("[$accent]", "")
-                )
-                super().notify(message, title=title, severity=severity, timeout=timeout, markup=False)
-                return
-
-        super().notify(message, title=title, severity=severity, timeout=timeout, markup=markup)
+        # if severity in {"warning", "error"}:
+        #     super().notify(
+        #         status_message,
+        #         title=title,
+        #         severity=severity,
+        #         timeout=timeout,
+        #         markup=effective_markup,
+        #     )
 
     @property
     def active_table(self) -> DataFrameTable | None:
@@ -160,11 +272,10 @@ class DataFrameViewer(App):
             The active DataFrameTable widget, or None if not found.
         """
         try:
-            tabbed: TabbedContent = self.query_one(TabbedContent)
-            if active_pane := tabbed.active_pane:
-                return active_pane.query_one(DataFrameTable)
-        except (NoMatches, AttributeError):
-            self.notify("No active table found", title="Locate Table", severity="error", timeout=10)
+            if active_pane := self.tabbed.active_pane:
+                return self.tabs.get(active_pane)
+        except AttributeError:
+            return None
 
         return None
 
@@ -202,12 +313,16 @@ class DataFrameViewer(App):
                     yield tab
                 except Exception as e:
                     self.notify(
-                        f"Error loading [$error]{filename}[/]: Try [$accent]-I[/] to disable schema inference",
+                        f"Failed to load [$error]{filename}[/]: Try [$accent]-I[/] to disable schema inference",
                         title="Load File",
                         severity="error",
-                        timeout=10,
                     )
                     self.log(f"Error loading `{filename}`: {e}")
+        with Horizontal(id="status_bar"):
+            self.status_context_bar = Static(self.status_context, id="status_context")
+            self.status_message_bar = Static(self.status_message, id="status_message")
+            yield self.status_context_bar
+            yield self.status_message_bar
 
     def on_mount(self) -> None:
         """Set up the application when it starts.
@@ -215,9 +330,13 @@ class DataFrameViewer(App):
         Initializes the app by hiding the tab bar for single-file mode and focusing
         the active table widget.
         """
+        self._set_status_context(self.active_table)
+        self._set_status(self.status_message, severity=self.status_severity)
+
         if len(self.tabs) == 1:
             self.query_one(ContentTabs).display = False
-            self.active_table.focus()
+            if table := self.active_table:
+                table.focus()
 
     def on_ready(self) -> None:
         """Called when the app is ready."""
@@ -255,6 +374,7 @@ class DataFrameViewer(App):
         """
         # Focus the table in the newly activated tab
         if table := self.active_table:
+            self._set_status_context(table)
             table.focus()
 
             if table.loaded_rows == 0:
@@ -321,6 +441,7 @@ class DataFrameViewer(App):
             else:
                 filename = table.filename
 
+            filename = Path(filename).resolve()
             self.save_to_file(filename, all_tabs=False, overwrite_prompt=False)
 
     def action_save_all_tabs_overwrite(self) -> None:
@@ -336,6 +457,7 @@ class DataFrameViewer(App):
             else:
                 filename = table.filename
 
+            filename = Path(filename).resolve()
             self.save_to_file(filename, all_tabs=True, overwrite_prompt=False)
 
     def action_duplicate_tab(self) -> None:
@@ -353,7 +475,7 @@ class DataFrameViewer(App):
         The expression is evaluated on the active table's data to create a new tab.
         """
         if not (table := self.active_table):
-            self.notify("No active table found", title="New Tab", severity="error", timeout=10)
+            self.notify("No active table found", title="New Tab", severity="error")
             return
 
         self.push_screen(NewTabScreen(), callback=partial(self.new_tab, dftable=table))
@@ -380,10 +502,9 @@ class DataFrameViewer(App):
                 df = expr.to_frame()
             else:
                 self.notify(
-                    f"Expression returned [$error]{type(expr).__name__}[/], expected DataFrame or Series",
+                    f"Expression returned [$error]{type(expr).__name__}[/], expected a DataFrame or Series",
                     title="New Tab",
                     severity="error",
-                    timeout=10,
                 )
                 return
 
@@ -399,12 +520,7 @@ class DataFrameViewer(App):
                 title="New Tab",
             )
         except Exception as e:
-            self.notify(
-                f"Invalid expression [$error]{result}[/]: {e}",
-                title="New Tab",
-                severity="error",
-                timeout=10,
-            )
+            self.notify(f"Failed to evaluate expression [$error]{result}[/]: {e}", title="New Tab", severity="error")
 
     def action_select_theme(self) -> None:
         """Open the theme selection screen."""
@@ -438,8 +554,8 @@ class DataFrameViewer(App):
         """
         tabs = self.query_one(ContentTabs)
         tabs.display = not tabs.display
-        # status = "shown" if tabs.display else "hidden"
-        # self.notify(f"Tab bar [$success]{status}[/]", title="Toggle Tab Bar")
+        status = "on" if tabs.display else "off"
+        self.notify(f"Tab bar is [$success]{status}[/]", title="Toggle Tab Bar")
 
     def do_duplicate_tab(self) -> None:
         """Duplicate the currently active tab.
@@ -580,11 +696,9 @@ class DataFrameViewer(App):
                 for source in load_file(filename, prefix_sheet=True):
                     self.add_tab(source.lf, filename, source.tabname, after=self.tabbed.active_pane)
                     n_tab += 1
-                # self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open File")
+                self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open File")
             except Exception as e:
-                self.notify(
-                    f"Error loading [$error]{filename}[/]: {e}", title="Open File", severity="error", timeout=10
-                )
+                self.notify(f"Failed to load [$error]{filename}[/]: {e}", title="Open File", severity="error")
         else:
             self.notify(f"File does not exist: [$warning]{filename}[/]", title="Open File", severity="warning")
 
@@ -797,7 +911,7 @@ class DataFrameViewer(App):
         content_tab, new_name = result
 
         # Update the tab name
-        # old_name = content_tab.label_text
+        old_name = content_tab.label_text
         content_tab.label = new_name
 
         # Mark tab as dirty to indicate name change
@@ -809,7 +923,7 @@ class DataFrameViewer(App):
                 table.focus()
                 break
 
-        # self.notify(f"Renamed tab [$accent]{old_name}[/] to [$success]{new_name}[/]", title="Rename Tab")
+        self.notify(f"Renamed tab [$accent]{old_name}[/] to [$success]{new_name}[/]", title="Rename Tab")
 
     def do_save_to_file(self, all_tabs: bool = True, task_after_save: str | None = None) -> None:
         """Open screen to save file."""
@@ -980,7 +1094,7 @@ class DataFrameViewer(App):
                         self.exit()
 
         except Exception as e:
-            self.notify(f"Error saving [$error]{filename}[/]", title="Save to File", severity="error", timeout=10)
+            self.notify(f"Failed to save [$error]{filename}[/]", title="Save to File", severity="error")
             self.log(f"Error saving file `{filename}`: {e}")
 
     def save_excel(self, filename: str, all_tabs: bool = True, use_view: bool = False) -> None:

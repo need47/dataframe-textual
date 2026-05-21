@@ -506,6 +506,8 @@ class DataFrameTable(DataTable):
         # fully loaded the dataframe
         self.df_done = True
 
+        self.notify("Data fully loaded", title="Load DataFrame")
+
     def wait_full_df(func):
         """Decorator to ensure the dataframe is fully loaded before executing a method.
 
@@ -1133,8 +1135,8 @@ class DataFrameTable(DataTable):
     def action_toggle_row_labels(self) -> None:
         """Toggle row labels visibility."""
         self.show_row_labels = not self.show_row_labels
-        # status = "shown" if self.show_row_labels else "hidden"
-        # self.notify(f"Row labels {status}", title="Toggle Row Labels")
+        status = "on" if self.show_row_labels else "off"
+        self.notify(f"Row labels are [$success]{status}[/]", title="Toggle Row Labels")
 
     @wait_full_df
     def action_cast_column_dtype(self, dtype: str | pl.DataType) -> None:
@@ -1151,10 +1153,9 @@ class DataFrameTable(DataTable):
             self.do_copy_to_clipboard(cell_str, f"Copied: [$success]{cell_str[:50]}[/]")
         except IndexError:
             self.notify(
-                f"Error copying cell ([$error]{ridx}[/], [$accent]{cidx}[/]) to clipboard",
+                f"Failed to copy cell ([$error]{ridx}[/], [$accent]{cidx}[/]) to clipboard",
                 title="Copy Cell",
                 severity="error",
-                timeout=10,
             )
 
     @wait_full_df
@@ -1173,10 +1174,7 @@ class DataFrameTable(DataTable):
             )
         except (FileNotFoundError, IndexError):
             self.notify(
-                f"Error copying column [$error]{col_name}[/] to clipboard",
-                title="Copy Column",
-                severity="error",
-                timeout=10,
+                f"Failed to copy column [$error]{col_name}[/] to clipboard", title="Copy Column", severity="error"
             )
 
     def action_copy_row(self) -> None:
@@ -1193,16 +1191,14 @@ class DataFrameTable(DataTable):
                 f"Copied row [$accent]{ridx + 1}[/] with [$success]{len(row_values)}[/] values",
             )
         except (FileNotFoundError, IndexError):
-            self.notify(
-                f"Error copying row [$error]{ridx}[/] to clipboard", title="Copy Row", severity="error", timeout=10
-            )
+            self.notify(f"Failed to copy row [$error]{ridx}[/] to clipboard", title="Copy Row", severity="error")
 
     def action_toggle_thousand_separator(self) -> None:
         """Toggle thousand separator for numeric display."""
         self.thousand_separator = not self.thousand_separator
         self.setup_table()
-        # status = "enabled" if self.thousand_separator else "disabled"
-        # self.notify(f"Thousand separator {status}", title="Toggle Thousand Separator")
+        status = "on" if self.thousand_separator else "off"
+        self.notify(f"Thousand separator is [$success]{status}[/]", title="Toggle Thousand Separator")
 
     def action_next_match(self) -> None:
         """Go to the next matched cell."""
@@ -1575,7 +1571,7 @@ class DataFrameTable(DataTable):
             return range_count
 
         except Exception as e:
-            self.notify(f"Error loading rows: {e}", title="Load Rows", severity="error", timeout=10)
+            self.notify(f"Failed to load rows: {e}", title="Load Rows", severity="error")
             self.log(f"Error loading rows: {e}")
             return 0
 
@@ -1838,7 +1834,7 @@ class DataFrameTable(DataTable):
     def do_undo(self) -> None:
         """Undo the last action."""
         if not self.histories_undo:
-            # self.notify("No actions to undo", title="Undo", severity="warning")
+            self.notify("No actions to undo", title="Undo", severity="warning")
             return
 
         # Pop the last history state for undo and save to redo stack
@@ -1853,7 +1849,7 @@ class DataFrameTable(DataTable):
     def do_redo(self) -> None:
         """Redo the last undone action."""
         if not self.histories_redo:
-            # self.notify("No actions to redo", title="Redo", severity="warning")
+            self.notify("No actions to redo", title="Redo", severity="warning")
             return
 
         # Pop the last undone state from redo stack
@@ -1892,7 +1888,7 @@ class DataFrameTable(DataTable):
         next_type = get_next_item(CURSOR_TYPES, self.cursor_type)
         self.cursor_type = next_type
 
-        # self.notify(f"Changed cursor type to [$success]{next_type}[/]", title="Cycle Cursor Type")
+        self.notify(f"Cursor type is now [$success]{next_type}[/]", title="Cycle Cursor Type")
 
     def do_view_row_detail(self) -> None:
         """Open a modal screen to view the selected row's details."""
@@ -2025,11 +2021,11 @@ class DataFrameTable(DataTable):
         fixed_rows, fixed_columns = result
 
         if fixed_rows > 0 and fixed_columns > 0:
-            descr = f"Freeze [$success]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns"
+            descr = f"Freezed [$success]{fixed_rows}[/] rows and [$accent]{fixed_columns}[/] columns"
         elif fixed_rows > 0:
-            descr = f"Freeze [$success]{fixed_rows}[/] rows"
+            descr = f"Freezed [$success]{fixed_rows}[/] rows"
         elif fixed_columns > 0:
-            descr = f"Freeze [$success]{fixed_columns}[/] columns"
+            descr = f"Freezed [$success]{fixed_columns}[/] columns"
         else:
             return
 
@@ -2042,7 +2038,7 @@ class DataFrameTable(DataTable):
         if fixed_columns >= 0:
             self.fixed_columns = fixed_columns
 
-        # self.notify(descr, title="Pin Row/Column")
+        self.notify(descr, title="Freeze Row/Column")
 
     def do_hide_column(self) -> None:
         """Hide the currently selected column from the table display."""
@@ -2063,9 +2059,9 @@ class DataFrameTable(DataTable):
         if col_idx >= len(self.columns):
             self.move_cursor(column=len(self.columns) - 1)
 
-        # self.notify(
-        #     f"Hid column [$success]{col_name}[/]. Press [$accent]H[/] to show hidden columns", title="Hide Column"
-        # )
+        self.notify(
+            f"Hide column [$success]{col_name}[/]. Press [$accent]H[/] to show hidden columns", title="Hide Column"
+        )
 
     def do_expand_column(self) -> None:
         """Expand the current column to show the widest cell in the loaded data."""
@@ -2114,9 +2110,7 @@ class DataFrameTable(DataTable):
                 col.width = max_width
 
             except Exception as e:
-                self.notify(
-                    f"Error expanding column [$error]{col_name}[/]", title="Expand Column", severity="error", timeout=10
-                )
+                self.notify(f"Failed to expand column [$error]{col_name}[/]", title="Expand Column", severity="error")
                 self.log(f"Error expanding column `{col_name}`: {e}")
 
         # Force a refresh
@@ -2124,7 +2118,7 @@ class DataFrameTable(DataTable):
         self._require_update_dimensions = True
         self.refresh(layout=True)
 
-        # self.notify(f"Expanded column [$success]{col_name}[/] to width [$accent]{max_width}[/]", title="Expand Column")
+        self.notify(f"Expanded column [$success]{col_name}[/] to width [$accent]{max_width}[/]", title="Expand Column")
 
     def do_toggle_rid(self) -> None:
         """Toggle display of the internal RID column."""
@@ -2173,12 +2167,12 @@ class DataFrameTable(DataTable):
         # Move cursor to first column
         self.move_cursor(row=ridx, column=0)
 
-        # self.notify(f"Set row [$success]{ridx + 1}[/] as header", title="Set Row as Header")
+        self.notify(f"Set row [$success]{ridx + 1}[/] as header", title="Set Row as Header")
 
     def do_show_hidden_columns(self) -> None:
         """Show all hidden columns by recreating the table."""
         if not self.hidden_columns:
-            # self.notify("No hidden columns to show", title="Show Hidden Column(s)", severity="warning")
+            self.notify("No hidden columns to show", title="Show Hidden Column(s)", severity="warning")
             return
 
         # Add to history
@@ -2190,7 +2184,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        # self.notify("Show hidden column(s)", title="Show Hidden Column(s)")
+        self.notify("Displayed hidden column(s)", title="Show Hidden Column(s)")
 
     # Sort
     def do_sort_by_column(self, descending: bool = False) -> None:
@@ -2251,6 +2245,16 @@ class DataFrameTable(DataTable):
 
         # Restore cursor position on the sorted column
         self.move_cursor(column=col_idx, row=0)
+
+        if not sort_cols:
+            self.notify("Removed sorting, restored original order", title="Sort")
+        elif col_name not in sort_cols:
+            self.notify(f"Removed column [$success]{col_name}[/] from sort", title="Sort")
+        else:
+            self.notify(
+                f"Sorted by column [$success]{col_name}[/] in {'descending' if descending else 'ascending'} order",
+                title="Sort",
+            )
 
     # Edit
     def do_edit_cell(self, ridx: int = None, cidx: int = None) -> None:
@@ -2316,13 +2320,12 @@ class DataFrameTable(DataTable):
             col_key = col_name
             self.update_cell(row_key, col_key, formatted_value, update_width=True)
 
-            # self.notify(f"Cell updated to [$success]{cell_value}[/]", title="Edit Cell")
+            self.notify(f"Updated cell to [$success]{cell_value}[/]", title="Edit Cell")
         except Exception as e:
             self.notify(
-                f"Error updating cell ([$error]{ridx}[/], [$accent]{col_name}[/])",
+                f"Failed to update cell ([$error]{ridx}[/], [$accent]{col_name}[/])",
                 title="Edit Cell",
                 severity="error",
-                timeout=10,
             )
             self.log(f"Error updating cell ({ridx}, {col_name}): {e}")
 
@@ -2354,9 +2357,7 @@ class DataFrameTable(DataTable):
             try:
                 expr = validate_expr(term, self.df.columns, cidx, self.df)
             except Exception as e:
-                self.notify(
-                    f"Error validating expression: [$error]{term}[/]", title="Edit Column", severity="error", timeout=10
-                )
+                self.notify(f"Failed to validate expression [$error]{term}[/]", title="Edit Column", severity="error")
                 self.log(f"Error validating expression `{term}`: {e}")
                 return
 
@@ -2368,7 +2369,7 @@ class DataFrameTable(DataTable):
                 expr = pl.lit(value)
             except Exception:
                 self.notify(
-                    f"Error converting [$error]{term}[/] to [$accent]{dtype}[/]. Cast to string.",
+                    f"Failed to convert [$error]{term}[/] to [$accent]{dtype}[/]. Casting to string.",
                     title="Edit Column",
                     severity="error",
                 )
@@ -2390,10 +2391,9 @@ class DataFrameTable(DataTable):
                 self.df_view = self.df_view.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
         except Exception as e:
             self.notify(
-                f"Error applying expression: [$error]{term}[/] to column [$accent]{col_name}[/]",
+                f"Failed to apply expression [$error]{term}[/] to column [$accent]{col_name}[/]",
                 title="Edit Column",
                 severity="error",
-                timeout=10,
             )
             self.log(f"Error applying expression `{term}` to column `{col_name}`: {e}")
             return
@@ -2401,7 +2401,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        # self.notify(f"Column [$accent]{col_name}[/] updated with [$success]{expr}[/]", title="Edit Column")
+        self.notify(f"Updated column [$accent]{col_name}[/] with [$success]{expr}[/]", title="Edit Column")
 
     def do_rename_column(self, col_idx: int | None) -> None:
         """Open modal to rename the selected column."""
@@ -2460,7 +2460,7 @@ class DataFrameTable(DataTable):
         # Move cursor to the renamed column
         self.move_cursor(column=col_idx)
 
-        # self.notify(f"Renamed column [$success]{col_name}[/] to [$success]{new_name}[/]", title="Rename Column")
+        self.notify(f"Renamed column [$success]{col_name}[/] to [$success]{new_name}[/]", title="Rename Column")
 
     def do_clear_cell(self) -> None:
         """Clear the current cell by setting its value to None."""
@@ -2502,13 +2502,12 @@ class DataFrameTable(DataTable):
 
             self.update_cell(row_key, col_key, formatted_value)
 
-            # self.notify(f"Cell cleared to [$success]{NULL_DISPLAY}[/]", title="Clear Cell")
+            self.notify(f"Cell cleared to [$success]{NULL_DISPLAY}[/]", title="Clear Cell")
         except Exception as e:
             self.notify(
-                f"Error clearing cell ([$error]{ridx}[/], [$accent]{col_name}[/])",
+                f"Failed to clear cell ([$error]{ridx}[/], [$accent]{col_name}[/])",
                 title="Clear Cell",
                 severity="error",
-                timeout=10,
             )
             self.log(f"Error clearing cell ({ridx}, {col_name}): {e}")
 
@@ -2542,11 +2541,9 @@ class DataFrameTable(DataTable):
             # Move cursor to the cleared column
             self.move_cursor(column=col_idx)
 
-            # self.notify(f"Cleared column [$success]{col_name}[/]", title="Clear Column")
+            self.notify(f"Cleared column [$success]{col_name}[/]", title="Clear Column")
         except Exception as e:
-            self.notify(
-                f"Error clearing column [$error]{col_name}[/]", title="Clear Column", severity="error", timeout=10
-            )
+            self.notify(f"Failed to clear column [$error]{col_name}[/]", title="Clear Column", severity="error")
             self.log(f"Error clearing column `{col_name}`: {e}")
 
     def do_add_column(self, col_name: str = None) -> None:
@@ -2590,11 +2587,9 @@ class DataFrameTable(DataTable):
             # Move cursor to the new column
             self.move_cursor(column=cidx + 1)
 
-            # self.notify(f"Added column [$success]{new_name}[/]", title="Add Column")
+            self.notify(f"Added column [$success]{new_col_name}[/]", title="Add Column")
         except Exception as e:
-            self.notify(
-                f"Error adding column [$error]{new_col_name}[/]", title="Add Column", severity="error", timeout=10
-            )
+            self.notify(f"Failed to add column [$error]{new_col_name}[/]", title="Add Column", severity="error")
             self.log(f"Error adding column `{new_col_name}`: {e}")
 
     def do_add_column_expr(self) -> None:
@@ -2642,11 +2637,9 @@ class DataFrameTable(DataTable):
             # Move cursor to the new column
             self.move_cursor(column=cidx + 1)
 
-            # self.notify(f"Added column [$success]{col_name}[/]", title="Add Column")
+            self.notify(f"Added column [$success]{new_col_name}[/]", title="Add Column")
         except Exception as e:
-            self.notify(
-                f"Error adding column [$error]{new_col_name}[/]", title="Add Column", severity="error", timeout=10
-            )
+            self.notify(f"Failed to add column [$error]{new_col_name}[/]", title="Add Column", severity="error")
             self.log(f"Error adding column `{new_col_name}`: {e}")
 
     def do_add_link_column(self) -> None:
@@ -2715,12 +2708,10 @@ class DataFrameTable(DataTable):
             # Move cursor to the new column
             self.move_cursor(column=cidx + 1)
 
-            # self.notify(f"Added link column [$success]{new_col_name}[/]. Use Ctrl/Cmd click to open.", title="Add Link")
+            self.notify(f"Added link column [$success]{new_col_name}[/]. Use Ctrl/Cmd click to open.", title="Add Link")
 
         except Exception as e:
-            self.notify(
-                f"Error adding link column [$error]{new_col_name}[/]", title="Add Link", severity="error", timeout=10
-            )
+            self.notify(f"Failed to add link column [$error]{new_col_name}[/]", title="Add Link", severity="error")
             self.log(f"Error adding link column: {e}")
 
     def do_delete_column(self, more: str = None) -> None:
@@ -2730,43 +2721,43 @@ class DataFrameTable(DataTable):
         try:
             col_name = self.cursor_col_name
         except CellDoesNotExist:
-            # self.notify("No column to delete at the current cursor position", title="Delete Column", severity="warning")
+            self.notify("No column to delete at the current cursor position", title="Delete Column", severity="warning")
             return
 
         col_key = self.cursor_col_key
 
-        col_names_to_remove = []
-        col_keys_to_remove = []
+        col_names_to_delete = []
+        col_keys_to_delete = []
 
         # Remove all columns before the current column
         if more == "before":
             for i in range(col_idx + 1):
                 col_key = self.get_col_key(i)
-                col_names_to_remove.append(col_key.value)
-                col_keys_to_remove.append(col_key)
+                col_names_to_delete.append(col_key.value)
+                col_keys_to_delete.append(col_key)
 
-            message = f"Remove column [$success]{col_name}[/] and all columns before"
+            message = f"Deleted column [$success]{col_name}[/] and all columns before"
 
         # Remove all columns after the current column
         elif more == "after":
             for i in range(col_idx, len(self.columns)):
                 col_key = self.get_col_key(i)
-                col_names_to_remove.append(col_key.value)
-                col_keys_to_remove.append(col_key)
+                col_names_to_delete.append(col_key.value)
+                col_keys_to_delete.append(col_key)
 
-            message = f"Remove column [$success]{col_name}[/] and all columns after"
+            message = f"Deleted column [$success]{col_name}[/] and all columns after"
 
         # Remove only the current column
         else:
-            col_names_to_remove.append(col_name)
-            col_keys_to_remove.append(col_key)
-            message = f"Remove column [$success]{col_name}[/]"
+            col_names_to_delete.append(col_name)
+            col_keys_to_delete.append(col_key)
+            message = f"Deleted column [$success]{col_name}[/]"
 
         # Add to history
         self.add_history(message, dirty=True)
 
         # Remove the columns from the table display using the column names as keys
-        for ck in col_keys_to_remove:
+        for ck in col_keys_to_delete:
             self.remove_column(ck)
 
         # Move cursor left if we deleted the last column(s)
@@ -2775,29 +2766,29 @@ class DataFrameTable(DataTable):
             self.move_cursor(column=last_col_idx)
 
         # Remove from sorted columns if present
-        for col_name in col_names_to_remove:
+        for col_name in col_names_to_delete:
             if col_name in self.sorted_columns:
                 del self.sorted_columns[col_name]
 
         # Remove from hidden columns if present
-        for col_name in col_names_to_remove:
+        for col_name in col_names_to_delete:
             self.hidden_columns.discard(col_name)
 
         # Remove from matches
         for rid in list(self.matches.keys()):
-            self.matches[rid].difference_update(col_names_to_remove)
+            self.matches[rid].difference_update(col_names_to_delete)
             # Remove empty entries
             if not self.matches[rid]:
                 del self.matches[rid]
 
         # Remove from dataframe
-        self.df = self.df.drop(col_names_to_remove)
+        self.df = self.df.drop(col_names_to_delete)
 
         # Also update the view if applicable
         if self.df_view is not None:
-            self.df_view = self.df_view.drop(col_names_to_remove)
+            self.df_view = self.df_view.drop(col_names_to_delete)
 
-        # self.notify(message, title="Delete Column")
+        self.notify(message, title="Delete Column")
 
     def do_duplicate_column(self) -> None:
         """Duplicate the currently selected column, inserting it right after the current column."""
@@ -2836,7 +2827,9 @@ class DataFrameTable(DataTable):
         # Move cursor to the new duplicated column
         self.move_cursor(column=col_idx + 1)
 
-        # self.notify(f"Duplicated column [$success]{col_name}[/] as [$accent]{new_col_name}[/]", title="Duplicate Column")
+        self.notify(
+            f"Duplicated column [$success]{col_name}[/] as [$accent]{new_col_name}[/]", title="Duplicate Column"
+        )
 
     def do_explode_column(self) -> None:
         """Explode the current list column into multiple rows."""
@@ -2919,10 +2912,9 @@ class DataFrameTable(DataTable):
             if self.histories_undo:
                 self.histories_undo.pop()
             self.notify(
-                f"Error exploding column [$error]{col_name}[/] with delimiter [$accent]{delimiter}[/]",
+                f"Failed to explode column [$error]{col_name}[/] with delimiter [$accent]{delimiter}[/]",
                 title="Explode Column with Delimiter",
                 severity="error",
-                timeout=10,
             )
             self.log(f"Error exploding column `{col_name}` with delimiter `{delimiter}`: {e}")
 
@@ -2931,32 +2923,32 @@ class DataFrameTable(DataTable):
 
         Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.
         """
-        # old_count = len(self.df)
+        old_count = len(self.df)
         rids_to_delete = set()
 
         # Delete all selected rows
         if selected_count := len(self.selected_rows):
-            history_desc = f"Delete {selected_count} selected row(s)"
+            history_desc = f"Deleted {selected_count} selected row(s)"
             rids_to_delete.update(self.selected_rows)
 
         # Delete current row and those above
         elif more == "above":
             ridx = self.cursor_ridx
-            history_desc = f"Delete current row [$success]{ridx + 1}[/] and those above"
+            history_desc = f"Deleted current row [$success]{ridx + 1}[/] and those above"
             for rid in self.df[RID][: ridx + 1]:
                 rids_to_delete.add(rid)
 
         # Delete current row and those below
         elif more == "below":
             ridx = self.cursor_ridx
-            history_desc = f"Delete current row [$success]{ridx + 1}[/] and those below"
+            history_desc = f"Deleted current row [$success]{ridx + 1}[/] and those below"
             for rid in self.df[RID][ridx:]:
                 rids_to_delete.add(rid)
 
         # Delete the row at the cursor
         else:
             ridx = self.cursor_ridx
-            history_desc = f"Delete row [$success]{ridx + 1}[/]"
+            history_desc = f"Deleted row [$success]{ridx + 1}[/]"
             rids_to_delete.add(self.df[RID][ridx])
 
         # Add to history
@@ -2966,7 +2958,7 @@ class DataFrameTable(DataTable):
         try:
             df_filtered = self.df.lazy().filter(~pl.col(RID).is_in(rids_to_delete)).collect()
         except Exception as e:
-            self.notify(f"Error deleting row(s): {e}", title="Delete Row(s)", severity="error", timeout=10)
+            self.notify(f"Failed to delete row(s): {e}", title="Delete Row(s)", severity="error")
             self.histories_undo.pop()  # Remove last history entry
             return
 
@@ -2991,9 +2983,9 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        # deleted_count = old_count - len(self.df)
-        # if deleted_count > 0:
-        #     self.notify(f"Deleted [$success]{deleted_count}[/] row(s)", title="Delete Row(s)")
+        deleted_count = old_count - len(self.df)
+        if deleted_count > 0:
+            self.notify(f"Deleted [$success]{deleted_count}[/] row(s)", title="Delete Row(s)")
 
     def do_duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""
@@ -3028,7 +3020,7 @@ class DataFrameTable(DataTable):
         # Move cursor to the new duplicated row
         self.move_cursor(row=ridx + 1)
 
-        # self.notify(f"Duplicated row [$success]{ridx + 1}[/]", title="Duplicate Row")
+        self.notify(f"Duplicated row [$success]{ridx + 1}[/]", title="Duplicate Row")
 
     def do_uniq_rows(self) -> None:
         """Remove duplicate rows from the current dataframe, keeping the first occurrence."""
@@ -3078,12 +3070,12 @@ class DataFrameTable(DataTable):
         # Validate move is possible
         if direction == "left":
             if col_idx <= 0:
-                # self.notify("Cannot move column left", title="Move Column", severity="warning")
+                self.notify("Cannot move column left", title="Move Column", severity="warning")
                 return
             swap_idx = col_idx - 1
         elif direction == "right":
             if col_idx >= len(self.columns) - 1:
-                # self.notify("Cannot move column right", title="Move Column", severity="warning")
+                self.notify("Cannot move column right", title="Move Column", severity="warning")
                 return
             swap_idx = col_idx + 1
 
@@ -3124,7 +3116,7 @@ class DataFrameTable(DataTable):
         if self.df_view is not None:
             self.df_view = self.df_view.select(cols)
 
-        # self.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move Column")
+        self.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move Column")
 
     def do_move_row(self, direction: str) -> None:
         """Move the current row up or down.
@@ -3137,12 +3129,12 @@ class DataFrameTable(DataTable):
         # Validate move is possible
         if direction == "up":
             if curr_row_idx <= 0:
-                # self.notify("Cannot move row up", title="Move Row", severity="warning")
+                self.notify("Cannot move row up", title="Move Row", severity="warning")
                 return
             swap_row_idx = curr_row_idx - 1
         elif direction == "down":
             if curr_row_idx >= len(self.rows) - 1:
-                # self.notify("Cannot move row down", title="Move Row", severity="warning")
+                self.notify("Cannot move row down", title="Move Row", severity="warning")
                 return
             swap_row_idx = curr_row_idx + 1
         else:
@@ -3213,7 +3205,7 @@ class DataFrameTable(DataTable):
                 ]
             ).collect()
 
-        # self.notify(f"Moved row [$success]{row_key.value}[/] {direction}", title="Move Row")
+        self.notify(f"Moved row [$success]{curr_key.value}[/] {direction}", title="Move Row")
 
     # Type casting
     def do_cast_column_dtype(self, dtype: str) -> None:
@@ -3228,17 +3220,15 @@ class DataFrameTable(DataTable):
         try:
             target_dtype = eval(dtype)
         except Exception:
-            self.notify(
-                f"Invalid target data type: [$error]{dtype}[/]", title="Cast Column", severity="error", timeout=10
-            )
+            self.notify(f"Invalid target data type: [$error]{dtype}[/]", title="Cast Column", severity="error")
             return
 
         if current_dtype == target_dtype:
-            # self.notify(
-            #     f"Column [$warning]{col_name}[/] is already of type [$accent]{target_dtype}[/]",
-            #     title="Cast Column",
-            #     severity="warning",
-            # )
+            self.notify(
+                f"Column [$warning]{col_name}[/] is already of type [$accent]{target_dtype}[/]",
+                title="Cast Column",
+                severity="warning",
+            )
             return  # No change needed
 
         # Add to history
@@ -3258,13 +3248,12 @@ class DataFrameTable(DataTable):
             # Recreate table for display
             self.setup_table()
 
-            # self.notify(f"Cast column [$success]{col_name}[/] to [$accent]{target_dtype}[/]", title="Cast")
+            self.notify(f"Cast column [$success]{col_name}[/] to [$accent]{target_dtype}[/]", title="Cast")
         except Exception as e:
             self.notify(
-                f"Error casting column [$error]{col_name}[/] to [$accent]{target_dtype}[/]",
+                f"Failed to cast column [$error]{col_name}[/] to [$accent]{target_dtype}[/]",
                 title="Cast Column",
                 severity="error",
-                timeout=10,
             )
             self.log(f"Error casting column `{col_name}`: {e}")
 
@@ -3322,9 +3311,7 @@ class DataFrameTable(DataTable):
                 try:
                     expr = validate_expr(term, self.df.columns, col_idx, self.df)
                 except Exception as e:
-                    self.notify(
-                        f"Error validating expression [$error]{term}[/]", title="Find", severity="error", timeout=10
-                    )
+                    self.notify(f"Failed to validate expression [$error]{term}[/]", title="Find", severity="error")
                     self.log(f"Error validating expression `{term}`: {e}")
                     return matches
             else:
@@ -3338,7 +3325,7 @@ class DataFrameTable(DataTable):
             try:
                 matched_ridxs = lf.filter(expr).collect()[RID]
             except Exception as e:
-                self.notify(f"Error applying filter: [$error]{expr}[/]", title="Find", severity="error", timeout=10)
+                self.notify(f"Failed to apply filter [$error]{expr}[/]", title="Find", severity="error")
                 self.log(f"Error applying filter: {e}")
                 return matches
 
@@ -3415,7 +3402,7 @@ class DataFrameTable(DataTable):
                 match_reverse=match_reverse,
             )
         except Exception as e:
-            self.notify(f"Error finding matches for [$error]{term}[/]", title=title, severity="error", timeout=10)
+            self.notify(f"Failed to find matches for [$error]{term}[/]", title=title, severity="error")
             self.log(f"Error finding matches for `{term}`: {e}")
             return
 
@@ -3442,7 +3429,7 @@ class DataFrameTable(DataTable):
     def do_next_match(self) -> None:
         """Move cursor to the next match."""
         if not self.matches:
-            # self.notify("No matches to navigate", title="Next Match", severity="warning")
+            self.notify("No matches to navigate", title="Next Match", severity="warning")
             return
 
         # Get sorted list of matched coordinates
@@ -3464,7 +3451,7 @@ class DataFrameTable(DataTable):
     def do_previous_match(self) -> None:
         """Move cursor to the previous match."""
         if not self.matches:
-            # self.notify("No matches to navigate", title="Previous Match", severity="warning")
+            self.notify("No matches to navigate", title="Previous Match", severity="warning")
             return
 
         # Get sorted list of matched coordinates
@@ -3492,7 +3479,7 @@ class DataFrameTable(DataTable):
     def do_next_selected_row(self) -> None:
         """Move cursor to the next selected row."""
         if not self.selected_rows:
-            # self.notify("No selected rows to navigate", title="Next Selected Row", severity="warning")
+            self.notify("No selected rows to navigate", title="Next Selected Row", severity="warning")
             return
 
         # Get list of selected row indices in order
@@ -3514,7 +3501,7 @@ class DataFrameTable(DataTable):
     def do_previous_selected_row(self) -> None:
         """Move cursor to the previous selected row."""
         if not self.selected_rows:
-            # self.notify("No selected rows to navigate", title="Previous Selected Row", severity="warning")
+            self.notify("No selected rows to navigate", title="Previous Selected Row", severity="warning")
             return
 
         # Get list of selected row indices in order
@@ -3631,10 +3618,9 @@ class DataFrameTable(DataTable):
 
         except Exception as e:
             self.notify(
-                f"Error replacing [$error]{term_find}[/] with [$accent]{term_replace}[/]",
+                f"Failed to replace [$error]{term_find}[/] with [$accent]{term_replace}[/]",
                 title="Replace",
                 severity="error",
-                timeout=10,
             )
             self.log(f"Error replacing `{term_find}` with `{term_replace}`: {e}")
 
@@ -3731,10 +3717,9 @@ class DataFrameTable(DataTable):
             self.show_next_replace_confirmation()
         except Exception as e:
             self.notify(
-                f"Error replacing [$error]{term_find}[/] with [$accent]{term_replace}[/]",
+                f"Failed to replace [$error]{term_find}[/] with [$accent]{term_replace}[/]",
                 title="Replace",
                 severity="error",
-                timeout=10,
             )
             self.log(f"Error in interactive replace: {e}")
 
@@ -3974,9 +3959,7 @@ class DataFrameTable(DataTable):
             try:
                 expr = validate_expr(term, self.df.columns, cidx, self.df)
             except Exception as e:
-                self.notify(
-                    f"Error validating expression [$error]{term}[/]", title="View Rows", severity="error", timeout=10
-                )
+                self.notify(f"Failed to validate expression [$error]{term}[/]", title="View Rows", severity="error")
                 self.log(f"Error validating expression `{term}`: {e}")
                 return
 
@@ -4001,7 +3984,7 @@ class DataFrameTable(DataTable):
                     except Exception as e:
                         expr = pl.col(col_name) == term
                         self.notify(
-                            f"Error evaling for column [$warning]{col_name}[/]. Cast to string.",
+                            f"Failed to evaluate values for column [$warning]{col_name}[/]. Casting to string.",
                             title="View Rows",
                         )
                         self.log(f"Error evaling term `{term}` for list column `{col_name}`: {e}")
@@ -4036,7 +4019,7 @@ class DataFrameTable(DataTable):
             df_filtered = lf.filter(expr).collect()
         except Exception as e:
             self.histories_undo.pop()  # Remove last history entry
-            self.notify(f"Error applying filter [$error]{expr_str}[/]", title="View Rows", severity="error", timeout=10)
+            self.notify(f"Failed to apply filter [$error]{expr_str}[/]", title="View Rows", severity="error")
             self.log(f"Error applying filter `{expr_str}`: {e}")
             return
 
@@ -4071,7 +4054,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        self.notify(f"Showing [$success]{matched_count}[/] matching row(s)", title="View Rows")
+        self.notify(f"Displayed [$success]{matched_count}[/] matching row(s)", title="View Rows")
 
     def do_filter_rows_value(self) -> None:
         """Filter current dataframe rows by a condition on the current numeric column.
@@ -4135,7 +4118,7 @@ class DataFrameTable(DataTable):
         try:
             df_filtered = self.df.lazy().filter(expr).collect()
         except Exception as e:
-            self.notify(f"Error applying filter [$error]{expr}[/]", title="Filter Rows", severity="error", timeout=10)
+            self.notify(f"Failed to apply filter [$error]{expr}[/]", title="Filter Rows", severity="error")
             self.log(f"Error applying filter `{expr}`: {e}")
             return
 
@@ -4298,9 +4281,7 @@ class DataFrameTable(DataTable):
             try:
                 expr = validate_expr(term, self.df.columns, cidx, self.df)
             except Exception as e:
-                self.notify(
-                    f"Error validating expression [$error]{term}[/]", title="Select Rows", severity="error", timeout=10
-                )
+                self.notify(f"Failed to validate expression [$error]{term}[/]", title="Select Rows", severity="error")
                 self.log(f"Error validating expression `{term}`: {e}")
                 return
 
@@ -4324,7 +4305,7 @@ class DataFrameTable(DataTable):
                     except Exception as e:
                         expr = pl.col(col_name) == term
                         self.notify(
-                            f"Error evaling for column [$warning]{col_name}[/]. Cast to string.",
+                            f"Failed to evaluate values for column [$warning]{col_name}[/]. Casting to string.",
                             title="Select Rows",
                         )
                         self.log(f"Error evaling term `{term}` for list column `{col_name}`: {e}")
@@ -4338,7 +4319,7 @@ class DataFrameTable(DataTable):
                 except Exception:
                     expr = handle_term(term, col_name, match_nocase, match_whole, match_literal, cast_to_str=True)
                     self.notify(
-                        f"Error converting [$error]{term}[/] to [$accent]{dtype}[/]. Cast to string.",
+                        f"Failed to convert [$error]{term}[/] to [$accent]{dtype}[/]. Casting to string.",
                         title="Select Rows",
                         severity="warning",
                     )
@@ -4354,7 +4335,7 @@ class DataFrameTable(DataTable):
         try:
             ok_rids = set(lf.filter(expr).collect()[RID])
         except Exception as e:
-            self.notify(f"Error applying filter [$error]{term}[/]", title="Select Rows", severity="error", timeout=10)
+            self.notify(f"Failed to apply filter [$error]{term}[/]", title="Select Rows", severity="error")
             self.log(f"Error applying filter `{term}`: {e}")
             return
 
@@ -4431,10 +4412,8 @@ class DataFrameTable(DataTable):
         """Clear all selected rows and matches without removing them from the dataframe."""
         # Check if any selected rows or matches
         if not self.selected_rows and not self.matches:
-            # self.notify("No selections to clear", title="Clear Selections and Matches", severity="warning")
+            self.notify("No selections to clear", title="Clear Selections and Matches", severity="warning")
             return
-
-        # row_count = len(self.selected_rows | set(self.matches.keys()))
 
         # Add to history
         self.add_history("Clear all selections and matches")
@@ -4446,7 +4425,8 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        # self.notify(f"Cleared selections for [$success]{row_count}[/] rows", title="Clear Selections and Matches")
+        row_count = len(self.selected_rows | set(self.matches.keys()))
+        self.notify(f"Cleared selections for [$success]{row_count}[/] rows", title="Clear Selections and Matches")
 
     # Copy
     def do_copy_to_clipboard(self, content: str, message: str) -> None:
@@ -4470,7 +4450,7 @@ class DataFrameTable(DataTable):
             )
             self.notify(message, title="Copy to Clipboard")
         except FileNotFoundError:
-            self.notify("Error copying to clipboard", title="Copy to Clipboard", severity="error", timeout=10)
+            self.notify("Failed to copy to clipboard", title="Copy to Clipboard", severity="error")
 
     # SQL Interface
     def do_simple_sql(self) -> None:
@@ -4534,7 +4514,7 @@ class DataFrameTable(DataTable):
                 return
 
         except Exception as e:
-            self.notify(f"Error executing SQL query [$error]{sql}[/]", title="SQL Query", severity="error", timeout=10)
+            self.notify(f"Failed to execute SQL query [$error]{sql}[/]", title="SQL Query", severity="error")
             self.log(f"Error executing SQL query `{sql}`: {e}")
             return
 
