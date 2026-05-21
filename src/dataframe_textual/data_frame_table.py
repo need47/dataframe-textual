@@ -1848,7 +1848,7 @@ class DataFrameTable(DataTable):
         # Restore state
         self.apply_history(history)
 
-        self.notify(history.description, title="Undo", markup=False)
+        self.notify(history.description, title="Undo")
 
     def do_redo(self) -> None:
         """Redo the last undone action."""
@@ -1866,7 +1866,7 @@ class DataFrameTable(DataTable):
         # Restore state
         self.apply_history(history)
 
-        self.notify(description, title="Redo", markup=False)
+        self.notify(description, title="Redo")
 
     def do_reset(self) -> None:
         """Reset the table to the initial state."""
@@ -4036,9 +4036,7 @@ class DataFrameTable(DataTable):
             df_filtered = lf.filter(expr).collect()
         except Exception as e:
             self.histories_undo.pop()  # Remove last history entry
-            self.notify(
-                f"Error applying filter: {expr_str}", title="View Rows", severity="error", timeout=10, markup=False
-            )
+            self.notify(f"Error applying filter [$error]{expr_str}[/]", title="View Rows", severity="error", timeout=10)
             self.log(f"Error applying filter `{expr_str}`: {e}")
             return
 
@@ -4046,7 +4044,10 @@ class DataFrameTable(DataTable):
         if not matched_count:
             self.histories_undo.pop()  # Remove last history entry
             self.notify(
-                f"No rows match the expression: {expr_str}", title="View Rows", severity="warning", markup=False
+                f"No rows match the expression: [$error]{expr_str}[/]",
+                title="View Rows",
+                severity="warning",
+                markup=True,
             )
             return
 
@@ -4134,7 +4135,7 @@ class DataFrameTable(DataTable):
         try:
             df_filtered = self.df.lazy().filter(expr).collect()
         except Exception as e:
-            self.notify(f"Error applying filter: {expr}", title="Filter Rows", severity="error", timeout=10)
+            self.notify(f"Error applying filter [$error]{expr}[/]", title="Filter Rows", severity="error", timeout=10)
             self.log(f"Error applying filter `{expr}`: {e}")
             return
 

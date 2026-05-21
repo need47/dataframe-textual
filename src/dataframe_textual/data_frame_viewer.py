@@ -6,8 +6,10 @@ from textwrap import dedent
 
 import polars as pl
 from textual.app import App, ComposeResult
+from textual.content import Content
 from textual.css.query import NoMatches
 from textual.events import Click
+from textual.markup import MarkupError
 from textual.widgets import TabbedContent, TabPane
 from textual.widgets.tabbed_content import ContentTab, ContentTabs
 
@@ -112,6 +114,43 @@ class DataFrameViewer(App):
         self.theme = theme
         self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel = None
+
+    def notify(
+        self,
+        message: str,
+        *,
+        title: str = "",
+        severity: str = "information",
+        timeout: float | None = None,
+        markup: bool = True,
+    ) -> None:
+        """Show a notification, falling back to plain text on invalid markup.
+
+        Args:
+            message: The notification message.
+            title: The notification title.
+            severity: Notification severity.
+            timeout: Optional notification timeout in seconds.
+            markup: Whether the message should be interpreted as Rich markup.
+        """
+
+        if markup:
+            self.log(f"Attempting to show notification with markup: {message!r}")
+            try:
+                Content.from_markup(message)
+            except MarkupError as error:
+                self.log(f"Invalid notification markup; falling back to plain text: {error}; message={message!r}")
+                message = (
+                    message.replace("[/]", "")
+                    .replace("[$error]", "")
+                    .replace("[$success]", "")
+                    .replace("[$warning]", "")
+                    .replace("[$accent]", "")
+                )
+                super().notify(message, title=title, severity=severity, timeout=timeout, markup=False)
+                return
+
+        super().notify(message, title=title, severity=severity, timeout=timeout, markup=markup)
 
     @property
     def active_table(self) -> DataFrameTable | None:
