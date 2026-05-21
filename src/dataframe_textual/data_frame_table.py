@@ -1244,6 +1244,9 @@ class DataFrameTable(DataTable):
         if row_idx < len(self.rows) and col_idx < len(self.columns):
             self.move_cursor(row=row_idx, column=col_idx)
 
+        # # Use the app's set_status_context method to set the current context for status messages
+        # self.app._set_status_context(self)
+
     def determine_column_widths(self) -> dict[str, int]:
         """Determine optimal width for each column based on data type and content.
 
@@ -1880,7 +1883,7 @@ class DataFrameTable(DataTable):
         self.dirty = False
 
         self.setup_table()
-        self.notify("Restored initial state", title="Reset")
+        self.notify("Restored to initial state", title="Reset")
 
     # Display
     def do_cycle_cursor_type(self) -> None:

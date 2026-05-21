@@ -186,17 +186,18 @@ class DataFrameViewer(App):
             table: Optional active table to render context from.
         """
         table = table or self.active_table
-        if table is None:
-            context = "No file | 0 rows x 0 cols"
-        else:
+        row_count, column_count = 0, 0
+        if table is not None:
             if table.df is not None:
-                row_count = f"{len(table.df):,}"
-                column_count = len(table.df.columns)
+                row_count = len(table.df)
+                column_count = len(table.df.columns) - 1  # Exclude the hidden RID column
             else:
-                row_count = f"{table.loaded_rows:,}+"
-                column_count = len(table.lf.collect_schema().names())
+                row_count = table.loaded_rows
+                column_count = len(table.lf.collect_schema().names()) - 1  # Exclude the hidden RID column
 
-            context = f"{Path(table.filename).name} | {row_count} rows x {column_count:,} cols"
+        filename = Path(table.filename).name if table else "No file"
+        main_or_view = "Main" if table is None or table.df_view is None else "View"
+        context = f"{filename} | {main_or_view} | {row_count:,} rows x {column_count:,} cols"
 
         self.status_context = context
         self.status_context_bar.update(context)
@@ -786,6 +787,7 @@ class DataFrameViewer(App):
                 table.df_view = None
                 table.setup_table()
 
+                self.notify("Returned to main table", title="Close View")
                 return
 
             def _on_save_confirm(result: bool) -> None:
