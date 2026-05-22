@@ -161,7 +161,6 @@ class DataFrameViewer(App):
         if not markup:
             return message, False
 
-        self.log(f"Attempting to show notification with markup: {message!r}")
         try:
             Content.from_markup(message)
         except MarkupError as error:

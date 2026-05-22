@@ -4133,7 +4133,7 @@ class DataFrameTable(DataTable):
             return
 
         if len(df_filtered) == 0:
-            self.notify("Filter results in zero rows. No changes applied.", title="Filter Rows", severity="warning")
+            self.notify("Filter results in zero row. No changes applied.", title="Filter Rows", severity="warning")
             return
 
         col_name = self.cursor_col_name

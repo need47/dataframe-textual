@@ -33,11 +33,11 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "polars>=1.39.3",
     "fastexcel>=0.16.0",
     "xlsxwriter>=3.2.9",
     "textual[syntax]>=8.0.2",
     "vortex-data>=0.71.0",
+    "polars>=1.41.0",
 ]
 
 [project.urls]
