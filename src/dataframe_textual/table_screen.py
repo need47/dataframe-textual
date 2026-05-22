@@ -1090,10 +1090,11 @@ class CellDetailScreen(TableModalScreen):
 class BarScreen(TableModalScreen):
     """Modal screen to display labels and values of a DataFrame as bars."""
 
-    def __init__(self, df: pl.DataFrame, cidx: int) -> None:
+    def __init__(self, df: pl.DataFrame, cidx: int, cidx_label: int) -> None:
         super().__init__()
         self.df = df
         self.cidx = cidx
+        self.cidx_label = cidx_label
 
     def on_mount(self) -> None:
         """Start bar calculation."""
@@ -1110,7 +1111,7 @@ class BarScreen(TableModalScreen):
         self.table.clear(columns=True)
 
         # Create bar table
-        label_col = self.df.columns[0]
+        label_col = self.df.columns[self.cidx_label]
         data_col = self.df.columns[self.cidx]
         dtype = self.df.dtypes[self.cidx]
         dc = DtypeConfig(dtype)

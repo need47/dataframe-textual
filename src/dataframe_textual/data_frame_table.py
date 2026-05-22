@@ -1982,7 +1982,9 @@ class DataFrameTable(DataTable):
             )
             return
 
-        self.app.push_screen(BarScreen(self.df, cidx))
+        col_label = self.get_col_key(0).value
+        cidx_label = self.df.columns.index(col_label)
+        self.app.push_screen(BarScreen(self.df, cidx, cidx_label))
 
     def do_show_statistics(self, cidx: int | None = None) -> None:
         """Show statistics for the current column or entire dataframe.
