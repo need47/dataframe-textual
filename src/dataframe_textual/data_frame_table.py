@@ -55,7 +55,6 @@ from .table_screen import (
     FrequencyScreen,
     HistogramScreen,
     MetaColumnScreen,
-    MetaShape,
     RowDetailScreen,
     StatisticsScreen,
 )
@@ -203,8 +202,7 @@ class DataFrameTable(DataTable):
         - **s** - 📈 Show statistics for current column
         - **S** - 📊 Show statistics for entire dataframe
         - **=** - 📊 Show histogram using first column as label and current column as value
-        - **m** - 📐 Show dataframe metadata (row/column counts)
-        - **M** - 📋 Show column metadata (ID, name, type)
+        - **m** - 📋 Show column metadata (ID, name, type)
         - **h** - 👁️ Hide current column
         - **H** - 👀 Show all hidden columns
         - **_** - 📏 Toggle column full width
@@ -313,8 +311,7 @@ class DataFrameTable(DataTable):
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
         ("ctrl+r", "copy_row", "Copy row to clipboard"),
         # Metadata, Detail, Frequency, and Statistics
-        ("m", "metadata_shape", "Show metadata for row count and column count"),
-        ("M", "metadata_column", "Show metadata for column"),
+        ("m", "metadata_column", "Show metadata for column"),
         ("enter", "view_row_detail", "View row details"),
         ("tab", "view_cell_detail", "View cell details"),
         ("F", "show_frequency", "Show frequency for current column"),
@@ -949,11 +946,6 @@ class DataFrameTable(DataTable):
 
         """
         self.do_show_statistics(cidx)
-
-    @wait_full_df
-    def action_metadata_shape(self) -> None:
-        """Show metadata about the dataframe (row and column counts)."""
-        self.do_metadata_shape()
 
     def action_metadata_column(self) -> None:
         """Show metadata for the current column."""
@@ -1999,10 +1991,6 @@ class DataFrameTable(DataTable):
             # Show statistics for current column or specified column
             cidx = self.cursor_cidx if cidx is None else cidx
             self.app.push_screen(StatisticsScreen(self, cidx=cidx))
-
-    def do_metadata_shape(self) -> None:
-        """Show metadata about the dataframe (row and column counts)."""
-        self.app.push_screen(MetaShape(self))
 
     def do_metadata_column(self) -> None:
         """Show metadata for all columns in the dataframe."""
@@ -4512,14 +4500,9 @@ class DataFrameTable(DataTable):
             sql: The SQL query string to execute.
             new_tab: Whether to show results in a new tab or update the current view.
         """
-
+        # $# is a special placeholder for the row identifier column, which is used for filtering and selection.
+        # Replace it with the actual expression to get the row index (1-based).
         sql = sql.replace("$#", f"(`{RID}` + 1)")
-        if RID not in sql and "*" not in sql and "group by" not in sql.lower():
-            # Ensure RID is selected
-            import re
-
-            RE_FROM_SELF = re.compile(r"\bFROM\s+self\b", re.IGNORECASE)
-            sql = RE_FROM_SELF.sub(f", `{RID}` FROM self", sql)
 
         # Execute the SQL query
         try:

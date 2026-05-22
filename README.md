@@ -289,8 +289,7 @@ dv data.csv -o data.parquet
 | `s`              | Show statistics for current column                                     |
 | `S`              | Show statistics for entire dataframe                                   |
 | `=`              | Show histogram using first column as label and current column as value |
-| `m`              | Show metadata for file name, row count, and column count               |
-| `M`              | Show metadata for columns (e.g., data types)                           |
+| `m`              | Show metadata for columns (e.g., data types)                           |
 | `K`              | Cycle cursor types: cell → row → column → cell                         |
 | `~`              | Toggle row labels                                                      |
 | `_` (underscore) | Toggle column full width                                               |
@@ -629,18 +628,12 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - Multi-column sorting supported (press multiple times on different columns)
 - Press same key twice to remove the current column from sorting
 
-### 9. Dataframe & Column Metadata
+### 9. Column Metadata
 
-View quick metadata about your dataframe and columns to understand their structure and content.
+View quick metadata about your columns to understand their structure and content.
 
-**Dataframe Metadata** (`m`):
-- Press `m` to open a modal displaying:
-  - **File Name** - File name of current file
-  - **Row Count** - Total number of rows in the dataframe
-  - **Column Count** - Total number of columns in the dataframe
-
-**Column Metadata** (`M`):
-- Press `M` to open a modal displaying details for all columns:
+**Column Metadata** (`m`):
+- Press `m` to open a modal displaying details for all columns:
   - **Column** - Column name
   - **Type** - Data type (e.g., Int64, String, Float64, Boolean)
 

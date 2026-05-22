@@ -10,7 +10,6 @@ from .data_frame_viewer import DataFrameViewer
 from .table_screen import (
     FrequencyScreen,
     MetaColumnScreen,
-    MetaShape,
     RowDetailScreen,
     StatisticsScreen,
     TableScreen,
@@ -43,7 +42,6 @@ __all__ = [
     "FrequencyScreen",
     "History",
     "MetaColumnScreen",
-    "MetaShape",
     "OpenFileScreen",
     "RenameColumnScreen",
     "RenameTabScreen",

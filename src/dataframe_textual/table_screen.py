@@ -906,43 +906,6 @@ class HistogramScreen(TableScreen):
         )
 
 
-class MetaShape(TableScreen):
-    """Modal screen to display metadata about the dataframe."""
-
-    def on_mount(self) -> None:
-        """Initialize the metadata screen.
-
-        Populates the table with metadata information about the dataframe,
-        including row and column counts.
-        """
-        self.table.loading = True
-        self._calc_metashape()
-
-    @work(thread=True)
-    def _calc_metashape(self) -> None:
-        """Calculate metadata shape."""
-        self.app.call_from_thread(self._on_calc_ready)
-
-    def build_table(self) -> None:
-        """Build the metadata table."""
-        self.table.clear(columns=True)
-        self.table.add_column("", key="metadata")
-        self.table.add_column(Text("Value", justify="right"), key="value")
-
-        # Get shape information
-        num_rows, num_cols = self.dftable.df.shape
-        num_cols -= 1  # Exclude RID column
-        dc_int = DtypeConfig(pl.Int64)
-        dc_str = DtypeConfig(pl.String)
-
-        # Add rows to the table
-        self.table.add_row("File Name", dc_str.format(self.dftable.filename, justify="right"))
-        self.table.add_row("Row Count", dc_int.format(num_rows, thousand_separator=self.thousand_separator))
-        self.table.add_row("Column Count", dc_int.format(num_cols, thousand_separator=self.thousand_separator))
-
-        self.table.cursor_type = "none"
-
-
 class MetaColumnScreen(TableScreen):
     """Modal screen to display metadata about the columns in the dataframe."""
 
