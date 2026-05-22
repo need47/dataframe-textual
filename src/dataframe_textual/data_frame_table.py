@@ -2123,7 +2123,7 @@ class DataFrameTable(DataTable):
         self.setup_table()
 
         self.notify(
-            f"{'Showing' if self.show_rid else 'Hiding'} internal RID column. Press [$accent]^[/] to toggle",
+            f"{'Showing' if self.show_rid else 'Hiding'} internal RID column. Press [$accent]^[/] to toggle.",
             title="Toggle RID",
         )
 
@@ -2247,12 +2247,12 @@ class DataFrameTable(DataTable):
         self.move_cursor(column=col_idx, row=0)
 
         if not sort_cols:
-            self.notify("Removed sorting, restored original order", title="Sort")
+            self.notify("Restored original order", title="Sort")
         elif col_name not in sort_cols:
             self.notify(f"Removed column [$success]{col_name}[/] from sort", title="Sort")
         else:
             self.notify(
-                f"Sorted by column [$success]{col_name}[/] in {'descending' if descending else 'ascending'} order",
+                f"Sorted by column [$success]{col_name}[/] in {'descending' if descending else 'ascending'} order. Press again to remove from sort.",
                 title="Sort",
             )
 
@@ -3054,7 +3054,7 @@ class DataFrameTable(DataTable):
         self.setup_table()
 
         self.notify(
-            f"Removed [$success]{removed_count}[/] duplicate row(s), now [$success]{len(self.df)}[/] row(s) remaining",
+            f"Removed [$success]{removed_count}[/] duplicate row(s), now [$accent]{len(self.df)}[/] row(s) remaining",
             title="Unique Rows",
         )
 

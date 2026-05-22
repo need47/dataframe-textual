@@ -1020,7 +1020,7 @@ class NewTabScreen(YMNScreen):
         with Container(id="new-tab-container") as container:
             container.border_title = "New Tab from Polars expression"
             yield TextArea.code_editor(
-                placeholder="Enter expression, e.g., \n\n- $2 > 30\n\n- self.select('name', 'age')\n\n- self.filter($age > 30)\n\n* use $1, $2, ... for column references by index\n* use $column_name for column references by name\n* use 'self' to reference the current data frame",
+                placeholder="Enter expression, e.g., \n\n- $2 > 30\n\n- self.select('name', 'age')\n\n- self.filter($age > 30)\n\n* use $1, $2, ... for column references by index\n* use $column_name for column references by name\n* use 'self' to reference the current dataframe",
                 id="new-tab-textarea",
                 language="python",
                 tab_behavior="focus",  # Tab to focus next and allow Esc to exit
