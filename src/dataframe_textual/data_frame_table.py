@@ -2134,6 +2134,11 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
+        self.notify(
+            f"{'Showing' if self.show_rid else 'Hiding'} internal RID column. Press [$accent]^[/] to toggle",
+            title="Toggle RID",
+        )
+
     def do_set_cursor_row_as_header(self) -> None:
         """Set cursor row as the new header row."""
         ridx = self.cursor_ridx
@@ -2519,7 +2524,7 @@ class DataFrameTable(DataTable):
             self.log(f"Error clearing cell ({ridx}, {col_name}): {e}")
 
     def do_clear_column(self) -> None:
-        """Clear the current column by setting all its values to None."""
+        """Clear cells in the current column that match the cursor value by setting them to None."""
         col_idx = self.cursor_column
         col_name = self.cursor_col_name
         value = self.cursor_value
@@ -2548,7 +2553,9 @@ class DataFrameTable(DataTable):
             # Move cursor to the cleared column
             self.move_cursor(column=col_idx)
 
-            self.notify(f"Cleared column [$success]{col_name}[/]", title="Clear Column")
+            self.notify(
+                f"Cleared cells matching [$success]{value}[/] in column [$accent]{col_name}[/]", title="Clear Column"
+            )
         except Exception as e:
             self.notify(f"Failed to clear column [$error]{col_name}[/]", title="Clear Column", severity="error")
             self.log(f"Error clearing column `{col_name}`: {e}")
@@ -2573,7 +2580,7 @@ class DataFrameTable(DataTable):
 
         try:
             # Create an empty column (all None values)
-            new_col_name = pl.lit(None).alias(new_col_name)
+            new_col = pl.lit(None).alias(new_col_name)
 
             # Get columns up to current, the new column, then remaining columns
             cols = self.df.columns
@@ -2581,12 +2588,12 @@ class DataFrameTable(DataTable):
             cols_after = cols[cidx + 1 :]
 
             # Build the new dataframe with columns reordered
-            select_cols = cols_before + [new_col_name] + cols_after
-            self.df = self.df.lazy().with_columns(new_col_name).select(select_cols).collect()
+            select_cols = cols_before + [new_col] + cols_after
+            self.df = self.df.lazy().with_columns(new_col).select(select_cols).collect()
 
             # Also update the view if applicable
             if self.df_view is not None:
-                self.df_view = self.df_view.lazy().with_columns(new_col_name).select(select_cols).collect()
+                self.df_view = self.df_view.lazy().with_columns(new_col).select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -3428,7 +3435,9 @@ class DataFrameTable(DataTable):
         match_count = sum(len(cols) for cols in matches.values())
         self.matches = matches
 
-        self.notify(f"Found [$success]{match_count}[/] matches for `[$accent]{term}[/]`", title=title)
+        message = f"Found [$success]{match_count}[/] matches for `[$accent]{term}[/]`"
+        message += f" in [$accent]{col_name}[/]" if scope == "column" else " across all columns"
+        self.notify(message, title=title)
 
         # Recreate table for display
         self.setup_table()
@@ -4516,9 +4525,7 @@ class DataFrameTable(DataTable):
         try:
             df_filtered = add_rid_column(self.df.lazy().sql(sql)).collect()
             if len(df_filtered) == 0:
-                self.notify(
-                    f"SQL query returned no results for [$warning]{sql}[/]", title="SQL Query", severity="warning"
-                )
+                self.notify(f"Query returned no results for [$warning]{sql}[/]", title="SQL Query", severity="warning")
                 return
 
         except Exception as e:
@@ -4549,6 +4556,6 @@ class DataFrameTable(DataTable):
         self.setup_table()
 
         self.notify(
-            f"SQL query executed successfully. Now showing [$accent]{len(self.df)}[/] rows and [$accent]{len(self.df.columns)}[/] columns.",
+            f"Query executed successfully. Now showing [$accent]{len(self.df)}[/] rows and [$accent]{len(self.df.columns)}[/] columns.",
             title="SQL Query",
         )
