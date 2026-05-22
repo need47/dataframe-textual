@@ -2012,6 +2012,7 @@ class DataFrameTable(DataTable):
         """Toggle the freeze."""
         if self.fixed_rows or self.fixed_columns:
             self.fixed_rows = self.fixed_columns = 0
+            self.notify("Unfreezed all rows and columns", title="Freeze Row/Column")
         else:
             self.app.push_screen(FreezeScreen(), callback=self.toggle_freeze_row_column)
 
@@ -2089,13 +2090,14 @@ class DataFrameTable(DataTable):
         # If already expanded, shrink back to label width
         if col_name in self.expanded_columns:
             col.width = max(label_width, COLUMN_WIDTH_CAP)
+            new_width = col.width
             self.expanded_columns.remove(col_name)
 
         # If not expanded, check if we need to expand by comparing label width to max cell width in loaded rows
         else:
             try:
                 need_expand = False
-                max_width = label_width
+                new_width = label_width
 
                 # Scan through all loaded rows that are visible to find max width
                 for row_start, row_end in self.loaded_ranges:
@@ -2103,16 +2105,16 @@ class DataFrameTable(DataTable):
                         cell_value = str(self.df.item(ridx, cidx))
                         cell_width = measure(self.app.console, cell_value, 1)
 
-                        if cell_width > max_width:
+                        if cell_width > new_width:
                             need_expand = True
-                            max_width = cell_width
+                            new_width = cell_width
 
                 if not need_expand:
                     return
 
                 # Update the column width
                 self.expanded_columns.add(col_name)
-                col.width = max_width
+                col.width = new_width
 
             except Exception as e:
                 self.notify(f"Failed to expand column [$error]{col_name}[/]", title="Expand Column", severity="error")
@@ -2123,7 +2125,7 @@ class DataFrameTable(DataTable):
         self._require_update_dimensions = True
         self.refresh(layout=True)
 
-        self.notify(f"Expanded column [$success]{col_name}[/] to width [$accent]{max_width}[/]", title="Expand Column")
+        self.notify(f"Expanded column [$success]{col_name}[/] to width [$accent]{new_width}[/]", title="Expand Column")
 
     def do_toggle_rid(self) -> None:
         """Toggle display of the internal RID column."""
