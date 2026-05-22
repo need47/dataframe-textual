@@ -417,7 +417,7 @@ class EditCellScreen(YesNoScreen):
             on_yes_callback=self._validate_input,
         )
 
-    def _validate_input(self) -> None:
+    def _validate_input(self) -> tuple[int, int, str | None] | None:
         """Validate and save the edited value."""
         new_value_str = self.input.value  # Do not strip to preserve spaces
 
@@ -472,7 +472,7 @@ class SearchScreen(YesNoScreen):
             on_yes_callback=self._get_input,
         )
 
-    def _get_input(self) -> tuple[str, int, bool, bool, bool, bool]:
+    def _get_input(self) -> dict:
         """Get input."""
         term = self.input.value  # Do not strip to preserve spaces
         match_nocase = self.checkbox.value
@@ -540,7 +540,7 @@ class RenameColumnScreen(YesNoScreen):
             on_yes_callback=self._validate_input,
         )
 
-    def _validate_input(self) -> None:
+    def _validate_input(self) -> tuple[int, str, Any]:
         """Validate and save the new column name."""
         new_name = self.input.value.strip()
 
@@ -609,7 +609,7 @@ class AddColumnScreen(YesNoScreen):
             on_yes_callback=self._get_input,
         )
 
-    def _get_input(self) -> tuple[int, str, str] | None:
+    def _get_input(self) -> tuple[int, str, Any] | None:
         """Validate and return the new column configuration."""
         col_name = self.input.value.strip()
         term = self.input2.value  # Do not strip to preserve spaces
@@ -712,7 +712,7 @@ class FindReplaceScreen(YesNoScreen):
             on_maybe_callback=partial(self._get_input, replace_all=True),
         )
 
-    def _get_input(self, replace_all: bool = False) -> tuple[bool, str, str, bool, bool, bool]:
+    def _get_input(self, replace_all: bool = False) -> dict:
         """Get input."""
         term_find = self.input.value  # Do not strip to preserve spaces
         term_replace = self.input2.value  # Do not strip to preserve spaces
@@ -745,7 +745,7 @@ class RenameTabScreen(YesNoScreen):
             on_yes_callback=self._validate_input,
         )
 
-    def _validate_input(self) -> None:
+    def _validate_input(self) -> tuple[ContentTab, str] | None:
         """Validate and save the new tab name."""
         new_name = self.input.value.strip()
 
@@ -933,7 +933,7 @@ class SimpleSqlScreen(YMNScreen):
             yield Input(placeholder="e.g., age > 30 and height < 180", id="where-input")
             yield from super().compose()
 
-    def handle_simple(self, new_tab: bool = False) -> None:
+    def handle_simple(self, new_tab: bool = False) -> tuple[str, str, bool]:
         """Handle Yes button/Enter key press."""
         selections = self.query_one(SelectionList).selected
         if not selections:
@@ -989,7 +989,7 @@ class AdvancedSqlScreen(YMNScreen):
             )
             yield from super().compose()
 
-    def handle_advanced(self, new_tab: bool = False) -> None:
+    def handle_advanced(self, new_tab: bool = False) -> tuple[str, bool]:
         """Handle Yes button/Enter key press."""
         return self.query_one(TextArea).text.strip(), new_tab
 
@@ -1027,7 +1027,7 @@ class NewTabScreen(YMNScreen):
             )
             yield from super().compose()
 
-    def _get_input(self) -> None:
+    def _get_input(self) -> str:
         """Handle Yes button/Enter key press."""
         return self.query_one(TextArea).text.strip()
 
@@ -1112,7 +1112,7 @@ class FilterNumericScreen(YMNScreen):
             )
             yield from super().compose()
 
-    def _get_input(self) -> pl.Expr | None:
+    def _get_input(self) -> tuple[pl.Expr | None, int]:
         """Handle Yes button/Enter key press."""
         col = self.s.name
         expr: pl.Expr | None = None
@@ -1236,7 +1236,7 @@ class FilterTemporalScreen(YMNScreen):
             )
             yield from super().compose()
 
-    def _temporal_literal(self, value: str) -> pl.Expr:
+    def _temporal_literal(self, value: str) -> pl.Expr | None:
         """Build a typed temporal literal for comparisons.
 
         Args:
@@ -1540,7 +1540,7 @@ class FilterStringScreen(YMNScreen):
                 yield Checkbox("Reverse", id="checkbox-reverse", tooltip="Invert the match result")
             yield from super().compose()
 
-    def _get_input(self) -> pl.Expr | None:
+    def _get_input(self) -> tuple[pl.Expr | None, int]:
         """Handle Yes button/Enter key press."""
         col = self.s.name
         expr: pl.Expr | None = None

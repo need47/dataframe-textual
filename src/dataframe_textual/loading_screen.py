@@ -1,6 +1,6 @@
 """A theme screen to select theme from a list of available themes."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
@@ -27,7 +27,7 @@ class LoadingScreen(ModalScreen):
         }
     """
 
-    def __init__(self, dftable: "DataFrameTable", callback: callable = None) -> None:
+    def __init__(self, dftable: "DataFrameTable", callback: Callable = None) -> None:
         super().__init__()
         self.dftable = dftable
         self.callback = callback
@@ -67,7 +67,7 @@ class BusyScreen(ModalScreen):
         }
     """
 
-    def __init__(self, dftable: "DataFrameTable", task: callable) -> None:
+    def __init__(self, dftable: "DataFrameTable", task: Callable) -> None:
         super().__init__()
         self.dftable = dftable
         self.run_task = task

@@ -166,7 +166,7 @@ class TableModalScreen(ModalScreen):
 
             self.table.add_row(*formatted_row, key=str(ridx), label=str(ridx + 1))
 
-    def sort_by_column(self, descending: bool = False) -> None:
+    def sort_by_column(self, descending: bool) -> None:
         """Sort the table by the current column.
 
         Args:
@@ -235,7 +235,7 @@ class TableScreen(TableModalScreen):
         super().__init__()
         self.dftable = dftable
 
-    def sort_by_column(self, descending=False):
+    def sort_by_column(self, descending: bool) -> None:
         # Override to disable sorting in TableScreen, but subclasses can still implement their own sorting if desired.
         pass
 
@@ -514,7 +514,7 @@ class StatisticsScreen(TableScreen):
         # Set cursor type based on whether this is dataframe stats (column cursor) or column stats (row cursor)
         self.table.cursor_type = "column" if self.cidx is None else "row"
 
-    def build_df(self) -> pl.DataFrame:
+    def build_df(self) -> None:
         """Get the dataframe to use for statistics."""
         if self.cidx is None:
             lf = self.dftable.df.lazy().select(pl.exclude(RID))
@@ -777,7 +777,7 @@ class FrequencyScreen(TableScreen):
         # order = "desc" if descending else "asc"
         # self.notify(f"Sorted by [on $primary]{col_name}[/] ({order})", title="Sort")
 
-    def get_cidx_name_value(self) -> tuple[str, str, str] | None:
+    def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
         row_idx = self.table.cursor_row
         if row_idx >= len(self.df[:, 0]):  # first column
             return None  # Skip the last `Total` row
@@ -961,7 +961,7 @@ class MetaColumnScreen(TableScreen):
 
         self.table.cursor_type = "row"
 
-    def get_cidx_name_value(self) -> int | None:
+    def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
         """Get the current column info."""
         cidx = self.table.cursor_row
         if cidx >= len(self.dftable.df.columns):

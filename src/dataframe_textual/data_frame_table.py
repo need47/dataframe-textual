@@ -8,7 +8,7 @@ from functools import partial
 from itertools import zip_longest
 from pathlib import Path
 from textwrap import dedent
-from typing import Any
+from typing import Any, Callable
 
 import polars as pl
 from rich.text import Text, TextType
@@ -505,7 +505,7 @@ class DataFrameTable(DataTable):
 
         self.notify("Data fully loaded", title="Load DataFrame")
 
-    def wait_full_df(func):
+    def wait_full_df(func: Callable) -> Callable:
         """Decorator to ensure the dataframe is fully loaded before executing a method.
 
         If the dataframe is not loaded, show a loading indicator and schedule the
@@ -549,7 +549,7 @@ class DataFrameTable(DataTable):
         return self.cursor_key.column_key
 
     @property
-    def cursor_col_name(self) -> str:
+    def cursor_col_name(self) -> str | None:
         """Get the current cursor column name as in dataframe.
 
         Returns:
@@ -653,7 +653,7 @@ class DataFrameTable(DataTable):
         """
         return super().get_row_index(row_key)
 
-    def get_row_key(self, row_idx: int) -> RowKey:
+    def get_row_key(self, row_idx: int) -> RowKey | None:
         """Get the row key for a given table row index.
 
         Args:
@@ -675,7 +675,7 @@ class DataFrameTable(DataTable):
         """
         return super().get_column_index(col_key)
 
-    def get_col_key(self, col_idx: int) -> ColumnKey:
+    def get_col_key(self, col_idx: int) -> ColumnKey | None:
         """Get the column key for a given table column index.
 
         Args:
@@ -1771,7 +1771,7 @@ class DataFrameTable(DataTable):
         self.load_rows_down()
 
     # History & Undo
-    def create_history(self, description: str) -> None:
+    def create_history(self, description: str) -> "History":
         """Create the initial history state."""
         return History(
             description=description,
@@ -2403,7 +2403,7 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Updated column [$accent]{col_name}[/] with [$success]{expr}[/]", title="Edit Column")
 
-    def do_rename_column(self, col_idx: int | None) -> None:
+    def do_rename_column(self, col_idx: int | None = None) -> None:
         """Open modal to rename the selected column."""
         col_idx = self.cursor_column if col_idx is None else col_idx
         col_name = self.get_col_key(col_idx).value
@@ -4500,9 +4500,8 @@ class DataFrameTable(DataTable):
             sql: The SQL query string to execute.
             new_tab: Whether to show results in a new tab or update the current view.
         """
-        # $# is a special placeholder for the row identifier column, which is used for filtering and selection.
-        # Replace it with the actual expression to get the row index (1-based).
-        sql = sql.replace("$#", f"(`{RID}` + 1)")
+        # handle special internal row identifier column references
+        sql = sql.replace('RID', RID).replace("$#", f"(`{RID}` + 1)")
 
         # Execute the SQL query
         try:
