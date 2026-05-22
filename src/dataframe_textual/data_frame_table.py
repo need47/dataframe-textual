@@ -1721,6 +1721,8 @@ class DataFrameTable(DataTable):
         """Go to the top of the table."""
         self.move_cursor(row=0)
 
+        self.notify("Moved to top of table", title="Go to Top")
+
     def do_go_bottom(self) -> None:
         """Go to the bottom of the table."""
         stop = len(self.df)
@@ -1734,6 +1736,8 @@ class DataFrameTable(DataTable):
 
         self.load_rows_range(start, stop)
         self.move_cursor(row=self.row_count - 1)
+
+        self.notify("Moved to bottom of table", title="Go to Bottom")
 
     def do_go_to_row(self) -> None:
         """Open a modal screen to Go to a specific row."""
@@ -1751,6 +1755,8 @@ class DataFrameTable(DataTable):
 
         ridx = result - 1  # Convert to 0-based index in the dataframe
         self.move_cursor_to(ridx, 0)
+
+        self.notify(f"Moved to row {result}", title="Go to Row")
 
     def do_page_up(self) -> None:
         """Move the cursor one page up."""
