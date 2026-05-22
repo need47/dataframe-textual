@@ -4421,6 +4421,8 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history("Clear all selections and matches")
 
+        row_count = len(self.selected_rows | set(self.matches.keys()))
+
         # Clear all selections
         self.selected_rows = set()
         self.matches = defaultdict(set)
@@ -4428,7 +4430,6 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        row_count = len(self.selected_rows | set(self.matches.keys()))
         self.notify(f"Cleared selections for [$success]{row_count}[/] rows", title="Clear Selections and Matches")
 
     # Copy
