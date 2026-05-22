@@ -58,7 +58,7 @@ class YMNScreen(ModalScreen):
     def __init__(
         self,
         yes: str | dict | Button = "Yes",
-        maybe: str | dict | Button = None,
+        maybe: str | dict | Button | None = None,
         no: str | dict | Button = "No",
         on_yes_callback=None,
         on_maybe_callback=None,
@@ -210,18 +210,18 @@ class YesNoScreen(YMNScreen):
 
     def __init__(
         self,
-        title: str = None,
-        label: str | dict | Label = None,
-        input: str | dict | Input = None,
-        label2: str | dict | Label = None,
-        input2: str | dict | Input = None,
-        label3: str | dict | Label = None,
-        checkbox: str | dict | Checkbox = None,
-        checkbox2: str | dict | Checkbox = None,
-        checkbox3: str | dict | Checkbox = None,
-        checkbox4: str | dict | Checkbox = None,
+        title: str | None = None,
+        label: str | dict | Label | None = None,
+        input: str | dict | Input | None = None,
+        label2: str | dict | Label | None = None,
+        input2: str | dict | Input | None = None,
+        label3: str | dict | Label | None = None,
+        checkbox: str | dict | Checkbox | None = None,
+        checkbox2: str | dict | Checkbox | None = None,
+        checkbox3: str | dict | Checkbox | None = None,
+        checkbox4: str | dict | Checkbox | None = None,
         yes: str | dict | Button = "Yes",
-        maybe: str | dict | Button = None,
+        maybe: str | dict | Button | None = None,
         no: str | dict | Button = "No",
         on_yes_callback=None,
         on_maybe_callback=None,
@@ -375,7 +375,7 @@ class ConfirmScreen(YesNoScreen):
         }
     """
 
-    def __init__(self, title: str, label=None, yes="Yes", maybe: str = None, no="No"):
+    def __init__(self, title: str, label=None, yes="Yes", maybe: str | None = None, no="No"):
         super().__init__(
             title=title,
             label=label,

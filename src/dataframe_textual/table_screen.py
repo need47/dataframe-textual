@@ -65,7 +65,7 @@ class TableModalScreen(ModalScreen):
         super().__init__()
         self.df = df  # DataFrame for this screen, to be set by subclasses
         self.thousand_separator = False  # Whether to use thousand separators in numbers
-        self.sorted_columns: dict[int, bool] = {}  # Track sorted columns and their sort order
+        self.sorted_columns: dict[str, bool] = {}  # Track sorted columns and their sort order
 
     def compose(self) -> ComposeResult:
         """Compose the table screen widget structure.
@@ -645,9 +645,15 @@ class FrequencyScreen(TableScreen):
     def __init__(self, dftable: "DataFrameTable", cidx: int) -> None:
         super().__init__(dftable)
         self.cidx = cidx
-        self.sorted_columns[1] = True  # Count sort by default
+        self.sorted_columns["Count"] = True  # Count sort by default
         self.total_count = len(dftable.df)
-        self.df: pl.DataFrame = None
+        self.col = self.dftable.df.columns[self.cidx]
+        self.columns = [
+            (self.col, "Value"),
+            ("Count", "Count"),
+            ("%", "%"),
+            ("Histogram", "Histogram"),
+        ]
 
     def on_mount(self) -> None:
         """Start frequency calculation."""
@@ -657,8 +663,7 @@ class FrequencyScreen(TableScreen):
     @work(thread=True)
     def _calculate_frequency(self) -> None:
         """Calculate frequency."""
-        col = self.dftable.df.columns[self.cidx]
-        self.df = self.dftable.df.lazy().select(pl.col(col).value_counts(sort=True)).unnest(col).collect()
+        self.df = self.dftable.df.lazy().select(pl.col(self.col).value_counts(sort=True)).unnest(self.col).collect()
         self.app.call_from_thread(self._on_calc_ready)
 
     def on_key(self, event):
@@ -686,29 +691,20 @@ class FrequencyScreen(TableScreen):
         self.table.clear(columns=True)
 
         # Create frequency table
-        column = self.dftable.df.columns[self.cidx]
         dtype = self.dftable.df.dtypes[self.cidx]
         dc = DtypeConfig(dtype)
 
-        # Add column headers with sort indicators
-        columns = [
-            (column, "Value", 0),
-            ("Count", "Count", 1),
-            ("%", "%", 2),
-            ("Histogram", "Histogram", 3),
-        ]
-
-        for display_name, key, col_idx_num in columns:
+        for display_name, col in self.columns:
             # Check if this column is sorted and add indicator
-            if col_idx_num in self.sorted_columns:
-                descending = self.sorted_columns[col_idx_num]
+            if col in self.sorted_columns:
+                descending = self.sorted_columns[col]
                 sort_indicator = " ▼" if descending else " ▲"
                 header_text = display_name + sort_indicator
             else:
                 header_text = display_name
 
-            justify = dc.justify if col_idx_num == 0 else ("right" if col_idx_num in (1, 2) else "left")
-            self.table.add_column(Text(header_text, justify=justify), key=key)
+            justify = dc.justify if col == "Value" else "right"
+            self.table.add_column(Text(header_text, justify=justify), key=col)
 
         # Get style config for Int64 and Float64
         dc_int = DtypeConfig(pl.Int64)
@@ -755,7 +751,7 @@ class FrequencyScreen(TableScreen):
     def sort_by_column(self, descending: bool) -> None:
         """Sort the dataframe by the selected column and refresh the main table."""
         row_idx, col_idx = self.table.cursor_coordinate
-        col_sort = col_idx
+        col_sort = self.columns[col_idx][1]
 
         if self.sorted_columns.get(col_sort) == descending:
             # self.notify("Already sorted in that order", title="Sort", severity="warning")
@@ -765,7 +761,7 @@ class FrequencyScreen(TableScreen):
         self.sorted_columns[col_sort] = descending
 
         # Percentage and Histogram use Count for sorting
-        col_name = self.df.columns[col_sort if col_sort in (0, 1) else 1]
+        col_name = self.df.columns[1 if col_idx >= 1 else 0]
         self.df = self.df.sort(col_name, descending=descending, nulls_last=True)
 
         # Rebuild the frequency table
@@ -804,13 +800,13 @@ class FrequencyScreen(TableScreen):
 class HistogramScreen(TableScreen):
     """Modal screen to display histogram of values in a column."""
 
-    def __init__(self, dftable: "DataFrameTable", bins: list[float] = None, bin_count: int = None) -> None:
+    def __init__(self, dftable: "DataFrameTable", bins: list[float] | None = None, bin_count: int | None = None) -> None:
         super().__init__(dftable)
         self.cidx = dftable.cursor_cidx
         self.bins = bins
         self.bin_count = bin_count
         self.total_count = len(dftable.df)
-        self.df: pl.DataFrame = None
+        self.df: pl.DataFrame | None = None
 
     def on_mount(self) -> None:
         """Start histogram calculation."""

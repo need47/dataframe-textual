@@ -969,7 +969,7 @@ class DataFrameTable(DataTable):
         self.do_filter_rows_value()
 
     @wait_full_df
-    def action_collect_rows(self, cidx: int = None, term: Any = None) -> None:
+    def action_collect_rows(self, cidx: int | None = None, term: Any = None) -> None:
         """Collect rows to a new tab based on the current selection or value."""
         self.do_collect_rows(cidx=cidx, term=term)
 
@@ -2263,7 +2263,7 @@ class DataFrameTable(DataTable):
             )
 
     # Edit
-    def do_edit_cell(self, ridx: int = None, cidx: int = None) -> None:
+    def do_edit_cell(self, ridx: int | None = None, cidx: int | None = None) -> None:
         """Open modal to edit the selected cell."""
         ridx = self.cursor_ridx if ridx is None else ridx
         cidx = self.cursor_cidx if cidx is None else cidx
@@ -2554,7 +2554,7 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to clear column [$error]{col_name}[/]", title="Clear Column", severity="error")
             self.log(f"Error clearing column `{col_name}`: {e}")
 
-    def do_add_column(self, col_name: str = None) -> None:
+    def do_add_column(self, col_name: str | None = None) -> None:
         """Add acolumn after the current column."""
         cidx = self.cursor_cidx
 
@@ -2609,7 +2609,7 @@ class DataFrameTable(DataTable):
         )
 
     @wait_full_df
-    def add_column_expr(self, result: tuple[int, str, str, pl.Expr] | None) -> None:
+    def add_column_expr(self, result: tuple[int, str, pl.Expr] | None) -> None:
         """Add a new column with an expression."""
         if result is None:
             return
@@ -2656,7 +2656,7 @@ class DataFrameTable(DataTable):
             callback=self.add_link_column,
         )
 
-    def add_link_column(self, result: tuple[str, str] | None) -> None:
+    def add_link_column(self, result: tuple[str, str, str] | None) -> None:
         """Handle result from AddLinkScreen.
 
         Creates a new link column in the dataframe based on a user-provided template.
@@ -2722,7 +2722,7 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to add link column [$error]{new_col_name}[/]", title="Add Link", severity="error")
             self.log(f"Error adding link column: {e}")
 
-    def do_delete_column(self, more: str = None) -> None:
+    def do_delete_column(self, more: str | None = None) -> None:
         """Remove the currently selected column from the table."""
         # Get the column to remove
         col_idx = self.cursor_column
@@ -2926,7 +2926,7 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error exploding column `{col_name}` with delimiter `{delimiter}`: {e}")
 
-    def do_delete_row(self, more: str = None) -> None:
+    def do_delete_row(self, more: str | None = None) -> None:
         """Delete rows from the table and dataframe.
 
         Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.

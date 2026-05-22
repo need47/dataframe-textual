@@ -974,7 +974,7 @@ class DataFrameViewer(App):
         all_tabs: bool = True,
         overwrite_prompt: bool = True,
         use_view=False,
-        use_df: pl.DataFrame = None,
+        use_df: pl.DataFrame | None = None,
     ) -> None:
         """Save to file"""
         if filename is None:
@@ -997,7 +997,7 @@ class DataFrameViewer(App):
         filename: str,
         all_tabs: bool = True,
         use_view: bool = False,
-        use_df: pl.DataFrame = None,
+        use_df: pl.DataFrame | None = None,
     ) -> None:
         """Handle result from ConfirmScreen."""
         if should_overwrite:
@@ -1014,7 +1014,7 @@ class DataFrameViewer(App):
         filepath: str | Path,
         all_tabs: bool = True,
         use_view: bool = False,
-        use_df: pl.DataFrame = None,
+        use_df: pl.DataFrame | None = None,
     ) -> None:
         """
         Actually save to a file.
