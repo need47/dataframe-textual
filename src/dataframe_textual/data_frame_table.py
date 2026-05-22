@@ -4543,7 +4543,7 @@ class DataFrameTable(DataTable):
             )
 
         # Add to history
-        self.add_history(f"Run SQL Query:\n[$success]{sql}[/]")
+        self.add_history(f"Run SQL Query: [$success]{sql}[/]")
 
         # Create a view of self.df as a copy
         if self.df_view is None:
