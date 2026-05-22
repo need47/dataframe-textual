@@ -549,6 +549,16 @@ class StatisticsScreen(TableScreen):
 
             df_sum = lf.select(sum_exprs).collect().cast(stats_df.schema)
 
+            # min_length and max_length
+            min_length_exprs: list[pl.Expr] = [pl.lit("min_length").alias("statistic")]
+            max_length_exprs: list[pl.Expr] = [pl.lit("max_length").alias("statistic")]
+            for col_name, dtype in source_schema.items():
+                min_length_exprs.append(pl.col(col_name).cast(pl.String).str.len_chars().min().alias(col_name))
+                max_length_exprs.append(pl.col(col_name).cast(pl.String).str.len_chars().max().alias(col_name))
+
+            df_min_length = lf.select(min_length_exprs).collect().cast(stats_df.schema)
+            df_max_length = lf.select(max_length_exprs).collect().cast(stats_df.schema)
+
             # fill rate
             fill_exprs: list[pl.Expr] = [pl.lit("fill%").alias("statistic")]
             for col_name, dtype in source_schema.items():
@@ -561,16 +571,6 @@ class StatisticsScreen(TableScreen):
 
             df_fill = lf.select(fill_exprs).collect().cast(stats_df.schema)
 
-            # min_length and max_length
-            min_length_exprs: list[pl.Expr] = [pl.lit("min_length").alias("statistic")]
-            max_length_exprs: list[pl.Expr] = [pl.lit("max_length").alias("statistic")]
-            for col_name, dtype in source_schema.items():
-                min_length_exprs.append(pl.col(col_name).cast(pl.String).str.len_chars().min().alias(col_name))
-                max_length_exprs.append(pl.col(col_name).cast(pl.String).str.len_chars().max().alias(col_name))
-
-            df_min_length = lf.select(min_length_exprs).collect().cast(stats_df.schema)
-            df_max_length = lf.select(max_length_exprs).collect().cast(stats_df.schema)
-
             # vstack
             self.df = pl.concat(
                 [
@@ -578,9 +578,9 @@ class StatisticsScreen(TableScreen):
                     df_n_total,
                     stats_df,
                     df_sum,
-                    df_fill,
                     df_min_length,
                     df_max_length,
+                    df_fill,
                 ]
             )
 
@@ -609,6 +609,13 @@ class StatisticsScreen(TableScreen):
             else:
                 df_sum = pl.DataFrame({"statistic": ["sum"], col_name: None}, schema=stats_df.schema)
 
+            # min_length and max_length
+            min_length = self.dftable.df[col_name].cast(pl.String).str.len_chars().min()
+            max_length = self.dftable.df[col_name].cast(pl.String).str.len_chars().max()
+
+            df_min_length = pl.DataFrame({"statistic": ["min_length"], col_name: min_length}, schema=stats_df.schema)
+            df_max_length = pl.DataFrame({"statistic": ["max_length"], col_name: max_length}, schema=stats_df.schema)
+
             # fill rate
             fill_rate = self.dftable.df[col_name].count() / n_total * 100
             if dc.gtype in ("integer", "float"):
@@ -618,13 +625,6 @@ class StatisticsScreen(TableScreen):
                     {"statistic": ["fill%"], col_name: str(round(fill_rate, 1))}, schema=stats_df.schema
                 )
 
-            # min_length and max_length
-            min_length = self.dftable.df[col_name].cast(pl.String).str.len_chars().min()
-            max_length = self.dftable.df[col_name].cast(pl.String).str.len_chars().max()
-
-            df_min_length = pl.DataFrame({"statistic": ["min_length"], col_name: min_length}, schema=stats_df.schema)
-            df_max_length = pl.DataFrame({"statistic": ["max_length"], col_name: max_length}, schema=stats_df.schema)
-
             # total first, then n_unique, then describe stats
             self.df = pl.concat(
                 [
@@ -632,9 +632,9 @@ class StatisticsScreen(TableScreen):
                     df_n_total,
                     stats_df,
                     df_sum,
-                    df_fill,
                     df_min_length,
                     df_max_length,
+                    df_fill,
                 ]
             )
 
