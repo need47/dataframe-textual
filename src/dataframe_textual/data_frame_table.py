@@ -1905,7 +1905,7 @@ class DataFrameTable(DataTable):
         dtype = self.df.dtypes[cidx]
         cell_value = self.cursor_value
 
-        if dtype == pl.String:
+        if dtype == pl.String and cell_value:
             # String contains the delimiter '|' (indicating a potential list of values)
             if "|" in cell_value:
                 self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
@@ -4507,7 +4507,7 @@ class DataFrameTable(DataTable):
             new_tab: Whether to show results in a new tab or update the current view.
         """
         # handle special internal row identifier column references
-        sql = sql.replace('RID', RID).replace("$#", f"(`{RID}` + 1)")
+        sql = sql.replace("RID", RID).replace("$#", f"(`{RID}` + 1)")
 
         # Execute the SQL query
         try:
