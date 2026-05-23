@@ -800,7 +800,9 @@ class FrequencyScreen(TableScreen):
 class HistogramScreen(TableScreen):
     """Modal screen to display histogram of values in a column."""
 
-    def __init__(self, dftable: "DataFrameTable", bins: list[float] | None = None, bin_count: int | None = None) -> None:
+    def __init__(
+        self, dftable: "DataFrameTable", bins: list[float] | None = None, bin_count: int | None = None
+    ) -> None:
         super().__init__(dftable)
         self.cidx = dftable.cursor_cidx
         self.bins = bins

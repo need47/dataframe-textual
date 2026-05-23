@@ -98,7 +98,7 @@ class DtypeClass:
         style: str | None = None,
         justify: str | None = None,
         thousand_separator: bool = False,
-    ) -> str:
+    ) -> Text:
         """Format the value according to its data type.
 
         Args:
@@ -308,7 +308,7 @@ def tentative_expr(expr: str) -> bool:
 
 
 def validate_expr(
-    expr: str, columns: list[str], current_col_idx: int = 0, df: pl.DataFrame = None
+    expr: str, columns: list[str], current_col_idx: int = 0, df: pl.DataFrame | None = None
 ) -> pl.Expr | pl.DataFrame | pl.Series | None:
     """Validate and return the expression.
 
@@ -494,7 +494,7 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
 
     # If no placeholders found, treat entire template as literal
     if not parts:
-        parts = [template]
+        parts: list[str | pl.Expr] = [template]
 
     return parts
 
@@ -713,10 +713,7 @@ def scan_vortex(source: str | list[str], n_rows: int | None = None) -> pl.LazyFr
     import vortex as vx
 
     if isinstance(source, list):
-        lf = None
-        for src in source:
-            lf_src = vx.open(src).to_polars()
-            lf = lf_src if lf is None else pl.concat([lf, lf_src])
+        lf = pl.concat([vx.open(src).to_polars() for src in source])
     else:
         lf = vx.open(source).to_polars()
 

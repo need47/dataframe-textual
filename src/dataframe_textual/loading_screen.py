@@ -27,7 +27,7 @@ class LoadingScreen(ModalScreen):
         }
     """
 
-    def __init__(self, dftable: "DataFrameTable", callback: Callable = None) -> None:
+    def __init__(self, dftable: "DataFrameTable", callback: Callable | None = None) -> None:
         super().__init__()
         self.dftable = dftable
         self.callback = callback

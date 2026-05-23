@@ -93,7 +93,7 @@ class FilePickerScreen(ModalScreen):
     """
 
     def __init__(
-        self, title: str = "", dirname: str = ".", filename: str = None, confirm_label: str = "Confirm"
+        self, title: str = "", dirname: str = ".", filename: str | None = None, confirm_label: str = "Confirm"
     ) -> None:
         """Initialize the file picker.
 
@@ -270,14 +270,14 @@ class FilePickerScreen(ModalScreen):
         self._option_paths[option_id] = path
         self._option_is_dir[option_id] = is_dir
 
-    def _current_file_type(self) -> str | None:
+    def _current_file_type(self) -> str:
         """Return the currently selected file type filter.
 
         Returns:
             The selected file type value or None.
         """
         try:
-            file_type_select_value = self.query_one("#file-type", Select).value
+            file_type_select_value : str = self.query_one("#file-type", Select).value
         except Exception as e:
             file_type_select_value = "*"
             self.log(f"Error retrieving file type selection: {e}")

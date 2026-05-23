@@ -982,7 +982,7 @@ class AdvancedSqlScreen(YMNScreen):
         with Container(id="sql-container") as container:
             container.border_title = "Advanced SQL Query Builder"
             yield TextArea.code_editor(
-                placeholder="Enter SQL query, e.g., \n\nSELECT * \nFROM self \nWHERE age > 30\n\n* use 'self' as the table name\n* use backticks (`) for column names with spaces.",
+                placeholder="Enter SQL query, e.g., \n\nSELECT * \nFROM self \nWHERE age > 30\n\n* use 'self' as the table name\n* use backtick (`) to quote column name with spaces",
                 id="sql-textarea",
                 language="sql",
                 tab_behavior="focus",  # Tab to focus next and allow Esc to exit
