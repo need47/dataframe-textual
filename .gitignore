@@ -13,5 +13,10 @@ wheels/
 *.xlsx
 test.py
 *.parquet
+*.csv
 *.tsv
+*.parquet
+*.ndjson
+*.jsonl
 *.vortex
+.DS_Store
