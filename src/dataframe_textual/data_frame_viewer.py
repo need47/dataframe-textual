@@ -216,9 +216,13 @@ class DataFrameViewer(App):
 
         status_message, effective_markup = self._normalize_message(full_message, markup=True)
         if effective_markup:
-            self.status_message_bar.update(Content.from_markup(status_message))
+            status_message = Content.from_markup(status_message)
+            self.status_message_bar.update(status_message)
+            self.status_message_bar.tooltip = status_message
         else:
-            self.status_message_bar.update(Content(status_message))
+            status_message = Content(status_message)
+            self.status_message_bar.update(status_message)
+            self.status_message_bar.tooltip = status_message
 
         self.status_message_bar.remove_class("is-success")
         self.status_message_bar.remove_class("is-warning")
