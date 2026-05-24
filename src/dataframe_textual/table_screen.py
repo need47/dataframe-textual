@@ -2,6 +2,8 @@
 
 from typing import TYPE_CHECKING, Any
 
+from textual.widgets.data_table import ColumnKey
+
 if TYPE_CHECKING:
     from .data_frame_table import DataFrameTable
 
@@ -66,6 +68,7 @@ class TableModalScreen(ModalScreen):
         self.df = df  # DataFrame for this screen, to be set by subclasses
         self.thousand_separator = False  # Whether to use thousand separators in numbers
         self.sorted_columns: dict[str, bool] = {}  # Track sorted columns and their sort order
+        self.sort_ignore_last = False  # Whether to ignore the last column (e.g., Total) when sorting
 
     def compose(self) -> ComposeResult:
         """Compose the table screen widget structure.
@@ -166,6 +169,18 @@ class TableModalScreen(ModalScreen):
 
             self.table.add_row(*formatted_row, key=str(ridx), label=str(ridx + 1))
 
+    def sort_by_column_key(self, col_key: ColumnKey, descending: bool) -> None:
+        """Sort the table by the specified column."""
+        if self.sort_ignore_last and self.table.row_count > 1:
+            # Detach the last row, sort the rest, then re-append it
+            last_row = self.table.ordered_rows[-1]
+            last_cells = self.table.get_row(last_row.key)
+            self.table.remove_row(last_row.key)
+            self.table.sort(col_key, key=lambda c: c.plain if isinstance(c, Text) else c, reverse=descending)
+            self.table.add_row(*last_cells, key=last_row.key.value, label=last_row.label)
+        else:
+            self.table.sort(col_key, key=lambda c: c.plain if isinstance(c, Text) else c, reverse=descending)
+
     def sort_by_column(self, descending: bool) -> None:
         """Sort the table by the current column.
 
@@ -185,9 +200,9 @@ class TableModalScreen(ModalScreen):
         self.sorted_columns.clear()
         self.sorted_columns[col_name] = descending
 
-        # If no DataFrame is available (e.g., not yet populated), sort the table directly
+        # If no DataFrame is available (e.g., not yet populated), use built-in sort to sort the table directly
         if self.df is None:
-            self.table.sort(col_key, key=lambda c: c.plain if isinstance(c, Text) else c, reverse=descending)
+            self.sort_by_column_key(col_key, descending)
             return
 
         if self.df.is_empty():
@@ -198,8 +213,8 @@ class TableModalScreen(ModalScreen):
         except Exception as e:
             self.log(f"Error sorting by column '{col_name}': {e}")
 
-            # Fallback to sorting the table directly if dataframe sorting fails (e.g. due to unsupported data types)
-            self.table.sort(col_key, key=lambda c: c.plain if isinstance(c, Text) else c, reverse=descending)
+            # Fallback to built-in sort if dataframe sorting fails (e.g. due to unsupported data types)
+            self.sort_by_column_key(col_key, descending)
             return
 
         # Rebuild the table
@@ -516,6 +531,7 @@ class StatisticsScreen(TableScreen):
 
     def build_df(self) -> None:
         """Get the dataframe to use for statistics."""
+        # all columns
         if self.cidx is None:
             lf = self.dftable.df.lazy().select(pl.exclude(RID))
 
@@ -553,8 +569,19 @@ class StatisticsScreen(TableScreen):
             min_length_exprs: list[pl.Expr] = [pl.lit("min_length").alias("statistic")]
             max_length_exprs: list[pl.Expr] = [pl.lit("max_length").alias("statistic")]
             for col_name, dtype in source_schema.items():
-                min_length_exprs.append(pl.col(col_name).cast(pl.String).str.len_chars().min().alias(col_name))
-                max_length_exprs.append(pl.col(col_name).cast(pl.String).str.len_chars().max().alias(col_name))
+                if dtype == pl.String:
+                    min_length_exprs.append(pl.col(col_name).str.len_chars().min().alias(col_name))
+                    max_length_exprs.append(pl.col(col_name).str.len_chars().max().alias(col_name))
+                elif dtype == pl.List:
+                    min_length_exprs.append(pl.col(col_name).list.len().min().alias(col_name))
+                    max_length_exprs.append(pl.col(col_name).list.len().max().alias(col_name))
+                else:
+                    try:
+                        min_length_exprs.append(pl.col(col_name).cast(pl.String).str.len_chars().min().alias(col_name))
+                        max_length_exprs.append(pl.col(col_name).cast(pl.String).str.len_chars().max().alias(col_name))
+                    except Exception:
+                        min_length_exprs.append(pl.lit(None).alias(col_name))
+                        max_length_exprs.append(pl.lit(None).alias(col_name))
 
             df_min_length = lf.select(min_length_exprs).collect().cast(stats_df.schema)
             df_max_length = lf.select(max_length_exprs).collect().cast(stats_df.schema)
@@ -584,8 +611,11 @@ class StatisticsScreen(TableScreen):
                 ]
             )
 
+        # single column
         else:
             col_name = self.dftable.df.columns[self.cidx]
+            dtype = self.dftable.df.dtypes[self.cidx]
+            this_col = self.dftable.df[col_name]
             lf = self.dftable.df.lazy()
 
             # Get column statistics
@@ -594,30 +624,41 @@ class StatisticsScreen(TableScreen):
                 return
 
             # unique count
-            n_unique = self.dftable.df[col_name].n_unique()
+            n_unique = this_col.n_unique()
             df_n_unique = pl.DataFrame({"statistic": ["n_unique"], col_name: n_unique}, schema=stats_df.schema)
 
             # total count
-            n_total = len(self.dftable.df[col_name])
+            n_total = len(this_col)
             df_n_total = pl.DataFrame({"statistic": ["n_total"], col_name: n_total}, schema=stats_df.schema)
 
             # sum
             dc = DtypeConfig(self.dftable.df.dtypes[self.cidx])
             if dc.gtype in ("integer", "float"):
-                sum_value = self.dftable.df[col_name].sum()
+                sum_value = this_col.sum()
                 df_sum = pl.DataFrame({"statistic": ["sum"], col_name: sum_value}, schema=stats_df.schema)
             else:
                 df_sum = pl.DataFrame({"statistic": ["sum"], col_name: None}, schema=stats_df.schema)
 
             # min_length and max_length
-            min_length = self.dftable.df[col_name].cast(pl.String).str.len_chars().min()
-            max_length = self.dftable.df[col_name].cast(pl.String).str.len_chars().max()
+            if dtype == pl.String:
+                min_length = this_col.str.len_chars().min()
+                max_length = this_col.str.len_chars().max()
+            elif dtype == pl.List:
+                min_length = this_col.list.len().min()
+                max_length = this_col.list.len().max()
+            else:
+                try:
+                    min_length = this_col.cast(pl.String).str.len_chars().min()
+                    max_length = this_col.cast(pl.String).str.len_chars().max()
+                except Exception:
+                    min_length = None
+                    max_length = None
 
             df_min_length = pl.DataFrame({"statistic": ["min_length"], col_name: min_length}, schema=stats_df.schema)
             df_max_length = pl.DataFrame({"statistic": ["max_length"], col_name: max_length}, schema=stats_df.schema)
 
             # fill rate
-            fill_rate = self.dftable.df[col_name].count() / n_total * 100
+            fill_rate = this_col.count() / n_total * 100
             if dc.gtype in ("integer", "float"):
                 df_fill = pl.DataFrame({"statistic": ["fill%"], col_name: fill_rate}, schema=stats_df.schema)
             else:
@@ -754,7 +795,6 @@ class FrequencyScreen(TableScreen):
         col_sort = self.columns[col_idx][1]
 
         if self.sorted_columns.get(col_sort) == descending:
-            # self.notify("Already sorted in that order", title="Sort", severity="warning")
             return
 
         self.sorted_columns.clear()
@@ -765,17 +805,13 @@ class FrequencyScreen(TableScreen):
         self.df = self.df.sort(col_name, descending=descending, nulls_last=True)
 
         # Rebuild the frequency table
-        self.table.clear(columns=True)
         self.build_table()
 
         self.table.move_cursor(row=row_idx, column=col_idx)
 
-        # order = "desc" if descending else "asc"
-        # self.notify(f"Sorted by [on $primary]{col_name}[/] ({order})", title="Sort")
-
     def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
         row_idx = self.table.cursor_row
-        if row_idx >= len(self.df[:, 0]):  # first column
+        if row_idx >= len(self.df):
             return None  # Skip the last `Total` row
 
         col_name = self.dftable.df.columns[self.cidx]
@@ -1056,6 +1092,7 @@ class BarScreen(TableModalScreen):
         self.df = df
         self.cidx = cidx
         self.cidx_label = cidx_label
+        self.sort_ignore_last = True  # Ignore the last column (Total) when sorting
 
     def on_mount(self) -> None:
         """Start bar calculation."""
