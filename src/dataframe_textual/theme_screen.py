@@ -49,6 +49,7 @@ class ThemeScreen(ModalScreen):
     def _set_theme(self, theme: str) -> None:
         if theme in self.themes:
             self.app.theme = theme
+            self.app.notify(f"Switched to theme [$success]{theme}[/]", title="Switch Theme")
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         self._set_theme(str(event.option.prompt))
@@ -59,4 +60,5 @@ class ThemeScreen(ModalScreen):
 
     def action_cancel(self) -> None:
         self.app.theme = self.original_theme
+        self.app.notify(f"Switched back to theme [$success]{self.original_theme}[/]", title="Switch Theme")
         self.app.pop_screen()

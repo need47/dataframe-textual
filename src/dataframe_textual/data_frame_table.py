@@ -2916,6 +2916,8 @@ class DataFrameTable(DataTable):
 
             self.task_done = True
             self.setup_table()
+
+            self.notify(f"Exploded column [$success]{col_name}[/]", title="Explode Column")
         except Exception as e:
             if self.histories_undo:
                 self.histories_undo.pop()
