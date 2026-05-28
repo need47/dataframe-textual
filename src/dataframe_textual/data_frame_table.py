@@ -2163,9 +2163,24 @@ class DataFrameTable(DataTable):
         buffer = io.StringIO()
         self.df.write_csv(buffer)
 
-        # Re-read with inferred schema to reset dtypes
-        buffer.seek(0)
-        self.df = pl.read_csv(buffer)
+        # Re-read with schema inference to get correct dtypes
+        try:
+            buffer.seek(0)
+            self.df = pl.read_csv(buffer)
+        except Exception as e:
+            self.log(f"Error setting row {ridx} as header: {e}")
+            # Try again without inferring schema (all columns as string) to at least update the header
+            try:
+                buffer.seek(0)
+                self.df = pl.read_csv(buffer, infer_schema=False)
+            except Exception as e2:
+                self.notify(
+                    f"Failed to set row as header even without inferring schema: {e2}",
+                    title="Set Row as Header",
+                    severity="error",
+                )
+                self.log(f"Error setting row {ridx} as header without inferring schema: {e2}")
+                return
 
         # Recreate table for display
         self.setup_table()
