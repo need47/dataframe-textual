@@ -218,22 +218,23 @@ class DataFrameViewer(App):
         if effective_markup:
             status_message = Content.from_markup(status_message)
             self.status_message_bar.update(status_message)
-            self.status_message_bar.tooltip = status_message
         else:
             status_message = Content(status_message)
             self.status_message_bar.update(status_message)
-            self.status_message_bar.tooltip = status_message
 
         self.status_message_bar.remove_class("is-success")
         self.status_message_bar.remove_class("is-warning")
         self.status_message_bar.remove_class("is-error")
 
+        self.status_message_bar.tooltip = None
         if severity == "success":
             self.status_message_bar.add_class("is-success")
         elif severity == "warning":
             self.status_message_bar.add_class("is-warning")
+            self.status_message_bar.tooltip = status_message
         elif severity == "error":
             self.status_message_bar.add_class("is-error")
+            self.status_message_bar.tooltip = status_message
 
     def notify(
         self,
