@@ -7,12 +7,9 @@ from typing import Any
 
 import polars as pl
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal
-from textual.content import Content
 from textual.css.query import NoMatches
 from textual.events import Click
-from textual.markup import MarkupError
-from textual.widgets import Static, TabbedContent, TabPane
+from textual.widgets import TabbedContent, TabPane
 from textual.widgets.tabbed_content import ContentTab, ContentTabs
 
 from dataframe_textual.theme_screen import ThemeScreen
@@ -22,6 +19,7 @@ from .console_panel import ConsolePanel
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
 from .file_picker_screen import OpenFileScreen, SaveFileScreen
+from .status_bar import StatusBar
 from .yes_no_screen import ConfirmScreen, NewTabScreen, RenameTabScreen
 
 
@@ -151,130 +149,6 @@ class DataFrameViewer(App):
         self.theme = theme
         self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel: DataFrameHelpPanel | None = None
-        self.console_panel: ConsolePanel | None = None
-        self.status_context_bar: Static | None = None
-        self.status_message_bar: Static | None = None
-        self.status_context = "No file | 0 rows x 0 cols"
-        self.status_message = "Ready"
-        self.status_severity = "information"
-
-    def _normalize_message(self, message: str, markup: bool) -> tuple[str, bool]:
-        """Normalize notification text for the status bar and toast display.
-
-        Args:
-            message: Notification message.
-            markup: Whether the message should be parsed as Rich markup.
-
-        Returns:
-            A tuple of plain-text status text, toast text, and effective markup flag.
-        """
-        if not markup:
-            return message, False
-
-        try:
-            Content.from_markup(message)
-        except MarkupError as error:
-            self.log(f"Invalid notification markup; falling back to plain text: {error}; message={message!r}")
-            # Remove Rich-style markup tags
-            plain_message = (
-                message.replace("[/]", "")
-                .replace("[b]", "")
-                .replace("[$error]", "")
-                .replace("[$success]", "")
-                .replace("[$warning]", "")
-                .replace("[$accent]", "")
-            )
-            return plain_message, False
-
-        return message, True
-
-    def _set_status_context(self, table: DataFrameTable | None = None) -> None:
-        """Update the fixed left-side status context.
-
-        Args:
-            table: Optional active table to render context from.
-        """
-        table = table or self.active_table
-        row_count, column_count = 0, 0
-        if table is not None:
-            if table.df is not None:
-                row_count = len(table.df)
-                column_count = len(table.df.columns) - 1  # Exclude the hidden RID column
-            else:
-                row_count = table.loaded_rows
-                column_count = len(table.lf.collect_schema().names()) - 1  # Exclude the hidden RID column
-
-        filename = Path(table.filename).name if table else "No file"
-        main_or_view = "Main" if table is None or table.df_view is None else "View"
-        context = f"{filename} | {main_or_view} | {row_count:,} rows x {column_count:,} cols"
-
-        self.status_context = context
-        self.status_context_bar.update(context)
-
-    def _set_status(self, message: str, *, title: str = "", severity: str = "information") -> None:
-        """Update the persistent bottom status bar.
-
-        Args:
-            message: Plain-text message to display.
-            title: Optional title prefix.
-            severity: Severity used for styling.
-        """
-        full_message = f"[b]{title}[/]: {message}" if title else message
-        self.status_message = full_message
-        self.status_severity = severity
-        self._set_status_context()
-
-        status_message, effective_markup = self._normalize_message(full_message, markup=True)
-        if effective_markup:
-            status_message = Content.from_markup(status_message)
-            self.status_message_bar.update(status_message)
-        else:
-            status_message = Content(status_message)
-            self.status_message_bar.update(status_message)
-
-        self.status_message_bar.remove_class("is-success")
-        self.status_message_bar.remove_class("is-warning")
-        self.status_message_bar.remove_class("is-error")
-
-        self.status_message_bar.tooltip = None
-        if severity == "success":
-            self.status_message_bar.add_class("is-success")
-        elif severity == "warning":
-            self.status_message_bar.add_class("is-warning")
-            self.status_message_bar.tooltip = status_message
-        elif severity == "error":
-            self.status_message_bar.add_class("is-error")
-            self.status_message_bar.tooltip = status_message
-
-    def notify(
-        self,
-        message: str,
-        *,
-        title: str = "",
-        severity: str = "information",
-        timeout: float | None = None,
-        markup: bool = True,
-    ) -> None:
-        """Show a notification, falling back to plain text on invalid markup.
-
-        Args:
-            message: The notification message.
-            title: The notification title.
-            severity: Notification severity.
-            timeout: Optional notification timeout in seconds.
-            markup: Whether the message should be interpreted as Rich markup.
-        """
-        status_message, effective_markup = self._normalize_message(message, markup)
-        self._set_status(status_message, title=title, severity=severity)
-
-        # if severity in {"warning", "error"}:
-        #     super().notify(
-        #         status_message,
-        #         title=title,
-        #         severity=severity,
-        #         timeout=timeout,
-        #         markup=effective_markup,
-        #     )
 
     @property
     def active_table(self) -> DataFrameTable | None:
@@ -336,11 +210,8 @@ class DataFrameViewer(App):
         yield self.console_panel
 
         # Status bar
-        with Horizontal(id="status_bar"):
-            self.status_context_bar = Static(self.status_context, id="status_context")
-            self.status_message_bar = Static(self.status_message, id="status_message")
-            yield self.status_context_bar
-            yield self.status_message_bar
+        self.status_bar = StatusBar()
+        yield self.status_bar
 
     def on_mount(self) -> None:
         """Set up the application when it starts.
@@ -348,8 +219,7 @@ class DataFrameViewer(App):
         Initializes the app by hiding the tab bar for single-file mode and focusing
         the active table widget.
         """
-        self._set_status_context(self.active_table)
-        self._set_status(self.status_message, severity=self.status_severity)
+        self._set_status(self.status_bar.message, severity=self.status_bar.severity)
 
         if len(self.tabs) == 1:
             self.query_one(ContentTabs).display = False
@@ -392,11 +262,86 @@ class DataFrameViewer(App):
         """
         # Focus the table in the newly activated tab
         if table := self.active_table:
-            self._set_status_context(table)
+            self._set_status()
             table.focus()
 
             if table.loaded_rows == 0:
                 table.init_table()
+
+    def _set_status_context(self, table: DataFrameTable | None = None) -> None:
+        """Update the fixed left-side status context.
+
+        Args:
+            table: Optional active table to render context from.
+        """
+        table = table or self.active_table
+
+        row_count, column_count = 0, 0
+        if table is not None:
+            if table.df is not None:
+                row_count = len(table.df)
+                column_count = len(table.df.columns) - 1  # Exclude the hidden RID column
+            else:
+                row_count = table.loaded_rows
+                column_count = len(table.lf.collect_schema().names()) - 1  # Exclude the hidden RID column
+
+        filename = Path(table.filename).name if table else "No file"
+        main_or_view = "Main" if table is None or table.df_view is None else "View"
+        context = f"{filename} | {main_or_view} | {row_count:,} rows x {column_count:,} cols"
+
+        self.status_bar.set_context(context)
+
+    def _set_status(
+        self,
+        message: str = "",
+        title: str = "",
+        severity: str = "information",
+        markup: bool = True,
+    ) -> None:
+        """Update the persistent bottom status bar.
+
+        Args:
+            message: Plain-text message to display.
+            title: Optional title prefix.
+            severity: Severity used for styling.
+            markup: Whether the message should be interpreted as Rich markup.
+        """
+        self._set_status_context()
+
+        if not message:
+            return
+        full_message = f"[b]{title}[/]: {message}" if title else message
+
+        self.status_bar.set_message(full_message, severity=severity, markup=markup)
+
+    def notify(
+        self,
+        message: str,
+        *,
+        title: str = "",
+        severity: str = "information",
+        timeout: float | None = None,
+        markup: bool = True,
+    ) -> None:
+        """Show a notification, falling back to plain text on invalid markup.
+
+        Args:
+            message: The notification message.
+            title: The notification title.
+            severity: Notification severity.
+            timeout: Optional notification timeout in seconds.
+            markup: Whether the message should be interpreted as Rich markup.
+        """
+        self._set_status(message, title=title, severity=severity, markup=markup)
+
+        # if severity in {"warning", "error"}:
+        #     super().notify(
+        #         status_message,
+        #         title=title,
+        #         severity=severity,
+        #         timeout=timeout,
+        #         markup=markup,
+        #     )
 
     def action_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.
@@ -876,7 +821,7 @@ class DataFrameViewer(App):
                 table.df_view = None
                 table.setup_table()
 
-                self.notify("Returned to main table", title="Close View")
+                self.notify("Returned to main table", title="Quit View")
                 return
 
             def _on_save_confirm(result: bool) -> None:
