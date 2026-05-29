@@ -49,7 +49,7 @@ class DataFrameHelpPanel(Widget):
                 padding: 1 0;
                 margin-top: 1;
                 display: none;
-                background: $panel;
+                background: $surface;
 
                 &:ansi {
                     background: ansi_default;

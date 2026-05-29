@@ -196,7 +196,7 @@ class FilePickerScreen(ModalScreen):
             self.query_one("#file-list", OptionList).focus()
             return True
 
-        self.notify(f"Directory not found: {candidate}", title="Open File", severity="error", timeout=10)
+        self.notify(f"Directory not found: {candidate}", title="Open File", severity="error")
         return False
 
     def confirm(self) -> None:
@@ -219,7 +219,7 @@ class FilePickerScreen(ModalScreen):
         self._option_is_dir.clear()
 
         if not directory.exists() or not directory.is_dir():
-            self.notify(f"Directory not found: {directory}", title="Open File", severity="error", timeout=10)
+            self.notify(f"Directory not found: {directory}", title="Open File", severity="error")
             return
 
         if not self._is_root(directory):
@@ -277,7 +277,7 @@ class FilePickerScreen(ModalScreen):
             The selected file type value or None.
         """
         try:
-            file_type_select_value : str = self.query_one("#file-type", Select).value
+            file_type_select_value: str = self.query_one("#file-type", Select).value
         except Exception as e:
             file_type_select_value = "*"
             self.log(f"Error retrieving file type selection: {e}")
@@ -535,7 +535,7 @@ class OpenFileScreen(FilePickerScreen):
         if filepath.exists() and filepath.is_file():
             self.dismiss(filepath)
         else:
-            self.notify(f"File not found: {filepath}", title="Open File", severity="error", timeout=10)
+            self.notify(f"File not found: {filepath}", title="Open File", severity="error")
 
 
 class SaveFileScreen(FilePickerScreen):
@@ -572,11 +572,10 @@ class SaveFileScreen(FilePickerScreen):
                 f"Error guessing file format based on extension `[$error]{filepath.suffix}[/]`. Supported formats are: {', '.join(SUPPORTED_FORMATS)}",
                 title="Save File",
                 severity="error",
-                timeout=10,
             )
             return
 
         if filepath.parent.exists() and filepath.parent.is_dir():
             self.dismiss(filepath)
         else:
-            self.notify(f"Directory not found: {filepath.parent}", title="Save File", severity="error", timeout=10)
+            self.notify(f"Directory not found: {filepath.parent}", title="Save File", severity="error")

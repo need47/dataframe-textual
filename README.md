@@ -25,6 +25,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 - 📂 **Multi-File Support** - Open multiple files in separate tabs
 - 🔄 **Tab Management** - Seamlessly switch between open files with keyboard shortcuts
 - 📑 **Duplicate Tab** - Create a copy of the current tab with the same data
+- 🐍 **Embedded Python Console** - Inspect and transform the active table with `df` and `pl` directly in-app
 - 📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
 - 🎯 **Cursor Type Cycling** - Switch between cell, row, and column selection modes
 - 📸 **Take Screenshot** - Capture terminal view as a SVG image
@@ -219,29 +220,31 @@ dv data.csv -o data.parquet
 
 #### File & Tab Management
 
-| Key            | Action                                                        |
-| -------------- | ------------------------------------------------------------- |
-| `q`            | Close current tab (prompts to save unsaved changes)           |
-| `Q`            | Close all tabs and quit app (prompts to save unsaved changes) |
-| `Ctrl+Q`       | Force to quit app (regardless of unsaved changes)             |
-| `space`        | Toggle tab bar visibility                                     |
-| `b`            | Next tab                                                      |
-| `B`            | Previous tab                                                  |
-| `>`            | Move current tab right (wrap to first)                        |
-| `<`            | Move current tab left (wrap to last)                          |
-| `Ctrl+T`       | Save current tab to file                                      |
-| `Ctrl+S`       | Save all tabs to file                                         |
-| `Ctrl+V`       | Save current view to file                                     |
-| `w`            | Save current tab to file (overwrite without prompt)           |
-| `W`            | Save all tabs to file (overwrite without prompt)              |
-| `Ctrl+D`       | Duplicate current tab                                         |
-| `Ctrl+O`       | Open file in a new tab                                        |
-| `Ctrl+N`       | Create new tab from Polars expression                         |
-| `Double-click` | Rename tab                                                    |
+| Key            | Action                                                       |
+| -------------- | ------------------------------------------------------------ |
+| `q`            | Quit current tab (prompts to save unsaved changes)           |
+| `Q`            | Quit all tabs and quit app (prompts to save unsaved changes) |
+| `Esc`          | Force to quit current tab or view (discards unsaved changes) |
+| `Ctrl+Q`       | Force to quit app (discards unsaved changes)                 |
+| `space`        | Toggle tab bar visibility                                    |
+| `b`            | Next tab                                                     |
+| `B`            | Previous tab                                                 |
+| `>`            | Move current tab right (wrap to first)                       |
+| `<`            | Move current tab left (wrap to last)                         |
+| `Ctrl+T`       | Save current tab to file                                     |
+| `Ctrl+S`       | Save all tabs to file                                        |
+| `Ctrl+V`       | Save current view to file                                    |
+| `w`            | Save current tab to file (overwrite without prompt)          |
+| `W`            | Save all tabs to file (overwrite without prompt)             |
+| `Ctrl+D`       | Duplicate current tab                                        |
+| `Ctrl+O`       | Open file in a new tab                                       |
+| `Ctrl+N`       | Create new tab from Polars expression                        |
+| `Double-click` | Rename tab                                                   |
 
 **Tips:**
 - Tabs with unsaved changes are indicated with a bright background
-- Closing or quitting a tab with unsaved changes triggers a save prompt
+- Closing a tab with unsaved changes triggers a save prompt
+- Use `Esc` to bypass save prompts and quit the current tab/view immediately
 
 #### View & Settings
 
@@ -249,6 +252,7 @@ dv data.csv -o data.parquet
 | ------------------------ | ------------------------------------ |
 | `F1`                     | Toggle help panel                    |
 | `k`                      | Select theme                         |
+| `` ` ``                  | Toggle Python console                |
 | `Ctrl+P` -> `Screenshot` | Capture terminal view as a SVG image |
 
 ---
@@ -859,7 +863,18 @@ The link template supports multiple placeholder types for maximum flexibility:
 - Use full undo (`u`) if template produces unexpected URLs
 - For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
 
-### 20. Handling Loading Errors
+### 20. Python Console
+
+Use the built-in Python console for quick interactive transformations without leaving the TUI.
+
+- Open/close console: `` ` ``
+- Run shell commands: prefix with `!` (example: `!ls`)
+- In console: `clear` or `cls` clears console output
+- In console: `Esc` closes the console panel
+- Available names: `df` (active DataFrame), `self` (active table), `app` (viewer app), `pl` (Polars)
+- Assign a DataFrame or Series back to `df` to refresh the current table immediately
+
+## Handling Loading Errors
 
 Most loading failures come from malformed CSV/TSV input, quoting issues, or mixed column types. When this happens, the application prints a hint with a suggested retry option.
 

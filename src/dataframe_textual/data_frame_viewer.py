@@ -3,6 +3,7 @@
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
+from typing import Any
 
 import polars as pl
 from textual.app import App, ComposeResult
@@ -17,6 +18,7 @@ from textual.widgets.tabbed_content import ContentTab, ContentTabs
 from dataframe_textual.theme_screen import ThemeScreen
 
 from .common import RID, SUPPORTED_FORMATS, Source, get_next_item, guess_file_format, load_file, validate_expr
+from .console_panel import ConsolePanel
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
 from .file_picker_screen import OpenFileScreen, SaveFileScreen
@@ -34,8 +36,9 @@ class DataFrameViewer(App):
         - **<** - ◀️ Move current tab left (wrap to last)
         - **b** - 🔄 Cycle through tabs
         - **B** - 👁️ Toggle tab bar visibility
-        - **q** - ❌ Close current tab (prompts to save unsaved changes)
-        - **Q** - ❌ Close all tabs (prompts to save unsaved changes)
+        - **q** - ❌ Quit current tab (prompts to save unsaved changes)
+        - **Q** - ❌ Quit all tabs (prompts to save unsaved changes)
+        - **Esc** - ❌ Force to quit current tab or view (discards unsaved changes)
         - **Ctrl+Q** - 🚪 Force to quit app (discards unsaved changes)
         - **Ctrl+V** - 💾 Save current view to file
         - **Ctrl+T** - 💾 Save current tab to file
@@ -50,6 +53,7 @@ class DataFrameViewer(App):
         ## 🎨 View & Settings
         - **F1** - ❓ Toggle this help panel
         - **k** - 🌙 Select theme
+        - **`** - 🐍 Toggle Python console
         - **Ctrl+P -> Screenshot** - 📸 Capture terminal view as a SVG image
 
         ## ⭐ Features
@@ -65,8 +69,9 @@ class DataFrameViewer(App):
     """).strip()
 
     BINDINGS = [
-        ("q,escape", "close", "Close current tab or view"),
-        ("Q", "close_all", "Close all tabs and quit"),
+        ("q", "close", "Quit current tab or view"),
+        ("Q", "close_all", "Quit all tabs and quit"),
+        ("escape", "force_close", "Force to quit current tab or view"),
         ("space", "toggle_tab_bar", "Toggle Tab Bar"),
         ("b", "next_tab(1)", "Next Tab"),
         ("B", "next_tab(-1)", "Previous Tab"),
@@ -82,6 +87,7 @@ class DataFrameViewer(App):
         ("W", "save_all_tabs_overwrite", "Save All Tabs (overwrite)"),
         ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
         ("k", "select_theme", "Select Theme"),
+        ("grave_accent", "toggle_python_console", "Python Console"),  # '`'
     ]
 
     CSS = """
@@ -92,24 +98,27 @@ class DataFrameViewer(App):
             overflow: auto;
             height: 1fr;
         }
+
         ContentTab.-active {
             background: $block-cursor-background; /* Same as underline */
         }
         ContentTab.dirty {
             background: $warning-darken-3;
         }
+
         #status_bar {
             dock: bottom;
             height: 1;
-            background: $panel;
+            background: $surface;
             color: $text-muted;
         }
+
         #status_context {
             width: auto;
             min-width: 24;
             padding: 0 1;
-            /* background: $panel-darken-1; */
         }
+
         #status_message {
             width: 1fr;
             padding: 0 1;
@@ -141,7 +150,8 @@ class DataFrameViewer(App):
         self.sources = sources
         self.theme = theme
         self.tabs: dict[TabPane, DataFrameTable] = {}
-        self.help_panel = None
+        self.help_panel: DataFrameHelpPanel | None = None
+        self.console_panel: ConsolePanel | None = None
         self.status_context_bar: Static | None = None
         self.status_message_bar: Static | None = None
         self.status_context = "No file | 0 rows x 0 cols"
@@ -320,6 +330,12 @@ class DataFrameViewer(App):
                         severity="error",
                     )
                     self.log(f"Error loading `{filename}`: {e}")
+
+        # Python console panel
+        self.console_panel = ConsolePanel(self._get_console_context, self._apply_console_locals, id="console_panel")
+        yield self.console_panel
+
+        # Status bar
         with Horizontal(id="status_bar"):
             self.status_context_bar = Static(self.status_context, id="status_context")
             self.status_message_bar = Static(self.status_message, id="status_message")
@@ -408,6 +424,10 @@ class DataFrameViewer(App):
         If this is the last tab, exits the app.
         """
         self.do_close()
+
+    def action_force_close(self) -> None:
+        """Force close current tab or view without save prompts."""
+        self.do_close(force=True)
 
     def action_close_all(self) -> None:
         """Close all tabs and quit.
@@ -527,6 +547,69 @@ class DataFrameViewer(App):
     def action_select_theme(self) -> None:
         """Open the theme selection screen."""
         self.push_screen(ThemeScreen())
+
+    def action_toggle_python_console(self) -> None:
+        """Toggle the embedded Python console for the current tab."""
+        if not self.console_panel:
+            return
+
+        if self.console_panel.display:
+            self.console_panel.display = False
+            if table := self.active_table:
+                table.focus()
+            return
+
+        if not self.active_table:
+            self.notify("No active table found", title="Python Console", severity="error")
+            return
+
+        self.console_panel.display = True
+        self.console_panel.focus_input()
+
+    def _get_console_context(self) -> dict[str, Any]:
+        """Build the execution context for the Python console.
+
+        Returns:
+            Console locals for the active table.
+        """
+        table = self.active_table
+        return {
+            "pl": pl,
+            "app": self,
+            "self": table,
+            "df": None if table is None else table.df,
+            "RID": RID,
+        }
+
+    def _apply_console_locals(self, locals_dict: dict[str, Any], previous_df: Any) -> None:
+        """Sync dataframe assignments from the Python console back into the active tab.
+
+        Args:
+            locals_dict: Console locals after command execution.
+            previous_df: The dataframe bound to the active tab before execution.
+        """
+        table = locals_dict.get("self") or self.active_table
+        if not isinstance(table, DataFrameTable):
+            return
+
+        candidate = None
+        if table.df is not previous_df and isinstance(table.df, (pl.DataFrame, pl.LazyFrame)):
+            candidate = table.df
+        else:
+            df = locals_dict.get("df")
+            if df is not previous_df and isinstance(df, (pl.DataFrame, pl.LazyFrame, pl.Series)):
+                candidate = df
+
+        if candidate is None:
+            return
+
+        table.apply_external_dataframe(candidate)
+        locals_dict["table"] = table
+        locals_dict["self"] = table
+        locals_dict["df"] = table.df
+
+        # self._set_status_context(table)
+        self.notify("Updated with new DataFrame", title="Python Console")
 
     def action_next_tab(self, offset: int = 1) -> None:
         """Switch to the next tab or previous tab.
@@ -766,11 +849,14 @@ class DataFrameViewer(App):
         self.tabbed.active = tab.id
         table.focus()
 
-    def do_close(self) -> None:
+    def do_close(self, force=False) -> None:
         """Close current tab or view.
 
         When in a view, return to main table. Otherwise, close the active tab.
         If only one tab remains and no more tabs can be closed, exits the application.
+
+        Args:
+            force: If True, forces the close without prompting to save unsaved changes.
         """
         try:
             if not (table := self.active_table):
@@ -806,7 +892,7 @@ class DataFrameViewer(App):
                     # User wants to discard - close immediately
                     self.close_tab()
 
-            if table.dirty:
+            if table.dirty and not force:
                 self.push_screen(
                     ConfirmScreen(
                         "Close Tab",

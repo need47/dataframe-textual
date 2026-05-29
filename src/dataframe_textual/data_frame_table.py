@@ -590,8 +590,10 @@ class DataFrameTable(DataTable):
         Raises:
             AssertionError: If the cursor column index is out of bounds.
         """
-        cidx = self.df.columns.index(self.cursor_col_name)
-        assert 0 <= cidx < len(self.df.columns), "Cursor column index is out of bounds"
+        try:
+            cidx = self.df.get_column_index(self.cursor_col_name)
+        except pl.exceptions.ColumnNotFoundError:
+            raise AssertionError("Cursor column index is out of bounds")
         return cidx
 
     @property
@@ -1215,6 +1217,45 @@ class DataFrameTable(DataTable):
     def action_advanced_sql(self) -> None:
         """Open the advanced SQL interface screen."""
         self.do_advanced_sql()
+
+    def apply_external_dataframe(
+        self, frame: pl.DataFrame | pl.LazyFrame | pl.Series, *, mark_dirty: bool = True
+    ) -> None:
+        """Replace the current dataframe from an external caller and refresh the table.
+
+        Args:
+            frame: Data to apply to the table.
+            mark_dirty: Whether to mark the table as modified.
+
+        Raises:
+            TypeError: If frame is not convertible to a Polars DataFrame.
+        """
+        if isinstance(frame, pl.Series):
+            frame = frame.to_frame()
+        elif isinstance(frame, pl.LazyFrame):
+            frame = frame.collect()
+
+        if not isinstance(frame, pl.DataFrame):
+            raise TypeError(f"Expected a Polars DataFrame, LazyFrame, or Series, got {type(frame).__name__}")
+
+        frame = add_rid_column(frame)
+
+        self.df = frame
+        self.df_view = None
+        self.loaded_rows = 0
+        self.loaded_ranges.clear()
+        self.selected_rows.clear()
+        self.matches.clear()
+        self.sorted_columns.clear()
+        self.hidden_columns.intersection_update(frame.columns)
+        self.expanded_columns.intersection_update(frame.columns)
+        self.fixed_rows = min(self.fixed_rows, len(frame))
+        self.fixed_columns = min(self.fixed_columns, max(len(frame.columns) - 1, 0))
+        self.df_done = True
+        self.setup_table()
+
+        if mark_dirty:
+            self.dirty = True
 
     def setup_table(self) -> None:
         """Setup the table for display.
