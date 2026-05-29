@@ -603,13 +603,12 @@ class DataFrameViewer(App):
         if candidate is None:
             return
 
-        table.apply_external_dataframe(candidate)
+        table.apply_dataframe(candidate, dirty=True)
         locals_dict["table"] = table
         locals_dict["self"] = table
         locals_dict["df"] = table.df
 
-        # self._set_status_context(table)
-        self.notify("Updated with new DataFrame", title="Python Console")
+        self.notify("Updated table from console", title="Python Console")
 
     def action_next_tab(self, offset: int = 1) -> None:
         """Switch to the next tab or previous tab.
