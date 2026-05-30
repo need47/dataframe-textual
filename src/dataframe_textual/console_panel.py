@@ -52,10 +52,11 @@ class ConsolePanel(Vertical):
         }
 
         #console_prompt {
-            width: 5;
+            width: auto;
             height: 3;
             color: $accent;
-            content-align: center middle;
+            content-align: right middle;
+            padding-left: 1;
         }
 
         #console_input {
