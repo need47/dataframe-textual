@@ -205,8 +205,8 @@ class DataFrameTable(DataTable):
         - **m** - 📋 Show column metadata (ID, name, type)
         - **h** - 👁️ Hide current column
         - **H** - 👀 Show all hidden columns
-        - **_** - 📏 Toggle column full width
-        - **`** - 📌 Freeze rows and/or columns
+        - **_** (underscore) - 📏 Toggle column full width
+        - **`** (backtick) - 📌 Freeze rows and/or columns
         - **~** - 🏷️ Toggle row labels
         - **^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for numeric display
@@ -224,7 +224,7 @@ class DataFrameTable(DataTable):
         - **Ctrl+X** - ❌ Delete row and those above
         - **delete** - ❌ Clear current cell (set to NULL)
         - **Shift+Delete** - ❌ Clear current column (set matching cells to NULL)
-        - **-** - ❌ Delete current column
+        - **-** (minus) - ❌ Delete current column
         - **d** - 📋 Duplicate current column
         - **D** - 📋 Duplicate current row
         - **Ctrl+Delete** - 🧹 Remove duplicate rows (keep first occurrence)
@@ -234,7 +234,7 @@ class DataFrameTable(DataTable):
         ## ✅ Row Selection
         - **\\\\** - ✅ Select rows with cell matches or those matching cursor value in current column
         - **|** - ✅ Select rows with expression
-        - **'** - ✅ Select/deselect current row
+        - **'** (single quote) - ✅ Select/deselect current row
         - **t** - 💡 Toggle row selection (invert all)
         - **T** - 🧹 Clear all selections and matches
         - **{** - ⬆️ Go to previous selected row
@@ -257,7 +257,7 @@ class DataFrameTable(DataTable):
         - **V** - ⏬ Filter rows with expression
         - **.** - ⏬ Filter rows with non-null values in current column
         - **f** - ⏬ Filter rows by column value
-        - **"** - 📤 Collect rows to a new tab
+        - **"** (double quote) - 📤 Collect rows to a new tab
 
         ## 🔀 Sorting
         - **[** - 🔼 Sort column ascending

@@ -11,11 +11,16 @@ from typing import Any, Callable
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.events import Key
 from textual.widgets import Input, RichLog, Static
 
 
 class ConsolePanel(Vertical):
     """Bottom-docked interactive Python console for the active dataframe tab."""
+
+    INPUT_PLACEHOLDER = "Enter Python code to execute"
+    HISTORY_BEGINNING_PLACEHOLDER = "Already at beginning of history. Press Down to return."
+    HISTORY_END_PLACEHOLDER = "Already at end of history. Press Up to return."
 
     BINDINGS = [
         ("escape", "close_console", "Close Console"),
@@ -84,6 +89,12 @@ class ConsolePanel(Vertical):
         self._locals: dict[str, Any] = {}
         self._interpreter = code.InteractiveConsole(self._locals)
         self._awaiting_more_input = False
+        self._history: list[str] = []
+        self._history_index: int | None = None
+        self._history_pending_input = ""
+        self._history_boundary: str | None = None
+        self._suppress_history_reset = False
+        self._ignore_input_changed = 0
 
     def compose(self) -> ComposeResult:
         """Compose the console output and input widgets."""
@@ -96,7 +107,7 @@ class ConsolePanel(Vertical):
         with Horizontal(id="console_input_row"):
             self.prompt = Static(">>>", id="console_prompt")
             yield self.prompt
-            self.input = Input(placeholder="Enter Python code to execute", id="console_input")
+            self.input = Input(placeholder=self.INPUT_PLACEHOLDER, id="console_input")
             yield self.input
 
     def on_mount(self) -> None:
@@ -128,6 +139,160 @@ class ConsolePanel(Vertical):
         prompt = "..." if self._awaiting_more_input else ">>>"
         self.prompt.update(prompt)
 
+    def _record_history(self, source: str) -> None:
+        """Record a submitted input line for later navigation.
+
+        Args:
+            source: Submitted source text.
+        """
+        if not source.strip():
+            return
+
+        if self._history and self._history[-1] == source:
+            return
+
+        self._history.append(source)
+
+    def _reset_history_navigation(self) -> None:
+        """Reset history cursor and pending in-progress input snapshot."""
+        self._history_index = None
+        self._history_pending_input = ""
+        self._history_boundary = None
+        self.input.placeholder = self.INPUT_PLACEHOLDER
+
+    def _set_input_value(self, value: str, *, cursor_to_end: bool = True) -> None:
+        """Set input value while ignoring the corresponding changed event.
+
+        Args:
+            value: Input value to set.
+            cursor_to_end: Whether to place cursor at the end of value.
+        """
+        self._ignore_input_changed += 1
+        self.input.value = value
+        self.input.cursor_position = len(value) if cursor_to_end else 0
+
+    def _enter_history_boundary(self, boundary: str) -> None:
+        """Enter a boundary state and show a hint in the input placeholder.
+
+        Args:
+            boundary: Either "beginning" or "end".
+        """
+        self._history_index = None
+        self._history_boundary = boundary
+        self._suppress_history_reset = True
+        try:
+            self._set_input_value("", cursor_to_end=False)
+            self.input.placeholder = (
+                self.HISTORY_BEGINNING_PLACEHOLDER if boundary == "beginning" else self.HISTORY_END_PLACEHOLDER
+            )
+        finally:
+            self._suppress_history_reset = False
+
+    def _navigate_history(self, step: int) -> None:
+        """Move backward or forward through input history.
+
+        Args:
+            step: -1 for older commands, +1 for newer commands.
+        """
+        if not self._history:
+            return
+
+        if self._history_boundary == "beginning":
+            if step > 0:
+                self._suppress_history_reset = True
+                try:
+                    self.input.placeholder = self.INPUT_PLACEHOLDER
+                    self._set_input_value(self._history[0])
+                    self._history_index = 0
+                    self._history_boundary = None
+                finally:
+                    self._suppress_history_reset = False
+            return
+
+        if self._history_boundary == "end":
+            if step < 0:
+                self._suppress_history_reset = True
+                try:
+                    self.input.placeholder = self.INPUT_PLACEHOLDER
+                    self._set_input_value(self._history[-1])
+                    self._history_index = len(self._history) - 1
+                    self._history_boundary = None
+                finally:
+                    self._suppress_history_reset = False
+            return
+
+        if self._history_index is None:
+            self._history_pending_input = self.input.value
+            self._history_index = len(self._history)
+            self.input.placeholder = self.INPUT_PLACEHOLDER
+
+        if step < 0 and self._history_index == 0:
+            self._enter_history_boundary("beginning")
+            return
+
+        if step > 0 and self._history_index == len(self._history) - 1:
+            self._enter_history_boundary("end")
+            return
+
+        if step > 0 and self._history_index == len(self._history):
+            self._enter_history_boundary("end")
+            return
+
+        new_index = self._history_index + step
+        new_index = max(0, min(new_index, len(self._history)))
+
+        self._suppress_history_reset = True
+        try:
+            if new_index == len(self._history):
+                self._set_input_value(self._history_pending_input)
+                self._history_index = None
+                self.input.placeholder = self.INPUT_PLACEHOLDER
+            else:
+                self._set_input_value(self._history[new_index])
+                self._history_index = new_index
+                self.input.placeholder = self.INPUT_PLACEHOLDER
+        finally:
+            self._suppress_history_reset = False
+
+    def on_key(self, event: Key) -> None:
+        """Handle Up/Down navigation for console input history.
+
+        Args:
+            event: Key event instance.
+        """
+        if not self.input.has_focus:
+            return
+
+        if event.key == "up":
+            event.stop()
+            self._navigate_history(-1)
+        elif event.key == "down":
+            event.stop()
+            self._navigate_history(1)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Reset history cursor if the user edits text after navigating history.
+
+        Args:
+            event: Input changed event.
+        """
+        if event.input.id != "console_input":
+            return
+
+        if self._ignore_input_changed > 0:
+            self._ignore_input_changed -= 1
+            return
+
+        if self._suppress_history_reset:
+            return
+
+        self.input.placeholder = self.INPUT_PLACEHOLDER
+        self._history_boundary = None
+
+        if self._history_index is not None:
+            self._history_index = None
+            self._history_pending_input = event.value
+
     def _run_shell_command(self, command: str) -> int:
         """Run a shell command and emit captured output in the console log.
 
@@ -154,6 +319,8 @@ class ConsolePanel(Vertical):
             return
 
         source = event.value
+        self._record_history(source)
+        self._reset_history_navigation()
         prompt = "..." if self._awaiting_more_input else ">>>"
 
         if not self._awaiting_more_input and source.strip().lower() in {"clear", "cls"}:

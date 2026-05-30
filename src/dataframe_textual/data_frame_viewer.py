@@ -30,18 +30,19 @@ class DataFrameViewer(App):
         # 📊 DataFrame Viewer - App Controls
 
         ## ⚙️ File & Tab Management
-        - **>** - ▶️ Move current tab right (wrap to first)
-        - **<** - ◀️ Move current tab left (wrap to last)
-        - **b** - 🔄 Cycle through tabs
-        - **B** - 👁️ Toggle tab bar visibility
         - **q** - ❌ Quit current tab (prompts to save unsaved changes)
         - **Q** - ❌ Quit all tabs (prompts to save unsaved changes)
-        - **Esc** - ❌ Force to quit current tab or view (discards unsaved changes)
         - **Ctrl+Q** - 🚪 Force to quit app (discards unsaved changes)
-        - **Ctrl+V** - 💾 Save current view to file
+        - **Esc** - ❌ Force to quit current tab or view (discards unsaved changes)
+        - **Space** - 👁️ Toggle tab bar visibility
+        - **b** - ⏭️ Next Tab
+        - **B** - ⏮️ Previous Tab
+        - **>** - ▶️ Move current tab right (wrap to first)
+        - **<** - ◀️ Move current tab left (wrap to last)
         - **Ctrl+T** - 💾 Save current tab to file
-        - **w** - 💾 Save current tab to file (overwrite without prompt)
         - **Ctrl+S** - 💾 Save all tabs to file
+        - **Ctrl+V** - 💾 Save current view to file
+        - **w** - 💾 Save current tab to file (overwrite without prompt)
         - **W** - 💾 Save all tabs to file (overwrite without prompt)
         - **Ctrl+D** - 📋 Duplicate current tab
         - **Ctrl+O** - 📁 Open a file
@@ -51,7 +52,7 @@ class DataFrameViewer(App):
         ## 🎨 View & Settings
         - **F1** - ❓ Toggle this help panel
         - **k** - 🌙 Select theme
-        - **`** - 🐍 Toggle Python console
+        - **` (backtick)** - 🐍 Toggle Python console
         - **Ctrl+P -> Screenshot** - 📸 Capture terminal view as a SVG image
 
         ## ⭐ Features

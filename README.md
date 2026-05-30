@@ -222,11 +222,11 @@ dv data.csv -o data.parquet
 
 | Key            | Action                                                       |
 | -------------- | ------------------------------------------------------------ |
-| `q`            | Quit current tab (prompts to save unsaved changes)           |
-| `Q`            | Quit all tabs and quit app (prompts to save unsaved changes) |
-| `Esc`          | Force to quit current tab or view (discards unsaved changes) |
+| `q`            | Quit current tab (prompts to save unsaved changes) or view   |
+| `Q`            | Quit all tabs then app (prompts to save unsaved changes)     |
 | `Ctrl+Q`       | Force to quit app (discards unsaved changes)                 |
-| `space`        | Toggle tab bar visibility                                    |
+| `Esc`          | Force to quit current tab (discards unsaved changes) or view |
+| `Space`        | Toggle tab bar visibility                                    |
 | `b`            | Next tab                                                     |
 | `B`            | Previous tab                                                 |
 | `>`            | Move current tab right (wrap to first)                       |
@@ -252,7 +252,7 @@ dv data.csv -o data.parquet
 | ------------------------ | ------------------------------------ |
 | `F1`                     | Toggle help panel                    |
 | `k`                      | Select theme                         |
-| `` ` ``                  | Toggle Python console                |
+| `` ` `` (backtick)       | Toggle Python console                |
 | `Ctrl+P` -> `Screenshot` | Capture terminal view as a SVG image |
 
 ---
@@ -328,15 +328,15 @@ dv data.csv -o data.parquet
 
 #### Row Selection
 
-| Key         | Action                                                                        |
-| ----------- | ----------------------------------------------------------------------------- |
-| `\`         | Select rows wth cell matches or those matching cursor value in current column |
-| `\|` (pipe) | Select rows by expression                                                     |
-| `{`         | Go to previous selected row                                                   |
-| `}`         | Go to next selected row                                                       |
-| `'`         | Select/deselect current row                                                   |
-| `t`         | Toggle row selections (invert)                                                |
-| `T`         | Clear all row selections and/or cell matches                                  |
+| Key                | Action                                                                        |
+| ------------------ | ----------------------------------------------------------------------------- |
+| `\`                | Select rows wth cell matches or those matching cursor value in current column |
+| `\|` (pipe)        | Select rows by expression                                                     |
+| `{`                | Go to previous selected row                                                   |
+| `}`                | Go to next selected row                                                       |
+| `'` (single quote) | Select/deselect current row                                                   |
+| `t`                | Toggle row selections (invert)                                                |
+| `T`                | Clear all row selections and/or cell matches                                  |
 
 #### Find & Replace
 
@@ -352,13 +352,13 @@ dv data.csv -o data.parquet
 | `R` | Find and replace across all columns (interactive or replace all)       |
 
 #### Filter & Collect
-| Key         | Action                                                 |
-| ----------- | ------------------------------------------------------ |
-| `v`         | Basic filter using the current cell value              |
-| `V`         | Advanced filter with value or expression               |
-| `.`         | Filter rows with non-null values in the current column |
-| `f`         | Filter rows using values in the current column         |
-| `"` (quote) | Collect rows to a new tab                              |
+| Key                | Action                                                 |
+| ------------------ | ------------------------------------------------------ |
+| `v`                | Basic filter using the current cell value              |
+| `V`                | Advanced filter with value or expression               |
+| `.`                | Filter rows with non-null values in the current column |
+| `f`                | Filter rows using values in the current column         |
+| `"` (double quote) | Collect rows to a new tab                              |
 
 #### Sorting (supporting multiple columns)
 
