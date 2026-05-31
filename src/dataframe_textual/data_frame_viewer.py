@@ -207,7 +207,7 @@ class DataFrameViewer(App):
                     self.log(f"Error loading `{filename}`: {e}")
 
         # Python console panel
-        self.console_panel = ConsolePanel(self._get_console_context, self._apply_console_locals, id="console_panel")
+        self.console_panel = ConsolePanel(self._get_console_context, self._apply_console_context, id="console_panel")
         yield self.console_panel
 
         # Status bar
@@ -527,7 +527,7 @@ class DataFrameViewer(App):
             "RID": RID,
         }
 
-    def _apply_console_locals(self, locals_dict: dict[str, Any], previous_df: Any) -> None:
+    def _apply_console_context(self, locals_dict: dict[str, Any], previous_df: Any) -> None:
         """Sync dataframe assignments from the Python console back into the active tab.
 
         Args:
