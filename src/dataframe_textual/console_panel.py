@@ -114,15 +114,125 @@ class ConsolePanel(Vertical):
         """Set initial focus once the panel is mounted."""
         self.focus_input()
 
-    def focus_input(self) -> None:
-        """Focus the input widget for interactive use."""
-        self.input.focus()
+    def on_key(self, event: Key) -> None:
+        """Handle Up/Down navigation for console input history.
+
+        Args:
+            event: Key event instance.
+        """
+        if not self.input.has_focus:
+            return
+
+        if event.key == "up":
+            event.stop()
+            self._navigate_history(-1)
+        elif event.key == "down":
+            event.stop()
+            self._navigate_history(1)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Reset history cursor if the user edits text after navigating history.
+
+        Args:
+            event: Input changed event.
+        """
+        if event.input.id != "console_input":
+            return
+
+        if self._ignore_input_changed > 0:
+            self._ignore_input_changed -= 1
+            return
+
+        if self._suppress_history_reset:
+            return
+
+        self.input.placeholder = self.INPUT_PLACEHOLDER
+        self._history_boundary = None
+
+        if self._history_index is not None:
+            self._history_index = None
+            self._history_pending_input = event.value
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Execute submitted Python source.
+
+        Args:
+            event: Submitted input event.
+        """
+        if event.input.id != "console_input":
+            return
+
+        source = event.value
+        self._record_history(source)
+        self._reset_history_navigation()
+        prompt = "..." if self._awaiting_more_input else ">>>"
+
+        if not self._awaiting_more_input and source.strip().lower() in {"clear", "cls"}:
+            self.output.clear()
+            event.input.value = ""
+            self.focus_input()
+            return
+
+        if not self._awaiting_more_input and source.lstrip().startswith("!"):
+            self.write_line(f"{prompt} {source}")
+            event.input.value = ""
+
+            command = source.lstrip()[1:].strip()
+            if not command:
+                self.write_line("Shell command is empty.")
+            else:
+                self._run_shell_command(command)
+
+            self._update_prompt()
+            self.focus_input()
+            return
+
+        self.write_line(f"{prompt} {source}")
+        event.input.value = ""
+
+        context = self._get_context()
+        self._locals.update(context)
+        self._interpreter.locals = self._locals
+
+        stdout_buffer = io.StringIO()
+        stderr_buffer = io.StringIO()
+
+        try:
+            with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
+                self._awaiting_more_input = self._interpreter.push(source)
+        except SystemExit as error:
+            stderr_buffer.write(f"SystemExit: {error}\n")
+            self._awaiting_more_input = False
+        except Exception:
+            stderr_buffer.write(traceback.format_exc())
+            self._awaiting_more_input = False
+
+        try:
+            previous_df = context.get("df")
+            self._apply_context(self._locals, previous_df)
+        except Exception:
+            stderr_buffer.write(traceback.format_exc())
+            self._awaiting_more_input = False
+
+        output = stdout_buffer.getvalue()
+        errors = stderr_buffer.getvalue()
+        if output:
+            self.write_line(output)
+        if errors:
+            self.write_line(errors)
+
+        self._update_prompt()
+        self.focus_input()
 
     def action_close_console(self) -> None:
         """Hide the console panel when escape is pressed."""
         self.display = False
         if table := self.app.active_table:
             table.focus()
+
+    def focus_input(self) -> None:
+        """Focus the input widget for interactive use."""
+        self.input.focus()
 
     def write_line(self, text: str) -> None:
         """Append text to the output log.
@@ -254,45 +364,6 @@ class ConsolePanel(Vertical):
         finally:
             self._suppress_history_reset = False
 
-    def on_key(self, event: Key) -> None:
-        """Handle Up/Down navigation for console input history.
-
-        Args:
-            event: Key event instance.
-        """
-        if not self.input.has_focus:
-            return
-
-        if event.key == "up":
-            event.stop()
-            self._navigate_history(-1)
-        elif event.key == "down":
-            event.stop()
-            self._navigate_history(1)
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """Reset history cursor if the user edits text after navigating history.
-
-        Args:
-            event: Input changed event.
-        """
-        if event.input.id != "console_input":
-            return
-
-        if self._ignore_input_changed > 0:
-            self._ignore_input_changed -= 1
-            return
-
-        if self._suppress_history_reset:
-            return
-
-        self.input.placeholder = self.INPUT_PLACEHOLDER
-        self._history_boundary = None
-
-        if self._history_index is not None:
-            self._history_index = None
-            self._history_pending_input = event.value
-
     def _run_shell_command(self, command: str) -> int:
         """Run a shell command and emit captured output in the console log.
 
@@ -308,74 +379,3 @@ class ConsolePanel(Vertical):
         if result.stderr:
             self.write_line(result.stderr)
         return result.returncode
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Execute submitted Python source.
-
-        Args:
-            event: Submitted input event.
-        """
-        if event.input.id != "console_input":
-            return
-
-        source = event.value
-        self._record_history(source)
-        self._reset_history_navigation()
-        prompt = "..." if self._awaiting_more_input else ">>>"
-
-        if not self._awaiting_more_input and source.strip().lower() in {"clear", "cls"}:
-            self.output.clear()
-            event.input.value = ""
-            self.focus_input()
-            return
-
-        if not self._awaiting_more_input and source.lstrip().startswith("!"):
-            self.write_line(f"{prompt} {source}")
-            event.input.value = ""
-
-            command = source.lstrip()[1:].strip()
-            if not command:
-                self.write_line("Shell command is empty.")
-            else:
-                self._run_shell_command(command)
-
-            self._update_prompt()
-            self.focus_input()
-            return
-
-        self.write_line(f"{prompt} {source}")
-        event.input.value = ""
-
-        context = self._get_context()
-        self._locals.update(context)
-        self._interpreter.locals = self._locals
-
-        stdout_buffer = io.StringIO()
-        stderr_buffer = io.StringIO()
-
-        try:
-            with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
-                self._awaiting_more_input = self._interpreter.push(source)
-        except SystemExit as error:
-            stderr_buffer.write(f"SystemExit: {error}\n")
-            self._awaiting_more_input = False
-        except Exception:
-            stderr_buffer.write(traceback.format_exc())
-            self._awaiting_more_input = False
-
-        try:
-            previous_df = context.get("df")
-            self._apply_context(self._locals, previous_df)
-        except Exception:
-            stderr_buffer.write(traceback.format_exc())
-            self._awaiting_more_input = False
-
-        output = stdout_buffer.getvalue()
-        errors = stderr_buffer.getvalue()
-        if output:
-            self.write_line(output)
-        if errors:
-            self.write_line(errors)
-
-        self._update_prompt()
-        self.focus_input()
