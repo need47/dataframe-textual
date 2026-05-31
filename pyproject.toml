@@ -5,14 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "dataframe-textual"
 version = "2.47.0"
-description = "Interactive terminal viewer/editor for tabular data"
+description = "Interactive terminal viewer/editor (TUI) for CSV/TSV, Excel, Parquet, JSONL, etc."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "Tiejun Cheng", email = "need47@gmail.com"}
 ]
-keywords = ["csv", "excel", "terminal", "tui", "textual", "data-analysis", "polars", "interactive", "viewer", "editor"]
+keywords = ["csv", "tsv", "excel", "parquet", "jsonl", "terminal", "tui", "textual", "data-analysis", "polars", "interactive", "viewer", "editor"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
