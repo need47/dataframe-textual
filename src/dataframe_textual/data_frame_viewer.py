@@ -522,7 +522,7 @@ class DataFrameViewer(App):
         return {
             "pl": pl,
             "app": self,
-            "self": table,
+            "table": table,
             "df": None if table is None else table.df,
             "RID": RID,
         }
@@ -549,9 +549,8 @@ class DataFrameViewer(App):
         if candidate is None:
             return
 
-        table.apply_dataframe(candidate, dirty=True)
+        table.apply_frame(candidate, dirty=True)
         locals_dict["table"] = table
-        locals_dict["self"] = table
         locals_dict["df"] = table.df
 
         self.notify("Updated table from console", title="Python Console")

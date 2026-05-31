@@ -16,8 +16,9 @@ from textual.widgets import Input, RichLog, Static
 
 
 class ConsolePanel(Vertical):
-    """Bottom-docked interactive Python console for the active dataframe tab."""
+    """Bottom-docked interactive Python console for the active tab."""
 
+    STICKY_HELP = "Python console ready. Available names: [$success]df[/] and [$success]pl[/]. Assign a DataFrame or Series back to [$success]df[/] to refresh the current table. Prefix with [$success]![/] to run shell commands."
     INPUT_PLACEHOLDER = "Enter Python code to execute"
     HISTORY_BEGINNING_PLACEHOLDER = "Already at beginning of history. Press Down to return."
     HISTORY_END_PLACEHOLDER = "Already at end of history. Press Up to return."
@@ -98,8 +99,7 @@ class ConsolePanel(Vertical):
 
     def compose(self) -> ComposeResult:
         """Compose the console output and input widgets."""
-        sticky_help = "Python console ready. Available names: [$success]df[/] and [$success]pl[/]. Assign a DataFrame or Series back to [$success]df[/] to refresh the current table. Prefix with [$success]![/] to run shell commands."
-        yield Static(sticky_help, id="console_help", markup=True)
+        yield Static(self.STICKY_HELP, id="console_help", markup=True)
 
         self.output = RichLog(id="console_output", markup=False, wrap=True, highlight=True)
         yield self.output

@@ -1867,7 +1867,7 @@ class DataFrameTable(DataTable):
 
         self.notify(description, title="Redo")
 
-    def apply_dataframe(self, frame: pl.DataFrame | pl.LazyFrame | pl.Series, dirty: bool = True) -> None:
+    def apply_frame(self, frame: pl.DataFrame | pl.LazyFrame | pl.Series, dirty: bool = True) -> None:
         """Replace the current dataframe from given data and refresh the table.
 
         Args:
@@ -1904,7 +1904,7 @@ class DataFrameTable(DataTable):
 
     def do_reset(self) -> None:
         """Reset the table to the initial state."""
-        self.apply_dataframe(self.dataframe, dirty=False)
+        self.apply_frame(self.dataframe, dirty=False)
         self.notify("Restored to initial state", title="Reset")
 
     # Display
