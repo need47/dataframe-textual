@@ -1270,7 +1270,7 @@ class DataFrameTable(DataTable):
 
         # Sample a reasonable number of rows to calculate widths (don't scan entire dataframe)
         sample_size = min(self.BATCH_SIZE, len(self.df))
-        sample_lf = self.df.lazy().slice(0, sample_size)
+        sample_lf = self.df.lazy().head(sample_size)
 
         # Determine widths for each column
         for col, dtype in zip(self.df.columns, self.df.dtypes):
