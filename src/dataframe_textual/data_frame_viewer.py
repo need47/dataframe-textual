@@ -180,7 +180,7 @@ class DataFrameViewer(App):
         with self.tabbed:
             seen_names = set()
             for idx, source in enumerate(self.sources, start=1):
-                df, filename, tabname = source.lf, source.filename, source.tabname
+                lf, filename, tabname = source.lf, source.filename, source.tabname
                 tab_id = f"tab-{idx}"
 
                 if not tabname:
@@ -194,7 +194,7 @@ class DataFrameViewer(App):
                 seen_names.add(tabname)
 
                 try:
-                    table = DataFrameTable(df, filename, tabname=tabname, id=tab_id, zebra_stripes=True)
+                    table = DataFrameTable(lf, filename, tabname=tabname, id=tab_id, zebra_stripes=True)
                     tab = TabPane(tabname, table, id=tab_id)
                     self.tabs[tab] = table
                     yield tab
