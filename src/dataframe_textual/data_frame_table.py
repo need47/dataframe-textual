@@ -639,7 +639,7 @@ class DataFrameTable(DataTable):
 
         return matches
 
-    def _round_to_nearest_hundreds(self, num: int):
+    def _round_to_nearest_hundreds(self, num: int) -> tuple[int, int]:
         """Round a number to the nearest hundreds.
 
         Args:
