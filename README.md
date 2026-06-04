@@ -299,6 +299,7 @@ dv data.csv -o data.parquet
 | `_` (underscore) | Toggle column full width                                               |
 | `+`              | Toggle freeze rows and/or columns                                      |
 | `,`              | Toggle thousand separator for numeric display                          |
+| `*`              | Toggle float precision between 2 decimals and full precision           |
 | `^`              | Toggle internal row index column (RID)                                 |
 | `&`              | Set current row as the new header row                                  |
 | `h`              | Hide current column                                                    |
@@ -426,6 +427,11 @@ Columns are automatically styled based on their data types:
 - Formats large numbers with commas for readability (e.g., `1000000` → `1,000,000`)
 - Works across all numeric columns in the table
 - Toggle on/off as needed for different viewing preferences
+- Display-only: does not modify underlying data in the dataframe
+
+**Float Precision Toggle** (`*`):
+- Applies to **float** columns
+- Switches between rounded display with 2 decimal places and full precision
 - Display-only: does not modify underlying data in the dataframe
 
 **Cursor Type Cycling** (`K`):

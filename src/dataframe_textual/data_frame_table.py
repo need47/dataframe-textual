@@ -206,10 +206,11 @@ class DataFrameTable(DataTable):
         - **h** - 👁️ Hide current column
         - **H** - 👀 Show all hidden columns
         - **_** (underscore) - 📏 Toggle column full width
-        - **`** (backtick) - 📌 Freeze rows and/or columns
+        - **+** - 📌 Freeze rows and/or columns
         - **~** - 🏷️ Toggle row labels
         - **^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for numeric display
+        - **\*** - 🔢 Toggle float precision between 2 decimals and full precision
         - **K** - 🔄 Cycle cursor (cell → row → column → cell)
 
         ## ✏️ Editing
@@ -303,6 +304,7 @@ class DataFrameTable(DataTable):
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
         ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
         ("comma", "toggle_thousand_separator", "Toggle thousand separator"),  # `,`
+        ("asterisk", "toggle_float_precision", "Toggle float precision"),  # `*`
         ("underscore", "expand_column", "Expand column to full width"),  # `_`
         ("circumflex_accent", "toggle_rid", "Toggle internal row index (RID)"),  # `^`
         ("ampersand", "set_cursor_row_as_header", "Set cursor row as the new header row"),  # `&`
@@ -439,6 +441,9 @@ class DataFrameTable(DataTable):
 
         # Whether to use thousand separator for numeric display
         self.thousand_separator = False
+
+        # Number of decimal places for float display
+        self.float_precision = 2
 
         # Set of columns expanded to full width
         self.expanded_columns: set[str] = set()
@@ -1194,6 +1199,18 @@ class DataFrameTable(DataTable):
         status = "on" if self.thousand_separator else "off"
         self.notify(f"Thousand separator is [$success]{status}[/]", title="Toggle Thousand Separator")
 
+    def action_toggle_float_precision(self) -> None:
+        """Toggle float precision between 2 and 4 decimal places."""
+        self.float_precision = 0 if self.float_precision == 2 else 2
+        self.setup_table()
+
+        message = (
+            "Float precision turned off"
+            if self.float_precision == 0
+            else f"Float precision set to {self.float_precision} decimal places"
+        )
+        self.notify(message, title="Toggle Float Precision")
+
     def action_next_match(self) -> None:
         """Go to the next matched cell."""
         self.do_next_match()
@@ -1513,6 +1530,7 @@ class DataFrameTable(DataTable):
                 dtypes,
                 style=styles,
                 thousand_separator=self.thousand_separator,
+                float_precision=self.float_precision,
             )
 
             # Find correct insertion position and insert
