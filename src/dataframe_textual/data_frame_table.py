@@ -210,7 +210,7 @@ class DataFrameTable(DataTable):
         - **~** - 🏷️ Toggle row labels
         - **^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for numeric display
-        - **\*** - 🔢 Toggle float precision between 2 decimals and full precision
+        - **\\*** - 🔢 Toggle float precision between 2 decimals and full precision
         - **K** - 🔄 Cycle cursor (cell → row → column → cell)
 
         ## ✏️ Editing
