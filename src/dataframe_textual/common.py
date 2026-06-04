@@ -519,52 +519,65 @@ def handle_compute_error(err_msg: str) -> None:
     if not err_msg:
         return
 
-    # Already disabled schema inference, cannot recover
+    from rich.console import Console
+
+    console = Console(stderr=True)
+
+    # CSV malformed error
     if "CSV malformed" in err_msg:
-        print(
-            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nSometimes quote characters might be mismatched. Try again with `-Q` to disable quoting",
-            file=sys.stderr,
+        console.rule("Error", style="red")
+        console.print(err_msg)
+        console.rule("Troubleshooting", style="green")
+        console.print(
+            "Sometimes quote characters might be mismatched and cause malformed CSV. Try again with `[yellow bold]-Q[/yellow bold]` to use a different quote character or disable quoting.\n"
         )
-        sys.exit(1)
 
     # Schema mismatch error
     elif "found more fields than defined in 'Schema'" in err_msg:
-        print(
-            f"{'-' * 21}\n{err_msg}.\n{'-' * 21}\nInput might be malformed. Try again with `-T` to truncate ragged lines",
-            file=sys.stderr,
+        console.rule("Error", style="red")
+        console.print(err_msg)
+        console.rule("Troubleshooting", style="green")
+        console.print(
+            "Input might be malformed. Try again with `[yellow bold]-T[/yellow bold]` to truncate ragged lines.\n"
         )
-        sys.exit(1)
 
     # Field ... is not properly escaped
     elif "is not properly escaped" in err_msg:
-        print(
-            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nQuoting might be causing the issue. Try again with `-Q` to use a different quote character or disable quoting",
-            file=sys.stderr,
+        console.rule("Error", style="red")
+        console.print(err_msg)
+        console.rule("Troubleshooting", style="green")
+        console.print(
+            "Quoting might be causing improper escaping. Try again with `[yellow bold]-Q[/yellow bold]` to use a different quote character or disable quoting.\n"
         )
-        sys.exit(1)
 
     # ComputeError: could not parse `n.a. as of 04.01.022` as `dtype` i64 at column 'PubChemCID' (column number 16)
     elif m := RE_COMPUTE_ERROR.search(err_msg):
         col_name = m.group(1)
-        print(
-            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nColumn `{col_name}` has mixed types. Try again with `-L` to increase the number of rows used for schema inference or `-I` to disable type inference",
-            file=sys.stderr,
+        console.rule("Error", style="red")
+        console.print(err_msg)
+        console.rule("Troubleshooting", style="green")
+        console.print(
+            f"Column `[green bold]{col_name}[/green bold]` has mixed types. Try again with `[yellow bold]-L[/yellow bold]` to increase the number of rows used for schema inference or `[yellow bold]-I[/yellow bold]` to disable type inference.\n"
         )
-        sys.exit(1)
 
     # no data to load
     elif "The provided LazyFrame has no data to load" in err_msg:
-        print(
-            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nNo data could be read from the input. Check if the file is empty or if the format/delimiter is correct.",
-            file=sys.stderr,
+        console.rule("Error", style="red")
+        console.print(err_msg)
+        console.rule("Troubleshooting", style="green")
+        console.print(
+            "No data could be read from the input. Check if the file is empty or if the format/delimiter is correct.\n"
         )
-        sys.exit(1)
 
+    # Other errors
     else:
-        print(
-            f"{'-' * 21}\n{err_msg}\n{'-' * 21}\nUnhandled error. Try again with `-E` to ignore errors", file=sys.stderr
-        )
-        sys.exit(1)
+        console.rule("Error", style="red")
+        console.print(err_msg)
+        console.rule("Troubleshooting", style="green")
+        console.print("Unhandled error. Try again with `[yellow bold]-E[/yellow bold]` to ignore errors.\n")
+
+    # Exit after handling the error
+    sys.exit(1)
 
 
 def get_columns(all_columns: list[str], use_columns: list[str] | None) -> list[str]:
