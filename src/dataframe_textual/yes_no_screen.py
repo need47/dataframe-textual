@@ -382,14 +382,7 @@ class ConfirmScreen(YesNoScreen):
             yes=yes,
             maybe=maybe,
             no=no,
-            on_yes_callback=self.handle_yes,
         )
-
-    def handle_yes(self) -> bool:
-        return True
-
-    def handle_maybe(self) -> bool:
-        return False
 
 
 class EditCellScreen(YesNoScreen):
