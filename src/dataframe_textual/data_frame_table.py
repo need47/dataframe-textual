@@ -8,6 +8,7 @@ from functools import partial
 from itertools import zip_longest
 from pathlib import Path
 from textwrap import dedent
+from threading import Event
 from typing import Any, Callable
 
 import polars as pl
@@ -87,8 +88,8 @@ HIGHLIGHT_COLOR = "red"
 # Buffer size for loading rows
 BUFFER_SIZE = 5
 
-# Warning threshold for loading rows
-WARN_ROWS_THRESHOLD = 50_000
+# Threshold for number of rows loaded before showing a warning to the user
+WARN_ROWS_THRESHOLD = 1_000_000
 
 
 @dataclass
@@ -492,11 +493,49 @@ class DataFrameTable(DataTable):
     def load_remaining_batches(self, batch_gen) -> None:
         """Background load the rest of the dataframe in batches."""
         batches, offset = [], len(self.df)
+        total_loaded = len(self.df)
+        warned, fully_loaded = False, True
 
         try:
             for batch in batch_gen:
                 batches.append(add_rid_column(batch, offset=offset))
                 offset += len(batch)
+                total_loaded += len(batch)
+
+                # Ask once when the loader reaches the warning threshold.
+                if not warned and total_loaded >= WARN_ROWS_THRESHOLD:
+                    warned = True
+                    decision_ready = Event()
+                    decision = {"continue": True}
+
+                    def on_decision(result: bool | None) -> None:
+                        decision["continue"] = bool(result)
+                        decision_ready.set()
+
+                    def prompt_continue_loading() -> None:
+                        self.app.push_screen(
+                            ConfirmScreen(
+                                "Continue Loading?",
+                                label=(
+                                    f"Loaded [$accent]{total_loaded:,}[/] rows so far. "
+                                    "Continue loading the remaining rows?"
+                                ),
+                            ),
+                            callback=on_decision,
+                        )
+
+                    self.app.call_from_thread(prompt_continue_loading)
+                    decision_ready.wait()
+
+                    if not decision["continue"]:
+                        fully_loaded = False
+                        self.app.call_from_thread(
+                            self.notify,
+                            f"Stopped loading at [$accent]{total_loaded:,}[/] rows by user choice",
+                            title="Load DataFrame",
+                            severity="warning",
+                        )
+                        break
         except pl.exceptions.ComputeError as e:
             self.log(f"Error loading remaining batch: {e}")
             return self.app.exit(return_code=1, result=str(e))
@@ -511,7 +550,7 @@ class DataFrameTable(DataTable):
         # fully loaded the dataframe
         self.df_done = True
 
-        self.notify("Data fully loaded", title="Load DataFrame")
+        self.notify("Data fully loaded" if fully_loaded else "Data loading stopped by user", title="Load DataFrame")
 
     def wait_full_df(func: Callable) -> Callable:
         """Decorator to ensure the dataframe is fully loaded before executing a method.
