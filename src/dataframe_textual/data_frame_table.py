@@ -207,7 +207,7 @@ class DataFrameTable(DataTable):
         - **H** - 👀 Show all hidden columns
         - **_** (underscore) - 📏 Toggle column full width
         - **+** - 📌 Freeze rows and/or columns
-        - **~** - 🏷️ Toggle row labels
+        - **~** - 🏷️ Toggle column index prefix
         - **^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for numeric display
         - **\\*** - 🔢 Toggle float precision between 2 decimals and full precision
@@ -247,8 +247,8 @@ class DataFrameTable(DataTable):
         - **?** - 🌐 Global find with expression
         - **;** - 🔎 Find in current column with cursor value
         - **:** - 🔎 Find in current column with expression
-        - **n** - ⬇️ Go to next match
-        - **N** - ⬆️ Go to previous match
+        - **(** - ⬆️ Go to previous match
+        - **)** - ⬇️ Go to next match
         - **r** - 🔄 Replace in current column (interactive or all)
         - **R** - 🔄 Replace across all columns (interactive or all)
         - *(Supports case-insensitive & whole-word matching)*
@@ -300,7 +300,7 @@ class DataFrameTable(DataTable):
         # Display
         ("h", "hide_column", "Hide column"),
         ("H", "show_hidden_columns", "Show hidden column(s)"),
-        ("tilde", "toggle_row_labels", "Toggle row labels"),  # `~`
+        ("tilde", "toggle_column_index", "Toggle column index prefix"),  # `~`
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
         ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
         ("comma", "toggle_thousand_separator", "Toggle thousand separator"),  # `,`
@@ -344,8 +344,8 @@ class DataFrameTable(DataTable):
         ("question_mark", "find_expr('global')", "Global find with expression"),  # `?`
         ("semicolon", "find_cursor_value", "Find in column with cursor value"),  # `;`
         ("colon", "find_expr", "Find in column with expression"),  # `:`
-        ("n", "next_match", "Go to next match"),  # `n`
-        ("N", "previous_match", "Go to previous match"),  # `Shift+n`
+        ("left_parenthesis", "previous_match", "Go to previous match"),  # `(`
+        ("right_parenthesis", "next_match", "Go to next match"),  # `)`
         ("r", "replace", "Replace in column"),  # `r`
         ("R", "replace('global')", "Replace global"),  # `Shift+R`
         # Delete
@@ -439,17 +439,20 @@ class DataFrameTable(DataTable):
         # History stack for redo
         self.histories_redo: deque[History] = deque()
 
-        # Whether to use thousand separator for numeric display
-        self.thousand_separator = False
-
-        # Number of decimal places for float display
-        self.float_precision = 2
-
         # Set of columns expanded to full width
         self.expanded_columns: set[str] = set()
 
         # Whether to show internal row index column
         self.show_rid = False
+
+        # Whether to show 1-based index prefix in column labels (e.g., "[1]  col")
+        self.show_column_index = False
+
+        # Whether to use thousand separator for numeric display
+        self.thousand_separator = False
+
+        # Number of decimal places for float display
+        self.float_precision = 2
 
     def init_table(self) -> None:
         """Initial load of the dataframe and setup of the table display.
@@ -1131,11 +1134,16 @@ class DataFrameTable(DataTable):
         """Toggle the freeze."""
         self.do_toggle_freeze_row_column()
 
+    def action_toggle_column_index(self) -> None:
+        """Toggle 1-based index prefixes in column labels."""
+        self.show_column_index = not self.show_column_index
+        self.setup_table()
+        status = "on" if self.show_column_index else "off"
+        self.notify(f"Column index prefix is [$success]{status}[/]", title="Toggle Column Index")
+
     def action_toggle_row_labels(self) -> None:
-        """Toggle row labels visibility."""
-        self.show_row_labels = not self.show_row_labels
-        status = "on" if self.show_row_labels else "off"
-        self.notify(f"Row labels are [$success]{status}[/]", title="Toggle Row Labels")
+        """Backward-compatible alias for toggling column index prefixes."""
+        self.action_toggle_column_index()
 
     @wait_full_df
     def action_cast_column_dtype(self, dtype: str | pl.DataType) -> None:
@@ -1289,14 +1297,17 @@ class DataFrameTable(DataTable):
         sample_size = min(self.BATCH_SIZE, len(self.df))
         sample_lf = self.df.lazy().head(sample_size)
 
-        # Determine widths for each column
+        # Determine widths for each visible column
+        visible_col_idx = 0
         for col, dtype in zip(self.df.columns, self.df.dtypes):
-            if col in self.hidden_columns:
-                continue
+            if col in self.hidden_columns or (col == RID and not self.show_rid):
+                continue  # Skip hidden columns and internal RID
+
+            visible_col_idx += 1
 
             # Get column label width
-            # Add padding for sort indicators if any
-            label_width = measure(self.app.console, col, 1) + 2
+            label_text = self._build_column_label(col, visible_col_idx)
+            label_width = measure(self.app.console, label_text, 1) + 2
             col_label_widths[col] = label_width
 
             # Let Textual auto-size for non-string and non-list columns and already expanded columns
@@ -1362,25 +1373,44 @@ class DataFrameTable(DataTable):
         column_widths = self.determine_column_widths()
 
         # Add columns with justified headers
+        visible_col_idx = 0
         for col, dtype in zip(self.df.columns, self.df.dtypes):
             if col in self.hidden_columns or (col == RID and not self.show_rid):
                 continue  # Skip hidden columns and internal RID
-            for idx, c in enumerate(self.sorted_columns, 1):
-                if c == col:
-                    # Add sort indicator to column header
-                    descending = self.sorted_columns[col]
-                    sort_indicator = (
-                        f" ▼{SUBSCRIPT_DIGITS.get(idx, '')}" if descending else f" ▲{SUBSCRIPT_DIGITS.get(idx, '')}"
-                    )
-                    cell_value = col + sort_indicator
-                    break
-            else:  # No break occurred, so column is not sorted
-                cell_value = col
+
+            visible_col_idx += 1
+            cell_value = self._build_column_label(col, visible_col_idx)
 
             # Get the width for this column (None means auto-size)
             width = column_widths.get(col)
 
             self.add_column(Text(cell_value, justify=DtypeConfig(dtype).justify), key=col, width=width)
+
+    def _build_column_label(self, col_name: str, visible_col_idx: int | None = None) -> str:
+        """Build display label for a column header.
+
+        Args:
+            col_name: Source dataframe column name.
+            visible_col_idx: 1-based index of the column among visible columns.
+
+        Returns:
+            Column label text with optional index prefix and sort indicator.
+        """
+        label = col_name
+        if self.show_column_index:
+            label = f"{visible_col_idx or self.cursor_column + 1}_{label}"
+
+        for idx, c in enumerate(self.sorted_columns, 1):
+            if c == col_name:
+                # Add sort indicator to column header
+                descending = self.sorted_columns[col_name]
+                sort_indicator = (
+                    f" ▼{SUBSCRIPT_DIGITS.get(idx, '')}" if descending else f" ▲{SUBSCRIPT_DIGITS.get(idx, '')}"
+                )
+                label = col_name + sort_indicator
+                break
+
+        return label
 
     def _calculate_load_range(self, start: int, stop: int) -> list[tuple[int, int]]:
         """Calculate the actual ranges to load, accounting for already-loaded ranges.
@@ -2094,6 +2124,15 @@ class DataFrameTable(DataTable):
         # Remove the column from the table display (but keep in dataframe)
         self.remove_column(col_key)
 
+        # If showing column indices, we need to update the labels of all subsequent columns
+        if self.show_column_index:
+            for idx in range(col_idx, len(self.ordered_columns)):
+                col = self.ordered_columns[idx]
+                original_col_name = col.key.value
+                new_label = self._build_column_label(original_col_name, idx + 1)
+                col.label = new_label
+                self.refresh_column(idx)
+
         # Track hidden columns
         self.hidden_columns.add(col_name)
 
@@ -2121,7 +2160,7 @@ class DataFrameTable(DataTable):
         col: Column = self.columns[col_key]
 
         # Calculate the maximum width across all loaded rows
-        label_width = len(col_name) + 2  # Start with column name width + padding
+        label_width = self._build_column_label(col_name) + 2  # Start with column name width + padding
 
         # If already expanded, shrink back to label width
         if col_name in self.expanded_columns:
@@ -2821,15 +2860,6 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(message, dirty=True)
 
-        # Remove the columns from the table display using the column names as keys
-        for ck in col_keys_to_delete:
-            self.remove_column(ck)
-
-        # Move cursor left if we deleted the last column(s)
-        last_col_idx = len(self.columns) - 1
-        if col_idx > last_col_idx:
-            self.move_cursor(column=last_col_idx)
-
         # Remove from sorted columns if present
         for col_name in col_names_to_delete:
             if col_name in self.sorted_columns:
@@ -2847,11 +2877,19 @@ class DataFrameTable(DataTable):
                 del self.matches[rid]
 
         # Remove from dataframe
-        self.df = self.df.drop(col_names_to_delete)
+        self.df = self.df.lazy().drop(col_names_to_delete).collect()
 
         # Also update the view if applicable
         if self.df_view is not None:
-            self.df_view = self.df_view.drop(col_names_to_delete)
+            self.df_view = self.df_view.lazy().drop(col_names_to_delete).collect()
+
+        # Recreate table for display
+        self.setup_table()
+
+        # Move cursor left if we deleted the last column(s)
+        last_col_idx = len(self.columns) - 1
+        if col_idx > last_col_idx:
+            self.move_cursor(column=last_col_idx)
 
         self.notify(message, title="Delete Column")
 
@@ -3157,31 +3195,20 @@ class DataFrameTable(DataTable):
             dirty=True,
         )
 
-        # Swap columns in the table's internal column locations
-        self.check_idle()
-
-        (
-            self._column_locations[col_key],
-            self._column_locations[swap_key],
-        ) = (
-            self._column_locations.get(swap_key),
-            self._column_locations.get(col_key),
-        )
-
-        self._update_count += 1
-        self.refresh()
-
-        # Restore cursor position on the moved column
-        self.move_cursor(row=row_idx, column=swap_idx)
-
         # Update the dataframe column order
         cols = list(self.df.columns)
         cols[cidx], cols[swap_cidx] = cols[swap_cidx], cols[cidx]
-        self.df = self.df.select(cols)
+        self.df = self.df.lazy().select(cols).collect()
 
         # Also update the view if applicable
         if self.df_view is not None:
-            self.df_view = self.df_view.select(cols)
+            self.df_view = self.df_view.lazy().select(cols).collect()
+
+        # Recreate table for display
+        self.setup_table()
+
+        # Restore cursor position on the moved column
+        self.move_cursor(row=row_idx, column=swap_idx)
 
         self.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move Column")
 

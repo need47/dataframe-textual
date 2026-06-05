@@ -295,7 +295,7 @@ dv data.csv -o data.parquet
 | `=`              | Show histogram using first column as label and current column as value |
 | `m`              | Show metadata for columns (e.g., data types)                           |
 | `K`              | Cycle cursor types: cell → row → column → cell                         |
-| `~`              | Toggle row labels                                                      |
+| `~`              | Toggle column index prefix                                             |
 | `_` (underscore) | Toggle column full width                                               |
 | `+`              | Toggle freeze rows and/or columns                                      |
 | `,`              | Toggle thousand separator for numeric display                          |
@@ -347,8 +347,8 @@ dv data.csv -o data.parquet
 | `?` | Find across all columns with expression and highlight matching cells   |
 | `;` | Find in current column with cursor value and highlight matching cells  |
 | `:` | Find in current column with expression and highlight matching cells    |
-| `n` | Go to next matching cell                                               |
-| `N` | Go to previous matching cell                                           |
+| `)` | Go to next matching cell                                               |
+| `(` | Go to previous matching cell                                           |
 | `r` | Find and replace in current column (interactive or replace all)        |
 | `R` | Find and replace across all columns (interactive or replace all)       |
 
@@ -421,6 +421,10 @@ Columns are automatically styled based on their data types:
 
 **Freeze Rows and Columns** (`+`):
 - Toggle frozen rows and/or columns to keep important headers and fields visible while scrolling
+
+**Column Index Prefix Toggle** (`~`):
+- Adds/removes a 1-based index prefix in visible column headers (e.g., `1_colname`)
+- Display-only: does not modify underlying data or column names
 
 **Thousand Separator Toggle** (`,`):
 - Applies to **integer** and **float** columns
@@ -503,8 +507,8 @@ Find by value/expression and highlight matching cells:
 - `?` - Open dialog to search all columns with expression (global search)
 - `;` - Find cursor value within current column (respects data type)
 - `:` - Open dialog to search current column with expression
-- `n` - Go to next matching cell
-- `N` - Go to previous matching cell
+- `)` - Go to next matching cell
+- `(` - Go to previous matching cell
 
 Replace values in current column (`r`) or across all columns (`R`).
 
