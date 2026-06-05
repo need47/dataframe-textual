@@ -445,7 +445,7 @@ class DataFrameTable(DataTable):
         # Whether to show internal row index column
         self.show_rid = False
 
-        # Whether to show 1-based index prefix in column labels (e.g., "[1]  col")
+        # Whether to show 1-based index prefix in column labels (e.g., "1_colname")
         self.show_column_index = False
 
         # Whether to use thousand separator for numeric display
