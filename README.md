@@ -303,7 +303,8 @@ dv data.csv -o data.parquet
 | `_` (underscore) | Toggle column full width                                               |
 | `+`              | Toggle freeze rows and/or columns                                      |
 | `,`              | Toggle thousand separator for current column                           |
-| `*`              | Toggle float precision between 2 decimals and full precision           |
+| `n`              | Decrease float precision for current column                            |
+| `N`              | Increase float precision for current column                            |
 | `^`              | Toggle internal row index column (RID)                                 |
 | `&`              | Set current row as the new header row                                  |
 | `h`              | Hide current column                                                    |
@@ -442,10 +443,12 @@ Columns are automatically styled based on their data types:
 - Toggle on/off as needed for different viewing preferences
 - Display-only: does not modify underlying data in the dataframe
 
-**Float Precision Toggle** (`*`):
+**Float Precision** (`n`/`N`):
 
-- Applies to **float** columns
-- Switches between rounded display with 2 decimal places and full precision
+- Applies to the **current cursor column** (float columns only)
+- `n` decreases precision (fewer decimal places), `N` increases precision
+- Each column can have its own precision setting
+- Precision of 0 means full (default) display
 - Display-only: does not modify underlying data in the dataframe
 
 **Cursor Type Cycling** (`K`):

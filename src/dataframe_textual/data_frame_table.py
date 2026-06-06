@@ -1,7 +1,6 @@
 """DataFrameTable widget for displaying and interacting with Polars DataFrames."""
 
 import io
-import re
 import sys
 from collections import defaultdict, deque
 from dataclasses import dataclass
@@ -41,7 +40,7 @@ from .common import (
     RID,
     RID_OLD,
     SUBSCRIPT_DIGITS,
-    DtypeClass,
+    THOUSAND_SEPARATOR,
     DtypeConfig,
     add_rid_column,
     format_row,
@@ -213,7 +212,8 @@ class DataFrameTable(DataTable):
         - **~** - 🏷️ Toggle column index prefix
         - **^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for current column
-        - **\\*** - 🔢 Toggle float precision between 2 decimals and full precision
+        - **n** - 🔢 Decrease float precision for current column
+        - **N** - 🔢 Increase float precision for current column
         - **K** - 🔄 Cycle cursor (cell → row → column → cell)
 
         ## ✏️ Editing
@@ -307,8 +307,8 @@ class DataFrameTable(DataTable):
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
         ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
         ("comma", "toggle_thousand_separator", "Toggle thousand separator for column"),  # `,`
-        ("asterisk", "toggle_float_precision", "Toggle float precision"),  # `*`
-        ("underscore", "expand_column", "Expand column to full width"),  # `_`
+        ("n", "adjust_float_precision(-1)", "Decrease float precision for column"),
+        ("N", "adjust_float_precision(1)", "Increase float precision for column"),
         ("circumflex_accent", "toggle_rid", "Toggle internal row index (RID)"),  # `^`
         ("ampersand", "set_cursor_row_as_header", "Set cursor row as the new header row"),  # `&`
         # Copy
@@ -448,14 +448,14 @@ class DataFrameTable(DataTable):
         # Set of columns with thousand separator enabled for numeric display
         self.thousand_separator_columns: set[str] = set()
 
+        # Per-column float precision: col_name -> number of decimal places
+        self.float_precision_columns: dict[str, int] = {}
+
         # Whether to show internal row index column
         self.show_rid = False
 
         # Whether to show 1-based index prefix in column labels (e.g., "1_colname")
         self.show_column_index = False
-
-        # Number of decimal places for float display
-        self.float_precision = 0
 
     def init_table(self) -> None:
         """Initial load of the dataframe and setup of the table display.
@@ -519,7 +519,7 @@ class DataFrameTable(DataTable):
                             ConfirmScreen(
                                 "Continue Loading?",
                                 label=(
-                                    f"Loaded [$accent]{total_loaded:,}[/] rows so far. "
+                                    f"Loaded [$accent]{total_loaded:{THOUSAND_SEPARATOR}}[/] rows so far. "
                                     "Continue loading the remaining rows?"
                                 ),
                             ),
@@ -1267,17 +1267,36 @@ class DataFrameTable(DataTable):
             title="Toggle Thousand Separator",
         )
 
-    def action_toggle_float_precision(self) -> None:
-        """Toggle float precision between 2 decimals and full precision."""
-        self.float_precision = 2 if self.float_precision == 0 else 0
-        self.setup_table()
+    def action_adjust_float_precision(self, delta: int) -> None:
+        """Adjust float precision for the current cursor column."""
+        col_name = self.cursor_col_name
+        dtype = self.cursor_col_dtype
+        dc = DtypeConfig(dtype)
+        if dc.gtype != "float":
+            self.notify(
+                f"Column [$warning]{col_name}[/] is not a float column",
+                title="Set Float Precision",
+                severity="warning",
+            )
+            return
+
+        current = self.float_precision_columns.get(col_name, 0)
+        new_precision = max(0, current + delta)
+
+        if new_precision == 0:
+            self.float_precision_columns.pop(col_name, None)
+        else:
+            self.float_precision_columns[col_name] = new_precision
+
+        if new_precision != current:
+            self.setup_table()
 
         message = (
-            "Float precision turned off"
-            if self.float_precision == 0
-            else f"Float precision set to {self.float_precision} decimal places"
+            f"Float precision turned off for column [$success]{col_name}[/]"
+            if new_precision == 0
+            else f"Float precision for column [$success]{col_name}[/] set to [$accent]{new_precision}[/] decimal place(s)"
         )
-        self.notify(message, title="Toggle Float Precision")
+        self.notify(message, title="Set Float Precision")
 
     def action_next_match(self) -> None:
         """Go to the next matched cell."""
@@ -1603,6 +1622,11 @@ class DataFrameTable(DataTable):
             for col in self.df.columns
             if col not in self.hidden_columns and (col != RID or self.show_rid)
         ]
+        float_precision = [
+            self.float_precision_columns.get(col, 0)
+            for col in self.df.columns
+            if col not in self.hidden_columns and (col != RID or self.show_rid)
+        ]
 
         # Load each row at the correct position
         for (ridx, row), rid in zip(enumerate(df_slice.iter_rows(), segment_start), df_slice[RID]):
@@ -1625,7 +1649,7 @@ class DataFrameTable(DataTable):
                 dtypes,
                 style=styles,
                 thousand_separator=thousand_separator,
-                float_precision=self.float_precision,
+                float_precision=float_precision,
             )
 
             # Find correct insertion position and insert
@@ -2010,13 +2034,13 @@ class DataFrameTable(DataTable):
         self.hidden_columns.clear()
         self.expanded_columns.clear()
         self.thousand_separator_columns = set()
+        self.float_precision_columns = {}
         self.fixed_rows = 0
         self.fixed_columns = 0
         self.df_done = True
         self.dirty = dirty
         self.show_rid = False
         self.show_column_index = False
-        self.float_precision = 0
         self.setup_table()
 
     def do_reset(self) -> None:
@@ -2074,8 +2098,7 @@ class DataFrameTable(DataTable):
 
     def do_show_histogram(self, default: int = 1) -> None:
         """Show histogram for a given columnn."""
-        cidx = self.cursor_cidx
-        dtype = self.df.dtypes[cidx]
+        dtype = self.cursor_col_dtype
         dc = DtypeConfig(dtype)
 
         if dc.gtype not in ("integer", "float"):
@@ -2109,8 +2132,8 @@ class DataFrameTable(DataTable):
     def do_show_bar(self) -> None:
         """Show histogram using first column as label and current column as value."""
         cidx = self.cursor_cidx
-        col_name = self.df.columns[cidx]
-        dtype = self.df.dtypes[cidx]
+        col_name = self.cursor_col_name
+        dtype = self.cursor_col_dtype
         dc = DtypeConfig(dtype)
 
         if dc.gtype not in ("integer", "float"):
@@ -4229,38 +4252,38 @@ class DataFrameTable(DataTable):
         For other dtypes, a warning is shown.
         """
         cidx = self.cursor_cidx
-        col = self.df.columns[cidx]
+        col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
         dc = DtypeConfig(dtype)
 
         if dc.gtype in ("integer", "float"):
             self.app.push_screen(
-                FilterNumericScreen(self.df[col], cidx, dc, self.cursor_value),
+                FilterNumericScreen(self.df[col_name], cidx, dc, self.cursor_value),
                 callback=self.filter_row_value,
             )
         elif dc.gtype == "string":
             self.app.push_screen(
-                FilterStringScreen(self.df[col], cidx, self.cursor_value),
+                FilterStringScreen(self.df[col_name], cidx, self.cursor_value),
                 callback=self.filter_row_value,
             )
         elif dc.gtype == "boolean":
             self.app.push_screen(
-                FilterBooleanScreen(self.df[col], cidx, self.cursor_value),
+                FilterBooleanScreen(self.df[col_name], cidx, self.cursor_value),
                 callback=self.filter_row_value,
             )
         elif dc.gtype == "temporal":
             self.app.push_screen(
-                FilterTemporalScreen(self.df[col], cidx, dc, self.cursor_value),
+                FilterTemporalScreen(self.df[col_name], cidx, dc, self.cursor_value),
                 callback=self.filter_row_value,
             )
         elif dtype == pl.List:
             self.app.push_screen(
-                FilterListScreen(self.df[col], cidx, self.cursor_value),
+                FilterListScreen(self.df[col_name], cidx, self.cursor_value),
                 callback=self.filter_row_value,
             )
         else:
             self.notify(
-                f"Filter by value not implemented for [$warning]{col}[/] with type of [$accent]{dtype}[/].",
+                f"Filter by value not implemented for [$warning]{col_name}[/] with type of [$accent]{dtype}[/].",
                 title="Filter Rows",
                 severity="warning",
             )

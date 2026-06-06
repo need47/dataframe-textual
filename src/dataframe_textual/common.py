@@ -50,25 +50,29 @@ NULL_DISPLAY = "-"
 # Maximum width for columns before truncation
 COLUMN_WIDTH_CAP = 35
 
+# Thousand separator for numeric values (must be ',' or '_' per Python's format mini-language)
+THOUSAND_SEPARATOR = ","
 
-def format_float(value: float, thousand_separator: bool = False, precision: int = 0) -> str:
+
+def format_float(value: float, thousand_separator: bool = False, precision: int = 2) -> str:
     """Format a float value, keeping integers without decimal point.
 
     Args:
         val: The float value to format.
         thousand_separator: Whether to include thousand separators. Defaults to False.
+        precision: The number of decimal places to display. Defaults to 2.
 
     Returns:
         The formatted float as a string.
     """
 
-    if (val := int(value)) == value:
-        return f"{val:,}" if thousand_separator else str(val)
+    if precision == 0 and (val := int(value)) == value:
+        return f"{val:{THOUSAND_SEPARATOR}}" if thousand_separator else str(val)
     else:
         if precision > 0:
-            return f"{value:,.{precision}f}" if thousand_separator else f"{value:.{precision}f}"
+            return f"{value:{THOUSAND_SEPARATOR}.{precision}f}" if thousand_separator else f"{value:.{precision}f}"
         else:
-            return f"{value:,f}" if thousand_separator else str(value)
+            return f"{value:{THOUSAND_SEPARATOR}f}" if thousand_separator else str(value)
 
 
 @dataclass
@@ -95,7 +99,7 @@ class DtypeClass:
         style: str | None = None,
         justify: str | None = None,
         thousand_separator: bool = False,
-        float_precision: int = 0,
+        float_precision: int = 2,
     ) -> Text:
         """Format the value according to its data type.
 
@@ -104,7 +108,7 @@ class DtypeClass:
             style: Optional style override for display. Defaults to None.
             justify: Optional justification (e.g., left, right, center) override for display. Defaults to None.
             thousand_separator: Whether to include thousand separators for numeric values. Defaults to False.
-            float_precision: Number of decimal places for float values. Defaults to 0.
+            float_precision: Number of decimal places for float values. Defaults to 2.
 
         Returns:
             The formatted value as a Text.
@@ -113,7 +117,7 @@ class DtypeClass:
         if val is None:
             text_val = NULL_DISPLAY
         elif self.gtype == "integer" and thousand_separator:
-            text_val = f"{val:,}"
+            text_val = f"{val:{THOUSAND_SEPARATOR}}"
         elif self.gtype == "float":
             text_val = format_float(val, thousand_separator, float_precision)
         else:
@@ -227,7 +231,7 @@ def format_row(
     style: str | list[str] = "",
     justify: str | list[str] = "",
     thousand_separator: bool | list[bool] = False,
-    float_precision: int = 0,
+    float_precision: int | list[int] = 2,
 ) -> list[Text]:
     """Format a single row with proper styling and justification.
 
@@ -241,7 +245,8 @@ def format_row(
         justify: Optional list of justification overrides for each value. Defaults to an empty string.
         thousand_separator: Whether to include thousand separators for numeric values.
             Can be a single bool (applied to all) or a list of bools per column. Defaults to False.
-        float_precision: Number of decimal places for float values. Defaults to 0.
+        float_precision: Number of decimal places for float values.
+            Can be a single int (applied to all) or a list of ints per column. Defaults to 2.
 
     Returns:
         A list of Rich Text objects with proper formatting applied.
@@ -249,6 +254,7 @@ def format_row(
     is_style_list = isinstance(style, list)
     is_justify_list = isinstance(justify, list)
     is_thousand_separator_list = isinstance(thousand_separator, list)
+    is_float_precision_list = isinstance(float_precision, list)
     formatted_row = []
 
     for idx, (val, dtype) in enumerate(zip(vals, dtypes, strict=True)):
@@ -259,7 +265,7 @@ def format_row(
                 style=style[idx] if is_style_list else style,
                 justify=justify[idx] if is_justify_list else justify,
                 thousand_separator=thousand_separator[idx] if is_thousand_separator_list else thousand_separator,
-                float_precision=float_precision,
+                float_precision=float_precision[idx] if is_float_precision_list else float_precision,
             )
         )
 
