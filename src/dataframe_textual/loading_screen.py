@@ -41,8 +41,9 @@ class LoadingScreen(ModalScreen):
     def check_progress(self) -> None:
         """Check the loading progress of the dataframe."""
         if self.dftable.df_done:
-            # self.notify("Dataframe loaded fully")
+            # fully loaded, dismiss the screen
             self.dismiss()
+
             if self.callback:
                 self.callback()
 

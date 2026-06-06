@@ -196,7 +196,7 @@ class FilePickerScreen(ModalScreen):
             self.query_one("#file-list", OptionList).focus()
             return True
 
-        self.notify(f"Directory not found: {candidate}", title="Open File", severity="error")
+        self.notify(f"Directory not found: [$error]{candidate}[/]", title="Open File", severity="error")
         return False
 
     def confirm(self) -> None:
@@ -219,7 +219,7 @@ class FilePickerScreen(ModalScreen):
         self._option_is_dir.clear()
 
         if not directory.exists() or not directory.is_dir():
-            self.notify(f"Directory not found: {directory}", title="Open File", severity="error")
+            self.notify(f"Directory not found: [$error]{directory}[/]", title="Open File", severity="error")
             return
 
         if not self._is_root(directory):
@@ -535,7 +535,7 @@ class OpenFileScreen(FilePickerScreen):
         if filepath.exists() and filepath.is_file():
             self.dismiss(filepath)
         else:
-            self.notify(f"File not found: {filepath}", title="Open File", severity="error")
+            self.notify(f"File not found: [$error]{filepath}[/]", title="Open File", severity="error")
 
 
 class SaveFileScreen(FilePickerScreen):
@@ -578,4 +578,4 @@ class SaveFileScreen(FilePickerScreen):
         if filepath.parent.exists() and filepath.parent.is_dir():
             self.dismiss(filepath)
         else:
-            self.notify(f"Directory not found: {filepath.parent}", title="Save File", severity="error")
+            self.notify(f"Directory not found: [$error]{filepath.parent}[/]", title="Save File", severity="error")

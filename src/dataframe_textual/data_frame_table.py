@@ -533,11 +533,11 @@ class DataFrameTable(DataTable):
                         fully_loaded = False
                         self.app.call_from_thread(
                             self.notify,
-                            f"Stopped loading at [$accent]{total_loaded:,}[/] rows by user choice",
+                            f"Stopped loading at [$warning]{total_loaded:,}[/] rows by user choice",
                             title="Load DataFrame",
                             severity="warning",
                         )
-                        break
+                        return
         except pl.exceptions.ComputeError as e:
             self.log(f"Error loading remaining batch: {e}")
             return self.app.exit(return_code=1, result=str(e))
@@ -1231,7 +1231,7 @@ class DataFrameTable(DataTable):
 
             self.do_copy_to_clipboard(
                 col_str,
-                f"Copied [$accent]{len(col_values)}[/] values from column [$success]{col_name}[/]",
+                f"Copied [$success]{len(col_values)}[/] values from column [$accent]{col_name}[/]",
             )
         except (FileNotFoundError, IndexError):
             self.notify(
@@ -1249,7 +1249,7 @@ class DataFrameTable(DataTable):
 
             self.do_copy_to_clipboard(
                 row_str,
-                f"Copied row [$accent]{ridx + 1}[/] with [$success]{len(row_values)}[/] values",
+                f"Copied row [$success]{ridx + 1}[/] with [$accent]{len(row_values)}[/] values",
             )
         except (FileNotFoundError, IndexError):
             self.notify(f"Failed to copy row [$error]{ridx}[/] to clipboard", title="Copy Row", severity="error")
@@ -2100,7 +2100,7 @@ class DataFrameTable(DataTable):
 
         if dc.gtype not in ("integer", "float"):
             self.notify(
-                f"Cannot show histogram for non-numeric column [$error]{self.cursor_col_name}[/] of type [$accent]{dtype}[/]",
+                f"Cannot show histogram for non-numeric column [$warning]{self.cursor_col_name}[/] of type [$accent]{dtype}[/]",
                 title="Show Histogram",
                 severity="warning",
             )
@@ -2135,7 +2135,7 @@ class DataFrameTable(DataTable):
 
         if dc.gtype not in ("integer", "float"):
             self.notify(
-                f"Cannot show bar chart for non-numeric column [$error]{col_name}[/] of type [$accent]{dtype}[/]",
+                f"Cannot show bar chart for non-numeric column [$warning]{col_name}[/] of type [$accent]{dtype}[/]",
                 title="Show Bar Chart",
                 severity="warning",
             )
@@ -2592,7 +2592,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        self.notify(f"Updated column [$accent]{col_name}[/] with [$success]{expr}[/]", title="Edit Column")
+        self.notify(f"Updated column [$success]{col_name}[/] with [$accent]{expr}[/]", title="Edit Column")
 
     def do_rename_column(self, col_idx: int | None = None) -> None:
         """Open modal to rename the selected column."""
@@ -2651,7 +2651,7 @@ class DataFrameTable(DataTable):
         # Move cursor to the renamed column
         self.move_cursor(column=col_idx)
 
-        self.notify(f"Renamed column [$success]{col_name}[/] to [$success]{new_name}[/]", title="Rename Column")
+        self.notify(f"Renamed column [$success]{col_name}[/] to [$accent]{new_name}[/]", title="Rename Column")
 
     def do_clear_cell(self) -> None:
         """Clear the current cell by setting its value to None."""
@@ -3412,7 +3412,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self.add_history(
-            f"Cast column [$success]{col_name}[/] from [$accent]{current_dtype}[/] to [$success]{target_dtype}[/]",
+            f"Cast column [$success]{col_name}[/] from [$accent]{current_dtype}[/] to [$accent]{target_dtype}[/]",
             dirty=True,
         )
 
@@ -3751,7 +3751,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self.add_history(
-            f"Replace [$success]{term_find}[/] with [$accent]{term_replace}[/] in column [$success]{col_name}[/]"
+            f"Replace [$success]{term_find}[/] with [$success]{term_replace}[/] in column [$accent]{col_name}[/]"
         )
 
         # Update matches
@@ -3928,7 +3928,7 @@ class DataFrameTable(DataTable):
         state.current_occurrence += 1
 
         # Show confirmation
-        label = f"Replace `[$warning]{state.term_find}[/]` with `[$success]{state.term_replace}[/]` ({state.current_occurrence} of {state.total_occurrence})?"
+        label = f"Replace `[$success]{state.term_find}[/]` with `[$accent]{state.term_replace}[/]` ({state.current_occurrence} of {state.total_occurrence})?"
 
         self.app.push_screen(
             ConfirmScreen("Replace", label=label, maybe="Skip"),
@@ -4208,7 +4208,7 @@ class DataFrameTable(DataTable):
         if not matched_count:
             self.histories_undo.pop()  # Remove last history entry
             self.notify(
-                f"No rows match the expression: [$error]{expr_str}[/]",
+                f"No rows match the expression: [$warning]{expr_str}[/]",
                 title="View Rows",
                 severity="warning",
                 markup=True,
@@ -4327,7 +4327,7 @@ class DataFrameTable(DataTable):
         self.move_cursor(column=cidx)
 
         self.notify(
-            f"Showing [$accent]{len(df_filtered)}[/] matching row(s) in column [$success]{col_name}[/]",
+            f"Showing [$success]{len(df_filtered)}[/] matching row(s) in column [$accent]{col_name}[/]",
             title="Filter Rows",
         )
 
@@ -4500,7 +4500,7 @@ class DataFrameTable(DataTable):
                 except Exception:
                     expr = handle_term(term, col_name, match_nocase, match_whole, match_literal, cast_to_str=True)
                     self.notify(
-                        f"Failed to convert [$error]{term}[/] to [$accent]{dtype}[/]. Casting to string.",
+                        f"Failed to convert [$warning]{term}[/] to [$accent]{dtype}[/]. Casting to string.",
                         title="Select Rows",
                         severity="warning",
                     )

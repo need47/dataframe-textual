@@ -418,7 +418,7 @@ class EditCellScreen(YesNoScreen):
         if not new_value_str:
             new_value = ""
             self.notify(
-                "Empty value provided. If you want to clear the cell, press [$accent]Delete[/].",
+                "Empty value provided. If you want to clear the cell, press [$warning]Delete[/].",
                 title="Edit Cell",
                 severity="warning",
             )
@@ -432,7 +432,7 @@ class EditCellScreen(YesNoScreen):
                 new_value = DtypeConfig(self.dtype).convert(new_value_str)
             except Exception as e:
                 self.notify(
-                    f"Failed to convert [$accent]{new_value_str}[/] to [$error]{self.dtype}[/]: {e}",
+                    f"Failed to convert [$error]{new_value_str}[/] to [$accent]{self.dtype}[/]: {e}",
                     title="Edit Cell",
                     severity="error",
                 )
@@ -549,7 +549,7 @@ class RenameColumnScreen(YesNoScreen):
         # Check if name already exists
         elif new_name in self.existing_columns:
             self.notify(
-                f"Column [$accent]{new_name}[/] already exists",
+                f"Column [$error]{new_name}[/] already exists",
                 title="Rename",
                 severity="error",
             )
@@ -614,7 +614,7 @@ class AddColumnScreen(YesNoScreen):
 
         if col_name in self.existing_columns:
             self.notify(
-                f"Column [$accent]{col_name}[/] already exists",
+                f"Column [$error]{col_name}[/] already exists",
                 title="Add Column",
                 severity="error",
             )
@@ -640,7 +640,7 @@ class AddColumnScreen(YesNoScreen):
                 return self.cidx, col_name, pl.lit(value)
             except Exception as e:
                 self.notify(
-                    f"Unable to convert [$accent]{term}[/] to [$warning]{dtype}[/]: {e}. Cast to string.",
+                    f"Unable to convert [$warning]{term}[/] to [$accent]{dtype}[/]: {e}. Cast to string.",
                     title="Add Column",
                     severity="warning",
                 )
@@ -754,7 +754,7 @@ class RenameTabScreen(YesNoScreen):
 
         # Check if name already exists
         if new_name in self.existing_tabs:
-            self.notify(f"Tab [$accent]{new_name}[/] already exists", title="Rename Tab", severity="error")
+            self.notify(f"Tab [$error]{new_name}[/] already exists", title="Rename Tab", severity="error")
             return None
 
         # Return new name
@@ -785,14 +785,14 @@ class GoToRowScreen(YesNoScreen):
             self.notify("Please enter a valid non-negative integer", title="Go to Row", severity="error", timeout=10)
             return None
 
-        if 1 <= row_index <= len(self.dftable.df):
+        total = len(self.dftable.df)
+        if 1 <= row_index <= total:
             return row_index  # Convert to 0-based index
 
         self.notify(
-            f"Please enter a number between 1 and {len(self.dftable.df)}",
+            f"Please enter a number between [$error]1[/] and [$accent]{total}[/]",
             title="Go to Row",
             severity="error",
-            timeout=10,
         )
         return None
 
@@ -1245,7 +1245,7 @@ class FilterTemporalScreen(YMNScreen):
         elif self.s.dtype == pl.Datetime:
             return pl.lit(value).str.to_datetime()
         else:
-            self.notify(f"Unsupported temporal dtype: {self.s.dtype}")
+            self.notify(f"Unsupported temporal dtype: [$warning]{self.s.dtype}[/]", severity="warning")
             return None
 
     def _get_input(self) -> tuple[pl.Expr | None, int]:

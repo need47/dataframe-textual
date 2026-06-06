@@ -125,13 +125,13 @@ class DataFrameViewer(App):
             text-align: right;
         }
         #status_message.is-success {
-            background: $success-darken-2;
+            background: $success-darken-3;
         }
         #status_message.is-warning {
-            background: $warning-darken-2;
+            background: $warning-darken-3;
         }
         #status_message.is-error {
-            background: $error-darken-2;
+            background: $error-darken-3;
         }
     """
 
@@ -725,7 +725,7 @@ class DataFrameViewer(App):
                 for source in load_file(filename, prefix_sheet=True):
                     self.add_tab(source.lf, filename, source.tabname, after=self.tabbed.active_pane)
                     n_tab += 1
-                self.notify(f"Added [$accent]{n_tab}[/] tab(s) for [$success]{filename}[/]", title="Open File")
+                self.notify(f"Added [$success]{n_tab}[/] tab(s) for [$accent]{filename}[/]", title="Open File")
             except Exception as e:
                 self.notify(f"Failed to load [$error]{filename}[/]: {e}", title="Open File", severity="error")
         else:
@@ -956,7 +956,7 @@ class DataFrameViewer(App):
                 table.focus()
                 break
 
-        self.notify(f"Renamed tab [$accent]{old_name}[/] to [$success]{new_name}[/]", title="Rename Tab")
+        self.notify(f"Renamed tab [$success]{old_name}[/] to [$accent]{new_name}[/]", title="Rename Tab")
 
     def do_save_to_file(self, all_tabs: bool = True, task_after_save: str | None = None) -> None:
         """Open screen to save file."""
@@ -1064,7 +1064,7 @@ class DataFrameViewer(App):
         filename = str(Path(filepath))
         if not (fmt := guess_file_format(filename)):
             self.notify(
-                f"Unsupported file format [$error]{fmt}[/] for [$accent]{filename}[/]. Supported formats are: {', '.join(SUPPORTED_FORMATS)}",
+                f"Unsupported file format [$warning]{fmt}[/] for [$accent]{filename}[/]. Supported formats are: {', '.join(SUPPORTED_FORMATS)}",
                 title="Save File",
                 severity="warning",
             )
