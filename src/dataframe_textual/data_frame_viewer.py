@@ -1065,7 +1065,7 @@ class DataFrameViewer(App):
         if not (fmt := guess_file_format(filename)):
             self.notify(
                 f"Unsupported file format [$error]{fmt}[/] for [$accent]{filename}[/]. Supported formats are: {', '.join(SUPPORTED_FORMATS)}",
-                title="Save to File",
+                title="Save File",
                 severity="warning",
             )
             return
@@ -1101,7 +1101,7 @@ class DataFrameViewer(App):
                 pass
 
             if use_view:
-                self.notify(f"Saved current view to [$success]{filename}[/]", title="Save to File")
+                self.notify(f"Saved current view to [$success]{filename}[/]", title="Save File")
             else:
                 # Reset dirty flag and update filename after save
                 if all_tabs:
@@ -1114,11 +1114,11 @@ class DataFrameViewer(App):
 
                 # From ConfirmScreen callback, so notify accordingly
                 if all_tabs:
-                    self.notify(f"Saved all tabs to [$success]{filename}[/]", title="Save to File")
+                    self.notify(f"Saved all tabs to [$success]{filename}[/]", title="Save File")
                 elif len(self.tabs) > 1:
-                    self.notify(f"Saved current tab to [$success]{filename}[/]", title="Save to File")
+                    self.notify(f"Saved current tab to [$success]{filename}[/]", title="Save File")
                 else:
-                    self.notify(f"Saved to [$success]{filename}[/]", title="Save to File")
+                    self.notify(f"Saved to [$success]{filename}[/]", title="Save File")
 
                 if hasattr(self, "_task_after_save"):
                     if self._task_after_save == "close_tab":
@@ -1127,7 +1127,7 @@ class DataFrameViewer(App):
                         self.exit()
 
         except Exception as e:
-            self.notify(f"Failed to save [$error]{filename}[/]", title="Save to File", severity="error")
+            self.notify(f"Failed to save [$error]{filename}[/]", title="Save File", severity="error")
             self.log(f"Error saving file `{filename}`: {e}")
 
     def save_excel(self, filename: str, all_tabs: bool = True, use_view: bool = False) -> None:

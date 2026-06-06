@@ -2199,7 +2199,7 @@ class DataFrameTable(DataTable):
         col: Column = self.columns[col_key]
 
         # Calculate the maximum width across all loaded rows
-        label_width = self._build_column_label(col_name) + 2  # Start with column name width + padding
+        label_width = len(self._build_column_label(col_name)) + 2  # Start with column name width + padding
 
         # If already expanded, shrink back to label width
         if col_name in self.expanded_columns:
