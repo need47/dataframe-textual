@@ -226,7 +226,7 @@ def format_row(
     dtypes,
     style: str | list[str] = "",
     justify: str | list[str] = "",
-    thousand_separator=False,
+    thousand_separator: bool | list[bool] = False,
     float_precision: int = 0,
 ) -> list[Text]:
     """Format a single row with proper styling and justification.
@@ -239,7 +239,8 @@ def format_row(
         dtypes: The list of data types corresponding to each value.
         style: Optional list of style overrides for each value. Defaults to an empty string.
         justify: Optional list of justification overrides for each value. Defaults to an empty string.
-        thousand_separator: Whether to include thousand separators for numeric values. Defaults to False.
+        thousand_separator: Whether to include thousand separators for numeric values.
+            Can be a single bool (applied to all) or a list of bools per column. Defaults to False.
         float_precision: Number of decimal places for float values. Defaults to 0.
 
     Returns:
@@ -247,6 +248,7 @@ def format_row(
     """
     is_style_list = isinstance(style, list)
     is_justify_list = isinstance(justify, list)
+    is_thousand_separator_list = isinstance(thousand_separator, list)
     formatted_row = []
 
     for idx, (val, dtype) in enumerate(zip(vals, dtypes, strict=True)):
@@ -256,7 +258,7 @@ def format_row(
                 val,
                 style=style[idx] if is_style_list else style,
                 justify=justify[idx] if is_justify_list else justify,
-                thousand_separator=thousand_separator,
+                thousand_separator=thousand_separator[idx] if is_thousand_separator_list else thousand_separator,
                 float_precision=float_precision,
             )
         )

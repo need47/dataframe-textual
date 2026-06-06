@@ -7,6 +7,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 ## Features
 
 ### Data Viewing
+
 - 🚀 **Fast Loading** - Powered by Polars for efficient batch data handling
 - 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with various data types (e.g., integer, float, string)
 - ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls
@@ -14,6 +15,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 - 🔄 **Smart Pagination** - Lazy load rows on demand for handling large datasets
 
 ### Data Manipulation
+
 - 📝 **Data Editing** - Edit cells, delete rows, remove columns, and explode columns
 - 🧹 **Duplicate Removal** - Remove duplicate rows
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
@@ -22,6 +24,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 - 💾 **Save & Undo** - Save edits back to file with full undo/redo support
 
 ### Advanced Features
+
 - 📂 **Multi-File Support** - Open multiple files in separate tabs
 - 🔄 **Tab Management** - Seamlessly switch between open files with keyboard shortcuts
 - 📑 **Duplicate Tab** - Create a copy of the current tab with the same data
@@ -40,7 +43,6 @@ pip install dataframe-textual
 ```
 
 This installs an executable `dv`.
-
 
 ### Using [uv](https://docs.astral.sh/uv/)
 
@@ -242,6 +244,7 @@ dv data.csv -o data.parquet
 | `Double-click` | Rename tab                                                   |
 
 **Tips:**
+
 - Tabs with unsaved changes are indicated with a bright background
 - Closing a tab with unsaved changes triggers a save prompt
 - Use `Esc` to bypass save prompts and quit the current tab/view immediately
@@ -275,6 +278,7 @@ dv data.csv -o data.parquet
 | `Ctrl+B`                     | Page backforward           |
 
 #### Undo/Redo/Reset
+
 | Key      | Action                  |
 | -------- | ----------------------- |
 | `u`      | Undo last action        |
@@ -298,7 +302,7 @@ dv data.csv -o data.parquet
 | `~`              | Toggle column index prefix                                             |
 | `_` (underscore) | Toggle column full width                                               |
 | `+`              | Toggle freeze rows and/or columns                                      |
-| `,`              | Toggle thousand separator for numeric display                          |
+| `,`              | Toggle thousand separator for current column                           |
 | `*`              | Toggle float precision between 2 decimals and full precision           |
 | `^`              | Toggle internal row index column (RID)                                 |
 | `&`              | Set current row as the new header row                                  |
@@ -353,6 +357,7 @@ dv data.csv -o data.parquet
 | `R` | Find and replace across all columns (interactive or replace all)       |
 
 #### Filter & Collect
+
 | Key                | Action                                                 |
 | ------------------ | ------------------------------------------------------ |
 | `v`                | Basic filter using the current cell value              |
@@ -416,29 +421,35 @@ Columns are automatically styled based on their data types:
 | temporal  | Magenta    | centered  |
 
 **Hide/Show Columns** (`h` / `H`):
+
 - `h` - Temporarily hide current column (data preserved)
 - `H` - Restore all hidden columns
 
 **Freeze Rows and Columns** (`+`):
+
 - Toggle frozen rows and/or columns to keep important headers and fields visible while scrolling
 
 **Column Index Prefix Toggle** (`~`):
+
 - Adds/removes a 1-based index prefix in visible column headers (e.g., `1_colname`)
 - Display-only: does not modify underlying data or column names
 
 **Thousand Separator Toggle** (`,`):
-- Applies to **integer** and **float** columns
+
+- Applies to the **current cursor column** (integer and float columns)
 - Formats large numbers with commas for readability (e.g., `1000000` → `1,000,000`)
-- Works across all numeric columns in the table
+- Each column can be toggled independently
 - Toggle on/off as needed for different viewing preferences
 - Display-only: does not modify underlying data in the dataframe
 
 **Float Precision Toggle** (`*`):
+
 - Applies to **float** columns
 - Switches between rounded display with 2 decimal places and full precision
 - Display-only: does not modify underlying data in the dataframe
 
 **Cursor Type Cycling** (`K`):
+
 - Cycles through cell, row, and column selection modes
 - Use it to switch between inspecting a single cell, an entire row, or an entire column
 
@@ -450,6 +461,7 @@ Useful for examining wide table where columns don't fit well on screen.
 ![Row detail](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/row-detail.png)
 
 **In the Row Detail Modal**:
+
 - Press `v` to **filter** all rows containing the selected column value
 - Press `"` to **collect** all rows containing the selected column value to a new tab
 - Press `{` to move to the previous row
@@ -488,6 +500,7 @@ The application provides multiple modes for selecting rows (marks it for filteri
 **Advanced Options**:
 
 When searching or finding, you can use checkboxes in the dialog to enable:
+
 - Match option `Nocase` for case-insensitive matching
 - Match option `Whole` to match full text
 - Match option `Literal` to ignore special regex characters
@@ -496,13 +509,16 @@ When searching or finding, you can use checkboxes in the dialog to enable:
 These options work with plain text searches. Use Polars regex patterns in expressions for more control. For example, use `(?i)` prefix in regex (e.g., `(?i)john`) for case-insensitive matching.
 
 **Quick Tips:**
+
 - Search results highlight matching rows in **red**
 - Use expression for advanced selection (e.g., $attack > $defense)
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 - Use `u` to undo any search or filter
 
 ### 5. Find & Replace
+
 Find by value/expression and highlight matching cells:
+
 - `/` - Find cursor value across all columns (global search)
 - `?` - Open dialog to search all columns with expression (global search)
 - `;` - Find cursor value within current column (respects data type)
@@ -515,6 +531,7 @@ Replace values in current column (`r`) or across all columns (`R`).
 **How It Works:**
 
 When you press `r` or `R`, enter:
+
 1. **Find term**: Value or expression to search for (done by string value)
 2. **Replace term**: Replacement value
 3. **Matching options**:
@@ -525,14 +542,17 @@ When you press `r` or `R`, enter:
 4. **Replace mode**: All at once or interactive review
 
 **Replace All**:
+
 - Replaces all matches with one operation
 - Shows confirmation with match count
 
 **Replace Interactive**:
+
 - Review each match one at a time (confirm, skip, or cancel)
 - Shows progress
 
 **Tips:**
+
 - Search are done by string value (i.e., ignoring data type)
 - Type `NULL` to find or replace null values
 - Support undo (`u`)
@@ -544,6 +564,7 @@ Both actions work on a subset of the original dataframe, but they serve differen
 **Filtering options**:
 
 **Basic Filter** (`v`):
+
 - Opens the chose subset as a derived view inside the current workflow
 - Edits made in the filtered view still apply to the original dataframe
 - Press `Ctrl+V` to save the current view to a file
@@ -551,10 +572,12 @@ Both actions work on a subset of the original dataframe, but they serve differen
 - Supports undo with `u`
 
 **Advanced Filter** (`V`):
+
 - Opens a dialog for value-based or expression-based filtering
 - Useful when you want to define the subset directly
 
 **Column Filter** (`f`):
+
 - Opens a type-aware filter dialog for the current column
 - Numeric columns support `=`, `!=`, `<`, `<=`, `>=`, and `>`
 - String columns support exact match, prefix, suffix, contains, and regex matching
@@ -563,6 +586,7 @@ Both actions work on a subset of the original dataframe, but they serve differen
 - List columns support exact-list matching and item membership checks such as "contains"
 
 **Collect** (`"`):
+
 - Creates a separate tab containing only the chosen rows
 - The collected tab is independent from the source dataframe
 - Edits in the collected tab do not modify the original table
@@ -578,18 +602,22 @@ For **Basic Filter** (`v`) and **Collect** (`"`), rows are chosen in this order:
 Complex values, filters, and advanced operations can be specified via Polars expressions, with the following adaptions for convenience:
 
 **Column References:**
+
 - `$_` - Current column (based on cursor position)
 - `$1`, `$2`, etc. - Column by 1-based index
 - `$age`, `$salary` - Column by name (use actual column names)
 - `` $`col name` `` - Column by name with spaces (backtick quoted)
 
 **Row References:**
+
 - `$#` - Current row index (1-based)
 
 **DataFrame References:**
+
 - `self` - Current dataframe
 
 **Basic Comparisons:**
+
 - `$_ > 50` - Current column greater than 50
 - `$salary >= 100000` - Salary at least 100,000
 - `$age < 30` - Age less than 30
@@ -598,11 +626,13 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - `$# <= 10` - Top 10 rows
 
 **Logical Operators:**
+
 - `&` - AND
 - `|` - OR
 - `~` - NOT
 
 **Practical Examples:**
+
 - `($age < 30) & ($status == 'active')` - Age less than 30 AND status is active
 - `($name == 'Alice') | ($name == 'Bob')` - Name is Alice or Bob
 - `$salary / 1000 >= 50` - Salary divided by 1,000 is at least 50
@@ -614,6 +644,7 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - `self.drop(RID).is_duplicated()` - Duplicate rows (note: the internal RID column must be excluded)
 
 **String Operations:** ([Polars string API reference](https://docs.pola.rs/api/python/stable/reference/series/string.html))
+
 - `$name.str.contains("John")` - Name contains "John" (case-sensitive)
 - `$name.str.contains("(?i)john")` - Name contains "john" (case-insensitive)
 - `$email.str.ends_with("@company.com")` - Email ends with domain
@@ -621,16 +652,19 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - `$name.str.len_chars() < 7` - Length of name shorter than 7
 
 **Number Operations:**
+
 - `$age * 2 > 100` - Double age greater than 100
 - `($salary + $bonus) > 150000` - Total compensation over 150,000
 - `$percentage >= 50` - Percentage at least 50%
 
 **Null Handling:**
+
 - `$column.is_null()` - Find null values
 - `$column.is_not_null()` - Find non-null values
 - `NULL` - a value to represent null for convenience
 
 **Tips:**
+
 - Use column indices (e.g., `$1`, `$2`) for faster column access.
 - Use column names that match exactly (case-sensitive)
 - Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
@@ -647,24 +681,29 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 View quick metadata about your columns to understand their structure and content.
 
 **Column Metadata** (`m`):
+
 - Press `m` to open a modal displaying details for all columns:
   - **Column** - Column name
   - **Type** - Data type (e.g., Int64, String, Float64, Boolean)
 
 **In the Column Metadata Table**
+
 - Press `F` to show the frequency table for the selected column
 - Press `s` to show the statistics table for the selected column
 
 **In Metadata Modals**:
+
 - Press `q` or `Escape` to close
 
 ### 10. Frequency Distribution
 
 Press `F` to see value distributions of the current column. The modal shows:
+
 - Value, Count, Percentage, Histogram
 - **Total row** at the bottom
 
 **In the Frequency Modal**:
+
 - Press `[` and `]` to sort by any column (value, count, or percentage)
 - Press `v` to **filter** all rows containing the selected value
 - Press `"` to **collect** all rows containing the selected value to a new tab
@@ -675,6 +714,7 @@ Press `F` to see value distributions of the current column. The modal shows:
 - Press `q` or `Escape` to close the modal
 
 This is useful for:
+
 - Understanding value distributions
 - Quickly filtering to specific values
 - Identifying rare or common values
@@ -683,14 +723,17 @@ This is useful for:
 ### 11. Column & Dataframe Statistics
 
 Show summary statistics such as count, null count, mean, median, standard deviation, min, and max using Polars' `describe()` method.
+
 - `s` shows statistics for the current column, with an additional `sum` field for numeric columns
 - `S` shows statistics for all columns in the dataframe
 
 **In the Statistics Modal**:
+
 - Use arrow keys to navigate
 - Press `q` or `Escape` to close the modal
 
 This is useful for:
+
 - Understanding data distributions and overall column behavior
 - Identifying outliers and anomalies
 - Checking data quality quickly
@@ -700,48 +743,59 @@ This is useful for:
 ### 12. Editing
 
 **Edit Cell** (`e` or **Double-click**):
+
 - Opens modal for editing current cell
 - Validates input based on column data type
 
 **Rename Column Header** (**Double-click** column header):
+
 - Quick rename by double-clicking the column header
 
 **Delete Row** (`x`):
+
 - Delete all selected rows (if any) at once
 - Or delete single row at cursor
 
 **Delete Row and Below** (`X`):
+
 - Deletes the current row and all rows below it
 - Useful for removing trailing data or the end of a dataset
 
 **Delete Row and Above** (`Ctrl+X`):
+
 - Deletes the current row and all rows above it
 - Useful for removing leading rows or the beginning of a dataset
 
 **Delete Column** (`-`):
+
 - Removes the entire column from display and dataframe
 
 **Add Empty Column** (`a`):
+
 - Adds a new empty column after the current column
 - Column is initialized with NULL values for all rows
 
 **Add Column with Value/Expression** (`A`):
+
 - Opens dialog to specify column name and initial value/expression
 - Value can be a constant (e.g., `0`, `"text"`) or a Polars expression (e.g., `$age * 2`)
 - Expression can reference other columns and perform calculations
 - Useful for creating derived columns or adding data with formulas
 
 **Duplicate Column** (`d`):
+
 - Creates a new column immediately after the current column
-- New column has '_copy' suffix (e.g., 'price' → 'price_copy')
+- New column has '\_copy' suffix (e.g., 'price' → 'price_copy')
 - Useful for creating backups before transformation
 
 **Duplicate Row** (`D`):
+
 - Creates a new row immediately after the current row
 - Duplicate preserves all data from original row
 - Useful for batch adding similar records
 
 **Remove Duplicate Rows** (`Ctrl+Delete`):
+
 - Removes duplicated rows while keeping the first occurrence
 - Compares row values across the visible columns
 - Useful for quick deduplication before further editing, collecting, or exporting
@@ -750,10 +804,12 @@ This is useful for:
 ### 13. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
+
 - Swaps adjacent columns
 - Reorder is preserved when saving
 
 **Move Rows**: `Shift+↑` and `Shift+↓`
+
 - Swaps adjacent rows
 - Reorder is preserved when saving
 
@@ -762,14 +818,17 @@ This is useful for:
 The application provides separate save actions for the current tab, all tabs, and the current filtered view.
 
 **Save Current Tab** (`Ctrl+T`):
+
 - Saves the active tab to file
 - Useful when you want to export only the dataframe you are currently working on
 
 **Save All Tabs** (`Ctrl+S`):
+
 - Saves every open tab to file
 - Useful after editing multiple datasets in the same session
 
 **Save Current View** (`Ctrl+V`):
+
 - Saves only the current filtered or derived view to file
 - Useful for exporting a subset without replacing the source dataframe
 
@@ -778,17 +837,20 @@ The output format is determined by the file extension, making it easy to convert
 ### 15. Undo/Redo/Reset
 
 **Undo** (`u`):
+
 - Reverts last action with full state restoration
 - Works for edits, deletions, sorts, searches, etc.
 - Shows description of reverted action
 
 **Redo** (`U`):
+
 - Reapplies the last undone action
 - Restores the state before the undo was performed
 - Useful for redoing actions you've undone by mistake
 - Useful for alternating between two different states
 
 **Reset** (`Ctrl+U`):
+
 - Reverts all changes and returns to original data state when file was first loaded
 - Clears all edits, deletions, selections, filters, and sorts
 - Useful for starting fresh without reloading the file
@@ -798,12 +860,14 @@ The output format is determined by the file extension, making it easy to convert
 Press the type conversion keys to instantly cast the current column to a different data type:
 
 **Type Conversion Shortcuts**:
+
 - `#` - Cast to **integer**
 - `%` - Cast to **float**
 - `!` - Cast to **boolean**
 - `$` - Cast to **string**
 
 **Features**:
+
 - Instant conversion with visual feedback
 - Full undo support - press `u` to revert
 - Leverage Polars' robust type casting
@@ -815,19 +879,24 @@ Press the type conversion keys to instantly cast the current column to a differe
 The SQL interface provides two modes for querying your dataframe:
 
 #### Simple SQL Interface (`l`)
+
 SELECT specific columns and apply WHERE conditions without writing full SQL:
+
 - Choose which columns to include in results
 - Specify WHERE clause for filtering
 - Ideal for quick filtering and column selection
 
 #### Advanced SQL Interface (`L`)
+
 Execute complete SQL queries for advanced data manipulation:
+
 - Write full SQL queries with standard [SQL syntax](https://docs.pola.rs/api/python/stable/reference/sql/index.html)
 - Access to all SQL capabilities for complex transformations
 - Always use `self` as the table name
 - Syntax highlighted
 
 **Examples:**
+
 ```sql
 -- Filter and select specific rows and/or columns
 SELECT name, age
@@ -866,10 +935,12 @@ The link template supports multiple placeholder types for maximum flexibility:
 - **`$name`** - Column by name (use actual column names), e.g., `https://example.com/$region/$city/data` - Uses `region` and `city` columns
 
 **Features:**
+
 - **Multiple Placeholders**: Mix and match placeholders in a single template
 - **URL Prefix**: Automatically prepends `https://` if URL doesn't start with `http://` or `https://`
 
 **Tips:**
+
 - Use full undo (`u`) if template produces unexpected URLs
 - For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
 
@@ -889,6 +960,7 @@ Use the built-in Python console for quick interactive transformations without le
 Most loading failures come from malformed CSV/TSV input, quoting issues, or mixed column types. When this happens, the application prints a hint with a suggested retry option.
 
 **Common fixes:**
+
 - Use `-Q` if quote characters are mismatched, improperly escaped, or should be ignored entirely
 - Use `-T` when rows contain more fields than expected and you want to truncate ragged lines
 - Use `-L` to increase the number of rows used for schema inference when early rows do not represent the full column types
@@ -899,25 +971,31 @@ Most loading failures come from malformed CSV/TSV input, quoting issues, or mixe
 **Typical cases:**
 
 **Malformed CSV or broken quoting**:
+
 - Symptom: errors mentioning malformed CSV, mismatched quotes, or improperly escaped fields
 - Try: `-Q` to disable quoting or choose a different quote character
 
 **Ragged lines or inconsistent field counts**:
+
 - Symptom: errors saying the input has more fields than defined in the schema
 - Try: `-T` to truncate ragged lines
 
 **Mixed data types in one column**:
+
 - Symptom: errors saying a value could not be parsed as an integer, float, or other inferred type at a specific column
 - Try: `-L` first, then `-I` if the column is genuinely mixed
 
 **No data could be loaded**:
+
 - Symptom: errors indicating that no data was available to load
 - Check: whether the file is empty, the format is correct, and the delimiter matches the input
 
 **Fallback option**:
+
 - If none of the above helps and the file is mostly usable, retry with `-E` to ignore parsing errors
 
 **Examples:**
+
 ```bash
 # Disable quote handling when CSV quoting is broken
 dv bad.csv -Q

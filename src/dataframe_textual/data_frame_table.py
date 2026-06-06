@@ -1,6 +1,7 @@
 """DataFrameTable widget for displaying and interacting with Polars DataFrames."""
 
 import io
+import re
 import sys
 from collections import defaultdict, deque
 from dataclasses import dataclass
@@ -40,6 +41,7 @@ from .common import (
     RID,
     RID_OLD,
     SUBSCRIPT_DIGITS,
+    DtypeClass,
     DtypeConfig,
     add_rid_column,
     format_row,
@@ -210,7 +212,7 @@ class DataFrameTable(DataTable):
         - **+** - 📌 Freeze rows and/or columns
         - **~** - 🏷️ Toggle column index prefix
         - **^** - 🆔 Toggle internal row index (RID)
-        - **,** - 🔢 Toggle thousand separator for numeric display
+        - **,** - 🔢 Toggle thousand separator for current column
         - **\\*** - 🔢 Toggle float precision between 2 decimals and full precision
         - **K** - 🔄 Cycle cursor (cell → row → column → cell)
 
@@ -304,7 +306,7 @@ class DataFrameTable(DataTable):
         ("tilde", "toggle_column_index", "Toggle column index prefix"),  # `~`
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
         ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
-        ("comma", "toggle_thousand_separator", "Toggle thousand separator"),  # `,`
+        ("comma", "toggle_thousand_separator", "Toggle thousand separator for column"),  # `,`
         ("asterisk", "toggle_float_precision", "Toggle float precision"),  # `*`
         ("underscore", "expand_column", "Expand column to full width"),  # `_`
         ("circumflex_accent", "toggle_rid", "Toggle internal row index (RID)"),  # `^`
@@ -443,14 +445,14 @@ class DataFrameTable(DataTable):
         # Set of columns expanded to full width
         self.expanded_columns: set[str] = set()
 
+        # Set of columns with thousand separator enabled for numeric display
+        self.thousand_separator_columns: set[str] = set()
+
         # Whether to show internal row index column
         self.show_rid = False
 
         # Whether to show 1-based index prefix in column labels (e.g., "1_colname")
         self.show_column_index = False
-
-        # Whether to use thousand separator for numeric display
-        self.show_thousand_separator = False
 
         # Number of decimal places for float display
         self.float_precision = 0
@@ -1240,11 +1242,30 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to copy row [$error]{ridx}[/] to clipboard", title="Copy Row", severity="error")
 
     def action_toggle_thousand_separator(self) -> None:
-        """Toggle thousand separator for numeric display."""
-        self.show_thousand_separator = not self.show_thousand_separator
+        """Toggle thousand separator for the current cursor column."""
+        col_name = self.cursor_col_name
+        if col_name in self.thousand_separator_columns:
+            self.thousand_separator_columns.discard(col_name)
+            status = "off"
+        else:
+            dtype = self.df[col_name].dtype
+            dc = DtypeConfig(dtype)
+            if dc.gtype in ("integer", "float"):
+                self.thousand_separator_columns.add(col_name)
+                status = "on"
+            else:
+                self.notify(
+                    f"Column [$warning]{col_name}[/] is not a numeric column and cannot be formatted as such",
+                    title="Toggle Thousand Separator",
+                    severity="warning",
+                )
+                return
+
         self.setup_table()
-        status = "on" if self.show_thousand_separator else "off"
-        self.notify(f"Thousand separator is [$success]{status}[/]", title="Toggle Thousand Separator")
+        self.notify(
+            f"Thousand separator is [$success]{status}[/] for column [$accent]{col_name}[/]",
+            title="Toggle Thousand Separator",
+        )
 
     def action_toggle_float_precision(self) -> None:
         """Toggle float precision between 2 decimals and full precision."""
@@ -1577,6 +1598,11 @@ class DataFrameTable(DataTable):
 
         # Load the dataframe slice
         df_slice = self.df.slice(segment_start, segment_stop - segment_start)
+        thousand_separator = [
+            col in self.thousand_separator_columns
+            for col in self.df.columns
+            if col not in self.hidden_columns and (col != RID or self.show_rid)
+        ]
 
         # Load each row at the correct position
         for (ridx, row), rid in zip(enumerate(df_slice.iter_rows(), segment_start), df_slice[RID]):
@@ -1598,7 +1624,7 @@ class DataFrameTable(DataTable):
                 vals,
                 dtypes,
                 style=styles,
-                thousand_separator=self.show_thousand_separator,
+                thousand_separator=thousand_separator,
                 float_precision=self.float_precision,
             )
 
@@ -1983,13 +2009,13 @@ class DataFrameTable(DataTable):
         self.sorted_columns.clear()
         self.hidden_columns.clear()
         self.expanded_columns.clear()
+        self.thousand_separator_columns = set()
         self.fixed_rows = 0
         self.fixed_columns = 0
         self.df_done = True
         self.dirty = dirty
         self.show_rid = False
         self.show_column_index = False
-        self.show_thousand_separator = False
         self.float_precision = 0
         self.setup_table()
 
