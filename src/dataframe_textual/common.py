@@ -227,7 +227,7 @@ def format_row(
     style: str | list[str] = "",
     justify: str | list[str] = "",
     thousand_separator=False,
-    float_precision: int = 2,
+    float_precision: int = 0,
 ) -> list[Text]:
     """Format a single row with proper styling and justification.
 
@@ -240,7 +240,7 @@ def format_row(
         style: Optional list of style overrides for each value. Defaults to an empty string.
         justify: Optional list of justification overrides for each value. Defaults to an empty string.
         thousand_separator: Whether to include thousand separators for numeric values. Defaults to False.
-        float_precision: Number of decimal places for float values. Defaults to 2.
+        float_precision: Number of decimal places for float values. Defaults to 0.
 
     Returns:
         A list of Rich Text objects with proper formatting applied.

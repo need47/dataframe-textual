@@ -450,10 +450,10 @@ class DataFrameTable(DataTable):
         self.show_column_index = False
 
         # Whether to use thousand separator for numeric display
-        self.thousand_separator = False
+        self.show_thousand_separator = False
 
         # Number of decimal places for float display
-        self.float_precision = 2
+        self.float_precision = 0
 
     def init_table(self) -> None:
         """Initial load of the dataframe and setup of the table display.
@@ -1241,14 +1241,14 @@ class DataFrameTable(DataTable):
 
     def action_toggle_thousand_separator(self) -> None:
         """Toggle thousand separator for numeric display."""
-        self.thousand_separator = not self.thousand_separator
+        self.show_thousand_separator = not self.show_thousand_separator
         self.setup_table()
-        status = "on" if self.thousand_separator else "off"
+        status = "on" if self.show_thousand_separator else "off"
         self.notify(f"Thousand separator is [$success]{status}[/]", title="Toggle Thousand Separator")
 
     def action_toggle_float_precision(self) -> None:
-        """Toggle float precision between 2 and 4 decimal places."""
-        self.float_precision = 0 if self.float_precision == 2 else 2
+        """Toggle float precision between 2 decimals and full precision."""
+        self.float_precision = 2 if self.float_precision == 0 else 0
         self.setup_table()
 
         message = (
@@ -1598,7 +1598,7 @@ class DataFrameTable(DataTable):
                 vals,
                 dtypes,
                 style=styles,
-                thousand_separator=self.thousand_separator,
+                thousand_separator=self.show_thousand_separator,
                 float_precision=self.float_precision,
             )
 
@@ -1987,6 +1987,10 @@ class DataFrameTable(DataTable):
         self.fixed_columns = 0
         self.df_done = True
         self.dirty = dirty
+        self.show_rid = False
+        self.show_column_index = False
+        self.show_thousand_separator = False
+        self.float_precision = 0
         self.setup_table()
 
     def do_reset(self) -> None:
