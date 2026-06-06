@@ -655,6 +655,19 @@ class DataFrameTable(DataTable):
         return self.df.item(self.cursor_ridx, self.cursor_cidx)
 
     @property
+    def visible_columns(self) -> dict[str, pl.DataType]:
+        """Get the list of visible columns ordered by their appearance in the dataframe.
+
+        Returns:
+            dict[str, pl.DataType]: A dictionary of visible column names and their data types.
+        """
+        return {
+            col: dtype
+            for col, dtype in zip(self.df.columns, self.df.dtypes, strict=True)
+            if col not in self.hidden_columns and (col != RID or self.show_rid)
+        }
+
+    @property
     def ordered_selected_rows(self) -> list[int]:
         """Get the list of selected row indices in order.
 
@@ -1377,15 +1390,9 @@ class DataFrameTable(DataTable):
         sample_lf = self.df.lazy().head(sample_size)
 
         # Determine widths for each visible column
-        visible_col_idx = 0
-        for col, dtype in zip(self.df.columns, self.df.dtypes):
-            if col in self.hidden_columns or (col == RID and not self.show_rid):
-                continue  # Skip hidden columns and internal RID
-
-            visible_col_idx += 1
-
+        for col_idx, (col, dtype) in enumerate(self.visible_columns.items(), 1):
             # Get column label width
-            label_text = self._build_column_label(col, visible_col_idx)
+            label_text = self._build_column_label(col, col_idx)
             label_width = measure(self.app.console, label_text, 1) + 2
             col_label_widths[col] = label_width
 
@@ -1452,13 +1459,8 @@ class DataFrameTable(DataTable):
         column_widths = self.determine_column_widths()
 
         # Add columns with justified headers
-        visible_col_idx = 0
-        for col, dtype in zip(self.df.columns, self.df.dtypes):
-            if col in self.hidden_columns or (col == RID and not self.show_rid):
-                continue  # Skip hidden columns and internal RID
-
-            visible_col_idx += 1
-            cell_value = self._build_column_label(col, visible_col_idx)
+        for col_idx, (col, dtype) in enumerate(self.visible_columns.items(), 1):
+            cell_value = self._build_column_label(col, col_idx)
 
             # Get the width for this column (None means auto-size)
             width = column_widths.get(col)
@@ -1615,18 +1617,13 @@ class DataFrameTable(DataTable):
         # Record this range before loading
         self.loaded_ranges.append((segment_start, segment_stop))
 
+        # Cache visible columns
+        visible_columns = self.visible_columns
+
         # Load the dataframe slice
         df_slice = self.df.slice(segment_start, segment_stop - segment_start)
-        thousand_separator = [
-            col in self.thousand_separator_columns
-            for col in self.df.columns
-            if col not in self.hidden_columns and (col != RID or self.show_rid)
-        ]
-        float_precision = [
-            self.float_precision_columns.get(col, 0)
-            for col in self.df.columns
-            if col not in self.hidden_columns and (col != RID or self.show_rid)
-        ]
+        thousand_separator = [col in self.thousand_separator_columns for col in visible_columns]
+        float_precision = [self.float_precision_columns.get(col, 0) for col in visible_columns]
 
         # Load each row at the correct position
         for (ridx, row), rid in zip(enumerate(df_slice.iter_rows(), segment_start), df_slice[RID]):
@@ -1635,8 +1632,8 @@ class DataFrameTable(DataTable):
 
             vals, dtypes, styles = [], [], []
             for val, col, dtype in zip(row, self.df.columns, self.df.dtypes, strict=True):
-                if col in self.hidden_columns or (col == RID and not self.show_rid):
-                    continue  # Skip hidden columns and internal RID
+                if col not in visible_columns:
+                    continue
 
                 vals.append(val)
                 dtypes.append(dtype)
@@ -3221,11 +3218,7 @@ class DataFrameTable(DataTable):
 
     def do_uniq_rows(self) -> None:
         """Remove duplicate rows from the current dataframe, keeping the first occurrence."""
-        subset = [col for col in self.df.columns if col != RID and col not in self.hidden_columns]
-
-        if not subset:
-            return
-
+        subset = list(self.visible_columns.keys())
         unique_df = self.df.unique(subset=subset, keep="first", maintain_order=True)
         removed_count = len(self.df) - len(unique_df)
 
