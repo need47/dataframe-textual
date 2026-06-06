@@ -51,7 +51,7 @@ NULL_DISPLAY = "-"
 COLUMN_WIDTH_CAP = 35
 
 
-def format_float(value: float, thousand_separator: bool = False, precision: int = 2) -> str:
+def format_float(value: float, thousand_separator: bool = False, precision: int = 0) -> str:
     """Format a float value, keeping integers without decimal point.
 
     Args:
@@ -95,7 +95,7 @@ class DtypeClass:
         style: str | None = None,
         justify: str | None = None,
         thousand_separator: bool = False,
-        float_precision: int = 2,
+        float_precision: int = 0,
     ) -> Text:
         """Format the value according to its data type.
 
@@ -104,7 +104,7 @@ class DtypeClass:
             style: Optional style override for display. Defaults to None.
             justify: Optional justification (e.g., left, right, center) override for display. Defaults to None.
             thousand_separator: Whether to include thousand separators for numeric values. Defaults to False.
-            float_precision: Number of decimal places for float values. Defaults to 2.
+            float_precision: Number of decimal places for float values. Defaults to 0.
 
         Returns:
             The formatted value as a Text.
