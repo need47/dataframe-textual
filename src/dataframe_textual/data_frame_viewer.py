@@ -8,7 +8,7 @@ from typing import Any
 import polars as pl
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
-from textual.events import Click
+from textual.events import Click, Key
 from textual.timer import Timer
 from textual.widgets import TabbedContent, TabPane
 from textual.widgets.tabbed_content import ContentTab, ContentTabs
@@ -164,24 +164,27 @@ class DataFrameViewer(App):
         self.g_mode = False
         self.timeout_timer: Timer | None = None
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: Key) -> None:
         """Handle leader mode key events at the app level."""
         # Already in leader mode, stop the timer and let action through
         if self.g_mode:
             # User pressed escape, cancel leader mode
             if event.key == "escape":
+                event.stop()
                 self.cancel_leader_mode()
             # User pressed a non-escape key, reset the timer and let action through
             elif self.timeout_timer:
                 self.timeout_timer.stop()
                 self.timeout_timer = None
                 self.notify(f"[$success]g[/]+[$accent]{event.key}[/] were pressed", title="Leader Mode")
+
+            # Let the event through and continue to the binding phase
             return
 
         # Enter leader mode on `g` key
         if event.key == "g":
             event.stop()
-            event.prevent_default()
+            event.prevent_default()  # Required because of the default action of the `g` key that goes to the top
 
             self.g_mode = True
             self.notify("Leader mode activated, waiting for next key in 3 seconds", title="Leader Mode")
