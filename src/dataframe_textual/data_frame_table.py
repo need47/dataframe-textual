@@ -16,9 +16,10 @@ from rich.text import Text, TextType
 from textual import work
 from textual._two_way_dict import TwoWayDict
 from textual.coordinate import Coordinate
-from textual.events import Click
+from textual.events import Click, Key
 from textual.reactive import reactive
 from textual.render import measure
+from textual.timer import Timer
 from textual.widgets import DataTable
 from textual.widgets._data_table import (
     CellDoesNotExist,
@@ -108,6 +109,12 @@ class History:
     fixed_rows: int
     fixed_columns: int
     cursor_coordinate: Coordinate
+    expanded_columns: set[str]
+    thousand_separator_columns: set[str]
+    float_precision_columns: dict[str, int]
+    show_rid: bool
+    show_column_index: bool
+    g_mode: bool = False
     dirty: bool = False  # Whether this history state has unsaved changes
 
 
@@ -180,7 +187,7 @@ class DataFrameTable(DataTable):
 
         ## ⬆️ Navigation
         - **↑↓←→** - 🎯 Move cursor (cell/row/column)
-        - **g** - ⬆️ Go to first row
+        - **gg** - ⬆️ Go to first row
         - **G** - ⬇️ Go to last row
         - **Ctrl+G** - 🎯 Go to row
         - **HOME/END** - 🎯 Go to first/last column
@@ -204,16 +211,18 @@ class DataFrameTable(DataTable):
         - **s** - 📈 Show statistics for current column
         - **S** - 📊 Show statistics for entire dataframe
         - **=** - 📊 Show histogram using first column as label and current column as value
-        - **m** - 📋 Show column metadata (ID, name, type)
+        - **C** - 📋 Show column metadata (ID, name, type)
         - **h** - 👁️ Hide current column
         - **H** - 👀 Show all hidden columns
-        - **_** (underscore) - 📏 Toggle column full width
+        - **_** (underscore) - 📏 Toggle column full width for current column
+        - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
         - **+** - 📌 Freeze rows and/or columns
         - **~** - 🏷️ Toggle column index prefix
         - **^** - 🆔 Toggle internal row index (RID)
-        - **,** - 🔢 Toggle thousand separator for current column
-        - **n** - 🔢 Decrease float precision for current column
-        - **N** - 🔢 Increase float precision for current column
+        - **,** - 🔢 Toggle thousand separator for current column (or all numeric columns with **g,**)
+        - **g,** - 🔢 Toggle thousand separator for all numeric columns
+        - **(** - 🔢 Decrease float precision for current column
+        - **)** - 🔢 Increase float precision for current column
         - **K** - 🔄 Cycle cursor (cell → row → column → cell)
 
         ## ✏️ Editing
@@ -248,12 +257,10 @@ class DataFrameTable(DataTable):
         ## 🔎 Find & Replace
         - **/** - 🌐 Global find using cursor value
         - **?** - 🌐 Global find with expression
-        - **;** - 🔎 Find in current column with cursor value
-        - **:** - 🔎 Find in current column with expression
-        - **(** - ⬆️ Go to previous match
-        - **)** - ⬇️ Go to next match
+        - **n** - ⬇️ Go to next match
+        - **N** - ⬆️ Go to previous match
         - **r** - 🔄 Replace in current column (interactive or all)
-        - **R** - 🔄 Replace across all columns (interactive or all)
+        - **gr** - 🔄 Replace across all columns (interactive or all)
         - *(Supports case-insensitive & whole-word matching)*
 
         ## ⏬ Filter & Collect
@@ -286,6 +293,13 @@ class DataFrameTable(DataTable):
         ## ⌨️ SQL Interface
         - **l** - 💬 Open simple SQL interface (select columns & where clause)
         - **L** - 🔎 Open advanced SQL interface (full SQL queries)
+
+        ## 🔑 Leader Mode
+        - Press **g** to activate leader mode (3-second timeout)
+        - **gg** - ⬆️ Go to first row
+        - **g,** - 🔢 Toggle thousand separator for all numeric columns
+        - **g_** - 📏 Toggle full width for all string/list columns
+        - If no second key is pressed within 3 seconds, leader mode is cancelled
     """).strip()
 
     # fmt: off
@@ -301,22 +315,23 @@ class DataFrameTable(DataTable):
         ("U", "redo", "Redo"),
         ("ctrl+u", "reset", "Reset to initial state"),
         # Display
+        ("underscore", "expand_column", "Toggle column full width"),  # `_`
         ("h", "hide_column", "Hide column"),
         ("H", "show_hidden_columns", "Show hidden column(s)"),
         ("tilde", "toggle_column_index", "Toggle column index prefix"),  # `~`
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
         ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
         ("comma", "toggle_thousand_separator", "Toggle thousand separator for column"),  # `,`
-        ("n", "adjust_float_precision(-1)", "Decrease float precision for column"),
-        ("N", "adjust_float_precision(1)", "Increase float precision for column"),
+        ("left_parenthesis", "adjust_float_precision(-1)", "Decrease float precision for column"),  # `(`
+        ("right_parenthesis", "adjust_float_precision(1)", "Increase float precision for column"),  # `)`
         ("circumflex_accent", "toggle_rid", "Toggle internal row index (RID)"),  # `^`
         ("ampersand", "set_cursor_row_as_header", "Set cursor row as the new header row"),  # `&`
         # Copy
         ("c", "copy_cell", "Copy cell to clipboard"),
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
         ("ctrl+r", "copy_row", "Copy row to clipboard"),
-        # Metadata, Detail, Frequency, and Statistics
-        ("m", "metadata_column", "Show metadata for column"),
+        # Column Metadata, Row Detail, Frequency, and Statistics
+        ("C", "metadata_column", "Show metadata for column"),
         ("enter", "view_row_detail", "View row details"),
         ("tab", "view_cell_detail", "View cell details"),
         ("F", "show_frequency", "Show frequency for current column"),
@@ -343,14 +358,11 @@ class DataFrameTable(DataTable):
         ("t", "toggle_selections", "Toggle all row selections"),
         ("T", "clear_selections_and_matches", "Clear selections"),
         # Find & Replace
-        ("slash", "find_cursor_value('global')", "Global find with cursor value"),  # `/`
-        ("question_mark", "find_expr('global')", "Global find with expression"),  # `?`
-        ("semicolon", "find_cursor_value", "Find in column with cursor value"),  # `;`
-        ("colon", "find_expr", "Find in column with expression"),  # `:`
-        ("left_parenthesis", "previous_match", "Go to previous match"),  # `(`
-        ("right_parenthesis", "next_match", "Go to next match"),  # `)`
-        ("r", "replace", "Replace in column"),  # `r`
-        ("R", "replace('global')", "Replace global"),  # `Shift+R`
+        ("slash", "find_cursor_value", "Find with cursor value"),  # `/`
+        ("question_mark", "find_expr", "Find with expression"),  # `?`
+        ("n", "next_match", "Go to next match"),
+        ("N", "previous_match", "Go to previous match"),
+        ("r", "replace", "Replace with value"),
         # Delete
         ("delete", "clear_cell", "Clear cell"),
         ("shift+delete", "clear_column", "Clear cells in current column that match cursor value"),  # `Shift+Delete`
@@ -457,6 +469,10 @@ class DataFrameTable(DataTable):
         # Whether to show 1-based index prefix in column labels (e.g., "1_colname")
         self.show_column_index = False
 
+        # Whether key bindings is in leader mode (i.e., key bindings are prefixed with a leader key)
+        self.g_mode = False
+        self.timeout_timer: Timer | None = None
+
     def init_table(self) -> None:
         """Initial load of the dataframe and setup of the table display.
 
@@ -554,7 +570,7 @@ class DataFrameTable(DataTable):
 
         self.notify("Data fully loaded" if fully_loaded else "Data loading stopped by user", title="Load DataFrame")
 
-    def wait_full_df(func: Callable) -> Callable:
+    def with_full_df(func: Callable) -> Callable:
         """Decorator to ensure the dataframe is fully loaded before executing a method.
 
         If the dataframe is not loaded, show a loading indicator and schedule the
@@ -567,6 +583,16 @@ class DataFrameTable(DataTable):
 
             callback = partial(func, self, *args, **kwargs)
             self.app.push_screen(LoadingScreen(self, callback=callback))
+
+        return wrapper
+
+    def with_g_mode(func: Callable) -> Callable:
+        """Exit leader mode, stopping the timeout timer and resetting the cursor."""
+
+        def wrapper(self, *args, **kwargs):
+            val = func(self, *args, **kwargs)
+            self.g_mode = False
+            return val
 
         return wrapper
 
@@ -876,16 +902,48 @@ class DataFrameTable(DataTable):
         # self.setup_table()
         pass
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: Key) -> None:
         """Handle key press events.
 
         Args:
             event: The key event object.
         """
+        # Already in leader mode, stop the timer and reset
+        if self.g_mode:
+            # User pressed escape, cancel leader mode
+            if event.key == "escape":
+                event.stop()
+                event.prevent_default()
+                self.cancel_leader_mode()
+            # User pressed a non-escape key, reset the timer and let action through
+            elif self.timeout_timer:
+                self.timeout_timer.stop()
+                self.timeout_timer = None
+                self.notify(f"[$success]g[/]+[$accent]{event.key}[/] were pressed", title="Leader Mode")
+            return
+
+        # Enter leader mode on `g` key
+        if event.key == "g":
+            event.stop()
+            event.prevent_default()
+
+            self.g_mode = True
+            self.notify("Leader mode activated, waiting for next key in 3 seconds", title="Leader Mode")
+            self.timeout_timer = self.set_timer(3, callback=self.cancel_leader_mode)
+
         if event.key == "up":
             self.load_rows_up()
         elif event.key == "down":
             self.load_rows_down()
+
+    def cancel_leader_mode(self) -> None:
+        """Cancel leader mode and reset the timeout timer."""
+        if self.timeout_timer:
+            self.timeout_timer.stop()
+            self.timeout_timer = None
+            self.notify("Leader mode cancelled", title="Leader Mode")
+
+        self.g_mode = False
 
     def on_click(self, event: Click) -> None:
         """Handle mouse click events on the table.
@@ -916,12 +974,12 @@ class DataFrameTable(DataTable):
         """Load more rows when scrolling down with mouse."""
         self.load_rows_down()
 
-    # Action handlers for BINDINGS
+    @with_g_mode
     def action_go_top(self) -> None:
         """Go to the top of the table."""
         self.do_go_top()
 
-    @wait_full_df
+    @with_full_df
     def action_go_bottom(self) -> None:
         """Go to the bottom of the table."""
         self.do_go_bottom()
@@ -948,7 +1006,7 @@ class DataFrameTable(DataTable):
         """View details of the current cell."""
         self.do_view_cell_detail()
 
-    @wait_full_df
+    @with_full_df
     def action_delete_column(self) -> None:
         """Delete the current column."""
         self.do_delete_column()
@@ -957,6 +1015,7 @@ class DataFrameTable(DataTable):
         """Hide the current column."""
         self.do_hide_column()
 
+    @with_g_mode
     def action_expand_column(self) -> None:
         """Expand the current column to its full width."""
         self.do_expand_column()
@@ -965,7 +1024,7 @@ class DataFrameTable(DataTable):
         """Toggle the internal row index column visibility."""
         self.do_toggle_rid()
 
-    @wait_full_df
+    @with_full_df
     def action_set_cursor_row_as_header(self) -> None:
         """Set cursor row as the new header row."""
         self.do_set_cursor_row_as_header()
@@ -974,32 +1033,32 @@ class DataFrameTable(DataTable):
         """Show all hidden columns."""
         self.do_show_hidden_columns()
 
-    @wait_full_df
+    @with_full_df
     def action_sort_ascending(self) -> None:
         """Sort by current column in ascending order."""
         self.do_sort_by_column(descending=False)
 
-    @wait_full_df
+    @with_full_df
     def action_sort_descending(self) -> None:
         """Sort by current column in descending order."""
         self.do_sort_by_column(descending=True)
 
-    @wait_full_df
+    @with_full_df
     def action_show_frequency(self, cidx: int | None = None) -> None:
         """Show frequency distribution for the current column."""
         self.do_show_frequency(cidx)
 
-    @wait_full_df
+    @with_full_df
     def action_show_histogram(self, default: int = 1) -> None:
         """Show histogram for the current column."""
         self.do_show_histogram(default=default)
 
-    @wait_full_df
+    @with_full_df
     def action_show_bar(self) -> None:
         """Show histogram using first column as label and current column as value."""
         self.do_show_bar()
 
-    @wait_full_df
+    @with_full_df
     def action_show_statistics(self, cidx: int | None = None) -> None:
         """Show statistics for the current column or entire dataframe.
 
@@ -1027,12 +1086,12 @@ class DataFrameTable(DataTable):
         """Open the advanced filter screen."""
         self.do_filter_rows_expr()
 
-    @wait_full_df
+    @with_full_df
     def action_filter_rows_value(self) -> None:
         """Filter rows by value for the current column."""
         self.do_filter_rows_value()
 
-    @wait_full_df
+    @with_full_df
     def action_collect_rows(self, cidx: int | None = None, term: Any = None) -> None:
         """Collect rows to a new tab based on the current selection or value."""
         self.do_collect_rows(cidx=cidx, term=term)
@@ -1045,7 +1104,7 @@ class DataFrameTable(DataTable):
         """Edit the entire current column with an expression."""
         self.do_edit_column()
 
-    @wait_full_df
+    @with_full_df
     def action_add_column(self) -> None:
         """Add an empty column after the current column."""
         self.do_add_column()
@@ -1054,7 +1113,7 @@ class DataFrameTable(DataTable):
         """Add a new column with optional expression after the current column."""
         self.do_add_column_expr()
 
-    @wait_full_df
+    @with_full_df
     def action_add_link_column(self) -> None:
         """Open AddLinkScreen to create a new link column from a Polars expression."""
         self.do_add_link_column()
@@ -1063,12 +1122,12 @@ class DataFrameTable(DataTable):
         """Rename the current column."""
         self.do_rename_column()
 
-    @wait_full_df
+    @with_full_df
     def action_clear_cell(self) -> None:
         """Clear the current cell (set to None)."""
         self.do_clear_cell()
 
-    @wait_full_df
+    @with_full_df
     def action_clear_column(self) -> None:
         """Clear cells in the current column that match the cursor value."""
         self.do_clear_column()
@@ -1081,48 +1140,52 @@ class DataFrameTable(DataTable):
         """Select rows by expression."""
         self.do_select_rows_expr()
 
-    def action_find_cursor_value(self, scope="column") -> None:
+    @with_g_mode
+    def action_find_cursor_value(self) -> None:
         """Find by cursor value in current column or globally across all columns."""
-        self.do_find_cursor_value(scope=scope)
+        self.do_find_cursor_value()
 
-    def action_find_expr(self, scope="column") -> None:
+    @with_g_mode
+    def action_find_expr(self) -> None:
         """Find by expression in current column or globally across all columns."""
-        self.do_find_expr(scope=scope)
+        self.do_find_expr()
 
-    def action_replace(self, scope="column") -> None:
+    @with_g_mode
+    def action_replace(self) -> None:
         """Replace values in current column or globally across all columns."""
+        scope = "global" if self.g_mode else "column"
         self.do_replace(scope=scope)
 
     def action_toggle_selection_current_row(self) -> None:
         """Toggle selection for the current row."""
         self.do_toggle_selection_current_row()
 
-    @wait_full_df
+    @with_full_df
     def action_toggle_selections(self) -> None:
         """Toggle all row selections."""
         self.do_toggle_selections()
 
-    @wait_full_df
+    @with_full_df
     def action_delete_row(self) -> None:
         """Delete the current row."""
         self.do_delete_row()
 
-    @wait_full_df
+    @with_full_df
     def action_delete_row_and_below(self) -> None:
         """Delete the current row and those below."""
         self.do_delete_row(more="below")
 
-    @wait_full_df
+    @with_full_df
     def action_delete_row_and_up(self) -> None:
         """Delete the current row and those above."""
         self.do_delete_row(more="above")
 
-    @wait_full_df
+    @with_full_df
     def action_duplicate_column(self) -> None:
         """Duplicate the current column."""
         self.do_duplicate_column()
 
-    @wait_full_df
+    @with_full_df
     def action_explode_column(self) -> None:
         """Explode the current list column into multiple rows."""
         self.do_explode_column()
@@ -1131,47 +1194,47 @@ class DataFrameTable(DataTable):
         """Explode the current column by a delimiter into multiple rows."""
         self.do_explode_column_delim()
 
-    @wait_full_df
+    @with_full_df
     def action_duplicate_row(self) -> None:
         """Duplicate the current row."""
         self.do_duplicate_row()
 
-    @wait_full_df
+    @with_full_df
     def action_uniq_rows(self) -> None:
         """Remove duplicate rows while keeping the first occurrence."""
         self.do_uniq_rows()
 
-    @wait_full_df
+    @with_full_df
     def action_undo(self) -> None:
         """Undo the last action."""
         self.do_undo()
 
-    @wait_full_df
+    @with_full_df
     def action_redo(self) -> None:
         """Redo the last undone action."""
         self.do_redo()
 
-    @wait_full_df
+    @with_full_df
     def action_reset(self) -> None:
         """Reset to the initial state."""
         self.do_reset()
 
-    @wait_full_df
+    @with_full_df
     def action_move_column_left(self) -> None:
         """Move the current column to the left."""
         self.do_move_column("left")
 
-    @wait_full_df
+    @with_full_df
     def action_move_column_right(self) -> None:
         """Move the current column to the right."""
         self.do_move_column("right")
 
-    @wait_full_df
+    @with_full_df
     def action_move_row_up(self) -> None:
         """Move the current row up."""
         self.do_move_row("up")
 
-    @wait_full_df
+    @with_full_df
     def action_move_row_down(self) -> None:
         """Move the current row down."""
         self.do_move_row("down")
@@ -1199,7 +1262,7 @@ class DataFrameTable(DataTable):
         """Backward-compatible alias for toggling column index prefixes."""
         self.action_toggle_column_index()
 
-    @wait_full_df
+    @with_full_df
     def action_cast_column_dtype(self, dtype: str | pl.DataType) -> None:
         """Cast the current column to a different data type."""
         self.do_cast_column_dtype(dtype)
@@ -1219,7 +1282,7 @@ class DataFrameTable(DataTable):
                 severity="error",
             )
 
-    @wait_full_df
+    @with_full_df
     def action_copy_column(self) -> None:
         """Copy the current column to clipboard (one value per line)."""
         col_name = self.cursor_col_name
@@ -1254,31 +1317,52 @@ class DataFrameTable(DataTable):
         except (FileNotFoundError, IndexError):
             self.notify(f"Failed to copy row [$error]{ridx}[/] to clipboard", title="Copy Row", severity="error")
 
+    @with_g_mode
     def action_toggle_thousand_separator(self) -> None:
         """Toggle thousand separator for the current cursor column."""
-        col_name = self.cursor_col_name
-        if col_name in self.thousand_separator_columns:
-            self.thousand_separator_columns.discard(col_name)
-            status = "off"
-        else:
-            dtype = self.df[col_name].dtype
-            dc = DtypeConfig(dtype)
-            if dc.gtype in ("integer", "float"):
-                self.thousand_separator_columns.add(col_name)
-                status = "on"
+        if self.g_mode:
+            if self.thousand_separator_columns:
+                self.thousand_separator_columns.clear()
+                status = "off"
             else:
-                self.notify(
-                    f"Column [$warning]{col_name}[/] is not a numeric column and cannot be formatted as such",
-                    title="Toggle Thousand Separator",
-                    severity="warning",
-                )
-                return
+                self.thousand_separator_columns = {
+                    c for c, dtype in self.visible_columns.items() if DtypeConfig(dtype).gtype in ("integer", "float")
+                }
+
+                if not self.thousand_separator_columns:
+                    self.notify(
+                        "No numeric columns to toggle thousand separator on",
+                        title="Toggle Thousand Separator",
+                        severity="warning",
+                    )
+                    return
+
+                status = "on"
+        else:
+            col_name = self.cursor_col_name
+            if col_name in self.thousand_separator_columns:
+                self.thousand_separator_columns.discard(col_name)
+                status = "off"
+            else:
+                dtype = self.df[col_name].dtype
+                dc = DtypeConfig(dtype)
+                if dc.gtype in ("integer", "float"):
+                    self.thousand_separator_columns.add(col_name)
+                    status = "on"
+                else:
+                    self.notify(
+                        f"Column [$warning]{col_name}[/] is not a numeric column and cannot be formatted as such",
+                        title="Toggle Thousand Separator",
+                        severity="warning",
+                    )
+                    return
 
         self.setup_table()
-        self.notify(
-            f"Thousand separator is [$success]{status}[/] for column [$accent]{col_name}[/]",
-            title="Toggle Thousand Separator",
+        message = f"Thousand separator is [$success]{status}[/] for " + (
+            "[$accesent]all numeric columns[/]" if self.g_mode else f"column [$accent]{col_name}[/]"
         )
+
+        self.notify(message, title="Toggle Thousand Separator")
 
     def action_adjust_float_precision(self, delta: int) -> None:
         """Adjust float precision for the current cursor column."""
@@ -1305,7 +1389,7 @@ class DataFrameTable(DataTable):
             self.setup_table()
 
         message = (
-            f"Float precision turned off for column [$success]{col_name}[/]"
+            f"Float precision turned [$success]off[/] for column [$accent]{col_name}[/]"
             if new_precision == 0
             else f"Float precision for column [$success]{col_name}[/] set to [$accent]{new_precision}[/] decimal place(s)"
         )
@@ -1879,7 +1963,7 @@ class DataFrameTable(DataTable):
         """Open a modal screen to Go to a specific row."""
         self.app.push_screen(GoToRowScreen(self), callback=self.go_to_row)
 
-    @wait_full_df
+    @with_full_df
     def go_to_row(self, result: int | None) -> None:
         """Go to a specific row.
 
@@ -1927,6 +2011,12 @@ class DataFrameTable(DataTable):
             fixed_rows=self.fixed_rows,
             fixed_columns=self.fixed_columns,
             cursor_coordinate=self.cursor_coordinate,
+            expanded_columns=self.expanded_columns.copy(),
+            thousand_separator_columns=self.thousand_separator_columns.copy(),
+            float_precision_columns=self.float_precision_columns.copy(),
+            show_rid=self.show_rid,
+            show_column_index=self.show_column_index,
+            g_mode=self.g_mode,
             dirty=self.dirty,
         )
 
@@ -1946,6 +2036,12 @@ class DataFrameTable(DataTable):
         self.fixed_rows = history.fixed_rows
         self.fixed_columns = history.fixed_columns
         self.cursor_coordinate = history.cursor_coordinate
+        self.expanded_columns = history.expanded_columns.copy()
+        self.thousand_separator_columns = history.thousand_separator_columns.copy()
+        self.float_precision_columns = history.float_precision_columns.copy()
+        self.show_rid = history.show_rid
+        self.show_column_index = history.show_column_index
+        self.g_mode = history.g_mode
         self.dirty = history.dirty
 
         # Recreate table for display
@@ -2125,7 +2221,7 @@ class DataFrameTable(DataTable):
         bin_count, bins = result
         self.app.push_screen(HistogramScreen(self, bins=bins, bin_count=bin_count))
 
-    @wait_full_df
+    @with_full_df
     def do_show_bar(self) -> None:
         """Show histogram using first column as label and current column as value."""
         cidx = self.cursor_cidx
@@ -2233,63 +2329,92 @@ class DataFrameTable(DataTable):
             f"Hide column [$success]{col_name}[/]. Press [$accent]H[/] to show hidden columns", title="Hide Column"
         )
 
-    def do_expand_column(self) -> None:
-        """Expand the current column to show the widest cell in the loaded data."""
-        dtype = self.cursor_col_dtype
-
-        # Only expand string columns
-        if dtype != pl.String and dtype != pl.List:
-            return
-
-        cidx = self.cursor_cidx
-        col_key = self.cursor_col_key
-        col_name = col_key.value
-
-        # The column to expand/shrink
+    def _expand_single_column(self, col_name: str) -> str | None:
+        """Expand or unexpand a single column. Returns a status message fragment, or None on failure."""
+        cidx = self.df.columns.index(col_name)
+        col_key = self.get_col_key(cidx)
         col: Column = self.columns[col_key]
 
-        # Calculate the maximum width across all loaded rows
-        label_width = len(self._build_column_label(col_name)) + 2  # Start with column name width + padding
+        label_width = len(self._build_column_label(col_name)) + 2
 
-        # If already expanded, shrink back to label width
+        # If already expanded, shrink back
         if col_name in self.expanded_columns:
             col.width = max(label_width, COLUMN_WIDTH_CAP)
-            new_width = col.width
             self.expanded_columns.remove(col_name)
+            return f"[$success]{col_name}[/] shrunk to [$accent]{col.width}[/]"
 
-        # If not expanded, check if we need to expand by comparing label width to max cell width in loaded rows
+        # Otherwise, expand to widest cell
+        try:
+            new_width = label_width
+            need_expand = False
+
+            for row_start, row_end in self.loaded_ranges:
+                for ridx in range(row_start, row_end):
+                    cell_value = str(self.df.item(ridx, cidx))
+                    cell_width = measure(self.app.console, cell_value, 1)
+                    if cell_width > new_width:
+                        need_expand = True
+                        new_width = cell_width
+
+            if not need_expand:
+                return None
+
+            self.expanded_columns.add(col_name)
+            col.width = new_width
+            return f"[$success]{col_name}[/] expanded to [$accent]{new_width}[/]"
+
+        except Exception as e:
+            self.log(f"Error expanding column `{col_name}`: {e}")
+            return None
+
+    def do_expand_column(self) -> None:
+        """Expand/unexpand string/list columns.
+
+        In leader mode (g_mode): expand or unexpand all string/list columns.
+        Otherwise: expand or unexpand the current column only.
+        """
+        if self.g_mode:
+            # Collect all string/list column names
+            target_cols = [
+                col for col, dtype in self.visible_columns.items() if DtypeConfig(dtype).gtype in ("string", "list")
+            ]
+
+            if not target_cols:
+                # self.notify("No string/list columns to expand", title="Expand Columns")
+                return
+
+            results = []
+            for col_name in target_cols:
+                result = self._expand_single_column(col_name)
+                if result:
+                    results.append(result)
+
+            if not results:
+                return
+
+            self._update_count += 1
+            self._require_update_dimensions = True
+            self.refresh(layout=True)
+
+            self.notify(
+                f"Toggled {len(results)} column(s)",
+                title="Expand Columns",
+            )
         else:
-            try:
-                need_expand = False
-                new_width = label_width
+            dtype = self.cursor_col_dtype
+            if dtype != pl.String and dtype != pl.List:
+                return
 
-                # Scan through all loaded rows that are visible to find max width
-                for row_start, row_end in self.loaded_ranges:
-                    for ridx in range(row_start, row_end):
-                        cell_value = str(self.df.item(ridx, cidx))
-                        cell_width = measure(self.app.console, cell_value, 1)
+            col_name = self.cursor_col_key.value
+            result = self._expand_single_column(col_name)
+            if not result:
+                return
 
-                        if cell_width > new_width:
-                            need_expand = True
-                            new_width = cell_width
+            self._update_count += 1
+            self._require_update_dimensions = True
+            self.refresh(layout=True)
 
-                if not need_expand:
-                    return
-
-                # Update the column width
-                self.expanded_columns.add(col_name)
-                col.width = new_width
-
-            except Exception as e:
-                self.notify(f"Failed to expand column [$error]{col_name}[/]", title="Expand Column", severity="error")
-                self.log(f"Error expanding column `{col_name}`: {e}")
-
-        # Force a refresh
-        self._update_count += 1
-        self._require_update_dimensions = True
-        self.refresh(layout=True)
-
-        self.notify(f"Expanded column [$success]{col_name}[/] to width [$accent]{new_width}[/]", title="Expand Column")
+            self.notify(f"Column {result}", title="Expand Column")
 
     def do_toggle_rid(self) -> None:
         """Toggle display of the internal RID column."""
@@ -2459,7 +2584,7 @@ class DataFrameTable(DataTable):
             callback=self.edit_cell,
         )
 
-    @wait_full_df
+    @with_full_df
     def edit_cell(self, result) -> None:
         """Handle result from EditCellScreen."""
         if result is None:
@@ -2530,7 +2655,7 @@ class DataFrameTable(DataTable):
             callback=self.edit_column,
         )
 
-    @wait_full_df
+    @with_full_df
     def edit_column(self, result) -> None:
         """Edit a column."""
         if result is None:
@@ -2605,7 +2730,7 @@ class DataFrameTable(DataTable):
             callback=self.rename_column,
         )
 
-    @wait_full_df
+    @with_full_df
     def rename_column(self, result) -> None:
         """Handle result from RenameColumnScreen."""
         if result is None:
@@ -2793,7 +2918,7 @@ class DataFrameTable(DataTable):
             self.add_column_expr,
         )
 
-    @wait_full_df
+    @with_full_df
     def add_column_expr(self, result: tuple[int, str, pl.Expr] | None) -> None:
         """Add a new column with an expression."""
         if result is None:
@@ -3049,7 +3174,7 @@ class DataFrameTable(DataTable):
             callback=self.explode_column_delim,
         )
 
-    @wait_full_df
+    @with_full_df
     def explode_column_delim(self, result) -> None:
         if result is None:
             return
@@ -3437,7 +3562,7 @@ class DataFrameTable(DataTable):
             self.log(f"Error casting column `{col_name}`: {e}")
 
     # Find & Replace
-    @wait_full_df
+    @with_full_df
     def find_matches(
         self,
         term: str,
@@ -3513,7 +3638,7 @@ class DataFrameTable(DataTable):
 
         return matches
 
-    def do_find_cursor_value(self, scope="column") -> None:
+    def do_find_cursor_value(self) -> None:
         """Find by cursor value.
 
         Args:
@@ -3532,10 +3657,10 @@ class DataFrameTable(DataTable):
                 "match_literal": True,
                 "match_reverse": False,
             },
-            scope=scope,
+            scope="global" if self.g_mode else "column",
         )
 
-    def do_find_expr(self, scope="column") -> None:
+    def do_find_expr(self) -> None:
         """Open screen to find by expression.
 
         Args:
@@ -3544,6 +3669,7 @@ class DataFrameTable(DataTable):
         # Use current cell value as default search term
         term = NULL if self.cursor_value is None else str(self.cursor_value)
         cidx = self.cursor_cidx
+        scope = "global" if self.g_mode else "column"
 
         # Push the search modal screen
         self.app.push_screen(
@@ -3551,7 +3677,7 @@ class DataFrameTable(DataTable):
             callback=partial(self.find, scope=scope),
         )
 
-    @wait_full_df
+    @with_full_df
     def find(self, result: dict, scope="column") -> None:
         """Find a term in current column or globally across all columns.
 
@@ -4097,7 +4223,7 @@ class DataFrameTable(DataTable):
             callback=self.filter_rows,
         )
 
-    @wait_full_df
+    @with_full_df
     def filter_rows(self, result) -> None:
         """Filter selected rows and hide others. Do not modify the dataframe.
 
@@ -4281,7 +4407,7 @@ class DataFrameTable(DataTable):
                 severity="warning",
             )
 
-    @wait_full_df
+    @with_full_df
     def filter_row_value(self, result: tuple[pl.Expr, int] | None) -> None:
         """Apply the filter expression in the current column.
 
@@ -4419,7 +4545,7 @@ class DataFrameTable(DataTable):
             callback=self.select_rows,
         )
 
-    @wait_full_df
+    @with_full_df
     def select_rows(self, result: dict) -> None:
         """Select rows by value or expression.
 
@@ -4669,7 +4795,7 @@ class DataFrameTable(DataTable):
 
         self.run_sql(sql, new_tab)
 
-    @wait_full_df
+    @with_full_df
     def run_sql(self, sql: str, new_tab: bool = False) -> None:
         """Execute a SQL query directly.
 

@@ -218,6 +218,14 @@ dv data.csv -o data.parquet
 
 ## Keyboard Shortcuts
 
+Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader sequence** starting with `g` (e.g., `g/`, `g,`, `g_`). Pressing `g` activates leader mode for 3 seconds — press the next key within that window to run the command.
+
+**How it works:**
+
+- Press `g` to activate leader mode — a 3-second timeout begins
+- Press the next key within the timeout to execute the combined command
+- If no second key is pressed within 3 seconds, leader mode is automatically cancelled
+
 ### App-Level Controls
 
 #### File & Tab Management
@@ -266,7 +274,7 @@ dv data.csv -o data.parquet
 
 | Key                          | Action                     |
 | ---------------------------- | -------------------------- |
-| `g`                          | Go to first row            |
+| `gg`                         | Go to first row            |
 | `G`                          | Go to last row             |
 | `Ctrl + G`                   | Go to specific row         |
 | `↑` / `↓`                    | Move up/down one row       |
@@ -287,28 +295,30 @@ dv data.csv -o data.parquet
 
 #### Display
 
-| Key              | Action                                                                 |
-| ---------------- | ---------------------------------------------------------------------- |
-| `Enter`          | Show details for the current row as two-column key–value pairs         |
-| `Tab`            | Show current cell details; press `Tab` again there to drill deeper     |
-| `F`              | Show frequency distribution for current column                         |
-| `i`              | Show histogram for current column                                      |
-| `I`              | Show histogram for current column with custom bins                     |
-| `s`              | Show statistics for current column                                     |
-| `S`              | Show statistics for entire dataframe                                   |
-| `=`              | Show histogram using first column as label and current column as value |
-| `m`              | Show metadata for columns (e.g., data types)                           |
-| `K`              | Cycle cursor types: cell → row → column → cell                         |
-| `~`              | Toggle column index prefix                                             |
-| `_` (underscore) | Toggle column full width                                               |
-| `+`              | Toggle freeze rows and/or columns                                      |
-| `,`              | Toggle thousand separator for current column                           |
-| `n`              | Decrease float precision for current column                            |
-| `N`              | Increase float precision for current column                            |
-| `^`              | Toggle internal row index column (RID)                                 |
-| `&`              | Set current row as the new header row                                  |
-| `h`              | Hide current column                                                    |
-| `H`              | Show all hidden columns                                                |
+| Key               | Action                                                                 |
+| ----------------- | ---------------------------------------------------------------------- |
+| `Enter`           | Show details for the current row as two-column key–value pairs         |
+| `Tab`             | Show current cell details; press `Tab` again there to drill deeper     |
+| `F`               | Show frequency distribution for current column                         |
+| `i`               | Show histogram for current column                                      |
+| `I`               | Show histogram for current column with custom bins                     |
+| `s`               | Show statistics for current column                                     |
+| `S`               | Show statistics for entire dataframe                                   |
+| `=`               | Show histogram using first column as label and current column as value |
+| `C`               | Show columnmetadata (e.g., data types)                                 |
+| `K`               | Cycle cursor types: cell → row → column → cell                         |
+| `~`               | Toggle column index prefix                                             |
+| `_` (underscore)  | Toggle column full width for current column                            |
+| `g_` (underscore) | Toggle column full width for all string/list columns                   |
+| `+`               | Toggle freeze rows and/or columns                                      |
+| `,`               | Toggle thousand separator for current column                           |
+| `g,`              | Toggle thousand separator for all numeric columns                      |
+| `(`               | Decrease float precision for current column                            |
+| `)`               | Increase float precision for current column                            |
+| `^`               | Toggle internal row index column (RID)                                 |
+| `&`               | Set current row as the new header row                                  |
+| `h`               | Hide current column                                                    |
+| `H`               | Show all hidden columns                                                |
 
 #### Editing
 
@@ -346,16 +356,16 @@ dv data.csv -o data.parquet
 
 #### Find & Replace
 
-| Key | Action                                                                 |
-| --- | ---------------------------------------------------------------------- |
-| `/` | Find across all columns with cursor value and highlight matching cells |
-| `?` | Find across all columns with expression and highlight matching cells   |
-| `;` | Find in current column with cursor value and highlight matching cells  |
-| `:` | Find in current column with expression and highlight matching cells    |
-| `)` | Go to next matching cell                                               |
-| `(` | Go to previous matching cell                                           |
-| `r` | Find and replace in current column (interactive or replace all)        |
-| `R` | Find and replace across all columns (interactive or replace all)       |
+| Key  | Action                                                                |
+| ---- | --------------------------------------------------------------------- |
+| `/`  | Find in current column with cursor value and highlight matching cells |
+| `g/` | Find in all columns with cursor value and highlight matching cells    |
+| `?`  | Find in current column with expression and highlight matching cells   |
+| `g?` | Find in all columns with expression and highlight matching cells      |
+| `n`  | Go to next matching cell                                              |
+| `N`  | Go to previous matching cell                                          |
+| `r`  | Find and replace in current column (interactive or replace all)       |
+| `gr` | Find and replace across all columns (interactive or replace all)      |
 
 #### Filter & Collect
 
@@ -440,13 +450,14 @@ Columns are automatically styled based on their data types:
 - Applies to the **current cursor column** (integer and float columns)
 - Formats large numbers with commas for readability (e.g., `1000000` → `1,000,000`)
 - Each column can be toggled independently
+- Use `g,` (leader mode) to toggle all numeric columns at once
 - Toggle on/off as needed for different viewing preferences
 - Display-only: does not modify underlying data in the dataframe
 
-**Float Precision** (`n`/`N`):
+**Float Precision** (`(`/`)`):
 
 - Applies to the **current cursor column** (float columns only)
-- `n` decreases precision (fewer decimal places), `N` increases precision
+- `(` decreases precision (fewer decimal places), `)` increases precision
 - Each column can have its own precision setting
 - Precision of 0 means full (default) display
 - Display-only: does not modify underlying data in the dataframe
@@ -522,18 +533,18 @@ These options work with plain text searches. Use Polars regex patterns in expres
 
 Find by value/expression and highlight matching cells:
 
-- `/` - Find cursor value across all columns (global search)
-- `?` - Open dialog to search all columns with expression (global search)
-- `;` - Find cursor value within current column (respects data type)
-- `:` - Open dialog to search current column with expression
-- `)` - Go to next matching cell
-- `(` - Go to previous matching cell
+- `/` - Find cursor value in current column
+- `g/` - Find cursor value across all columns (global search)
+- `?` - Open dialog to search in current column with expression
+- `g?` - Open dialog to search across all columns with expression (global search)
+- `n` - Go to next matching cell
+- `N` - Go to previous matching cell
 
-Replace values in current column (`r`) or across all columns (`R`).
+Replace values in current column (`r`) or across all columns (`gr`).
 
 **How It Works:**
 
-When you press `r` or `R`, enter:
+When you press `r` or `gr`, enter:
 
 1. **Find term**: Value or expression to search for (done by string value)
 2. **Replace term**: Replacement value
@@ -683,9 +694,9 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 
 View quick metadata about your columns to understand their structure and content.
 
-**Column Metadata** (`m`):
+**Column Metadata** (`C`):
 
-- Press `m` to open a modal displaying details for all columns:
+- Press `C` to open a modal displaying details for all columns:
   - **Column** - Column name
   - **Type** - Data type (e.g., Int64, String, Float64, Boolean)
 
