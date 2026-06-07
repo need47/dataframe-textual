@@ -9,12 +9,21 @@ import polars as pl
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
 from textual.events import Click
+from textual.timer import Timer
 from textual.widgets import TabbedContent, TabPane
 from textual.widgets.tabbed_content import ContentTab, ContentTabs
 
 from dataframe_textual.theme_screen import ThemeScreen
 
-from .common import RID, SUPPORTED_FORMATS, Source, get_next_item, guess_file_format, load_file, validate_expr
+from .common import (
+    RID,
+    SUPPORTED_FORMATS,
+    Source,
+    get_next_item,
+    guess_file_format,
+    load_file,
+    validate_expr,
+)
 from .console_panel import ConsolePanel
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
@@ -30,7 +39,7 @@ class DataFrameViewer(App):
         # 📊 DataFrame Viewer - App Controls
 
         ## ⚙️ File & Tab Management
-        - **q** - ❌ Quit current tab (prompts to save unsaved changes)
+        - **q** - ❌ Quit tab (prompts to save unsaved changes or view)
         - **Q** - ❌ Quit all tabs (prompts to save unsaved changes)
         - **Ctrl+Q** - 🚪 Force to quit app (discards unsaved changes)
         - **Esc** - ❌ Force to quit current tab or view (discards unsaved changes)
@@ -150,6 +159,44 @@ class DataFrameViewer(App):
         self.theme = theme
         self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel: DataFrameHelpPanel | None = None
+
+        # Global leader mode state
+        self.g_mode = False
+        self.timeout_timer: Timer | None = None
+
+    def on_key(self, event) -> None:
+        """Handle leader mode key events at the app level."""
+        # Already in leader mode, stop the timer and let action through
+        if self.g_mode:
+            # User pressed escape, cancel leader mode
+            if event.key == "escape":
+                event.stop()
+                event.prevent_default()
+                self.cancel_leader_mode()
+            # User pressed a non-escape key, reset the timer and let action through
+            elif self.timeout_timer:
+                self.timeout_timer.stop()
+                self.timeout_timer = None
+                self.notify(f"[$success]g[/]+[$accent]{event.key}[/] were pressed", title="Leader Mode")
+            return
+
+        # Enter leader mode on `g` key
+        if event.key == "g":
+            event.stop()
+            event.prevent_default()
+
+            self.g_mode = True
+            self.notify("Leader mode activated, waiting for next key in 3 seconds", title="Leader Mode")
+            self.timeout_timer = self.set_timer(3, callback=self.cancel_leader_mode)
+
+    def cancel_leader_mode(self) -> None:
+        """Cancel leader mode and reset the timeout timer."""
+        if self.timeout_timer:
+            self.timeout_timer.stop()
+            self.timeout_timer = None
+            self.notify("Leader mode cancelled", title="Leader Mode")
+
+        self.g_mode = False
 
     @property
     def active_table(self) -> DataFrameTable | None:

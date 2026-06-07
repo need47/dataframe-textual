@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sys
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from io import StringIO
@@ -52,6 +53,17 @@ COLUMN_WIDTH_CAP = 35
 
 # Thousand separator for numeric values (must be ',' or '_' per Python's format mini-language)
 THOUSAND_SEPARATOR = ","
+
+
+def with_g_mode(func: Callable) -> Callable:
+    """Decorator that resets leader mode (g_mode) after the action completes."""
+
+    def wrapper(self, *args, **kwargs):
+        val = func(self, *args, **kwargs)
+        self.g_mode = False
+        return val
+
+    return wrapper
 
 
 def format_float(value: float, thousand_separator: bool = False, precision: int = 2) -> str:

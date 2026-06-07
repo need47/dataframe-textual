@@ -19,7 +19,6 @@ from textual.coordinate import Coordinate
 from textual.events import Click, Key
 from textual.reactive import reactive
 from textual.render import measure
-from textual.timer import Timer
 from textual.widgets import DataTable
 from textual.widgets._data_table import (
     CellDoesNotExist,
@@ -50,6 +49,7 @@ from .common import (
     round_to_nearest_hundreds,
     tentative_expr,
     validate_expr,
+    with_g_mode,
 )
 from .loading_screen import BusyScreen, LoadingScreen
 from .table_screen import (
@@ -114,7 +114,6 @@ class History:
     float_precision_columns: dict[str, int]
     show_rid: bool
     show_column_index: bool
-    g_mode: bool = False
     dirty: bool = False  # Whether this history state has unsaved changes
 
 
@@ -469,10 +468,6 @@ class DataFrameTable(DataTable):
         # Whether to show 1-based index prefix in column labels (e.g., "1_colname")
         self.show_column_index = False
 
-        # Whether key bindings is in leader mode (i.e., key bindings are prefixed with a leader key)
-        self.g_mode = False
-        self.timeout_timer: Timer | None = None
-
     def init_table(self) -> None:
         """Initial load of the dataframe and setup of the table display.
 
@@ -586,16 +581,6 @@ class DataFrameTable(DataTable):
 
         return wrapper
 
-    def with_g_mode(func: Callable) -> Callable:
-        """Exit leader mode, stopping the timeout timer and resetting the cursor."""
-
-        def wrapper(self, *args, **kwargs):
-            val = func(self, *args, **kwargs)
-            self.g_mode = False
-            return val
-
-        return wrapper
-
     @property
     def cursor_key(self) -> CellKey:
         """Get the current cursor position as a CellKey.
@@ -692,6 +677,15 @@ class DataFrameTable(DataTable):
             for col, dtype in zip(self.df.columns, self.df.dtypes, strict=True)
             if col not in self.hidden_columns and (col != RID or self.show_rid)
         }
+
+    @property
+    def g_mode(self) -> bool:
+        """Whether the app is currently in leader mode."""
+        return self.app.g_mode
+
+    @g_mode.setter
+    def g_mode(self, value: bool) -> None:
+        self.app.g_mode = value
 
     @property
     def ordered_selected_rows(self) -> list[int]:
@@ -903,47 +897,11 @@ class DataFrameTable(DataTable):
         pass
 
     def on_key(self, event: Key) -> None:
-        """Handle key press events.
-
-        Args:
-            event: The key event object.
-        """
-        # Already in leader mode, stop the timer and reset
-        if self.g_mode:
-            # User pressed escape, cancel leader mode
-            if event.key == "escape":
-                event.stop()
-                event.prevent_default()
-                self.cancel_leader_mode()
-            # User pressed a non-escape key, reset the timer and let action through
-            elif self.timeout_timer:
-                self.timeout_timer.stop()
-                self.timeout_timer = None
-                self.notify(f"[$success]g[/]+[$accent]{event.key}[/] were pressed", title="Leader Mode")
-            return
-
-        # Enter leader mode on `g` key
-        if event.key == "g":
-            event.stop()
-            event.prevent_default()
-
-            self.g_mode = True
-            self.notify("Leader mode activated, waiting for next key in 3 seconds", title="Leader Mode")
-            self.timeout_timer = self.set_timer(3, callback=self.cancel_leader_mode)
-
+        """Handle key press events."""
         if event.key == "up":
             self.load_rows_up()
         elif event.key == "down":
             self.load_rows_down()
-
-    def cancel_leader_mode(self) -> None:
-        """Cancel leader mode and reset the timeout timer."""
-        if self.timeout_timer:
-            self.timeout_timer.stop()
-            self.timeout_timer = None
-            self.notify("Leader mode cancelled", title="Leader Mode")
-
-        self.g_mode = False
 
     def on_click(self, event: Click) -> None:
         """Handle mouse click events on the table.
@@ -2016,7 +1974,6 @@ class DataFrameTable(DataTable):
             float_precision_columns=self.float_precision_columns.copy(),
             show_rid=self.show_rid,
             show_column_index=self.show_column_index,
-            g_mode=self.g_mode,
             dirty=self.dirty,
         )
 
@@ -2041,7 +1998,6 @@ class DataFrameTable(DataTable):
         self.float_precision_columns = history.float_precision_columns.copy()
         self.show_rid = history.show_rid
         self.show_column_index = history.show_column_index
-        self.g_mode = history.g_mode
         self.dirty = history.dirty
 
         # Recreate table for display
