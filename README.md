@@ -233,9 +233,9 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | Key            | Action                                                       |
 | -------------- | ------------------------------------------------------------ |
 | `q`            | Quit current tab (prompts to save unsaved changes) or view   |
-| `Q`            | Quit all tabs then app (prompts to save unsaved changes)     |
+| `gq`           | Quit all tabs then app (prompts to save unsaved changes)     |
+| `Q`            | Force to quit current tab (discards unsaved changes) or view |
 | `Ctrl+Q`       | Force to quit app (discards unsaved changes)                 |
-| `Esc`          | Force to quit current tab (discards unsaved changes) or view |
 | `Space`        | Toggle tab bar visibility                                    |
 | `b`            | Next tab                                                     |
 | `B`            | Previous tab                                                 |

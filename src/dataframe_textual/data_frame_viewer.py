@@ -23,6 +23,7 @@ from .common import (
     guess_file_format,
     load_file,
     validate_expr,
+    with_g_mode,
 )
 from .console_panel import ConsolePanel
 from .data_frame_help_panel import DataFrameHelpPanel
@@ -39,10 +40,10 @@ class DataFrameViewer(App):
         # 📊 DataFrame Viewer - App Controls
 
         ## ⚙️ File & Tab Management
-        - **q** - ❌ Quit tab (prompts to save unsaved changes or view)
-        - **Q** - ❌ Quit all tabs (prompts to save unsaved changes)
-        - **Ctrl+Q** - 🚪 Force to quit app (discards unsaved changes)
-        - **Esc** - ❌ Force to quit current tab or view (discards unsaved changes)
+        - **q** - 🚪 Quit tab (prompts to save unsaved changes) or view
+        - **gq** - 🚪 Quit all tabs (prompts to save unsaved changes)
+        - **Q** - ⚠️ Force to quit current tab (discards unsaved changes) or view
+        - **Ctrl+Q** - ⚠️ Force to quit app (discards unsaved changes)
         - **Space** - 👁️ Toggle tab bar visibility
         - **b** - ⏭️ Next Tab
         - **B** - ⏮️ Previous Tab
@@ -77,9 +78,8 @@ class DataFrameViewer(App):
     """).strip()
 
     BINDINGS = [
-        ("q", "close", "Quit current tab or view"),
-        ("Q", "close_all", "Quit all tabs and quit"),
-        ("escape", "force_close", "Force to quit current tab or view"),
+        ("q", "close", "Quit tab or view"),
+        ("Q", "force_close", "Force to quit tab or view"),
         ("space", "toggle_tab_bar", "Toggle Tab Bar"),
         ("b", "next_tab(1)", "Next Tab"),
         ("B", "next_tab(-1)", "Previous Tab"),
@@ -170,8 +170,6 @@ class DataFrameViewer(App):
         if self.g_mode:
             # User pressed escape, cancel leader mode
             if event.key == "escape":
-                event.stop()
-                event.prevent_default()
                 self.cancel_leader_mode()
             # User pressed a non-escape key, reset the timer and let action through
             elif self.timeout_timer:
@@ -410,13 +408,17 @@ class DataFrameViewer(App):
         """
         self.push_screen(OpenFileScreen(), self.do_open_file)
 
+    @with_g_mode
     def action_close(self) -> None:
         """Close current tab or view.
 
         Checks for unsaved changes and prompts the user to save if needed.
         If this is the last tab, exits the app.
         """
-        self.do_close()
+        if self.g_mode:
+            self.do_close_all()
+        else:
+            self.do_close()
 
     def action_force_close(self) -> None:
         """Force close current tab or view without save prompts."""

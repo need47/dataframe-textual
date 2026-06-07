@@ -254,8 +254,10 @@ class DataFrameTable(DataTable):
         - *(Supports case-insensitive & whole-word matching)*
 
         ## 🔎 Find & Replace
-        - **/** - 🌐 Global find using cursor value
-        - **?** - 🌐 Global find with expression
+        - **/** - 🔎 Find in current column with cursor value
+        - **g/** - 🌐 Find in all columns with cursor value
+        - **?** - 🔎 Find in current column with expression
+        - **g?** - 🌐 Find in all columns with expression
         - **n** - ⬇️ Go to next match
         - **N** - ⬆️ Go to previous match
         - **r** - 🔄 Replace in current column (interactive or all)
@@ -296,6 +298,9 @@ class DataFrameTable(DataTable):
         ## 🔑 Leader Mode
         - Press **g** to activate leader mode (3-second timeout)
         - **gg** - ⬆️ Go to first row
+        - **g/** - 🌐 Find in all columns with cursor value
+        - **g?** - 🌐 Find in all columns with expression
+        - **gr** - 🔄 Replace across all columns
         - **g,** - 🔢 Toggle thousand separator for all numeric columns
         - **g_** - 📏 Toggle full width for all string/list columns
         - If no second key is pressed within 3 seconds, leader mode is cancelled
