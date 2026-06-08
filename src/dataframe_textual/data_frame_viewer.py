@@ -1196,6 +1196,10 @@ class DataFrameViewer(App):
             if not (table := self.active_table):
                 return
 
+            # Ensure DataFrame is collected before writing to Excel
+            if table.df is None:
+                table.df = table.lf.collect()
+
             df = (table.df if table.df_view is None else table.df if use_view else table.df_view).select(
                 pl.exclude(RID)
             )
@@ -1206,6 +1210,11 @@ class DataFrameViewer(App):
                 tabs: dict[TabPane, DataFrameTable] = self.tabs
                 for table in tabs.values():
                     worksheet = wb.add_worksheet(table.tabname)
+
+                    # Ensure DataFrame is collected before writing to Excel
+                    if table.df is None:
+                        table.df = table.lf.collect()
+
                     df = (table.df if table.df_view is None else table.df if use_view else table.df_view).select(
                         pl.exclude(RID)
                     )

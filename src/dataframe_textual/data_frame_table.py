@@ -104,6 +104,7 @@ class History:
     filename: str
     hidden_columns: set[str]
     selected_rows: set[int]
+    selected_columns: set[str]
     sorted_columns: dict[str, bool]  # col_name -> descending
     matches: dict[int, set[str]]  # RID -> set of col names
     fixed_rows: int
@@ -207,11 +208,11 @@ class DataFrameTable(DataTable):
         - **F** - 📊 Show frequency distribution for current column
         - **i** - 📊 Show histogram for current column
         - **I** - 📊 Show histogram for current column with custom bins
-        - **s** - 📈 Show statistics for current column
-        - **gs** - 📊 Show statistics for entire dataframe
+        - **S** - 📈 Show statistics for current column
+        - **gS** - 📊 Show statistics for entire dataframe
         - **=** - 📊 Show histogram using first column as label and current column as value
         - **C** - 📋 Show column metadata (ID, name, type)
-        - **h** - 👁️ Hide current column
+        - **h** - 👁️ Hide selected columns or current column
         - **H** - 👀 Show all hidden columns
         - **_** (underscore) - 📏 Toggle column full width for current column
         - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
@@ -236,19 +237,20 @@ class DataFrameTable(DataTable):
         - **Ctrl+X** - ✖️ Delete row and those above
         - **Delete** - ✖️ Clear current cell (set to NULL)
         - **Shift+Delete** - ✖️ Clear current column (set matching cells to NULL)
-        - **-** (minus) - ✖️ Delete current column
+        - **-** (minus) - ✖️ Delete selected columns or current column
         - **d** - 📋 Duplicate current column
         - **D** - 📋 Duplicate current row
         - **Ctrl+Delete** - 🧹 Remove duplicate rows (keep first occurrence)
         - **o** - 💥 Explode current list column into rows
         - **O** - 💥 Explode current string column by delimiter into rows
 
-        ## ✅ Row Selection
+        ## ✅ Row/Column Selection
         - **\\\\** - ✅ Select rows with cell matches or those matching cursor value in current column
         - **|** - ✅ Select rows with expression
-        - **'** (single quote) - ✅ Select/deselect current row
+        - **s** - ✅ Select/deselect current row
+        - **'** (apostrophe) - ✅ Select/deselect current column
         - **t** - 💡 Toggle row selection (invert all)
-        - **T** - 🧹 Clear all selections and matches
+        - **T** - 🧹 Clear all row/column selections and cell matches
         - **{** - ⬆️ Go to previous selected row
         - **}** - ⬇️ Go to next selected row
         - *(Supports case-insensitive & whole-word matching)*
@@ -310,7 +312,7 @@ class DataFrameTable(DataTable):
         ("ctrl+u", "reset", "Reset to initial state"),
         # Display
         ("underscore", "expand_column", "Toggle column full width"),  # `_`
-        ("h", "hide_column", "Hide column"),
+        ("h", "hide_column", "Hide selected columns or current column"),
         ("H", "show_hidden_columns", "Show hidden column(s)"),
         ("tilde", "toggle_column_index", "Toggle column index prefix"),  # `~`
         ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
@@ -331,7 +333,7 @@ class DataFrameTable(DataTable):
         ("F", "show_frequency", "Show frequency for current column"),
         ("i", "show_histogram", "Show histogram for current column"),
         ("I", "show_histogram(0)", "Show histogram for current column with custom bins"),
-        ("s", "show_statistics", "Show statistics"),
+        ("S", "show_statistics", "Show statistics"),
         ("equals_sign", "show_bar", "Show histogram using first column as label and current column as value"),  # `=`
         # Sort
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
@@ -342,14 +344,15 @@ class DataFrameTable(DataTable):
         ("full_stop", "filter_rows_non_null", "Filter rows with non-null values in current column"),
         ("f", "filter_rows_value", "Filter rows by value"),  # `f`
         ("quotation_mark", "collect_rows", "Collect rows to a new tab"),  # `"`
-        # Row Selection
+        # Row/Column Selection
         ("backslash", "select_rows", "Select rows with cell matches or those matching cursor value in current column"),  # `\`
         ("vertical_line", "select_rows_expr", "Select rows with expression"),  # `|`
         ("right_curly_bracket", "next_selected_row", "Go to next selected row"),  # `}`
         ("left_curly_bracket", "previous_selected_row", "Go to previous selected row"),  # `{`
-        ("apostrophe", "toggle_selection_current_row", "Toggle row selection"),  # `'`
+        ("s", "toggle_selection_current_row", "Toggle row selection"),  # `s`
+        ("apostrophe", "toggle_selection_current_column", "Toggle column selection"),  # `'`
         ("t", "toggle_selections", "Toggle row selections"),
-        ("T", "clear_selections_and_matches", "Clear selections"),
+        ("T", "clear_selections_and_matches", "Clear row/column selections and cell matches"),
         # Find & Replace
         ("slash", "find_cursor_value", "Find with cursor value"),  # `/`
         ("question_mark", "find_expr", "Find with expression"),  # `?`
@@ -359,7 +362,7 @@ class DataFrameTable(DataTable):
         # Delete
         ("delete", "clear_cell", "Clear cell"),
         ("shift+delete", "clear_column", "Clear cells in current column that match cursor value"),  # `Shift+Delete`
-        ("minus", "delete_column", "Delete column"),  # `-`
+        ("minus", "delete_column", "Delete selected columns or current column"),  # `-`
         ("x", "delete_row", "Delete row"),
         ("X", "delete_row_and_below", "Delete row and those below"),
         ("ctrl+x", "delete_row_and_up", "Delete row and those up"),
@@ -435,6 +438,7 @@ class DataFrameTable(DataTable):
         # State tracking (all 0-based indexing)
         self.hidden_columns: set[str] = set()  # Set of hidden column names
         self.selected_rows: set[int] = set()  # Track selected rows by RID
+        self.selected_columns: set[str] = set()  # Track selected columns by name
         self.sorted_columns: dict[str, bool] = {}  # col_name -> descending
         self.matches: dict[int, set[str]] = defaultdict(set)  # Track search matches: RID -> set of col_names
 
@@ -960,11 +964,11 @@ class DataFrameTable(DataTable):
 
     @with_full_df
     def action_delete_column(self) -> None:
-        """Delete the current column."""
+        """Delete selected columns or the current column."""
         self.do_delete_column()
 
     def action_hide_column(self) -> None:
-        """Hide the current column."""
+        """Hide selected columns or the current column."""
         self.do_hide_column()
 
     @with_g_mode
@@ -1106,6 +1110,10 @@ class DataFrameTable(DataTable):
         """Toggle selection for the current row."""
         self.do_toggle_selection_current_row()
 
+    def action_toggle_selection_current_column(self) -> None:
+        """Toggle selection for the current column."""
+        self.do_toggle_selection_current_column()
+
     @with_full_df
     def action_toggle_selections(self) -> None:
         """Toggle all row selections."""
@@ -1186,7 +1194,7 @@ class DataFrameTable(DataTable):
         self.do_move_row("down")
 
     def action_clear_selections_and_matches(self) -> None:
-        """Clear all row selections and matches."""
+        """Clear all row/column selections and cell matches."""
         self.do_clear_selections_and_matches()
 
     def action_cycle_cursor_type(self) -> None:
@@ -1669,7 +1677,9 @@ class DataFrameTable(DataTable):
                 dtypes.append(dtype)
 
                 # Highlight entire row with selection or cells with matches
-                styles.append(HIGHLIGHT_COLOR if is_selected or col in match_cols else None)
+                styles.append(
+                    HIGHLIGHT_COLOR if is_selected or col in match_cols or col in self.selected_columns else None
+                )
 
             formatted_row = format_row(
                 vals,
@@ -1952,6 +1962,7 @@ class DataFrameTable(DataTable):
             filename=self.filename,
             hidden_columns=self.hidden_columns.copy(),
             selected_rows=self.selected_rows.copy(),
+            selected_columns=self.selected_columns.copy(),
             sorted_columns=self.sorted_columns.copy(),
             matches={k: v.copy() for k, v in self.matches.items()},
             fixed_rows=self.fixed_rows,
@@ -1976,6 +1987,7 @@ class DataFrameTable(DataTable):
         self.filename = history.filename
         self.hidden_columns = history.hidden_columns.copy()
         self.selected_rows = history.selected_rows.copy()
+        self.selected_columns = history.selected_columns.copy()
         self.sorted_columns = history.sorted_columns.copy()
         self.matches = {k: v.copy() for k, v in history.matches.items()} if history.matches else defaultdict(set)
         self.fixed_rows = history.fixed_rows
@@ -2237,36 +2249,39 @@ class DataFrameTable(DataTable):
         self.notify(descr, title="Freeze Row/Column")
 
     def do_hide_column(self) -> None:
-        """Hide the currently selected column from the table display."""
-        col_key = self.cursor_col_key
-        col_name = col_key.value
-        col_idx = self.cursor_column
+        """Hide selected columns when present, otherwise hide the current column."""
+        target_columns = [col for col in self.visible_columns if col in self.selected_columns]
+        if not target_columns:
+            target_columns = [self.cursor_col_name]
 
-        # Add to history
-        self.add_history(f"Hide column [$success]{col_name}[/]")
+        descr = (
+            f"Hide column [$success]{target_columns[0]}[/]"
+            if len(target_columns) == 1
+            else f"Hide [$accent]{len(target_columns)}[/] selected columns"
+        )
 
-        # Remove the column from the table display (but keep in dataframe)
-        self.remove_column(col_key)
+        # Add to history before mutating the display state.
+        self.add_history(descr)
 
-        # If showing column indices, we need to update the labels of all subsequent columns
+        for col_name in target_columns:
+            col_key = ColumnKey(col_name)
+            if col_key not in self.columns:
+                continue
+            self.remove_column(col_key)
+            self.hidden_columns.add(col_name)
+            self.selected_columns.discard(col_name)
+
+        # Recompute labels for remaining visible columns when prefixes are shown.
         if self.show_column_index:
-            for idx in range(col_idx, len(self.ordered_columns)):
-                col = self.ordered_columns[idx]
-                original_col_name = col.key.value
-                new_label = self._build_column_label(original_col_name, idx + 1)
-                col.label = new_label
-                self.refresh_column(idx)
+            for idx, col in enumerate(self.ordered_columns, start=1):
+                col.label = self._build_column_label(col.key.value, idx)
+                self.refresh_column(idx - 1)
 
-        # Track hidden columns
-        self.hidden_columns.add(col_name)
-
-        # Move cursor left if we hid the last column
-        if col_idx >= len(self.columns):
+        # Move cursor left if we hid the last visible column.
+        if self.columns and self.cursor_column >= len(self.columns):
             self.move_cursor(column=len(self.columns) - 1)
 
-        self.notify(
-            f"Hide column [$success]{col_name}[/]. Press [$accent]H[/] to show hidden columns", title="Hide Column"
-        )
+        self.notify(f"{descr}. Press [$accent]H[/] to show hidden columns", title="Hide Column")
 
     def _expand_single_column(self, col_name: str) -> str | None:
         """Expand or unexpand a single column. Returns a status message fragment, or None on failure."""
@@ -2972,7 +2987,7 @@ class DataFrameTable(DataTable):
             self.log(f"Error adding link column: {e}")
 
     def do_delete_column(self, more: str | None = None) -> None:
-        """Remove the currently selected column from the table."""
+        """Remove selected columns when present, otherwise the current column."""
         # Get the column to remove
         col_idx = self.cursor_column
         try:
@@ -3004,11 +3019,21 @@ class DataFrameTable(DataTable):
 
             message = f"Deleted column [$success]{col_name}[/] and all columns after"
 
-        # Remove only the current column
+        # Remove selected visible columns, or fall back to the current column.
         else:
-            col_names_to_delete.append(col_name)
-            col_keys_to_delete.append(col_key)
-            message = f"Deleted column [$success]{col_name}[/]"
+            selected_visible_columns = [col for col in self.visible_columns if col in self.selected_columns]
+            if selected_visible_columns:
+                col_names_to_delete.extend(selected_visible_columns)
+                col_keys_to_delete.extend(ColumnKey(col) for col in selected_visible_columns)
+                message = (
+                    f"Deleted column [$success]{selected_visible_columns[0]}[/]"
+                    if len(selected_visible_columns) == 1
+                    else f"Deleted [$accent]{len(selected_visible_columns)}[/] selected columns"
+                )
+            else:
+                col_names_to_delete.append(col_name)
+                col_keys_to_delete.append(col_key)
+                message = f"Deleted column [$success]{col_name}[/]"
 
         # Add to history
         self.add_history(message, dirty=True)
@@ -3021,6 +3046,7 @@ class DataFrameTable(DataTable):
         # Remove from hidden columns if present
         for col_name in col_names_to_delete:
             self.hidden_columns.discard(col_name)
+            self.selected_columns.discard(col_name)
 
         # Remove from matches
         for rid in list(self.matches.keys()):
@@ -3041,7 +3067,7 @@ class DataFrameTable(DataTable):
 
         # Move cursor left if we deleted the last column(s)
         last_col_idx = len(self.columns) - 1
-        if col_idx > last_col_idx:
+        if self.columns and col_idx > last_col_idx:
             self.move_cursor(column=last_col_idx)
 
         self.notify(message, title="Delete Column")
@@ -4654,10 +4680,29 @@ class DataFrameTable(DataTable):
 
             self.update_cell(row_key, col_key, cell_text)
 
+    def do_toggle_selection_current_column(self) -> None:
+        """Select/deselect current column."""
+        # Add to history
+        self.add_history("Toggle column selection")
+
+        # Get current column key
+        col_idx = self.cursor_column
+        col_name = self.cursor_col_name
+        col_key = self.cursor_col_key
+        col = self.columns[col_key]
+
+        if col_name in self.selected_columns:
+            self.selected_columns.discard(col_name)
+        else:
+            self.selected_columns.add(col_name)
+
+        # Recreate table for display
+        self.setup_table()
+
     def do_clear_selections_and_matches(self) -> None:
-        """Clear all selected rows and matches without removing them from the dataframe."""
+        """Clear all selected rows/columns and matches without changing the dataframe."""
         # Check if any selected rows or matches
-        if not self.selected_rows and not self.matches:
+        if not self.selected_rows and not self.selected_columns and not self.matches:
             self.notify("No selections to clear", title="Clear Selections and Matches", severity="warning")
             return
 
@@ -4668,6 +4713,7 @@ class DataFrameTable(DataTable):
 
         # Clear all selections
         self.selected_rows = set()
+        self.selected_columns = set()
         self.matches = defaultdict(set)
 
         # Recreate table for display

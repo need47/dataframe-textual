@@ -410,7 +410,7 @@ class RowDetailScreen(TableScreen):
             # Show frequency for the selected value
             self.show_frequency(self.get_cidx_name_value())
             event.stop()
-        elif event.key == "s":
+        elif event.key == "S":
             # Show statistics for the selected value
             self.show_statistics(self.get_cidx_name_value())
             event.stop()
@@ -965,7 +965,7 @@ class MetaColumnScreen(TableScreen):
             # Show frequency for the selected value
             self.show_frequency(self.get_cidx_name_value())
             event.stop()
-        elif event.key == "s":
+        elif event.key == "S":
             # Show statistics for the selected value
             self.show_statistics(self.get_cidx_name_value())
             event.stop()

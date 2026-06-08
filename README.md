@@ -235,7 +235,6 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `q`            | Quit current tab (prompts to save unsaved changes) or view   |
 | `gq`           | Quit all tabs then app (prompts to save unsaved changes)     |
 | `Q`            | Force to quit current tab (discards unsaved changes) or view |
-| `Ctrl+Q`       | Force to quit app (discards unsaved changes)                 |
 | `Space`        | Toggle tab bar visibility                                    |
 | `b`            | Next tab                                                     |
 | `B`            | Previous tab                                                 |
@@ -245,7 +244,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `Ctrl+S`       | Save all tabs to file                                        |
 | `Ctrl+V`       | Save current view to file                                    |
 | `w`            | Save current tab to file (overwrite without prompt)          |
-| `W`            | Save all tabs to file (overwrite without prompt)             |
+| `gw`           | Save all tabs to file (overwrite without prompt)             |
 | `Ctrl+D`       | Duplicate current tab                                        |
 | `Ctrl+O`       | Open file in a new tab                                       |
 | `Ctrl+N`       | Create new tab from Polars expression                        |
@@ -302,10 +301,10 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `F`               | Show frequency distribution for current column                         |
 | `i`               | Show histogram for current column                                      |
 | `I`               | Show histogram for current column with custom bins                     |
-| `s`               | Show statistics for current column                                     |
-| `gs`              | Show statistics for entire dataframe                                   |
+| `S`               | Show statistics for current column                                     |
+| `gS`              | Show statistics for entire dataframe                                   |
 | `=`               | Show histogram using first column as label and current column as value |
-| `C`               | Show columnmetadata (e.g., data types)                                 |
+| `C`               | Show column metadata (e.g., data types)                                |
 | `K`               | Cycle cursor types: cell → row → column → cell                         |
 | `~`               | Toggle column index prefix                                             |
 | `_` (underscore)  | Toggle column full width for current column                            |
@@ -317,7 +316,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `)`               | Increase float precision for current column                            |
 | `^`               | Toggle internal row index column (RID)                                 |
 | `&`               | Set current row as the new header row                                  |
-| `h`               | Hide current column                                                    |
+| `h`               | Hide selected columns or current column                                |
 | `H`               | Show all hidden columns                                                |
 
 #### Editing
@@ -332,7 +331,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `a`            | Add empty column after current                                |
 | `A`            | Add column with name and value/expression                     |
 | `@`            | Add a link column from URL template                           |
-| `-` (minus)    | Delete current column                                         |
+| `-` (minus)    | Delete selected columns or current column                     |
 | `x`            | Delete current row                                            |
 | `X`            | Delete current row and all those below                        |
 | `Ctrl+X`       | Delete current row and all those above                        |
@@ -342,17 +341,18 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `o`            | Explode current list column into multiple rows                |
 | `O`            | Explode current string column by delimiter into multiple rows |
 
-#### Row Selection
+#### Row/Column Selection
 
-| Key                | Action                                                                        |
-| ------------------ | ----------------------------------------------------------------------------- |
-| `\`                | Select rows wth cell matches or those matching cursor value in current column |
-| `\|` (pipe)        | Select rows by expression                                                     |
-| `{`                | Go to previous selected row                                                   |
-| `}`                | Go to next selected row                                                       |
-| `'` (single quote) | Select/deselect current row                                                   |
-| `t`                | Toggle row selections (invert)                                                |
-| `T`                | Clear all row selections and/or cell matches                                  |
+| Key              | Action                                                                         |
+| ---------------- | ------------------------------------------------------------------------------ |
+| `\`              | Select rows with cell matches or those matching cursor value in current column |
+| `\|` (pipe)      | Select rows by expression                                                      |
+| `{`              | Go to previous selected row                                                    |
+| `}`              | Go to next selected row                                                        |
+| `s`              | Select/deselect current row                                                    |
+| `'` (apostrophe) | Select/deselect current column                                                 |
+| `t`              | Toggle row selections (invert)                                                 |
+| `T`              | Clear all row/column selections and cell matches                               |
 
 #### Find & Replace
 
@@ -433,7 +433,7 @@ Columns are automatically styled based on their data types:
 
 **Hide/Show Columns** (`h` / `H`):
 
-- `h` - Temporarily hide current column (data preserved)
+- `h` - Temporarily hide selected columns, or the current column when no columns are selected (data preserved)
 - `H` - Restore all hidden columns
 
 **Freeze Rows and Columns** (`+`):
@@ -481,7 +481,7 @@ Useful for examining wide table where columns don't fit well on screen.
 - Press `{` to move to the previous row
 - Press `}` to move to the next row
 - Press `F` to show the frequency table for the selected column
-- Press `s` to show the statistics table for the selected column
+- Press `S` to show the statistics table for the selected column
 - Press `Tab` to open a cell-detail modal for the selected field
 - Press `q` or `Escape` to close the modal
 
@@ -499,15 +499,16 @@ Inside the cell-detail modal, press `Tab` again on the selected row/column to ke
 - Dict-like values are shown as key/value columns
 - Press `q` or `Escape` to close the modal
 
-### 4. Row Selection
+### 4. Row/Column Selection
 
-The application provides multiple modes for selecting rows (marks it for filtering or collecting):
+The application provides multiple ways to select rows (for filtering or collecting) and columns (for hiding or deleting):
 
 - `\` - Select rows with cell matches or those matching cursor value in current column (respects data type)
 - `|` - Opens dialog to select rows with custom expression
-- `'` - Select/deselect current row
+- `s` - Select/deselect current row
+- `'` (apostrophe) - Select/deselect current column
 - `t` - Flip selections of all rows
-- `T` - Clear all row selections and cell matches
+- `T` - Clear all row selections, column selections, and cell matches
 - `{` - Go to previous selected row
 - `}` - Go to next selected row
 
@@ -703,7 +704,7 @@ View quick metadata about your columns to understand their structure and content
 **In the Column Metadata Table**
 
 - Press `F` to show the frequency table for the selected column
-- Press `s` to show the statistics table for the selected column
+- Press `S` to show the statistics table for the selected column
 
 **In Metadata Modals**:
 
@@ -738,8 +739,8 @@ This is useful for:
 
 Show summary statistics such as count, null count, mean, median, standard deviation, min, max, and etc.
 
-- `s` shows statistics for the current column
-- `gs` shows statistics for all columns in the dataframe
+- `S` shows statistics for the current column
+- `gS` shows statistics for all columns in the dataframe
 
 **In the Statistics Modal**:
 
@@ -782,7 +783,7 @@ This is useful for:
 
 **Delete Column** (`-`):
 
-- Removes the entire column from display and dataframe
+- Deletes selected columns when present, otherwise deletes the current column
 
 **Add Empty Column** (`a`):
 
