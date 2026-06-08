@@ -168,6 +168,7 @@ class TableModalScreen(ModalScreen):
 
             dc = DtypeConfig(dtype)
             justify = col_justify.get(col) if isinstance(col_justify, dict) else col_justify
+            justify = dc.justify if justify is None else justify
 
             for c in self.sorted_columns:
                 if c == col:
@@ -556,12 +557,13 @@ class StatisticsScreen(TableScreen):
         # Add rows
         for ridx, row in enumerate(self.df.iter_rows()):
             formatted_row = []
+            is_selected = ridx in self.selected_rows
 
             # Format remaining values with appropriate styling
             for idx, stat_value in enumerate(row):
                 # First element is the statistic label, no styling needed
                 if idx == 0:
-                    formatted_row.append(stat_value)
+                    formatted_row.append(Text(stat_value, style=HIGHLIGHT_COLOR if is_selected else ""))
                     continue
 
                 col_dtype = self.df.dtypes[idx]
@@ -570,7 +572,14 @@ class StatisticsScreen(TableScreen):
                 if ridx < 4 and col_dtype == pl.String and self.thousand_separator:
                     stat_value = f"{int(stat_value):,}"
 
-                formatted_row.append(dc.format(stat_value, thousand_separator=self.thousand_separator))
+                formatted_row.append(
+                    dc.format(
+                        stat_value,
+                        style=HIGHLIGHT_COLOR if is_selected else None,
+                        justify=dc.justify,
+                        thousand_separator=self.thousand_separator,
+                    )
+                )
 
             self.table.add_row(*formatted_row, key=str(ridx), label=str(ridx + 1))
 
