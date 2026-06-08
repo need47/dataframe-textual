@@ -15,6 +15,7 @@ from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
 from textual.coordinate import Coordinate
+from textual.events import Key
 from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
@@ -86,7 +87,7 @@ class TableModalScreen(ModalScreen):
         self.table = DataTable(zebra_stripes=True)
         yield self.table
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: Key) -> None:
         """Handle key press events in the table screen.
 
         Provides keyboard shortcuts for navigation and interaction, including q/Escape to close.
@@ -422,7 +423,7 @@ class RowDetailScreen(TableScreen):
         """
         self.build_table()
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: Key) -> None:
         """Handle key press events on the row detail screen.
 
         Supported keys:
@@ -770,7 +771,7 @@ class FrequencyScreen(TableScreen):
         self.df = self.dftable.df.lazy().select(pl.col(self.col).value_counts(sort=True)).unnest(self.col).collect()
         self.app.call_from_thread(self._on_calc_ready)
 
-    def on_key(self, event):
+    def on_key(self, event: Key):
         if event.key == "left_square_bracket":  # '['
             # Sort by current column in ascending order
             self.sort_by_column(descending=False)
@@ -788,6 +789,8 @@ class FrequencyScreen(TableScreen):
         elif event.key == "ctrl+s":
             # Save the frequency table to file
             self.save_frequency_table()
+            event.stop()
+        elif event.key == "s":
             event.stop()
 
     def build_table(self) -> None:
@@ -841,7 +844,7 @@ class FrequencyScreen(TableScreen):
                 justify="right",
             ),
             Text(
-                format_float(100.0, self.thousand_separator, precision=-2 if len(self.df) > 1 else 2),
+                format_float(100.0, self.thousand_separator),
                 style="bold",
                 justify="right",
             ),
@@ -907,7 +910,6 @@ class HistogramScreen(TableScreen):
         self.bins = bins
         self.bin_count = bin_count
         self.total_count = len(dftable.df)
-        self.df: pl.DataFrame | None = None
 
     def on_mount(self) -> None:
         """Start histogram calculation."""
@@ -918,13 +920,20 @@ class HistogramScreen(TableScreen):
     def _calculate_histogram(self) -> None:
         """Calculate histogram."""
         col = self.dftable.df.columns[self.cidx]
-        self.df = self.dftable.df.lazy().select(col).collect()[col].hist(bins=self.bins, bin_count=self.bin_count)
+        self.df = (
+            self.dftable.df.lazy()
+            .select(col)
+            .collect()[col]
+            .hist(bins=self.bins, bin_count=self.bin_count, include_breakpoint=False)
+        ).rename({"category": col, "count": "Count"})
         self.app.call_from_thread(self._on_calc_ready)
 
-    def on_key(self, event):
+    def on_key(self, event: Key):
         if event.key == "ctrl+s":
             # Save the histogram table to file
             self.save_histogram_table()
+            event.stop()
+        elif event.key == "s":
             event.stop()
 
     def build_table(self) -> None:
@@ -956,8 +965,8 @@ class HistogramScreen(TableScreen):
         bar_width = 10
 
         # Add rows to the histogram table
-        for row_idx, row in enumerate(self.df.iter_rows()):
-            _breakpoint, column, count = row
+        for ridx, row in enumerate(self.df.iter_rows()):
+            column, count = row
             percentage = (count / self.total_count) * 100
 
             self.table.add_row(
@@ -968,8 +977,8 @@ class HistogramScreen(TableScreen):
                     highlight_range=(0.0, percentage / 100 * bar_width),
                     width=bar_width,
                 ),
-                key=str(row_idx),
-                label=str(row_idx + 1),
+                key=str(ridx),
+                label=str(ridx + 1),
             )
 
         # Add a total row
@@ -981,7 +990,7 @@ class HistogramScreen(TableScreen):
                 justify="right",
             ),
             Text(
-                format_float(100.0, self.thousand_separator, precision=-2 if len(self.df) > 1 else 2),
+                format_float(100.0, self.thousand_separator),
                 style="bold",
                 justify="right",
             ),
@@ -1014,7 +1023,7 @@ class MetaColumnScreen(TableScreen):
         """
         self.build_table()
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: Key) -> None:
         """Handle key press events on the column metadata screen.
 
         Supports keys:
@@ -1024,12 +1033,12 @@ class MetaColumnScreen(TableScreen):
         Args:
             event: The key event object.
         """
+        # Show frequency for the selected value
         if event.key == "F":
-            # Show frequency for the selected value
             self.show_frequency(self.get_cidx_name_value())
             event.stop()
+        # Show statistics for the selected value
         elif event.key == "S":
-            # Show statistics for the selected value
             self.show_statistics(self.get_cidx_name_value())
             event.stop()
 
@@ -1077,7 +1086,7 @@ class CellDetailScreen(TableModalScreen):
         """Initialize the cell detail screen."""
         self.build_table()
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: Key) -> None:
         """Handle key press events on the column metadata screen.
 
         Supports keys:
@@ -1143,9 +1152,9 @@ class CellDetailScreen(TableModalScreen):
 class BarScreen(TableModalScreen):
     """Modal screen to display labels and values of a DataFrame as bars."""
 
-    def __init__(self, df: pl.DataFrame, cidx: int, cidx_label: int) -> None:
+    def __init__(self, dftable: "DataFrameTable", cidx: int, cidx_label: int) -> None:
         super().__init__()
-        self.df = df
+        self.dftable = dftable
         self.cidx = cidx
         self.cidx_label = cidx_label
         self.sort_ignore_last = True  # Ignore the last column (Total) when sorting
@@ -1165,9 +1174,9 @@ class BarScreen(TableModalScreen):
         self.table.clear(columns=True)
 
         # Create bar table
-        label_col = self.df.columns[self.cidx_label]
-        data_col = self.df.columns[self.cidx]
-        dtype = self.df.dtypes[self.cidx]
+        label_col = self.dftable.df.columns[self.cidx_label]
+        data_col = self.dftable.df.columns[self.cidx]
+        dtype = self.dftable.df.dtypes[self.cidx]
         dc = DtypeConfig(dtype)
 
         # Add column headers with sort indicators
@@ -1186,10 +1195,10 @@ class BarScreen(TableModalScreen):
         dc_int = DtypeConfig(pl.Int64)
         dc_float = DtypeConfig(pl.Float64)
         bar_width = 10
-        total = self.df[data_col].sum()
+        total = self.dftable.df[data_col].sum()
 
         # Add rows to the histogram table
-        for row_idx, (column, count) in enumerate(zip(self.df[label_col], self.df[data_col])):
+        for ridx, (column, count) in enumerate(zip(self.dftable.df[label_col], self.dftable.df[data_col])):
             percentage = (count / total) * 100
 
             self.table.add_row(
@@ -1200,8 +1209,8 @@ class BarScreen(TableModalScreen):
                     highlight_range=(0.0, percentage / 100 * bar_width),
                     width=bar_width,
                 ),
-                key=str(row_idx),
-                label=str(row_idx + 1),
+                key=str(ridx),
+                label=str(ridx + 1),
             )
 
         # Add a total row
@@ -1213,7 +1222,7 @@ class BarScreen(TableModalScreen):
                 justify="right",
             ),
             Text(
-                format_float(100.0, self.thousand_separator, precision=-2 if len(self.df) > 1 else 2),
+                format_float(100, self.thousand_separator),
                 style="bold",
                 justify="right",
             ),
