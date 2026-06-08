@@ -48,6 +48,9 @@ BOOLS = {
 NULL = "NULL"
 NULL_DISPLAY = "-"
 
+# Color for highlighting selections and matches
+HIGHLIGHT_COLOR = "red"
+
 # Maximum width for columns before truncation
 COLUMN_WIDTH_CAP = 35
 
@@ -117,8 +120,8 @@ class DtypeClass:
 
         Args:
             val: The value to format.
-            style: Optional style override for display. Defaults to None.
-            justify: Optional justification (e.g., left, right, center) override for display. Defaults to None.
+            style: Optional style override for display. Defaults to None (uses the default style of the data type).
+            justify: Optional justification (e.g., left, right, center) override for display. Defaults to None (uses the default justification of the data type).
             thousand_separator: Whether to include thousand separators for numeric values. Defaults to False.
             float_precision: Number of decimal places for float values. Defaults to 2.
 
@@ -137,8 +140,8 @@ class DtypeClass:
 
         return Text(
             text_val,
-            style=style or self.style,
-            justify=justify or self.justify,
+            style=self.style if style is None else style,
+            justify=self.justify if justify is None else justify,
             overflow="ellipsis",
             no_wrap=True,
         )
@@ -240,8 +243,8 @@ def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
 def format_row(
     vals,
     dtypes,
-    style: str | list[str] = "",
-    justify: str | list[str] = "",
+    style: str | list[str] | None = None,
+    justify: str | list[str] | None = None,
     thousand_separator: bool | list[bool] = False,
     float_precision: int | list[int] = 2,
 ) -> list[Text]:
@@ -253,8 +256,8 @@ def format_row(
     Args:
         vals: The list of values in the row.
         dtypes: The list of data types corresponding to each value.
-        style: Optional list of style overrides for each value. Defaults to an empty string.
-        justify: Optional list of justification overrides for each value. Defaults to an empty string.
+        style: Optional list of style overrides for each value. Defaults to None (uses the default style of the data type).
+        justify: Optional list of justification overrides for each value. Defaults to None (uses the default justification of the data type).
         thousand_separator: Whether to include thousand separators for numeric values.
             Can be a single bool (applied to all) or a list of bools per column. Defaults to False.
         float_precision: Number of decimal places for float values.

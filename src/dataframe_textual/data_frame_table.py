@@ -20,7 +20,7 @@ from textual.events import Click, Key
 from textual.reactive import reactive
 from textual.render import measure
 from textual.widgets import DataTable
-from textual.widgets._data_table import (
+from textual.widgets.data_table import (
     CellDoesNotExist,
     CellKey,
     CellType,
@@ -35,6 +35,7 @@ from textual.widgets._data_table import (
 from .common import (
     COLUMN_WIDTH_CAP,
     CURSOR_TYPES,
+    HIGHLIGHT_COLOR,
     NULL,
     NULL_DISPLAY,
     RID,
@@ -83,9 +84,6 @@ from .yes_no_screen import (
     SearchScreen,
     SimpleSqlScreen,
 )
-
-# Color for highlighting selections and matches
-HIGHLIGHT_COLOR = "red"
 
 # Buffer size for loading rows
 BUFFER_SIZE = 5

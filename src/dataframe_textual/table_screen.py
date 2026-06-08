@@ -1,5 +1,6 @@
 """Modal screens for displaying data in tables (row details and frequency)."""
 
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 from textual.widgets.data_table import ColumnKey
@@ -21,12 +22,12 @@ from textual.widgets import DataTable
 from .common import (
     COLUMN_WIDTH_CAP,
     CURSOR_TYPES,
+    HIGHLIGHT_COLOR,
     NULL,
     NULL_DISPLAY,
     RID,
     DtypeConfig,
     format_float,
-    format_row,
     get_next_item,
 )
 from .file_picker_screen import SaveFileScreen
@@ -67,8 +68,11 @@ class TableModalScreen(ModalScreen):
         super().__init__()
         self.df = df  # DataFrame for this screen, to be set by subclasses
         self.thousand_separator = False  # Whether to use thousand separators in numbers
+        self.selected_rows: set[int] = set()  # Track selected row indices for potential multi-row actions
         self.sorted_columns: dict[str, bool] = {}  # Track sorted columns and their sort order
         self.sort_ignore_last = False  # Whether to ignore the last column (e.g., Total) when sorting
+        self.col_style = None
+        self.col_justify = None
 
     def compose(self) -> ComposeResult:
         """Compose the table screen widget structure.
@@ -114,6 +118,10 @@ class TableModalScreen(ModalScreen):
             next_type = get_next_item(CURSOR_TYPES, self.table.cursor_type)
             self.table.cursor_type = next_type
             event.stop()
+        elif event.key == "s":
+            event.stop()
+            self.toggele_row_selection()
+            self.df2table()  # Rebuild table to update row styling based on selection
 
     def build_table(self) -> None:
         """Build the table content.
@@ -123,17 +131,43 @@ class TableModalScreen(ModalScreen):
         """
         raise NotImplementedError("Subclasses must implement build_table method.")
 
-    def df2table(self) -> None:
-        """Convert a Polars DataFrame to a DataTable for display."""
+    def df2table(
+        self,
+        col_style: str | dict[str, str | list[str]] | None = None,
+        col_justify: str | dict[str, str] | None = None,
+    ) -> None:
+        """Convert a Polars DataFrame to a DataTable for display.
+
+
+        Args:
+            col_style: Optional style(s) to apply to all cells. Can be a single string, or a dict mapping column names to styles (which can be strings or lists for per-row styling).
+            col_justify: Optional justification(s) for all cells. Can be a single string, or a dict mapping column names to justification.
+        """
         if self.df is None:
             return
+
+        if col_style is None:
+            col_style = self.col_style
+        else:
+            self.col_style = col_style
+
+        if col_justify is None:
+            col_justify = self.col_justify
+        else:
+            self.col_justify = col_justify
+
+        # Store the current cursor coordinate to restore it after rebuilding the table
+        row_idx, col_idx = self.table.cursor_coordinate
 
         self.table.clear(columns=True)
 
         # Add columns with proper justification based on data types
-        for col, dtype in zip(self.df.columns, self.df.dtypes):
+        for cidx, (col, dtype) in enumerate(zip(self.df.columns, self.df.dtypes)):
             if col == RID:
                 continue
+
+            dc = DtypeConfig(dtype)
+            justify = col_justify.get(col) if isinstance(col_justify, dict) else col_justify
 
             for c in self.sorted_columns:
                 if c == col:
@@ -145,8 +179,7 @@ class TableModalScreen(ModalScreen):
             else:  # No break occurred, so column is not sorted
                 cell_value = col
 
-            dc = DtypeConfig(dtype)
-            self.table.add_column(Text(cell_value, justify=dc.justify), key=col)
+            self.table.add_column(Text(cell_value, justify=justify), key=col)
 
         # Add rows with proper formatting based on data types
         for ridx, row in enumerate(self.df.iter_rows()):
@@ -154,20 +187,30 @@ class TableModalScreen(ModalScreen):
             if row[0] == RID or (isinstance(row[0], Text) and row[0].plain == RID):
                 continue
 
+            is_selected = ridx in self.selected_rows
+
             formatted_row = []
             for cidx, c in enumerate(row):
-                if self.df.columns[cidx] == RID:
+                col = self.df.columns[cidx]
+                if col == RID:
                     continue
+                dc = DtypeConfig(self.df.dtypes[cidx])
+                style = col_style.get(col) if isinstance(col_style, dict) else col_style
+                justify = col_justify.get(col) if isinstance(col_justify, dict) else col_justify
 
-                # If the value is already a Text object (e.g. with styling), keep it as is. Otherwise, format based on dtype.
-                if isinstance(c, Text):
-                    formatted_row.append(c)
-                else:
-                    dtype = self.df.dtypes[cidx]
-                    dc = DtypeConfig(dtype)
-                    formatted_row.append(dc.format(c, thousand_separator=self.thousand_separator))
+                formatted_row.append(
+                    dc.format(
+                        c,
+                        style=HIGHLIGHT_COLOR if is_selected else style[ridx] if isinstance(style, list) else style,
+                        justify=justify,
+                        thousand_separator=self.thousand_separator,
+                    )
+                )
 
             self.table.add_row(*formatted_row, key=str(ridx), label=str(ridx + 1))
+
+        # Restore the old cursor coordinate
+        self.table.move_cursor(row=row_idx, column=col_idx)
 
     def sort_by_column_key(self, col_key: ColumnKey, descending: bool) -> None:
         """Sort the table by the specified column."""
@@ -222,6 +265,14 @@ class TableModalScreen(ModalScreen):
 
         # Move cursor back to the same column and approximate row position after sorting
         self.table.move_cursor(row=ridx, column=cidx)
+
+    def toggele_row_selection(self) -> None:
+        """Toggle selection of the currently focused row."""
+        ridx, _ = self.table.cursor_coordinate
+        if ridx in self.selected_rows:
+            self.selected_rows.remove(ridx)
+        else:
+            self.selected_rows.add(ridx)
 
     def _on_calc_ready(self) -> None:
         self.build_table()
@@ -446,21 +497,18 @@ class RowDetailScreen(TableScreen):
         """Build the row detail table."""
         self.df = pl.DataFrame(
             {
-                # Use pl.Object dtype to disable styling for the column names.
-                "Column": format_row(
-                    self.dftable.df.columns,
-                    dtypes=[pl.Object] * len(self.dftable.df.columns),
-                ),
-                "Value": format_row(
-                    self.dftable.df.row(self.ridx),
-                    self.dftable.df.dtypes,
-                    justify="left",
-                    thousand_separator=self.thousand_separator,
-                ),
+                "Column": self.dftable.df.columns,
+                "Value": [str(c) for c in self.dftable.df.row(self.ridx)],
             }
         )
 
-        self.df2table()
+        col2style = defaultdict(list)
+        col2style["Column"] = ""  # No specific style for the "Column" header
+        for dtype in self.dftable.df.dtypes:
+            col2style["Value"].append(DtypeConfig(dtype).style)
+
+        self.df2table(col_style=col2style)
+
         self.table.cursor_type = "row"
 
     def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
@@ -524,7 +572,7 @@ class StatisticsScreen(TableScreen):
 
                 formatted_row.append(dc.format(stat_value, thousand_separator=self.thousand_separator))
 
-            self.table.add_row(*formatted_row)
+            self.table.add_row(*formatted_row, key=str(ridx), label=str(ridx + 1))
 
         # Set cursor type based on whether this is dataframe stats (column cursor) or column stats (row cursor)
         self.table.cursor_type = "column" if self.cidx is None else "row"
@@ -678,6 +726,12 @@ class StatisticsScreen(TableScreen):
                     df_fill,
                 ]
             )
+
+        # Rename the first column to "Statistic" for better display
+        self.df = self.df.rename({"statistic": "Statistic"})
+
+        # No specific styling for the "Statistics" header
+        self.col_style = {"Statistic": ""}
 
 
 class FrequencyScreen(TableScreen):
@@ -972,26 +1026,19 @@ class MetaColumnScreen(TableScreen):
 
     def build_table(self) -> None:
         """Build the column metadata table."""
-        self.table.clear(columns=True)
-        self.table.add_column("Column", key="column")
-        self.table.add_column("Type", key="type")
+        self.df = pl.DataFrame(
+            {
+                "Column": self.dftable.df.columns,
+                "Type": self.dftable.df.dtypes,
+            }
+        )
 
-        # Get schema information
-        schema = self.dftable.df.schema
-        dc_str = DtypeConfig(pl.String)
+        col2style = defaultdict(list)
+        col2style["Column"] = ""  # No specific style for the "Column" header
+        for dtype in self.dftable.df.dtypes:
+            col2style["Type"].append(DtypeConfig(dtype).style)
 
-        # Add a row for each column
-        for idx, (col_name, col_type) in enumerate(schema.items()):
-            if col_name == RID:
-                continue  # Skip RID column
-
-            dc = DtypeConfig(col_type)
-            self.table.add_row(
-                col_name,
-                dc_str.format("Datetime" if str(col_type).startswith("Datetime") else col_type, style=dc.style),
-                key=str(idx),
-                label=str(idx + 1),
-            )
+        self.df2table(col_style=col2style)
 
         self.table.cursor_type = "row"
 
