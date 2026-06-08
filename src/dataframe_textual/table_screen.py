@@ -74,6 +74,7 @@ class TableModalScreen(ModalScreen):
         self.sort_ignore_last = False  # Whether to ignore the last column (e.g., Total) when sorting
         self.col_style = None
         self.col_justify = None
+        self.filename: str | None = None
 
     def compose(self) -> ComposeResult:
         """Compose the table screen widget structure.
@@ -97,32 +98,31 @@ class TableModalScreen(ModalScreen):
             event: The key event object.
         """
         if event.key in ("q", "escape"):
-            self.app.pop_screen()
             event.stop()
+            self.app.pop_screen()
         elif event.key == "comma":
+            event.stop()
             self.thousand_separator = not self.thousand_separator
             self.build_table()
-            event.stop()
         elif event.key == "g":
+            event.stop()
             self.table.action_scroll_top()
-            event.stop()
         elif event.key == "G":
+            event.stop()
             self.table.action_scroll_bottom()
-            event.stop()
         elif event.key == "left_square_bracket":  # '['
+            event.stop()
             self.sort_by_column(descending=False)
-            event.stop()
         elif event.key == "right_square_bracket":  # ']'
-            self.sort_by_column(descending=True)
             event.stop()
+            self.sort_by_column(descending=True)
         elif event.key == "K":
+            event.stop()
             next_type = get_next_item(CURSOR_TYPES, self.table.cursor_type)
             self.table.cursor_type = next_type
+        elif event.key == "ctrl+s":
             event.stop()
-        elif event.key == "s":
-            event.stop()
-            self.toggele_row_selection()
-            self.df2table()  # Rebuild table to update row styling based on selection
+            self.save_table()
 
     def build_table(self) -> None:
         """Build the table content.
@@ -131,6 +131,15 @@ class TableModalScreen(ModalScreen):
         with appropriate columns and rows based on the specific screen's purpose.
         """
         raise NotImplementedError("Subclasses must implement build_table method.")
+
+    def save_table(self) -> None:
+        """Save the frequency table to file."""
+        filename = self.filename or "untitled.csv"
+
+        self.app.push_screen(
+            SaveFileScreen(filename=filename),
+            callback=partial(self.app.save_to_file, all_tabs=False, use_df=self.df),
+        )
 
     def df2table(
         self,
@@ -438,36 +447,37 @@ class RowDetailScreen(TableScreen):
             event: The key event object.
         """
         if event.key == "v":
+            event.stop()
             self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="filter")
-            event.stop()
         elif event.key == "quotation_mark":  # '"'
-            self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="collect")
             event.stop()
+            self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="collect")
+        # Move to the previous row
         elif event.key == "left_curly_bracket":  # '{'
-            # Move to the previous row
+            event.stop()
             ridx = self.ridx - 1
             if ridx >= 0:
                 self.ridx = ridx
                 self.dftable.move_cursor_to(self.ridx)
                 self.build_table()
-            event.stop()
+        # Move to the next row
         elif event.key == "right_curly_bracket":  # '}'
-            # Move to the next row
+            event.stop()
             ridx = self.ridx + 1
             if ridx < len(self.dftable.df):
                 self.ridx = ridx
                 self.dftable.move_cursor_to(self.ridx)
                 self.build_table()
-            event.stop()
+        # Show frequency for the selected value
         elif event.key == "F":
-            # Show frequency for the selected value
+            event.stop()
             self.show_frequency(self.get_cidx_name_value())
-            event.stop()
+        # Show statistics for the selected value
         elif event.key == "S":
-            # Show statistics for the selected value
-            self.show_statistics(self.get_cidx_name_value())
             event.stop()
+            self.show_statistics(self.get_cidx_name_value())
         elif event.key == "tab":
+            event.stop()
             ridx = self.ridx
             cidx = self.table.cursor_row
             col_name = self.dftable.df.columns[cidx]
@@ -492,8 +502,6 @@ class RowDetailScreen(TableScreen):
             # or a non-empty dict (struct)
             elif dtype == pl.Struct and cell_value:
                 self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
-
-            event.stop()
 
     def build_table(self) -> None:
         """Build the row detail table."""
@@ -772,29 +780,22 @@ class FrequencyScreen(TableScreen):
         self.app.call_from_thread(self._on_calc_ready)
 
     def on_key(self, event: Key):
-        if event.key == "left_square_bracket":  # '['
-            # Sort by current column in ascending order
-            self.sort_by_column(descending=False)
+        if event.key == "v":
             event.stop()
-        elif event.key == "right_square_bracket":  # ']'
-            # Sort by current column in descending order
-            self.sort_by_column(descending=True)
-            event.stop()
-        elif event.key == "v":
             self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="filter")
-            event.stop()
         elif event.key == "quotation_mark":  # '"'
+            event.stop()
             self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="collect")
-            event.stop()
-        elif event.key == "ctrl+s":
-            # Save the frequency table to file
-            self.save_frequency_table()
-            event.stop()
         elif event.key == "s":
             event.stop()
+            self.toggele_row_selection()
+            self.build_table()
 
     def build_table(self) -> None:
         """Build the frequency table."""
+        # Save cursor position
+        row_idx, col_idx = self.table.cursor_coordinate
+
         self.table.clear(columns=True)
 
         # Create frequency table
@@ -819,20 +820,22 @@ class FrequencyScreen(TableScreen):
         bar_width = 10
 
         # Add rows to the frequency table
-        for row_idx, row in enumerate(self.df.iter_rows()):
+        for ridx, row in enumerate(self.df.iter_rows()):
             column, count = row
             percentage = (count / self.total_count) * 100
+            is_selected = ridx in self.selected_rows
+            style = HIGHLIGHT_COLOR if is_selected else None
 
             self.table.add_row(
-                dc.format(column),
-                dc_int.format(count, thousand_separator=self.thousand_separator),
-                dc_float.format(percentage, thousand_separator=self.thousand_separator),
+                dc.format(column, style=style),
+                dc_int.format(count, style=style, thousand_separator=self.thousand_separator),
+                dc_float.format(percentage, style=style, thousand_separator=self.thousand_separator),
                 Bar(
                     highlight_range=(0.0, percentage / 100 * bar_width),
                     width=bar_width,
                 ),
-                key=str(row_idx),
-                label=str(row_idx + 1),
+                key=str(ridx),
+                label=str(ridx + 1),
             )
 
         # Add a total row
@@ -854,6 +857,9 @@ class FrequencyScreen(TableScreen):
             ),
             key="total",
         )
+
+        # Restore cursor position
+        self.table.move_cursor(row=row_idx, column=col_idx)
 
     def sort_by_column(self, descending: bool) -> None:
         """Sort the dataframe by the selected column and refresh the main table."""
@@ -888,16 +894,6 @@ class FrequencyScreen(TableScreen):
 
         return self.cidx, col_name, col_value
 
-    def save_frequency_table(self) -> None:
-        """Save the frequency table to file."""
-        column = self.dftable.df.columns[self.cidx]
-        filename = f"{column}_freq.csv"
-
-        self.app.push_screen(
-            SaveFileScreen(filename=filename),
-            callback=partial(self.app.save_to_file, all_tabs=False, use_df=self.df),
-        )
-
 
 class HistogramScreen(TableScreen):
     """Modal screen to display histogram of values in a column."""
@@ -927,14 +923,6 @@ class HistogramScreen(TableScreen):
             .hist(bins=self.bins, bin_count=self.bin_count, include_breakpoint=False)
         ).rename({"category": col, "count": "Count"})
         self.app.call_from_thread(self._on_calc_ready)
-
-    def on_key(self, event: Key):
-        if event.key == "ctrl+s":
-            # Save the histogram table to file
-            self.save_histogram_table()
-            event.stop()
-        elif event.key == "s":
-            event.stop()
 
     def build_table(self) -> None:
         """Build the histogram table."""
@@ -1001,16 +989,6 @@ class HistogramScreen(TableScreen):
             key="total",
         )
 
-    def save_histogram_table(self) -> None:
-        """Save the histogram table to file."""
-        column = self.dftable.df.columns[self.cidx]
-        filename = f"{column}_hist.csv"
-
-        self.app.push_screen(
-            SaveFileScreen(filename=filename),
-            callback=partial(self.app.save_to_file, all_tabs=False, use_df=self.df),
-        )
-
 
 class MetaColumnScreen(TableScreen):
     """Modal screen to display metadata about the columns in the dataframe."""
@@ -1035,19 +1013,19 @@ class MetaColumnScreen(TableScreen):
         """
         # Show frequency for the selected value
         if event.key == "F":
-            self.show_frequency(self.get_cidx_name_value())
             event.stop()
+            self.show_frequency(self.get_cidx_name_value())
         # Show statistics for the selected value
         elif event.key == "S":
-            self.show_statistics(self.get_cidx_name_value())
             event.stop()
+            self.show_statistics(self.get_cidx_name_value())
 
     def build_table(self) -> None:
         """Build the column metadata table."""
         self.df = pl.DataFrame(
             {
                 "Column": self.dftable.df.columns,
-                "Type": self.dftable.df.dtypes,
+                "Type": [str(dtype) for dtype in self.dftable.df.dtypes],
             }
         )
 
@@ -1096,6 +1074,7 @@ class CellDetailScreen(TableModalScreen):
             event: The key event object.
         """
         if event.key == "tab":
+            event.stop()
             cidx = self.table.cursor_column
             ridx = self.table.cursor_row
             col_name = self.df.columns[cidx]
@@ -1120,8 +1099,6 @@ class CellDetailScreen(TableModalScreen):
             # or a non-empty dict (struct)
             elif dtype == pl.Struct and cell_value:
                 self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
-
-            event.stop()
 
     def build_table(self) -> None:
         """Build the list table."""
