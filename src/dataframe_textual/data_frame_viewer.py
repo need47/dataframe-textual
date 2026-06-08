@@ -53,7 +53,7 @@ class DataFrameViewer(App):
         - **Ctrl+S** - 💾 Save all tabs to file
         - **Ctrl+V** - 💾 Save current view to file
         - **w** - 💾 Save current tab to file (overwrite without prompt)
-        - **W** - 💾 Save all tabs to file (overwrite without prompt)
+        - **gw** - 💾 Save all tabs to file (overwrite without prompt)
         - **Ctrl+D** - 📋 Duplicate current tab
         - **Ctrl+O** - 📁 Open a file
         - **Ctrl+N** - 📋 Create new tab from Polars expression
@@ -91,8 +91,7 @@ class DataFrameViewer(App):
         ("ctrl+t", "save_current_tab", "Save Current Tab"),
         ("ctrl+s", "save_all_tabs", "Save All Tabs"),
         ("ctrl+n", "new_tab", "New Tab"),
-        ("w", "save_current_tab_overwrite", "Save Current Tab (overwrite)"),
-        ("W", "save_all_tabs_overwrite", "Save All Tabs (overwrite)"),
+        ("w", "save_tab_overwrite", "Save Tab (overwrite)"),
         ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
         ("k", "select_theme", "Select Theme"),
         ("grave_accent", "toggle_python_console", "Python Console"),  # '`'
@@ -447,7 +446,13 @@ class DataFrameViewer(App):
         """Open a save dialog to save all tabs to file."""
         self.do_save_to_file(all_tabs=True)
 
-    def action_save_current_tab_overwrite(self) -> None:
+    def action_save_tab_overwrite(self) -> None:
+        if self.g_mode:
+            self._save_all_tabs_overwrite()
+        else:
+            self._save_current_tab_overwrite()
+
+    def _save_current_tab_overwrite(self) -> None:
         """Save current tab to file, overwrite if exists."""
         if table := self.active_table:
             if len(self.tabs) > 1:
@@ -464,7 +469,7 @@ class DataFrameViewer(App):
             filename = Path(filename).resolve()
             self.save_to_file(filename, all_tabs=False, overwrite_prompt=False)
 
-    def action_save_all_tabs_overwrite(self) -> None:
+    def _save_all_tabs_overwrite(self) -> None:
         """Save all tabs to file, overwrite if exists."""
         if table := self.active_table:
             if len(self.tabs) > 1:

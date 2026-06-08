@@ -208,7 +208,7 @@ class DataFrameTable(DataTable):
         - **i** - 📊 Show histogram for current column
         - **I** - 📊 Show histogram for current column with custom bins
         - **s** - 📈 Show statistics for current column
-        - **S** - 📊 Show statistics for entire dataframe
+        - **gs** - 📊 Show statistics for entire dataframe
         - **=** - 📊 Show histogram using first column as label and current column as value
         - **C** - 📋 Show column metadata (ID, name, type)
         - **h** - 👁️ Hide current column
@@ -218,7 +218,7 @@ class DataFrameTable(DataTable):
         - **+** - 📌 Freeze rows and/or columns
         - **~** - 🏷️ Toggle column index prefix
         - **^** - 🆔 Toggle internal row index (RID)
-        - **,** - 🔢 Toggle thousand separator for current column (or all numeric columns with **g,**)
+        - **,** - 🔢 Toggle thousand separator for current column
         - **g,** - 🔢 Toggle thousand separator for all numeric columns
         - **(** - 🔢 Decrease float precision for current column
         - **)** - 🔢 Increase float precision for current column
@@ -231,12 +231,12 @@ class DataFrameTable(DataTable):
         - **a** - ➕ Add empty column after current
         - **A** - ➕ Add column with name and optional expression
         - **@** - 🔗 Add a new link column from template
-        - **x** - ❌ Delete current row
-        - **X** - ❌ Delete row and those below
-        - **Ctrl+X** - ❌ Delete row and those above
-        - **delete** - ❌ Clear current cell (set to NULL)
-        - **Shift+Delete** - ❌ Clear current column (set matching cells to NULL)
-        - **-** (minus) - ❌ Delete current column
+        - **x** - ✖️ Delete current row
+        - **X** - ✖️ Delete row and those below
+        - **Ctrl+X** - ✖️ Delete row and those above
+        - **Delete** - ✖️ Clear current cell (set to NULL)
+        - **Shift+Delete** - ✖️ Clear current column (set matching cells to NULL)
+        - **-** (minus) - ✖️ Delete current column
         - **d** - 📋 Duplicate current column
         - **D** - 📋 Duplicate current row
         - **Ctrl+Delete** - 🧹 Remove duplicate rows (keep first occurrence)
@@ -294,16 +294,6 @@ class DataFrameTable(DataTable):
         ## ⌨️ SQL Interface
         - **l** - 💬 Open simple SQL interface (select columns & where clause)
         - **L** - 🔎 Open advanced SQL interface (full SQL queries)
-
-        ## 🔑 Leader Mode
-        - Press **g** to activate leader mode (3-second timeout)
-        - **gg** - ⬆️ Go to first row
-        - **g/** - 🌐 Find in all columns with cursor value
-        - **g?** - 🌐 Find in all columns with expression
-        - **gr** - 🔄 Replace across all columns
-        - **g,** - 🔢 Toggle thousand separator for all numeric columns
-        - **g_** - 📏 Toggle full width for all string/list columns
-        - If no second key is pressed within 3 seconds, leader mode is cancelled
     """).strip()
 
     # fmt: off
@@ -335,14 +325,13 @@ class DataFrameTable(DataTable):
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
         ("ctrl+r", "copy_row", "Copy row to clipboard"),
         # Column Metadata, Row Detail, Frequency, and Statistics
-        ("C", "metadata_column", "Show metadata for column"),
+        ("C", "metadata_column", "Show metadata for current column"),
         ("enter", "view_row_detail", "View row details"),
         ("tab", "view_cell_detail", "View cell details"),
         ("F", "show_frequency", "Show frequency for current column"),
         ("i", "show_histogram", "Show histogram for current column"),
         ("I", "show_histogram(0)", "Show histogram for current column with custom bins"),
-        ("s", "show_statistics", "Show statistics for current column"),
-        ("S", "show_statistics(-1)", "Show statistics for dataframe"),
+        ("s", "show_statistics", "Show statistics"),
         ("equals_sign", "show_bar", "Show histogram using first column as label and current column as value"),  # `=`
         # Sort
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
@@ -359,7 +348,7 @@ class DataFrameTable(DataTable):
         ("right_curly_bracket", "next_selected_row", "Go to next selected row"),  # `}`
         ("left_curly_bracket", "previous_selected_row", "Go to previous selected row"),  # `{`
         ("apostrophe", "toggle_selection_current_row", "Toggle row selection"),  # `'`
-        ("t", "toggle_selections", "Toggle all row selections"),
+        ("t", "toggle_selections", "Toggle row selections"),
         ("T", "clear_selections_and_matches", "Clear selections"),
         # Find & Replace
         ("slash", "find_cursor_value", "Find with cursor value"),  # `/`
@@ -1022,16 +1011,10 @@ class DataFrameTable(DataTable):
         self.do_show_bar()
 
     @with_full_df
-    def action_show_statistics(self, cidx: int | None = None) -> None:
-        """Show statistics for the current column or entire dataframe.
-
-        Args:
-            cidx: Column index
-                If -1, show statistics for entire dataframe.
-                If None, show statistics for current column, otherwise for specified column.
-
-        """
-        self.do_show_statistics(cidx)
+    @with_g_mode
+    def action_show_statistics(self) -> None:
+        """Show statistics for the current column or entire dataframe."""
+        self.do_show_statistics()
 
     def action_metadata_column(self) -> None:
         """Show metadata for the current column."""
@@ -2202,19 +2185,14 @@ class DataFrameTable(DataTable):
         cidx_label = self.df.columns.index(col_label)
         self.app.push_screen(BarScreen(self.df, cidx, cidx_label))
 
-    def do_show_statistics(self, cidx: int | None = None) -> None:
-        """Show statistics for the current column or entire dataframe.
-
-        Args:
-            cidx: Column index to show statistics for. If None, show for entire dataframe.
-        """
-        if cidx == -1:
-            # Show statistics for entire dataframe
+    def do_show_statistics(self) -> None:
+        """Show statistics for the current column or entire dataframe."""
+        # Show statistics for entire dataframe
+        if self.g_mode:
             self.app.push_screen(StatisticsScreen(self, cidx=None))
+        # Show statistics for current column
         else:
-            # Show statistics for current column or specified column
-            cidx = self.cursor_cidx if cidx is None else cidx
-            self.app.push_screen(StatisticsScreen(self, cidx=cidx))
+            self.app.push_screen(StatisticsScreen(self, cidx=self.cursor_cidx))
 
     def do_metadata_column(self) -> None:
         """Show metadata for all columns in the dataframe."""

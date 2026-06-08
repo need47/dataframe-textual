@@ -303,7 +303,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `i`               | Show histogram for current column                                      |
 | `I`               | Show histogram for current column with custom bins                     |
 | `s`               | Show statistics for current column                                     |
-| `S`               | Show statistics for entire dataframe                                   |
+| `gs`              | Show statistics for entire dataframe                                   |
 | `=`               | Show histogram using first column as label and current column as value |
 | `C`               | Show columnmetadata (e.g., data types)                                 |
 | `K`               | Cycle cursor types: cell → row → column → cell                         |
@@ -736,10 +736,10 @@ This is useful for:
 
 ### 11. Column & Dataframe Statistics
 
-Show summary statistics such as count, null count, mean, median, standard deviation, min, and max using Polars' `describe()` method.
+Show summary statistics such as count, null count, mean, median, standard deviation, min, max, and etc.
 
-- `s` shows statistics for the current column, with an additional `sum` field for numeric columns
-- `S` shows statistics for all columns in the dataframe
+- `s` shows statistics for the current column
+- `gs` shows statistics for all columns in the dataframe
 
 **In the Statistics Modal**:
 
