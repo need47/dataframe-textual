@@ -317,7 +317,7 @@ class TableScreen(TableModalScreen):
         pass
 
     def filter_or_collect_selected_value(
-        self, cidx_name_value: tuple[int, str, Any] | None, action: str = "filter"
+        self, cidx: int, col_name: str, values: Any | list[Any], action: str = "filter"
     ) -> None:
         """Apply filter or collect action by the selected value.
 
@@ -329,23 +329,20 @@ class TableScreen(TableModalScreen):
             col_name_value: Tuple of (column_index, column_name, column_value) to filter/collect by, or None.
             action: Either "filter" to filter rows, or "collect" to collect rows. Defaults to "filter".
         """
-        if cidx_name_value is None:
-            return
-        cidx, col_name, col_value = cidx_name_value
-        # self.log(f"Filtering or collecting by `{col_name} == {col_value}`")
-
-        # Handle NULL values
-        if col_value is None or col_value == NULL:
-            # Create expression for NULL values
+        # Create expression for NULL values
+        if values is None or values == NULL:
             expr = pl.col(col_name).is_null()
             value_display = f"[$success]{NULL_DISPLAY}[/]"
+        # Create expression for the selected value
         else:
-            # Create expression for the selected value
-            expr = pl.col(col_name) == col_value
-            value_display = f"[$success]{col_value}[/]"
+            if isinstance(values, list):
+                expr = pl.col(col_name).is_in(values)
+                value_display = f"[$success]{','.join(values)}[/]"
+            else:
+                expr = pl.col(col_name) == values
+                value_display = f"[$success]{values}[/]"
 
         df_filtered = self.dftable.df.lazy().filter(expr).collect()
-        # self.log(f"Filtered dataframe has {len(df_filtered)} rows")
 
         ok_rids = set(df_filtered[RID].to_list())
         if not ok_rids:
@@ -358,7 +355,7 @@ class TableScreen(TableModalScreen):
 
         # Action collect
         if action == "collect":
-            self.dftable.action_collect_rows(cidx, col_value)
+            self.dftable.action_collect_rows(cidx, values)
 
         # Action filter
         else:
@@ -380,41 +377,29 @@ class TableScreen(TableModalScreen):
 
         self.dftable.move_cursor(column=cidx)
 
-    def show_frequency(self, cidx_name_value: tuple[int, str, Any] | None) -> None:
+    def show_frequency(self, cidx: int | None = None) -> None:
         """Show frequency by the selected value.
 
         Args:
             col_name_value: Tuple of (column_index, column_name, column_value).
         """
-        if cidx_name_value is None:
+        if cidx is None:
             return
-        cidx, col_name, col_value = cidx_name_value
-        # self.log(f"Showing frequency for `{col_name} == {col_value}`")
-
-        # Do not dismiss the current modal screen so it can be returned to
-        # when frequency screen is closed.
-        # self.app.pop_screen()
 
         # Show frequency screen
-        self.dftable.action_show_frequency(cidx)
+        self.dftable.do_show_frequency(cidx)
 
-    def show_statistics(self, cidx_name_value: tuple[int, str, Any] | None) -> None:
+    def show_statistics(self, cidx: int | None = None) -> None:
         """Show frequency by the selected value.
 
         Args:
             col_name_value: Tuple of (column_index, column_name, column_value).
         """
-        if cidx_name_value is None:
+        if cidx is None:
             return
-        cidx, col_name, col_value = cidx_name_value
-        # self.log(f"Showing statistics for `{col_name} == {col_value}`")
-
-        # Do not dismiss the current modal screen so it can be returned to
-        # when frequency screen is closed.
-        # self.app.pop_screen()
 
         # Show statistics screen
-        self.dftable.action_show_statistics(cidx)
+        self.dftable.do_show_statistics(cidx)
 
 
 class RowDetailScreen(TableScreen):
@@ -448,10 +433,12 @@ class RowDetailScreen(TableScreen):
         """
         if event.key == "v":
             event.stop()
-            self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="filter")
+            cidx, name, value = self.get_cidx_name_value()
+            self.filter_or_collect_selected_value(cidx, name, value, action="filter")
         elif event.key == "quotation_mark":  # '"'
             event.stop()
-            self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="collect")
+            cidx, name, value = self.get_cidx_name_value()
+            self.filter_or_collect_selected_value(cidx, name, value, action="collect")
         # Move to the previous row
         elif event.key == "left_curly_bracket":  # '{'
             event.stop()
@@ -471,11 +458,13 @@ class RowDetailScreen(TableScreen):
         # Show frequency for the selected value
         elif event.key == "F":
             event.stop()
-            self.show_frequency(self.get_cidx_name_value())
+            cidx, _, _ = self.get_cidx_name_value()
+            self.show_frequency(cidx)
         # Show statistics for the selected value
         elif event.key == "S":
             event.stop()
-            self.show_statistics(self.get_cidx_name_value())
+            cidx, _, _ = self.get_cidx_name_value()
+            self.show_statistics(cidx)
         elif event.key == "tab":
             event.stop()
             ridx = self.ridx
@@ -524,9 +513,6 @@ class RowDetailScreen(TableScreen):
     def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
         """Get the current column info."""
         cidx = self.table.cursor_row
-        if cidx >= len(self.dftable.df.columns):
-            return None  # Invalid row
-
         col_name = self.dftable.df.columns[cidx]
         col_value = self.dftable.df.item(self.ridx, cidx)
         return cidx, col_name, col_value
@@ -760,9 +746,9 @@ class FrequencyScreen(TableScreen):
         self.cidx = cidx
         self.sorted_columns["Count"] = True  # Count sort by default
         self.total_count = len(dftable.df)
-        self.col = self.dftable.df.columns[self.cidx]
+        self.col_name = self.dftable.df.columns[self.cidx]
         self.columns = [
-            (self.col, "Value"),
+            (self.col_name, "Value"),
             ("Count", "Count"),
             ("%", "%"),
             ("Histogram", "Histogram"),
@@ -776,16 +762,18 @@ class FrequencyScreen(TableScreen):
     @work(thread=True)
     def _calculate_frequency(self) -> None:
         """Calculate frequency."""
-        self.df = self.dftable.df.lazy().select(pl.col(self.col).value_counts(sort=True)).unnest(self.col).collect()
+        self.df = (
+            self.dftable.df.lazy().select(pl.col(self.col_name).value_counts(sort=True)).unnest(self.col_name).collect()
+        )
         self.app.call_from_thread(self._on_calc_ready)
 
     def on_key(self, event: Key):
         if event.key == "v":
             event.stop()
-            self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="filter")
+            self.filter_or_collect_selected_value(self.cidx, self.col_name, self.get_values(), action="filter")
         elif event.key == "quotation_mark":  # '"'
             event.stop()
-            self.filter_or_collect_selected_value(self.get_cidx_name_value(), action="collect")
+            self.filter_or_collect_selected_value(self.cidx, self.col_name, self.get_values(), action="collect")
         elif event.key == "s":
             event.stop()
             self.toggele_row_selection()
@@ -802,17 +790,17 @@ class FrequencyScreen(TableScreen):
         dtype = self.dftable.df.dtypes[self.cidx]
         dc = DtypeConfig(dtype)
 
-        for display_name, col in self.columns:
+        for display_name, col_name in self.columns:
             # Check if this column is sorted and add indicator
-            if col in self.sorted_columns:
-                descending = self.sorted_columns[col]
+            if col_name in self.sorted_columns:
+                descending = self.sorted_columns[col_name]
                 sort_indicator = " ▼" if descending else " ▲"
                 header_text = display_name + sort_indicator
             else:
                 header_text = display_name
 
-            justify = dc.justify if col == "Value" else "right"
-            self.table.add_column(Text(header_text, justify=justify), key=col)
+            justify = dc.justify if col_name == "Value" else "right"
+            self.table.add_column(Text(header_text, justify=justify), key=col_name)
 
         # Get style config for Int64 and Float64
         dc_int = DtypeConfig(pl.Int64)
@@ -881,18 +869,21 @@ class FrequencyScreen(TableScreen):
 
         self.table.move_cursor(row=row_idx, column=col_idx)
 
-    def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
-        row_idx = self.table.cursor_row
-        if row_idx >= len(self.df):
-            return None  # Skip the last `Total` row
-
+    def get_values(self) -> Any | list[Any]:
         col_name = self.dftable.df.columns[self.cidx]
-        col_dtype = self.dftable.df.dtypes[self.cidx]
+        values = []
+        if self.selected_rows:
+            for ridx in self.selected_rows:
+                if ridx >= len(self.df):
+                    continue  # Skip the last `Total` row
+                values.append(self.df[col_name][ridx])
+        else:
+            ridx = self.table.cursor_row
+            if ridx >= len(self.df):
+                return None  # Skip the last `Total` row
+            values.append(self.df[col_name][ridx])
 
-        cell_value = self.table.get_cell_at(Coordinate(row_idx, 0))
-        col_value = NULL if cell_value.plain == NULL_DISPLAY else DtypeConfig(col_dtype).convert(cell_value.plain)
-
-        return self.cidx, col_name, col_value
+        return values[0] if len(values) == 1 else values
 
 
 class HistogramScreen(TableScreen):
@@ -1014,11 +1005,13 @@ class MetaColumnScreen(TableScreen):
         # Show frequency for the selected value
         if event.key == "F":
             event.stop()
-            self.show_frequency(self.get_cidx_name_value())
+            cidx, _, _ = self.get_cidx_name_value()
+            self.show_frequency(cidx)
         # Show statistics for the selected value
         elif event.key == "S":
             event.stop()
-            self.show_statistics(self.get_cidx_name_value())
+            cidx, _, _ = self.get_cidx_name_value()
+            self.show_statistics(cidx)
 
     def build_table(self) -> None:
         """Build the column metadata table."""

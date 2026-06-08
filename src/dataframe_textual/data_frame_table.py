@@ -998,9 +998,9 @@ class DataFrameTable(DataTable):
         self.do_sort_by_column(descending=True)
 
     @with_full_df
-    def action_show_frequency(self, cidx: int | None = None) -> None:
+    def action_show_frequency(self) -> None:
         """Show frequency distribution for the current column."""
-        self.do_show_frequency(cidx)
+        self.do_show_frequency()
 
     @with_full_df
     def action_show_histogram(self, default: int = 1) -> None:
@@ -2195,14 +2195,14 @@ class DataFrameTable(DataTable):
         cidx_label = self.df.columns.index(col_label)
         self.app.push_screen(BarScreen(self, cidx, cidx_label))
 
-    def do_show_statistics(self) -> None:
+    def do_show_statistics(self, cidx: int | None = None) -> None:
         """Show statistics for the current column or entire dataframe."""
         # Show statistics for entire dataframe
         if self.g_mode:
             self.app.push_screen(StatisticsScreen(self, cidx=None))
         # Show statistics for current column
         else:
-            self.app.push_screen(StatisticsScreen(self, cidx=self.cursor_cidx))
+            self.app.push_screen(StatisticsScreen(self, cidx=self.cursor_cidx if cidx is None else cidx))
 
     def do_metadata_column(self) -> None:
         """Show metadata for all columns in the dataframe."""
@@ -4420,7 +4420,7 @@ class DataFrameTable(DataTable):
             title="Filter Rows",
         )
 
-    def do_collect_rows(self, cidx: int | None = None, term: Any = None) -> None:
+    def do_collect_rows(self, cidx: int | None = None, term: Any | list[Any] = None) -> None:
         """Collect rows to a new tab.
 
         If there are selected rows, use those.
@@ -4438,6 +4438,8 @@ class DataFrameTable(DataTable):
                 filter_expr = pl.col(col_name).is_null()
             elif isinstance(dtype, pl.List):
                 filter_expr = pl.col(col_name) == term.to_list()
+            elif isinstance(term, list):
+                filter_expr = pl.col(col_name).is_in(term)
             else:
                 filter_expr = pl.col(col_name) == term
 

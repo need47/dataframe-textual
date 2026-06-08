@@ -134,9 +134,10 @@ class YMNScreen(ModalScreen):
     def on_key(self, event) -> None:
         """Handle key press events in the table screen."""
         if event.key in ("q", "escape"):
-            self.dismiss(None)
             event.stop()
+            self.dismiss(None)
         elif event.key == "enter":
+            event.stop()
             for button in self.query(Button):
                 if button.has_focus:
                     if button.id == "yes":
@@ -148,8 +149,6 @@ class YMNScreen(ModalScreen):
                     break
             else:
                 self._handle_yes()
-
-            event.stop()
 
     def _handle_yes(self) -> None:
         """Handle Yes button/Enter key press."""
