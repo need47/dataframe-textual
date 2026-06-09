@@ -1004,13 +1004,11 @@ class MetaColumnScreen(TableScreen):
         # Show frequency for the selected value
         if event.key == "F":
             event.stop()
-            cidx, _, _ = self.get_cidx_name_value()
-            self.show_frequency(cidx)
+            self.show_frequency(self.get_cidx())
         # Show statistics for the selected value
         elif event.key == "S":
             event.stop()
-            cidx, _, _ = self.get_cidx_name_value()
-            self.show_statistics(cidx)
+            self.show_statistics(self.get_cidx())
 
     def build_table(self) -> None:
         """Build the column metadata table."""
@@ -1030,16 +1028,10 @@ class MetaColumnScreen(TableScreen):
 
         self.table.cursor_type = "row"
 
-    def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
-        """Get the current column info."""
+    def get_cidx(self) -> int:
+        """Get the current column index."""
         cidx = self.table.cursor_row
-        if cidx >= len(self.dftable.df.columns):
-            return None  # Invalid row
-
-        col_name = self.dftable.df.columns[cidx]
-        col_value = None
-
-        return cidx, col_name, col_value
+        return cidx
 
 
 class CellDetailScreen(TableModalScreen):
