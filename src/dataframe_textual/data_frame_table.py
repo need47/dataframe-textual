@@ -342,7 +342,7 @@ class DataFrameTable(DataTable):
         ("V", "filter_rows_expr", "Filter rows with expression"),
         ("full_stop", "filter_rows_non_null", "Filter rows with non-null values in current column"),
         ("f", "filter_rows_value", "Filter rows by value"),  # `f`
-        ("quotation_mark", "collect_rows", "Collect rows to a new tab"),  # `"`
+        ("quotation_mark", "collect_rows_columns", "Collect rows/columns to a new tab"),  # `"`
         # Row/Column Selection
         ("backslash", "select_rows", "Select rows with cell matches or those matching cursor value in current column"),  # `\`
         ("vertical_line", "select_rows_expr", "Select rows with expression"),  # `|`
@@ -1042,9 +1042,9 @@ class DataFrameTable(DataTable):
         self.do_filter_rows_value()
 
     @with_full_df
-    def action_collect_rows(self, cidx: int | None = None, term: Any = None) -> None:
+    def action_collect_rows_columns(self, cidx: int | None = None, term: Any = None) -> None:
         """Collect rows to a new tab based on the current selection or value."""
-        self.do_collect_rows(cidx=cidx, term=term)
+        self.do_collect_rows_columns(cidx=cidx, term=term)
 
     def action_edit_cell(self) -> None:
         """Edit the current cell."""
@@ -4423,11 +4423,11 @@ class DataFrameTable(DataTable):
             title="Filter Rows",
         )
 
-    def do_collect_rows(self, cidx: int | None = None, term: Any | list[Any] = None) -> None:
-        """Collect rows to a new tab.
+    def do_collect_rows_columns(self, cidx: int | None = None, term: Any | list[Any] = None) -> None:
+        """Collect rows/columns to a new tab.
 
-        If there are selected rows, use those.
-        Otherwise, move based on the value provided or the current cell value.
+        If there are selected rows/columns, use those.
+        Otherwise, use the current cell value as the search term to determine which rows to collect.
         """
         if self.selected_rows:
             filter_expr = pl.col(RID).is_in(self.selected_rows)
@@ -4447,12 +4447,22 @@ class DataFrameTable(DataTable):
                 filter_expr = pl.col(col_name) == term
 
         # Apply filter to dataframe with row indices
-        df_filtered = self.df.lazy().filter(filter_expr).collect()
-        if len(df_filtered) == len(self.df):
-            self.notify("Filter does not reduce any rows. No new tab created.", title="Filter Rows", severity="warning")
-            return
-        elif len(df_filtered) == 0:
+        lf_filtered = self.df.lazy().filter(filter_expr)
+
+        # Apply column selection if any
+        if self.selected_columns:
+            lf_filtered = lf_filtered.select(self.selected_columns.copy().union({RID}))
+
+        # Collect the filtered dataframe
+        df_filtered = lf_filtered.collect()
+
+        if len(df_filtered) == 0:
             self.notify("Filter results in zero rows. No new tab created.", title="Filter Rows", severity="warning")
+            return
+        elif len(df_filtered) == len(self.df) and len(df_filtered.columns) == len(self.df.columns):
+            self.notify(
+                "Filter does not reduce any rows/columns. No new tab created.", title="Filter Rows", severity="warning"
+            )
             return
 
         self.app.add_tab(

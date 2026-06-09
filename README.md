@@ -374,7 +374,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `V`                | Advanced filter with value or expression               |
 | `.`                | Filter rows with non-null values in the current column |
 | `f`                | Filter rows using values in the current column         |
-| `"` (double quote) | Collect rows to a new tab                              |
+| `"` (double quote) | Collect rows/columns to a new tab                      |
 
 #### Sorting (supporting multiple columns)
 
@@ -601,7 +601,7 @@ Both actions work on a subset of the original dataframe, but they serve differen
 
 **Collect** (`"`):
 
-- Creates a separate tab containing only the chosen rows
+- Creates a separate tab containing only the chosen rows/columns
 - The collected tab is independent from the source dataframe
 - Edits in the collected tab do not modify the original table
 
