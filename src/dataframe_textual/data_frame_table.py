@@ -553,7 +553,11 @@ class DataFrameTable(DataTable):
         # fully loaded the dataframe
         self.df_done = True
 
-        self.notify("Data fully loaded" if fully_loaded else "Data loading stopped by user", title="Load DataFrame")
+        self.notify(
+            "Data fully loaded" if fully_loaded else "Data loading stopped by user",
+            title="Load DataFrame",
+            severity="information" if fully_loaded else "warning",
+        )
 
     def with_full_df(func: Callable) -> Callable:
         """Decorator to ensure the dataframe is fully loaded before executing a method.
