@@ -220,7 +220,7 @@ dv data.csv -o data.parquet
 
 Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader sequence** starting with `g` or `z` (e.g., `g/`, `g_`, `zQ`).
 
-**How leader mode works:**
+**How Leader Mode Works:**
 
 - Press the leader key `g` or `z` to activate the mode — a 3-second timeout begins
 - Press the next key within the timeout to execute the combined command
@@ -480,7 +480,7 @@ Useful for examining wide table where columns don't fit well on screen.
 - Press `{` to move to the previous row
 - Press `}` to move to the next row
 - Press `F` to show the frequency table for the selected column
-- Press `S` to show the statistics table for the selected column
+- Press `I` to show the statistics table for the selected column
 - Press `Tab` to open a cell-detail modal for the selected field
 - Press `q` or `Escape` to close the modal
 
@@ -703,7 +703,7 @@ View quick metadata about your columns to understand their structure and content
 **In the Column Metadata Table**
 
 - Press `F` to show the frequency table for the selected column
-- Press `S` to show the statistics table for the selected column
+- Press `I` to show the statistics table for the selected column
 
 **In Metadata Modals**:
 
