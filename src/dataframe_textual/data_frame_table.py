@@ -404,7 +404,7 @@ class DataFrameTable(DataTable):
         initializes all state tracking variables for row/column operations.
 
         Args:
-            df: The Polars DataFrame to display and edit.
+            frame: The Polars DataFrame or LazyFrame to display and edit.
             filename: Optional source filename for the data (used in save operations). Defaults to "".
             tabname: Optional name for the tab displaying this dataframe. Defaults to "".
             **kwargs: Additional keyword arguments passed to the parent DataTable widget.
@@ -538,13 +538,7 @@ class DataFrameTable(DataTable):
 
                     if not decision["continue"]:
                         fully_loaded = False
-                        self.app.call_from_thread(
-                            self.notify,
-                            f"Stopped loading at [$warning]{total_loaded:,}[/] rows by user choice",
-                            title="Load DataFrame",
-                            severity="warning",
-                        )
-                        return
+                        break
         except pl.exceptions.ComputeError as e:
             self.log(f"Error loading remaining batch: {e}")
             return self.app.exit(return_code=1, result=str(e))
@@ -2007,6 +2001,7 @@ class DataFrameTable(DataTable):
         Args:
             description: Description of the action for this history entry.
             dirty: Whether this operation modifies the data (True) or just display state (False).
+            clear_redo: Whether to clear the redo stack. Defaults to True.
         """
         self.histories_undo.append(self.create_history(description))
 
@@ -3604,8 +3599,7 @@ class DataFrameTable(DataTable):
     def do_find_cursor_value(self) -> None:
         """Find by cursor value.
 
-        Args:
-            scope: "column" to find in current column, "global" to find across all columns.
+        Scope is determined by g_mode: current column by default, or global when in leader mode.
         """
         # Get the value of the currently selected cell
         term = NULL if self.cursor_value is None else str(self.cursor_value)
@@ -3626,8 +3620,7 @@ class DataFrameTable(DataTable):
     def do_find_expr(self) -> None:
         """Open screen to find by expression.
 
-        Args:
-            scope: "column" to find in current column, "global" to find across all columns.
+        Scope is determined by g_mode: current column by default, or global when in leader mode.
         """
         # Use current cell value as default search term
         term = NULL if self.cursor_value is None else str(self.cursor_value)
@@ -3645,7 +3638,8 @@ class DataFrameTable(DataTable):
         """Find a term in current column or globally across all columns.
 
         Args:
-            result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse"
+            result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse".
+            scope: "column" to find in current column, "global" to find across all columns. Defaults to "column".
         """
         if result is None:
             return

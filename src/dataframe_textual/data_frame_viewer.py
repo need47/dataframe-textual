@@ -331,7 +331,7 @@ class DataFrameViewer(App):
                 column_count = len(table.df.columns) - 1  # Exclude the hidden RID column
             else:
                 row_count = table.loaded_rows
-                column_count = len(table.lf.collect_schema().names()) - 1  # Exclude the hidden RID column
+                column_count = len(table.lf.collect_schema().names())
 
         filename = Path(table.filename).name if table else "No file"
         main_or_view = "Main" if table is None or table.df_view is None else "View"
