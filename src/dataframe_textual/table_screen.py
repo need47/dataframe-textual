@@ -210,7 +210,7 @@ class TableModalScreen(ModalScreen):
 
                 formatted_row.append(
                     dc.format(
-                        c,
+                        NULL_DISPLAY if c is None else c,
                         style=HIGHLIGHT_COLOR if is_selected else style[ridx] if isinstance(style, list) else style,
                         justify=justify,
                         thousand_separator=self.thousand_separator,
@@ -498,7 +498,7 @@ class RowDetailScreen(TableScreen):
         self.df = pl.DataFrame(
             {
                 "Column": self.dftable.df.columns,
-                "Value": [str(c) for c in self.dftable.df.row(self.ridx)],
+                "Value": [NULL_DISPLAY if c is None else str(c) for c in self.dftable.df.row(self.ridx)],
             }
         )
 
