@@ -4428,6 +4428,8 @@ class DataFrameTable(DataTable):
         """
         if self.selected_rows:
             filter_expr = pl.col(RID).is_in(self.selected_rows)
+        elif self.selected_columns:
+            filter_expr = pl.lit(True)  # No row filter, just select columns later
         else:  # Search cursor value in current column
             cidx = self.cursor_cidx if cidx is None else cidx
             col_name = self.df.columns[cidx]
