@@ -14,7 +14,6 @@ import polars as pl
 from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
-from textual.coordinate import Coordinate
 from textual.events import Key
 from textual.renderables.bar import Bar
 from textual.screen import ModalScreen

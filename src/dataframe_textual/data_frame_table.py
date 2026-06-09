@@ -4685,11 +4685,8 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history("Toggle column selection")
 
-        # Get current column key
-        col_idx = self.cursor_column
+        # Get current column name
         col_name = self.cursor_col_name
-        col_key = self.cursor_col_key
-        col = self.columns[col_key]
 
         if col_name in self.selected_columns:
             self.selected_columns.discard(col_name)
