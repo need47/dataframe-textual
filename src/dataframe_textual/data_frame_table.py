@@ -50,7 +50,7 @@ from .common import (
     round_to_nearest_hundreds,
     tentative_expr,
     validate_expr,
-    with_g_mode,
+    with_leader_key,
 )
 from .loading_screen import BusyScreen, LoadingScreen
 from .table_screen import (
@@ -293,8 +293,8 @@ class DataFrameTable(DataTable):
         - **Ctrl+r** - 📝 Copy row to clipboard (tab-separated)
 
         ## ⌨️ SQL Interface
-        - **l** - 💬 Open simple SQL interface (select columns & where clause)
-        - **L** - 🔎 Open advanced SQL interface (full SQL queries)
+        - **Q** - 💬 Open simple SQL interface (select columns & where clause)
+        - **zQ** - 🔎 Open advanced SQL interface (full SQL queries)
     """).strip()
 
     # fmt: off
@@ -390,8 +390,7 @@ class DataFrameTable(DataTable):
         ("exclamation_mark", "cast_column_dtype('pl.Boolean')", "Cast column dtype to bool"),  # `!`
         ("dollar_sign", "cast_column_dtype('pl.String')", "Cast column dtype to string"),  # `$`
         # Sql
-        ("l", "simple_sql", "Simple SQL interface"),
-        ("L", "advanced_sql", "Advanced SQL interface"),
+        ("Q", "sql_query", "Open SQL interface"),  # `Q`
     ]
     # fmt: on
 
@@ -674,13 +673,13 @@ class DataFrameTable(DataTable):
         }
 
     @property
-    def g_mode(self) -> bool:
+    def leader_key(self) -> bool:
         """Whether the app is currently in leader mode."""
-        return self.app.g_mode
+        return self.app.leader_key
 
-    @g_mode.setter
-    def g_mode(self, value: bool) -> None:
-        self.app.g_mode = value
+    @leader_key.setter
+    def leader_key(self, value: bool) -> None:
+        self.app.leader_key = value
 
     @property
     def ordered_selected_rows(self) -> list[int]:
@@ -893,7 +892,7 @@ class DataFrameTable(DataTable):
 
     def on_key(self, event: Key) -> None:
         """Handle key press events."""
-        if self.g_mode and event.key == "circumflex_accent":  # `g^`:
+        if self.leader_key and event.key == "circumflex_accent":  # `g^`:
             event.stop()
             if self.app.timeout_timer:
                 self.app.timeout_timer.stop()
@@ -935,7 +934,7 @@ class DataFrameTable(DataTable):
         """Load more rows when scrolling down with mouse."""
         self.load_rows_down()
 
-    @with_g_mode
+    @with_leader_key
     def action_go_top(self) -> None:
         """Go to the top of the table."""
         self.do_go_top()
@@ -976,7 +975,7 @@ class DataFrameTable(DataTable):
         """Hide selected columns or the current column."""
         self.do_hide_column()
 
-    @with_g_mode
+    @with_leader_key
     def action_expand_column(self) -> None:
         """Expand the current column to its full width."""
         self.do_expand_column()
@@ -1016,7 +1015,7 @@ class DataFrameTable(DataTable):
         self.do_show_bar()
 
     @with_full_df
-    @with_g_mode
+    @with_leader_key
     def action_show_statistics(self) -> None:
         """Show statistics for the current column or entire dataframe."""
         self.do_show_statistics()
@@ -1091,20 +1090,20 @@ class DataFrameTable(DataTable):
         """Select rows by expression."""
         self.do_select_rows_expr()
 
-    @with_g_mode
+    @with_leader_key
     def action_find_cursor_value(self) -> None:
         """Find by cursor value in current column or globally across all columns."""
         self.do_find_cursor_value()
 
-    @with_g_mode
+    @with_leader_key
     def action_find_expr(self) -> None:
         """Find by expression in current column or globally across all columns."""
         self.do_find_expr()
 
-    @with_g_mode
+    @with_leader_key
     def action_replace(self) -> None:
         """Replace values in current column or globally across all columns."""
-        scope = "global" if self.g_mode else "column"
+        scope = "global" if self.leader_key else "column"
         self.do_replace(scope=scope)
 
     def action_toggle_selection_current_row(self) -> None:
@@ -1272,10 +1271,10 @@ class DataFrameTable(DataTable):
         except (FileNotFoundError, IndexError):
             self.notify(f"Failed to copy row [$error]{ridx}[/] to clipboard", title="Copy Row", severity="error")
 
-    @with_g_mode
+    @with_leader_key
     def action_toggle_thousand_separator(self) -> None:
         """Toggle thousand separator for the current cursor column."""
-        if self.g_mode:
+        if self.leader_key:
             if self.thousand_separator_columns:
                 self.thousand_separator_columns.clear()
                 status = "off"
@@ -1314,7 +1313,7 @@ class DataFrameTable(DataTable):
 
         self.setup_table()
         message = f"Thousand separator is [$success]{status}[/] for " + (
-            "[$accesent]all numeric columns[/]" if self.g_mode else f"column [$accent]{col_name}[/]"
+            "[$accesent]all numeric columns[/]" if self.leader_key else f"column [$accent]{col_name}[/]"
         )
 
         self.notify(message, title="Toggle Thousand Separator")
@@ -1366,13 +1365,13 @@ class DataFrameTable(DataTable):
         """Go to the previous selected row."""
         self.do_previous_selected_row()
 
-    def action_simple_sql(self) -> None:
+    @with_leader_key
+    def action_sql_query(self) -> None:
         """Open the SQL interface screen."""
-        self.do_simple_sql()
-
-    def action_advanced_sql(self) -> None:
-        """Open the advanced SQL interface screen."""
-        self.do_advanced_sql()
+        if self.leader_key:
+            self.do_advanced_sql()
+        else:
+            self.do_simple_sql()
 
     def setup_table(self) -> None:
         """Setup the table for display.
@@ -2202,7 +2201,7 @@ class DataFrameTable(DataTable):
     def do_show_statistics(self, cidx: int | None = None) -> None:
         """Show statistics for the current column or entire dataframe."""
         # Show statistics for entire dataframe
-        if self.g_mode:
+        if self.leader_key:
             self.app.push_screen(StatisticsScreen(self, cidx=None))
         # Show statistics for current column
         else:
@@ -2326,10 +2325,10 @@ class DataFrameTable(DataTable):
     def do_expand_column(self) -> None:
         """Expand/unexpand string/list columns.
 
-        In leader mode (g_mode): expand or unexpand all string/list columns.
+        In leader mode: expand or unexpand all string/list columns.
         Otherwise: expand or unexpand the current column only.
         """
-        if self.g_mode:
+        if self.leader_key:
             # Collect all string/list column names
             target_cols = [
                 col for col, dtype in self.visible_columns.items() if DtypeConfig(dtype).gtype in ("string", "list")
@@ -2372,7 +2371,7 @@ class DataFrameTable(DataTable):
 
             self.notify(f"Column {result}", title="Expand Column")
 
-    @with_g_mode
+    @with_leader_key
     def do_toggle_rid(self) -> None:
         """Toggle display of the internal RID column."""
         self.show_rid = not self.show_rid
@@ -3609,7 +3608,7 @@ class DataFrameTable(DataTable):
     def do_find_cursor_value(self) -> None:
         """Find by cursor value.
 
-        Scope is determined by g_mode: current column by default, or global when in leader mode.
+        Scope is determined by leader mode: current column by default, or global when in leader mode.
         """
         # Get the value of the currently selected cell
         term = NULL if self.cursor_value is None else str(self.cursor_value)
@@ -3624,18 +3623,18 @@ class DataFrameTable(DataTable):
                 "match_literal": True,
                 "match_reverse": False,
             },
-            scope="global" if self.g_mode else "column",
+            scope="global" if self.leader_key else "column",
         )
 
     def do_find_expr(self) -> None:
         """Open screen to find by expression.
 
-        Scope is determined by g_mode: current column by default, or global when in leader mode.
+        Scope is determined by leader mode: current column by default, or global when in leader mode.
         """
         # Use current cell value as default search term
         term = NULL if self.cursor_value is None else str(self.cursor_value)
         cidx = self.cursor_cidx
-        scope = "global" if self.g_mode else "column"
+        scope = "global" if self.leader_key else "column"
 
         # Push the search modal screen
         self.app.push_screen(

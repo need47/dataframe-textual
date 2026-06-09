@@ -58,12 +58,12 @@ COLUMN_WIDTH_CAP = 35
 THOUSAND_SEPARATOR = ","
 
 
-def with_g_mode(func: Callable) -> Callable:
-    """Decorator that resets leader mode (g_mode) after the action completes."""
+def with_leader_key(func: Callable) -> Callable:
+    """Decorator that resets leader mode after the action completes."""
 
     def wrapper(self, *args, **kwargs):
         val = func(self, *args, **kwargs)
-        self.g_mode = False
+        self.leader_key = ""
         return val
 
     return wrapper
@@ -73,7 +73,7 @@ def format_float(value: float, thousand_separator: bool = False, precision: int 
     """Format a float value, keeping integers without decimal point.
 
     Args:
-        val: The float value to format.
+        value: The float value to format.
         thousand_separator: Whether to include thousand separators. Defaults to False.
         precision: The number of decimal places to display. Defaults to 2.
 
@@ -81,8 +81,8 @@ def format_float(value: float, thousand_separator: bool = False, precision: int 
         The formatted float as a string.
     """
 
-    if precision == 0 and (val := int(value)) == value:
-        return f"{val:{THOUSAND_SEPARATOR}}" if thousand_separator else str(val)
+    if precision == 0 and (value_int := int(value)) == value:
+        return f"{value_int:{THOUSAND_SEPARATOR}}" if thousand_separator else str(value_int)
     else:
         if precision > 0:
             return f"{value:{THOUSAND_SEPARATOR}.{precision}f}" if thousand_separator else f"{value:.{precision}f}"

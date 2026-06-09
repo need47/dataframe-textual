@@ -23,7 +23,7 @@ from .common import (
     guess_file_format,
     load_file,
     validate_expr,
-    with_g_mode,
+    with_leader_key,
 )
 from .console_panel import ConsolePanel
 from .data_frame_help_panel import DataFrameHelpPanel
@@ -42,7 +42,6 @@ class DataFrameViewer(App):
         ## ⚙️ File & Tab Management
         - **q** - 🚪 Quit tab (prompts to save unsaved changes) or view
         - **gq** - 🚪 Quit all tabs (prompts to save unsaved changes)
-        - **Q** - ⚠️ Force to quit current tab (discards unsaved changes) or view
         - **Ctrl+Q** - ⚠️ Force to quit app (discards unsaved changes)
         - **Space** - 👁️ Toggle tab bar visibility
         - **b** - ⏭️ Next Tab
@@ -79,7 +78,6 @@ class DataFrameViewer(App):
 
     BINDINGS = [
         ("q", "close", "Quit tab or view"),
-        ("Q", "force_close", "Force to quit tab or view"),
         ("space", "toggle_tab_bar", "Toggle Tab Bar"),
         ("b", "next_tab(1)", "Next Tab"),
         ("B", "next_tab(-1)", "Previous Tab"),
@@ -160,43 +158,45 @@ class DataFrameViewer(App):
         self.help_panel: DataFrameHelpPanel | None = None
 
         # Global leader mode state
-        self.g_mode = False
+        self.leader_key = ""
         self.timeout_timer: Timer | None = None
 
     def on_key(self, event: Key) -> None:
         """Handle leader mode key events at the app level."""
         # Already in leader mode, stop the timer and let action through
-        if self.g_mode:
+        if self.leader_key:
             # User pressed escape, cancel leader mode
             if event.key == "escape":
                 event.stop()
-                self.cancel_leader_mode()
+                self.cancel_leader_key()
             # User pressed a non-escape key, reset the timer and let action through
             elif self.timeout_timer:
                 self.timeout_timer.stop()
                 self.timeout_timer = None
-                self.notify(f"[$success]g[/]+[$accent]{event.key}[/] were pressed", title="Leader Mode")
+                self.notify(f"[$success]{self.leader_key}[/]+[$accent]{event.key}[/] were pressed", title="Leader Mode")
 
             # Let the event through and continue to the binding phase
             return
 
-        # Enter leader mode on `g` key
-        if event.key == "g":
+        # Enter leader mode on `g` or `z` key
+        if event.key in ("g", "z"):
             event.stop()
             event.prevent_default()  # Required because of the default action of the `g` key that goes to the top
 
-            self.g_mode = True
-            self.notify("Leader mode activated, waiting for next key in 3 seconds", title="Leader Mode")
-            self.timeout_timer = self.set_timer(3, callback=self.cancel_leader_mode)
+            self.leader_key = event.key
+            self.notify(
+                f"Leader mode activated with [{event.key}], waiting for next key in 3 seconds", title="Leader Mode"
+            )
+            self.timeout_timer = self.set_timer(3, callback=self.cancel_leader_key)
 
-    def cancel_leader_mode(self) -> None:
+    def cancel_leader_key(self) -> None:
         """Cancel leader mode and reset the timeout timer."""
         if self.timeout_timer:
             self.timeout_timer.stop()
             self.timeout_timer = None
             self.notify("Leader mode cancelled", title="Leader Mode")
 
-        self.g_mode = False
+        self.leader_key = ""
 
     @property
     def active_table(self) -> DataFrameTable | None:
@@ -410,21 +410,17 @@ class DataFrameViewer(App):
         """
         self.push_screen(OpenFileScreen(), self.do_open_file)
 
-    @with_g_mode
+    @with_leader_key
     def action_close(self) -> None:
         """Close current tab or view.
 
         Checks for unsaved changes and prompts the user to save if needed.
         If this is the last tab, exits the app.
         """
-        if self.g_mode:
+        if self.leader_key:
             self.do_close_all()
         else:
             self.do_close()
-
-    def action_force_close(self) -> None:
-        """Force close current tab or view without save prompts."""
-        self.do_close(force=True)
 
     def action_close_all(self) -> None:
         """Close all tabs and quit.
@@ -447,7 +443,7 @@ class DataFrameViewer(App):
         self.do_save_to_file(all_tabs=True)
 
     def action_save_tab_overwrite(self) -> None:
-        if self.g_mode:
+        if self.leader_key:
             self._save_all_tabs_overwrite()
         else:
             self._save_current_tab_overwrite()

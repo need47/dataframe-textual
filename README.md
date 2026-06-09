@@ -218,11 +218,11 @@ dv data.csv -o data.parquet
 
 ## Keyboard Shortcuts
 
-Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader sequence** starting with `g` (e.g., `g/`, `g,`, `g_`). Pressing `g` activates leader mode for 3 seconds — press the next key within that window to run the command.
+Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader sequence** starting with `g` or `z` (e.g., `g/`, `g_`, `zQ`).
 
-**How it works:**
+**How leader mode works:**
 
-- Press `g` to activate leader mode — a 3-second timeout begins
+- Press the leader key `g` or `z` to activate the mode — a 3-second timeout begins
 - Press the next key within the timeout to execute the combined command
 - If no second key is pressed within 3 seconds, leader mode is automatically cancelled
 
@@ -230,25 +230,24 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 #### File & Tab Management
 
-| Key            | Action                                                       |
-| -------------- | ------------------------------------------------------------ |
-| `q`            | Quit current tab (prompts to save unsaved changes) or view   |
-| `gq`           | Quit all tabs then app (prompts to save unsaved changes)     |
-| `Q`            | Force to quit current tab (discards unsaved changes) or view |
-| `Space`        | Toggle tab bar visibility                                    |
-| `b`            | Next tab                                                     |
-| `B`            | Previous tab                                                 |
-| `>`            | Move current tab right (wrap to first)                       |
-| `<`            | Move current tab left (wrap to last)                         |
-| `Ctrl+T`       | Save current tab to file                                     |
-| `Ctrl+S`       | Save all tabs to file                                        |
-| `Ctrl+V`       | Save current view to file                                    |
-| `w`            | Save current tab to file (overwrite without prompt)          |
-| `gw`           | Save all tabs to file (overwrite without prompt)             |
-| `Ctrl+D`       | Duplicate current tab                                        |
-| `Ctrl+O`       | Open file in a new tab                                       |
-| `Ctrl+N`       | Create new tab from Polars expression                        |
-| `Double-click` | Rename tab                                                   |
+| Key            | Action                                                     |
+| -------------- | ---------------------------------------------------------- |
+| `q`            | Quit current tab (prompts to save unsaved changes) or view |
+| `gq`           | Quit all tabs then app (prompts to save unsaved changes)   |
+| `Space`        | Toggle tab bar visibility                                  |
+| `b`            | Next tab                                                   |
+| `B`            | Previous tab                                               |
+| `>`            | Move current tab right (wrap to first)                     |
+| `<`            | Move current tab left (wrap to last)                       |
+| `Ctrl+T`       | Save current tab to file                                   |
+| `Ctrl+S`       | Save all tabs to file                                      |
+| `Ctrl+V`       | Save current view to file                                  |
+| `w`            | Save current tab to file (overwrite without prompt)        |
+| `gw`           | Save all tabs to file (overwrite without prompt)           |
+| `Ctrl+D`       | Duplicate current tab                                      |
+| `Ctrl+O`       | Open file in a new tab                                     |
+| `Ctrl+N`       | Create new tab from Polars expression                      |
+| `Double-click` | Rename tab                                                 |
 
 **Tips:**
 
@@ -412,10 +411,10 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 #### SQL Interface
 
-| Key | Action                                                        |
-| --- | ------------------------------------------------------------- |
-| `l` | Simple SQL interface (select columns & where clause)          |
-| `L` | Advanced SQL interface (full SQL query with syntax highlight) |
+| Key  | Action                                                        |
+| ---- | ------------------------------------------------------------- |
+| `Q`  | Simple SQL interface (select columns & where clause)          |
+| `zQ` | Advanced SQL interface (full SQL query with syntax highlight) |
 
 ## Features in Detail
 
@@ -893,7 +892,7 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 The SQL interface provides two modes for querying your dataframe:
 
-#### Simple SQL Interface (`l`)
+#### Simple SQL Interface (`Q`)
 
 SELECT specific columns and apply WHERE conditions without writing full SQL:
 
@@ -901,7 +900,7 @@ SELECT specific columns and apply WHERE conditions without writing full SQL:
 - Specify WHERE clause for filtering
 - Ideal for quick filtering and column selection
 
-#### Advanced SQL Interface (`L`)
+#### Advanced SQL Interface (`zQ`)
 
 Execute complete SQL queries for advanced data manipulation:
 
