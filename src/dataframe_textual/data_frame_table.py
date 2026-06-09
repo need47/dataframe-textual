@@ -193,7 +193,7 @@ class DataFrameTable(DataTable):
         - **Ctrl+F** - 📜 Page down
         - **Ctrl+B** - 📜 Page up
         - **PgUp/PgDn** - 📜 Page up/down
-        - **&** - 📌 Mark current row as header
+        - **\\*** - 📌 Mark current row as header
 
         ## ♻️ Undo/Redo/Reset
         - **u** - ↩️ Undo last action
@@ -216,7 +216,7 @@ class DataFrameTable(DataTable):
         - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
         - **+** - 📌 Freeze rows and/or columns
         - **~** - 🏷️ Toggle column index prefix
-        - **^** - 🆔 Toggle internal row index (RID)
+        - **g^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for current column
         - **g,** - 🔢 Toggle thousand separator for all numeric columns
         - **(** - 🔢 Decrease float precision for current column
@@ -230,6 +230,7 @@ class DataFrameTable(DataTable):
         - **a** - ➕ Add empty column after current
         - **A** - ➕ Add column with name and optional expression
         - **@** - 🔗 Add a new link column from template
+        - **^** - ✏️ Rename current column
         - **x** - ✖️ Delete current row
         - **X** - ✖️ Delete row and those below
         - **Ctrl+X** - ✖️ Delete row and those above
@@ -318,8 +319,8 @@ class DataFrameTable(DataTable):
         ("comma", "toggle_thousand_separator", "Toggle thousand separator for column"),  # `,`
         ("left_parenthesis", "adjust_float_precision(-1)", "Decrease float precision for column"),  # `(`
         ("right_parenthesis", "adjust_float_precision(1)", "Increase float precision for column"),  # `)`
-        ("circumflex_accent", "toggle_rid", "Toggle internal row index (RID)"),  # `^`
-        ("ampersand", "set_cursor_row_as_header", "Set cursor row as the new header row"),  # `&`
+        ("circumflex_accent", "rename_column", "Rename current column"),  # `^`
+        ("asterisk", "set_cursor_row_as_header", "Set cursor row as the new header row"),  # `*`
         # Copy
         ("c", "copy_cell", "Copy cell to clipboard"),
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
@@ -892,6 +893,14 @@ class DataFrameTable(DataTable):
 
     def on_key(self, event: Key) -> None:
         """Handle key press events."""
+        if self.g_mode and event.key == "circumflex_accent":  # `g^`:
+            event.stop()
+            if self.app.timeout_timer:
+                self.app.timeout_timer.stop()
+                self.app.timeout_timer = None
+            self.do_toggle_rid()
+            return
+
         if event.key == "up":
             self.load_rows_up()
         elif event.key == "down":
@@ -971,10 +980,6 @@ class DataFrameTable(DataTable):
     def action_expand_column(self) -> None:
         """Expand the current column to its full width."""
         self.do_expand_column()
-
-    def action_toggle_rid(self) -> None:
-        """Toggle the internal row index column visibility."""
-        self.do_toggle_rid()
 
     @with_full_df
     def action_set_cursor_row_as_header(self) -> None:
@@ -2367,6 +2372,7 @@ class DataFrameTable(DataTable):
 
             self.notify(f"Column {result}", title="Expand Column")
 
+    @with_g_mode
     def do_toggle_rid(self) -> None:
         """Toggle display of the internal RID column."""
         self.show_rid = not self.show_rid
@@ -2375,7 +2381,7 @@ class DataFrameTable(DataTable):
         self.setup_table()
 
         self.notify(
-            f"{'Showing' if self.show_rid else 'Hiding'} internal RID column. Press [$accent]^[/] to toggle.",
+            f"{'Showing' if self.show_rid else 'Hiding'} internal RID column. Press [$success]g[/][$accent]^[/] to toggle.",
             title="Toggle RID",
         )
 

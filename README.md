@@ -314,8 +314,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `g,`              | Toggle thousand separator for all numeric columns                      |
 | `(`               | Decrease float precision for current column                            |
 | `)`               | Increase float precision for current column                            |
-| `^`               | Toggle internal row index column (RID)                                 |
-| `&`               | Set current row as the new header row                                  |
+| `*`               | Set current row as the new header row                                  |
 | `h`               | Hide selected columns or current column                                |
 | `H`               | Show all hidden columns                                                |
 
@@ -331,6 +330,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `a`            | Add empty column after current                                |
 | `A`            | Add column with name and value/expression                     |
 | `@`            | Add a link column from URL template                           |
+| `^`            | Rename current column                                         |
 | `-` (minus)    | Delete selected columns or current column                     |
 | `x`            | Delete current row                                            |
 | `X`            | Delete current row and all those below                        |
