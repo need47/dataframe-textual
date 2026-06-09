@@ -325,7 +325,9 @@ class TableScreen(TableModalScreen):
         and notifies the user of the action.
 
         Args:
-            col_name_value: Tuple of (column_index, column_name, column_value) to filter/collect by, or None.
+            cidx: Column index.
+            col_name: Column name.
+            values: Selected value(s) to filter/collect by.
             action: Either "filter" to filter rows, or "collect" to collect rows. Defaults to "filter".
         """
         # Create expression for NULL values
@@ -377,10 +379,10 @@ class TableScreen(TableModalScreen):
         self.dftable.move_cursor(column=cidx)
 
     def show_frequency(self, cidx: int | None = None) -> None:
-        """Show frequency by the selected value.
+        """Show frequency for the selected column.
 
         Args:
-            col_name_value: Tuple of (column_index, column_name, column_value).
+            cidx: Column index.
         """
         if cidx is None:
             return
@@ -389,10 +391,10 @@ class TableScreen(TableModalScreen):
         self.dftable.do_show_frequency(cidx)
 
     def show_statistics(self, cidx: int | None = None) -> None:
-        """Show frequency by the selected value.
+        """Show statistics for the selected column.
 
         Args:
-            col_name_value: Tuple of (column_index, column_name, column_value).
+            cidx: Column index.
         """
         if cidx is None:
             return
