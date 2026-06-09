@@ -216,7 +216,7 @@ class DataFrameTable(DataTable):
         - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
         - **+** - 📌 Freeze rows and/or columns
         - **~** - 🏷️ Toggle column index prefix
-        - **g^** - 🆔 Toggle internal row index (RID)
+        - **z^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for current column
         - **g,** - 🔢 Toggle thousand separator for all numeric columns
         - **(** - 🔢 Decrease float precision for current column
@@ -475,6 +475,7 @@ class DataFrameTable(DataTable):
         if self.df is not None:
             self.dataframe = add_rid_column(self.df)
             self.df = self.dataframe
+            self.df_done = True
             self.setup_table()
             return
 
@@ -892,7 +893,7 @@ class DataFrameTable(DataTable):
 
     def on_key(self, event: Key) -> None:
         """Handle key press events."""
-        if self.leader_key and event.key == "circumflex_accent":  # `g^`:
+        if self.leader_key == "z" and event.key == "circumflex_accent":  # `z^`:
             event.stop()
             if self.app.timeout_timer:
                 self.app.timeout_timer.stop()
@@ -1103,7 +1104,7 @@ class DataFrameTable(DataTable):
     @with_leader_key
     def action_replace(self) -> None:
         """Replace values in current column or globally across all columns."""
-        scope = "global" if self.leader_key else "column"
+        scope = "global" if self.leader_key == "g" else "column"
         self.do_replace(scope=scope)
 
     def action_toggle_selection_current_row(self) -> None:
@@ -1274,7 +1275,7 @@ class DataFrameTable(DataTable):
     @with_leader_key
     def action_toggle_thousand_separator(self) -> None:
         """Toggle thousand separator for the current cursor column."""
-        if self.leader_key:
+        if self.leader_key == "g":
             if self.thousand_separator_columns:
                 self.thousand_separator_columns.clear()
                 status = "off"
@@ -1313,7 +1314,7 @@ class DataFrameTable(DataTable):
 
         self.setup_table()
         message = f"Thousand separator is [$success]{status}[/] for " + (
-            "[$accesent]all numeric columns[/]" if self.leader_key else f"column [$accent]{col_name}[/]"
+            "[$accesent]all numeric columns[/]" if self.leader_key == "g" else f"column [$accent]{col_name}[/]"
         )
 
         self.notify(message, title="Toggle Thousand Separator")
@@ -1368,7 +1369,7 @@ class DataFrameTable(DataTable):
     @with_leader_key
     def action_sql_query(self) -> None:
         """Open the SQL interface screen."""
-        if self.leader_key:
+        if self.leader_key == "z":
             self.do_advanced_sql()
         else:
             self.do_simple_sql()
@@ -2201,7 +2202,7 @@ class DataFrameTable(DataTable):
     def do_show_statistics(self, cidx: int | None = None) -> None:
         """Show statistics for the current column or entire dataframe."""
         # Show statistics for entire dataframe
-        if self.leader_key:
+        if self.leader_key == "g":
             self.app.push_screen(StatisticsScreen(self, cidx=None))
         # Show statistics for current column
         else:
@@ -2328,7 +2329,7 @@ class DataFrameTable(DataTable):
         In leader mode: expand or unexpand all string/list columns.
         Otherwise: expand or unexpand the current column only.
         """
-        if self.leader_key:
+        if self.leader_key == "g":
             # Collect all string/list column names
             target_cols = [
                 col for col, dtype in self.visible_columns.items() if DtypeConfig(dtype).gtype in ("string", "list")
@@ -3623,7 +3624,7 @@ class DataFrameTable(DataTable):
                 "match_literal": True,
                 "match_reverse": False,
             },
-            scope="global" if self.leader_key else "column",
+            scope="global" if self.leader_key == "g" else "column",
         )
 
     def do_find_expr(self) -> None:
@@ -3634,7 +3635,7 @@ class DataFrameTable(DataTable):
         # Use current cell value as default search term
         term = NULL if self.cursor_value is None else str(self.cursor_value)
         cidx = self.cursor_cidx
-        scope = "global" if self.leader_key else "column"
+        scope = "global" if self.leader_key == "g" else "column"
 
         # Push the search modal screen
         self.app.push_screen(

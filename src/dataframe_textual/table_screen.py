@@ -1195,3 +1195,69 @@ class BarScreen(TableModalScreen):
             ),
             key="total",
         )
+
+
+class SheetScreen(TableModalScreen):
+    """Modal screen displaying information about all currently opened tables."""
+
+    def __init__(self, tabs: dict) -> None:
+        """Initialize the SheetScreen.
+
+        Args:
+            tabs: Dict mapping TabPane to DataFrameTable instances.
+        """
+        super().__init__()
+        self.tabs = tabs
+
+    def on_mount(self) -> None:
+        """Build the table on mount."""
+        self.build_table()
+
+    def on_key(self, event) -> None:
+        """Handle key events."""
+        if event.key == "enter":
+            event.stop()
+            self._switch_to_cursor_tab()
+        elif event.key == "x":
+            event.stop()
+            self._close_cursor_tab()
+
+    def _switch_to_cursor_tab(self) -> None:
+        """Close the SheetScreen and switch to the tab under the cursor."""
+        row_idx = self.table.cursor_row
+        panes = list(self.tabs.keys())
+        if 0 <= row_idx < len(panes):
+            target_pane = panes[row_idx]
+            self.app.pop_screen()
+            self.app.tabbed.active = target_pane.id
+            self.tabs[target_pane].focus()
+
+    def _close_cursor_tab(self) -> None:
+        """Close the SheetScreen, activate the tab under the cursor, and close it."""
+        row_idx = self.table.cursor_row
+        panes = list(self.tabs.keys())
+        if 0 <= row_idx < len(panes):
+            target_pane = panes[row_idx]
+            self.app.do_close(target_pane)
+            self.build_table()
+
+    def build_table(self) -> None:
+        """Build the sheets overview table."""
+        rows = []
+        for pane, dftable in self.tabs.items():
+            # Collect the dataframe if it hasn't been loaded yet
+            if dftable.df is None:
+                dftable.df = dftable.lf.collect()
+
+            rows.append(
+                {
+                    "Tab": dftable.tabname,
+                    "#Rows_Loaded": dftable.loaded_rows,
+                    "#Rows": len(dftable.df),
+                    "#Cols": len(dftable.df.select(pl.exclude(RID)).columns),
+                    "Filename": dftable.filename,
+                }
+            )
+
+        self.df = pl.DataFrame(rows)
+        self.df2table()

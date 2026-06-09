@@ -234,6 +234,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | -------------- | ---------------------------------------------------------- |
 | `q`            | Quit current tab (prompts to save unsaved changes) or view |
 | `gq`           | Quit all tabs then app (prompts to save unsaved changes)   |
+| `S`            | Show all open sheets/tabs                                  |
 | `Space`        | Toggle tab bar visibility                                  |
 | `b`            | Next tab                                                   |
 | `B`            | Previous tab                                               |
@@ -420,7 +421,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 ### 1. Display & UI
 
-Columns are automatically styled based on their data types:
+Columns are automatically styled based on their data types (auto-inferred):
 
 | Data Type | Text Color | Alignment |
 | --------- | ---------- | --------- |
@@ -429,6 +430,30 @@ Columns are automatically styled based on their data types:
 | string    | Green      | left      |
 | boolean   | Blue       | centered  |
 | temporal  | Magenta    | centered  |
+
+### 2. Sheets Overview (SheetScreen)
+
+Press `S` at the app level to open the **Sheets** modal — a summary view of all currently opened tabs, inspired by VisiData's "Sheets Sheet".
+
+The modal displays a table with the following columns:
+
+| Column           | Description                                      |
+| ---------------- | ------------------------------------------------ |
+| **Tabname**      | Display name of the tab                          |
+| **#Loaded_Rows** | Number of rows currently loaded into the table   |
+| **#Rows**        | Total number of rows in the underlying DataFrame |
+| **#Cols**        | Number of columns (excluding the internal RID)   |
+| **Filename**     | Source file path                                 |
+
+**Keys inside the SheetScreen:**
+
+| Key     | Action                                                      |
+| ------- | ----------------------------------------------------------- |
+| `Enter` | Close the modal and switch to the tab under the cursor      |
+| `x`     | Close the tab under the cursor (prompts if unsaved changes) |
+| `q`     | Dismiss the modal                                           |
+
+This is useful for quickly navigating between tabs, reviewing file sizes at a glance, or closing tabs you no longer need without switching to them first.
 
 **Hide/Show Columns** (`h` / `H`):
 
@@ -466,7 +491,7 @@ Columns are automatically styled based on their data types:
 - Cycles through cell, row, and column selection modes
 - Use it to switch between inspecting a single cell, an entire row, or an entire column
 
-### 2. Row Detail View
+### 3. Row Detail View
 
 Press `Enter` on any row to open a modal showing all column values for that row.
 Useful for examining wide table where columns don't fit well on screen.
@@ -484,7 +509,7 @@ Useful for examining wide table where columns don't fit well on screen.
 - Press `Tab` to open a cell-detail modal for the selected field
 - Press `q` or `Escape` to close the modal
 
-### 3. Cell Detail View
+### 4. Cell Detail View
 
 Press `Tab` in the main table to inspect the current cell in its own modal.
 
@@ -498,7 +523,7 @@ Inside the cell-detail modal, press `Tab` again on the selected row/column to ke
 - Dict-like values are shown as key/value columns
 - Press `q` or `Escape` to close the modal
 
-### 4. Row/Column Selection
+### 5. Row/Column Selection
 
 The application provides multiple ways to select rows (for filtering or collecting) and columns (for hiding or deleting):
 
@@ -529,7 +554,7 @@ These options work with plain text searches. Use Polars regex patterns in expres
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 - Use `u` to undo any search or filter
 
-### 5. Find & Replace
+### 6. Find & Replace
 
 Find by value/expression and highlight matching cells:
 
@@ -571,7 +596,7 @@ When you press `r` or `gr`, enter:
 - Type `NULL` to find or replace null values
 - Support undo (`u`)
 
-### 6. Filter & Collect
+### 7. Filter & Collect
 
 Both actions work on a subset of the original dataframe, but they serve different workflows.
 
@@ -611,7 +636,7 @@ For **Basic Filter** (`v`) and **Collect** (`"`), rows are chosen in this order:
 - Otherwise, use rows with active matches from search or find
 - Otherwise, use rows whose current-column value matches the current cell
 
-### 7. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
+### 8. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
 
 Complex values, filters, and advanced operations can be specified via Polars expressions, with the following adaptions for convenience:
 
@@ -683,14 +708,14 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - Use column names that match exactly (case-sensitive)
 - Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
 
-### 8. Sorting
+### 9. Sorting
 
 - Press `[` to sort current column ascending
 - Press `]` to sort current column descending
 - Multi-column sorting supported (press multiple times on different columns)
 - Press same key twice to remove the current column from sorting
 
-### 9. Column Metadata
+### 10. Column Metadata
 
 View quick metadata about your columns to understand their structure and content.
 
@@ -709,7 +734,7 @@ View quick metadata about your columns to understand their structure and content
 
 - Press `q` or `Escape` to close
 
-### 10. Frequency Distribution
+### 11. Frequency Distribution
 
 Press `F` to see value distributions of the current column. The modal shows:
 
@@ -734,7 +759,7 @@ This is useful for:
 - Identifying rare or common values
 - Finding the most/least frequent entries
 
-### 11. Column & Dataframe Statistics
+### 12. Column & Dataframe Statistics
 
 Show summary statistics such as count, null count, mean, median, standard deviation, min, max, and etc.
 
@@ -754,7 +779,7 @@ This is useful for:
 - Reviewing summary statistics without leaving the TUI
 - Comparing columns at a glance
 
-### 12. Editing
+### 13. Editing
 
 **Edit Cell** (`e` or **Double-click**):
 
@@ -815,7 +840,7 @@ This is useful for:
 - Useful for quick deduplication before further editing, collecting, or exporting
 - Supports undo with `u`
 
-### 13. Column & Row Reordering
+### 14. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
 
@@ -827,7 +852,7 @@ This is useful for:
 - Swaps adjacent rows
 - Reorder is preserved when saving
 
-### 14. Save File
+### 15. Save File
 
 The application provides separate save actions for the current tab, all tabs, and the current filtered view.
 
@@ -848,7 +873,7 @@ The application provides separate save actions for the current tab, all tabs, an
 
 The output format is determined by the file extension, making it easy to convert between formats such as CSV, TSV, Parquet, or Excel.
 
-### 15. Undo/Redo/Reset
+### 16. Undo/Redo/Reset
 
 **Undo** (`u`):
 
@@ -869,7 +894,7 @@ The output format is determined by the file extension, making it easy to convert
 - Clears all edits, deletions, selections, filters, and sorts
 - Useful for starting fresh without reloading the file
 
-### 16. Column Type Conversion
+### 17. Column Type Conversion
 
 Press the type conversion keys to instantly cast the current column to a different data type:
 
@@ -888,7 +913,7 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 **Note**: Type conversion attempts to preserve data where possible. Conversions may lose data (e.g., float to int rounding).
 
-### 17. SQL Interface
+### 18. SQL Interface
 
 The SQL interface provides two modes for querying your dataframe:
 
@@ -923,7 +948,7 @@ FROM self
 WHERE `product id` = 7
 ```
 
-### 18. Clipboard Operations
+### 19. Clipboard Operations
 
 Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 
@@ -934,7 +959,7 @@ Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 - Press `Ctrl+R` to copy row values (delimited by tab)
 - Hold `Shift` to select with mouse
 
-### 19. Link Column Creation
+### 20. Link Column Creation
 
 Press `@` to create a new column containing dynamically generated URLs using template. Links are typically clickable in a terminal emulator using Ctrl+Click.
 
@@ -958,7 +983,7 @@ The link template supports multiple placeholder types for maximum flexibility:
 - Use full undo (`u`) if template produces unexpected URLs
 - For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
 
-### 20. Python Console
+### 21. Python Console
 
 Use the built-in Python console for quick interactive transformations without leaving the TUI.
 

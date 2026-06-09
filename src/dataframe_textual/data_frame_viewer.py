@@ -30,6 +30,7 @@ from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
 from .file_picker_screen import OpenFileScreen, SaveFileScreen
 from .status_bar import StatusBar
+from .table_screen import SheetScreen
 from .yes_no_screen import ConfirmScreen, NewTabScreen, RenameTabScreen
 
 
@@ -59,6 +60,7 @@ class DataFrameViewer(App):
         - **Double-click** - ✏️ Rename tab
 
         ## 🎨 View & Settings
+        - **S** - 📋 Show all open sheets/tabs
         - **F1** - ❓ Toggle this help panel
         - **k** - 🌙 Select theme
         - **` (backtick)** - 🐍 Toggle Python console
@@ -93,6 +95,7 @@ class DataFrameViewer(App):
         ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
         ("k", "select_theme", "Select Theme"),
         ("grave_accent", "toggle_python_console", "Python Console"),  # '`'
+        ("S", "show_sheets", "Show Sheets"),
     ]
 
     CSS = """
@@ -310,11 +313,11 @@ class DataFrameViewer(App):
         """
         # Focus the table in the newly activated tab
         if table := self.active_table:
-            self._set_status()
-            table.focus()
-
             if table.loaded_rows == 0:
                 table.init_table()
+
+            self._set_status()
+            table.focus()
 
     def _set_status_context(self, table: DataFrameTable | None = None) -> None:
         """Update the fixed left-side status context.
@@ -391,6 +394,10 @@ class DataFrameViewer(App):
         #         markup=markup,
         #     )
 
+    def action_show_sheets(self) -> None:
+        """Show a modal with information about all currently opened tables."""
+        self.push_screen(SheetScreen(self.tabs))
+
     def action_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.
 
@@ -417,7 +424,7 @@ class DataFrameViewer(App):
         Checks for unsaved changes and prompts the user to save if needed.
         If this is the last tab, exits the app.
         """
-        if self.leader_key:
+        if self.leader_key == "g":
             self.do_close_all()
         else:
             self.do_close()
@@ -443,7 +450,7 @@ class DataFrameViewer(App):
         self.do_save_to_file(all_tabs=True)
 
     def action_save_tab_overwrite(self) -> None:
-        if self.leader_key:
+        if self.leader_key == "g":
             self._save_all_tabs_overwrite()
         else:
             self._save_current_tab_overwrite()
@@ -906,14 +913,16 @@ class DataFrameViewer(App):
         except Exception:
             pass
 
-    def close_tab(self) -> None:
+    def close_tab(self, pane: TabPane | None = None) -> None:
         """Actually close the tab."""
         try:
-            if not (active_pane := self.tabbed.active_pane):
+            if pane is None:
+                pane = self.tabbed.active_pane
+            if not pane:
                 return
 
-            self.tabbed.remove_pane(active_pane.id)
-            self.tabs.pop(active_pane)
+            self.tabbed.remove_pane(pane.id)
+            self.tabs.pop(pane)
 
             # Quit app if no tabs remain
             if len(self.tabs) == 0:
