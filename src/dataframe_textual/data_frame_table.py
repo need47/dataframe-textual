@@ -204,10 +204,10 @@ class DataFrameTable(DataTable):
         - **Enter** - 📋 Show row details in modal
         - **Tab** - 🔍 Show current cell details in modal; use `Tab` again there to drill deeper
         - **F** - 📊 Show frequency distribution for current column
-        - **i** - 📊 Show histogram for current column
-        - **I** - 📊 Show histogram for current column with custom bins
-        - **S** - 📈 Show statistics for current column
-        - **gS** - 📊 Show statistics for entire dataframe
+        - **m** - 📊 Show histogram for current column
+        - **M** - 📊 Show histogram for current column with custom bins
+        - **I** - 📈 Show statistics for current column
+        - **gI** - 📊 Show statistics for entire dataframe
         - **=** - 📊 Show histogram using first column as label and current column as value
         - **C** - 📋 Show column metadata (ID, name, type)
         - **h** - 👁️ Hide selected columns or current column
@@ -330,9 +330,9 @@ class DataFrameTable(DataTable):
         ("enter", "view_row_detail", "View row details"),
         ("tab", "view_cell_detail", "View cell details"),
         ("F", "show_frequency", "Show frequency for current column"),
-        ("i", "show_histogram", "Show histogram for current column"),
-        ("I", "show_histogram(0)", "Show histogram for current column with custom bins"),
-        ("S", "show_statistics", "Show statistics"),
+        ("m", "show_histogram", "Show histogram for current column"),
+        ("M", "show_histogram(0)", "Show histogram for current column with custom bins"),
+        ("I", "show_statistics", "Show statistics"),
         ("equals_sign", "show_bar", "Show histogram using first column as label and current column as value"),  # `=`
         # Sort
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`

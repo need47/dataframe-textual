@@ -298,10 +298,10 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `Enter`           | Show details for the current row as two-column key–value pairs         |
 | `Tab`             | Show current cell details; press `Tab` again there to drill deeper     |
 | `F`               | Show frequency distribution for current column                         |
-| `i`               | Show histogram for current column                                      |
-| `I`               | Show histogram for current column with custom bins                     |
-| `S`               | Show statistics for current column                                     |
-| `gS`              | Show statistics for entire dataframe                                   |
+| `m`               | Show histogram for current column                                      |
+| `M`               | Show histogram for current column with custom bins                     |
+| `I`               | Show statistics for current column                                     |
+| `gI`              | Show statistics for entire dataframe                                   |
 | `=`               | Show histogram using first column as label and current column as value |
 | `C`               | Show column metadata (e.g., data types)                                |
 | `K`               | Cycle cursor types: cell → row → column → cell                         |
@@ -738,8 +738,8 @@ This is useful for:
 
 Show summary statistics such as count, null count, mean, median, standard deviation, min, max, and etc.
 
-- `S` shows statistics for the current column
-- `gS` shows statistics for all columns in the dataframe
+- `I` shows statistics for the current column
+- `gI` shows statistics for all columns in the dataframe
 
 **In the Statistics Modal**:
 
