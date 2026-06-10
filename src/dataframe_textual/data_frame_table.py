@@ -194,7 +194,6 @@ class DataFrameTable(DataTable):
         - **Ctrl+F** - 📜 Page down
         - **Ctrl+B** - 📜 Page up
         - **PgUp/PgDn** - 📜 Page up/down
-        - **g^** - 📌 Mark current row as header
 
         ## ♻️ Undo/Redo/Reset
         - **u** - ↩️ Undo last action
@@ -216,7 +215,8 @@ class DataFrameTable(DataTable):
         - **_** (underscore) - 📏 Toggle column full width for current column
         - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
         - **+** - 📌 Freeze rows and/or columns
-        - **~** - 🏷️ Toggle column index prefix
+        - **$** - 🏷️ Toggle column index prefix
+        - **g^** - 📌 Mark current row as header
         - **z^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for current column
         - **g,** - 🔢 Toggle thousand separator for all numeric columns
@@ -229,7 +229,7 @@ class DataFrameTable(DataTable):
         - **E** - 📊 Edit entire column with expression
         - **a** - ➕ Add empty column after current
         - **A** - ➕ Add column with name and optional expression
-        - **@** - 🔗 Add a new link column from template
+        - **za** - ➕ Add a link column after current (leader `z` then `a`)
         - **i** - ➕ Add an index column after current
         - **^** - ✏️ Rename current column
         - **d** - ✖️ Delete current row
@@ -289,8 +289,9 @@ class DataFrameTable(DataTable):
         ## 🎨 Type Casting
         - **#** - 🔢 Cast column to integer
         - **%** - 🔢 Cast column to float
-        - **!** - ✅ Cast column to boolean
-        - **$** - 📝 Cast column to string
+        - **$** - ✅ Cast column to boolean
+        - **~** - 📝 Cast column to string
+        - **@** - 📅 Cast column to date
 
         ## 📋 Copy
         - **c** - 📋 Copy cell to clipboard
@@ -321,7 +322,6 @@ class DataFrameTable(DataTable):
         # Display
         ("underscore", "expand_column", "Toggle column full width"),  # `_`
         ("asterisk", "toggle_column", "Hide/show selected columns or current column"),  # `*`
-        ("tilde", "toggle_column_index", "Toggle column index prefix"),  # `~`
         ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
         ("comma", "toggle_thousand_separator", "Toggle thousand separator for column"),  # `,`
         ("left_parenthesis", "adjust_float_precision(-1)", "Decrease float precision for column"),  # `(`
@@ -381,7 +381,6 @@ class DataFrameTable(DataTable):
         # Add Column
         ("a", "add_column", "Add column"),
         ("A", "add_column_expr", "Add column with expression"),
-        ("at", "add_link_column", "Add a link column"),  # `@`
         ("i", "add_index_column", "Add an index column"),  # `i`
         # Reorder
         ("shift+left,H", "move_column_left", "Move column left"),
@@ -391,8 +390,9 @@ class DataFrameTable(DataTable):
         # Type Casting
         ("number_sign", "cast_column_dtype('pl.Int64')", "Cast column dtype to integer"),  # `#`
         ("percent_sign", "cast_column_dtype('pl.Float64')", "Cast column dtype to float"),  # `%`
-        ("exclamation_mark", "cast_column_dtype('pl.Boolean')", "Cast column dtype to bool"),  # `!`
-        ("dollar_sign", "cast_column_dtype('pl.String')", "Cast column dtype to string"),  # `$`
+        ("dollar_sign", "cast_column_dtype('pl.Boolean')", "Cast column dtype to bool"),  # `$`
+        ("tilde", "cast_column_dtype('pl.String')", "Cast column dtype to string"),  # `~`
+        ("at", "cast_column_dtype('pl.Date')", "Cast column dtype to date"),  # `@`
         # Sql
         ("Q", "sql_query", "Open SQL interface"),  # `Q`
     ]
@@ -930,11 +930,19 @@ class DataFrameTable(DataTable):
             event: The key event object.
         """
         # Toggle internal row index column (RID)
-        if self.leader_key == "z" and event.key == "circumflex_accent":  # `z^`:
-            event.stop()
-            self.stop_timer()
-            self.do_toggle_rid()
-            return
+        if self.leader_key == "z":
+            if event.key == "circumflex_accent":  # `z^`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_toggle_rid()
+                return
+            elif event.key == "tilde":  # `z~`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_toggle_column_index()
+                return
         elif self.leader_key == "g":
             # Go to leftmost column
             if event.key == "h":  # `gh`:
@@ -1135,9 +1143,13 @@ class DataFrameTable(DataTable):
         self.do_edit_column()
 
     @with_full_df
+    @with_leader_key
     def action_add_column(self) -> None:
         """Add an empty column after the current column."""
-        self.do_add_column()
+        if self.leader_key == "z":
+            self.do_add_link_column()
+        else:
+            self.do_add_column()
 
     def action_add_column_expr(self) -> None:
         """Add a new column with optional expression after the current column."""
@@ -1147,11 +1159,6 @@ class DataFrameTable(DataTable):
     def action_add_index_column(self) -> None:
         """Add an index column after the current column."""
         self.do_add_index_column()
-
-    @with_full_df
-    def action_add_link_column(self) -> None:
-        """Open AddLinkScreen to create a new link column from a Polars expression."""
-        self.do_add_link_column()
 
     def action_rename_column(self, col_idx: int | None = None) -> None:
         """Rename the current column."""
@@ -1281,13 +1288,6 @@ class DataFrameTable(DataTable):
     def action_toggle_freeze_row_column(self) -> None:
         """Toggle the freeze."""
         self.do_toggle_freeze_row_column()
-
-    def action_toggle_column_index(self) -> None:
-        """Toggle 1-based index prefixes in column labels."""
-        self.show_column_index = not self.show_column_index
-        self.setup_table()
-        status = "on" if self.show_column_index else "off"
-        self.notify(f"Column index prefix is [$success]{status}[/]", title="Toggle Column Index")
 
     def action_toggle_row_labels(self) -> None:
         """Backward-compatible alias for toggling column index prefixes."""
@@ -2461,6 +2461,14 @@ class DataFrameTable(DataTable):
             title="Toggle RID",
         )
 
+    @with_leader_key
+    def do_toggle_column_index(self) -> None:
+        """Toggle display of column index prefixes in headers."""
+        self.show_column_index = not self.show_column_index
+        self.setup_table()
+        status = "on" if self.show_column_index else "off"
+        self.notify(f"Column index prefix is [$success]{status}[/]", title="Toggle Column Index")
+
     @with_full_df
     @with_leader_key
     def do_set_cursor_row_as_header(self) -> None:
@@ -3128,17 +3136,14 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to add link column [$error]{new_col_name}[/]", title="Add Link", severity="error")
             self.log(f"Error adding link column: {e}")
 
-    def do_delete_column(self, more: str | None = None) -> None:
+    def do_delete_column(self, more: str | None = None, col_idx: int | None = None) -> None:
         """Remove selected columns when present, otherwise the current column."""
         # Get the column to remove
-        col_idx = self.cursor_column
-        try:
-            col_name = self.cursor_col_name
-        except CellDoesNotExist:
-            self.notify("No column to delete at the current cursor position", title="Delete Column", severity="warning")
-            return
+        if col_idx is None:
+            col_idx = self.cursor_column
 
-        col_key = self.cursor_col_key
+        col_key = self.get_col_key(col_idx)
+        col_name = col_key.value
 
         col_names_to_delete = []
         col_keys_to_delete = []
@@ -3661,7 +3666,15 @@ class DataFrameTable(DataTable):
 
         try:
             # Cast the column using Polars
-            self.df = self.df.with_columns(pl.col(col_name).cast(target_dtype))
+            if target_dtype == pl.Date:
+                if current_dtype == pl.String:
+                    self.df = self.df.with_columns(pl.col(col_name).str.to_date())
+                elif current_dtype == pl.Datetime:
+                    self.df = self.df.with_columns(pl.col(col_name).dt.date())
+                else:
+                    self.df = self.df.with_columns(pl.col(col_name).cast(target_dtype))
+            else:
+                self.df = self.df.with_columns(pl.col(col_name).cast(target_dtype))
 
             # Also update the view if applicable
             if self.df_view is not None:

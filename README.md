@@ -306,7 +306,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `C`               | Show column metadata (e.g., data types)                                |
 | `*`               | Hide selected columns or current column                                |
 | `g*`              | Show all hidden columns                                                |
-| `~`               | Toggle column index prefix                                             |
+| `z~`              | Toggle column index prefix                                             |
 | `_` (underscore)  | Toggle column full width for current column                            |
 | `g_` (underscore) | Toggle column full width for all string/list columns                   |
 | `+`               | Toggle freeze rows and/or columns                                      |
@@ -327,7 +327,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `E`            | Edit entire column with value/expression                      |
 | `a`            | Add empty column after current                                |
 | `A`            | Add column with name and value/expression                     |
-| `@`            | Add a link column from URL template                           |
+| `za`           | Add a link column from URL template                           |
 | `i`            | Add index column after current                                |
 | `^`            | Rename current column                                         |
 | `-` (minus)    | Delete selected columns or current column                     |
@@ -399,12 +399,13 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 #### Type Casting
 
-| Key | Action                                 |
-| --- | -------------------------------------- |
-| `#` | Cast current column to integer (Int64) |
-| `%` | Cast current column to float (Float64) |
-| `!` | Cast current column to boolean         |
-| `$` | Cast current column to string          |
+| Key | Action                         |
+| --- | ------------------------------ |
+| `#` | Cast current column to integer |
+| `%` | Cast current column to float   |
+| `$` | Cast current column to boolean |
+| `~` | Cast current column to string  |
+| `@` | Cast current column to date    |
 
 #### Copy
 
@@ -469,10 +470,11 @@ This is useful for quickly navigating between tabs, reviewing file sizes at a gl
 
 - Toggle frozen rows and/or columns to keep important headers and fields visible while scrolling
 
-**Column Index Prefix Toggle** (`~`):
+**Column Index Prefix Toggle** (`$`):
 
 - Adds/removes a 1-based index prefix in visible column headers (e.g., `1_colname`)
 - Display-only: does not modify underlying data or column names
+- Shortcut mapping note: use `$` for column index prefix and `~` for casting the current column to string
 
 **Thousand Separator Toggle** (`,`):
 
@@ -733,6 +735,7 @@ View quick metadata about your columns to understand their structure and content
 - Press `J` or `Shift+↓` to move the selected column right (and move the metadata row down)
 - Press `K` or `Shift+↑` to move the selected column left (and move the metadata row up)
 - Press `e` to rename the selected column
+- Press `d` to delete the selected column from the main table
 - Press `g` to scroll to top
 - Press `G` to scroll to bottom
 - Press `q` or `Escape` to close
@@ -923,7 +926,7 @@ Press the type conversion keys to instantly cast the current column to a differe
 - `#` - Cast to **integer**
 - `%` - Cast to **float**
 - `!` - Cast to **boolean**
-- `$` - Cast to **string**
+- `~` - Cast to **string**
 
 **Features**:
 
@@ -981,13 +984,13 @@ Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 
 ### 20. Link Column Creation
 
-Press `@` to create a new column containing dynamically generated URLs using template. Links are typically clickable in a terminal emulator using Ctrl+Click.
+Press `za` (leader `z` then `a`) to create a new column containing dynamically generated URLs using template. Links are typically clickable in a terminal emulator using Ctrl+Click.
 
 **Template Placeholders:**
 
 The link template supports multiple placeholder types for maximum flexibility:
 
-- **`$_`** - Current column (the column where cursor was when `@` was pressed), e.g., `https://example.com/search/$_` - Uses values from the current column
+- **`$_`** - Current column, e.g., `https://example.com/search/$_` - Uses values from the current column
 
 - **`$1`, `$2`, `$3`, etc.** - Column by 1-based position index, e.g., `https://example.com/product/$1/details/$2` - Uses 1st and 2nd columns
 

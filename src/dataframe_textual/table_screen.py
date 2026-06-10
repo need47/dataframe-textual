@@ -1006,6 +1006,7 @@ class MetaColumnScreen(TableScreen):
           - 'g': Scroll to top.
           - 'G': Scroll to bottom.
           - 'q' / 'Escape': Close the modal.
+          - 'd': Delete the selected column.
 
         Args:
             event: The key event object.
@@ -1052,6 +1053,24 @@ class MetaColumnScreen(TableScreen):
             # Rename is asynchronous (opens a modal), so rebuild on resume.
             self._resume_row_idx = self.table.cursor_row
             self.dftable.action_rename_column(col_idx=self._resume_row_idx)
+        # Delete column
+        elif event.key == "d":
+            event.stop()
+            event.prevent_default()
+
+            row_idx = self.table.cursor_row
+
+            # Align the main table cursor to the selected metadata row, then delete.
+            self.dftable.move_cursor(column=row_idx)
+            self.dftable.do_delete_column(col_idx=row_idx)
+
+            # Refresh metadata and keep cursor on a valid row after deletion.
+            if not self.dftable.visible_columns:
+                self.app.pop_screen()
+                return
+            else:
+                self.build_table()
+                self.table.move_cursor(row=row_idx)
 
     def on_screen_resume(self) -> None:
         """Rebuild metadata after returning from stacked screens (e.g., rename dialog)."""
