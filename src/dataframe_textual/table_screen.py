@@ -115,7 +115,7 @@ class TableModalScreen(ModalScreen):
         elif event.key == "right_square_bracket":  # ']'
             event.stop()
             self.sort_by_column(descending=True)
-        elif event.key == "K":
+        elif event.key == "C":
             event.stop()
             next_type = get_next_item(CURSOR_TYPES, self.table.cursor_type)
             self.table.cursor_type = next_type
@@ -826,8 +826,7 @@ class FrequencyScreen(TableScreen):
             style = HIGHLIGHT_COLOR if is_selected else None
 
             value_cells = [
-                dcs[col].format(value, style=style)
-                for col, value in zip(self.col_names, values, strict=True)
+                dcs[col].format(value, style=style) for col, value in zip(self.col_names, values, strict=True)
             ]
 
             self.table.add_row(

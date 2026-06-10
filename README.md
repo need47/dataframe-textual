@@ -466,6 +466,36 @@ Columns are automatically styled based on their data types (auto-inferred):
 - Precision of 0 means full (default) display
 - Display-only: does not modify underlying data in the dataframe
 
+#### Modal Screens (Common Controls)
+
+Several features open a **modal screen** (an overlay table) for inspection or interaction. The following modals share a common set of keyboard shortcuts:
+
+| Modal Screen    | Opened With | Purpose                                    |
+| --------------- | ----------- | ------------------------------------------ |
+| Sheets Overview | `S`         | Summary of all open tabs                   |
+| Column Metadata | `C`         | Column names and data types                |
+| Row Detail      | `Enter`     | All column values for one row              |
+| Cell Detail     | `Tab`       | Drill into a single cell value             |
+| Frequency       | `F`         | Value distribution for a column            |
+| Statistics      | `I` / `gI`  | Summary statistics for column or dataframe |
+| Histogram       | `m` / `M`   | Numeric distribution as histogram          |
+| Bar Chart       | `=`         | Bar chart using label + value columns      |
+
+**Common keys available in all modal screens:**
+
+| Key            | Action                                       |
+| -------------- | -------------------------------------------- |
+| `q` / `Escape` | Close the modal                              |
+| `g`            | Scroll to top                                |
+| `G`            | Scroll to bottom                             |
+| `[`            | Sort by current column ascending             |
+| `]`            | Sort by current column descending            |
+| `,`            | Toggle thousand separator for numeric values |
+| `C`            | Cycle cursor type (cell → row → column)      |
+| `Ctrl+S`       | Save the modal table to file                 |
+
+Individual modals may add extra keys on top of these (documented in each subsection below).
+
 ### 2. Sheets Overview
 
 Press `S` at the app level to open the **Sheets** modal — a summary view of all currently opened tabs, inspired by VisiData's "Sheets Sheet".
@@ -487,7 +517,6 @@ The modal displays a table with the following columns:
 | `Enter` | Close the modal and switch to the tab under the cursor      |
 | `e`     | Rename the tab under the cursor                             |
 | `d`     | Close the tab under the cursor (prompts if unsaved changes) |
-| `q`     | Dismiss the modal                                           |
 
 This is useful for quickly navigating between tabs, reviewing file sizes at a glance, or closing tabs you no longer need without switching to them first.
 
@@ -510,9 +539,6 @@ View quick metadata about your columns to understand their structure and content
 - Press `K` or `Shift+↑` to move the selected column left (and move the metadata row up)
 - Press `e` to rename the selected column
 - Press `d` to delete the selected column from the main table
-- Press `g` to scroll to top
-- Press `G` to scroll to bottom
-- Press `q` or `Escape` to close
 
 ### 4. Row Detail View
 
@@ -530,7 +556,6 @@ Useful for examining wide table where columns don't fit well on screen.
 - Press `F` to show the frequency table for the selected column
 - Press `I` to show the statistics table for the selected column
 - Press `Tab` to open a cell-detail modal for the selected field
-- Press `q` or `Escape` to close the modal
 
 ### 5. Cell Detail View
 
@@ -544,7 +569,6 @@ Inside the cell-detail modal, press `Tab` again on the selected row/column to ke
 - String values are split into multiple rows using `|` by default
 - List-like values are expanded into a one-column table
 - Dict-like values are shown as key/value columns
-- Press `q` or `Escape` to close the modal
 
 ### 6. Frequency Distribution
 
@@ -555,14 +579,8 @@ Press `F` to see value distributions for the current column. If multiple columns
 
 **In the Frequency Modal**:
 
-- Press `[` and `]` to sort by any displayed value column or by count/percentage
 - Press `v` to **filter** rows matching the selected value (or selected value combinations)
 - Press `"` to **collect** rows matching the selected value (or selected value combinations) to a new tab
-- Press `,` to toggle thousand separator for numeric values
-- Press `g` to scroll to top
-- Press `G` to scroll to bottom
-- Press `Ctrl+S` to save the frequency table to file
-- Press `q` or `Escape` to close the modal
 
 This is useful for:
 
@@ -581,7 +599,6 @@ Show summary statistics such as count, null count, mean, median, standard deviat
 **In the Statistics Modal**:
 
 - Use arrow keys to navigate
-- Press `q` or `Escape` to close the modal
 
 This is useful for:
 
