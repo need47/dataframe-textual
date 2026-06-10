@@ -434,10 +434,10 @@ Columns are automatically styled based on their data types (auto-inferred):
 | boolean   | Blue       | centered  |
 | temporal  | Magenta    | centered  |
 
-**Hide/Show Columns** (`*` / `g*`):
+**Hide/Show Columns** (`*` / `z*`):
 
 - `*` - Temporarily hide selected columns, or the current column when no columns are selected (data preserved)
-- `g*` - Restore all hidden columns
+- `z*` - Restore all hidden columns
 
 **Freeze Rows and Columns** (`+`):
 

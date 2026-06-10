@@ -211,7 +211,7 @@ class DataFrameTable(DataTable):
         - **=** - 📊 Show bar chart using first selected column as label and cursor column as value
         - **C** - 📋 Show column metadata (ID, name, type)
         - **\\*** - 👁️ Hide selected columns or current column
-        - **g\\*** - 👀 Show all hidden columns
+        - **z\\*** - 👀 Show all hidden columns
         - **_** (underscore) - 📏 Toggle column full width for current column
         - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
         - **+** - 📌 Freeze rows and/or columns
@@ -1091,7 +1091,7 @@ class DataFrameTable(DataTable):
     @with_leader_key
     def action_toggle_column(self) -> None:
         """Hide selected columns or the current column."""
-        if self.leader_key == "g":
+        if self.leader_key == "z":
             self.do_show_hidden_columns()
         else:
             self.do_hide_column()
