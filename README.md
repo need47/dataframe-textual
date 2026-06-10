@@ -16,7 +16,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 
 ### Data Manipulation
 
-- 📝 **Data Editing** - Edit cells, delete rows, remove columns, and explode columns
+- 📝 **Data Editing** - Edit cells, delete rows, reorder columns, and beyond
 - 🧹 **Duplicate Removal** - Remove duplicate rows
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
 - ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts
@@ -260,6 +260,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | ------------------------ | ------------------------------------ |
 | `F1`                     | Toggle help panel                    |
 | `` ` `` (backtick)       | Toggle Python console                |
+| `gT`                     | Select theme                         |
 | `Ctrl+P` -> `Screenshot` | Capture terminal view as a SVG image |
 
 ---
@@ -291,30 +292,29 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 #### Display
 
-| Key               | Action                                                                 |
-| ----------------- | ---------------------------------------------------------------------- |
-| `Enter`           | Show details for the current row as two-column key–value pairs         |
-| `Tab`             | Show current cell details; press `Tab` again there to drill deeper     |
-| `F`               | Show frequency distribution for current or selected columns            |
-| `m`               | Show histogram for current column                                      |
-| `M`               | Show histogram for current column with custom bins                     |
-| `I`               | Show statistics for current column                                     |
-| `gI`              | Show statistics for entire dataframe                                   |
-| `=`               | Show histogram using first column as label and current column as value |
-| `C`               | Show column metadata (e.g., data types)                                |
-| `*`               | Hide selected columns or current column                                |
-| `g*`              | Show all hidden columns                                                |
-| `z~`              | Toggle 1-based column index prefixes in visible headers                |
-| `_` (underscore)  | Toggle column full width for current column                            |
-| `g_` (underscore) | Toggle column full width for all string/list columns                   |
-| `+`               | Toggle freeze rows and/or columns                                      |
-| `,`               | Toggle thousand separator for current column                           |
-| `g,`              | Toggle thousand separator for all numeric columns                      |
-| `(`               | Decrease float precision for current column                            |
-| `)`               | Increase float precision for current column                            |
-| `g^`              | Set current row as the new header row                                  |
-| `gT`              | Open theme selection screen                                            |
-| `zC`              | Cycle cursor type (cell -> row -> column)                              |
+| Key               | Action                                                                         |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `Enter`           | Show details for the current row as two-column key–value pairs                 |
+| `Tab`             | Show current cell details; press `Tab` again there to drill deeper             |
+| `C`               | Show column metadata (e.g., name, data type)                                   |
+| `F`               | Show frequency distribution for current or selected columns                    |
+| `I`               | Show statistics for current column                                             |
+| `gI`              | Show statistics for entire dataframe                                           |
+| `m`               | Show histogram for current column                                              |
+| `M`               | Show histogram for current column with custom bins                             |
+| `=`               | Show bar chart using first selected column as label and cursor column as value |
+| `*`               | Hide selected columns or current column                                        |
+| `g*`              | Show all hidden columns                                                        |
+| `z~`              | Toggle 1-based column index prefixes in visible headers                        |
+| `_` (underscore)  | Toggle column full width for current column                                    |
+| `g_` (underscore) | Toggle column full width for all string/list columns                           |
+| `+`               | Toggle freeze rows and/or columns                                              |
+| `,`               | Toggle thousand separator for current column                                   |
+| `g,`              | Toggle thousand separator for all numeric columns                              |
+| `(`               | Decrease float precision for current column                                    |
+| `)`               | Increase float precision for current column                                    |
+| `g^`              | Set current row as the new header row                                          |
+| `zC`              | Cycle cursor type (cell -> row -> column)                                      |
 
 #### Editing
 
@@ -470,16 +470,16 @@ Columns are automatically styled based on their data types (auto-inferred):
 
 Several features open a **modal screen** (an overlay table) for inspection or interaction. The following modals share a common set of keyboard shortcuts:
 
-| Modal Screen    | Opened With | Purpose                                    |
-| --------------- | ----------- | ------------------------------------------ |
-| Sheets Overview | `S`         | Summary of all open tabs                   |
-| Column Metadata | `C`         | Column names and data types                |
-| Row Detail      | `Enter`     | All column values for one row              |
-| Cell Detail     | `Tab`       | Drill into a single cell value             |
-| Frequency       | `F`         | Value distribution for a column            |
-| Statistics      | `I` / `gI`  | Summary statistics for column or dataframe |
-| Histogram       | `m` / `M`   | Numeric distribution as histogram          |
-| Bar Chart       | `=`         | Bar chart using label + value columns      |
+| Modal Screen    | Opened With | Purpose                                                          |
+| --------------- | ----------- | ---------------------------------------------------------------- |
+| Sheets Overview | `S`         | Summary of all open tabs                                         |
+| Column Metadata | `C`         | Column names and data types                                      |
+| Row Detail      | `Enter`     | All column values for one row                                    |
+| Cell Detail     | `Tab`       | Drill into a single cell value                                   |
+| Frequency       | `F`         | Value distribution for a column                                  |
+| Statistics      | `I` / `gI`  | Summary statistics for column or dataframe                       |
+| Histogram       | `m` / `M`   | Numeric distribution as histogram                                |
+| Bar Chart       | `=`         | Bar chart using selected column as label, cursor column as value |
 
 **Common keys available in all modal screens:**
 

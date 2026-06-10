@@ -208,7 +208,7 @@ class DataFrameTable(DataTable):
         - **M** - 📊 Show histogram for current column with custom bins
         - **I** - 📈 Show statistics for current column
         - **gI** - 📊 Show statistics for entire dataframe
-        - **=** - 📊 Show histogram using first column as label and current column as value
+        - **=** - 📊 Show bar chart using first selected column as label and cursor column as value
         - **C** - 📋 Show column metadata (ID, name, type)
         - **\\*** - 👁️ Hide selected columns or current column
         - **g\\*** - 👀 Show all hidden columns
@@ -341,7 +341,7 @@ class DataFrameTable(DataTable):
         ("m", "show_histogram", "Show histogram for current column"),
         ("M", "show_histogram(0)", "Show histogram for current column with custom bins"),
         ("I", "show_statistics", "Show statistics"),
-        ("equals_sign", "show_bar", "Show histogram using first column as label and current column as value"),  # `=`
+        ("equals_sign", "show_bar", "Show bar chart using first selected column as label and cursor column as value"),  # `=`
         # Sort
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
@@ -1123,7 +1123,7 @@ class DataFrameTable(DataTable):
 
     @with_full_df
     def action_show_bar(self) -> None:
-        """Show histogram using first column as label and current column as value."""
+        """Show bar chart using first selected column as label and cursor column as value."""
         self.do_show_bar()
 
     @with_full_df
@@ -2288,22 +2288,31 @@ class DataFrameTable(DataTable):
 
     @with_full_df
     def do_show_bar(self) -> None:
-        """Show histogram using first column as label and current column as value."""
-        cidx = self.cursor_cidx
-        col_name = self.cursor_col_name
-        dtype = self.cursor_col_dtype
-        dc = DtypeConfig(dtype)
-
-        if dc.gtype not in ("integer", "float"):
+        """Show bar chart using first selected column as label and cursor column as value."""
+        if not self.selected_columns:
             self.notify(
-                f"Cannot show bar chart for non-numeric column [$warning]{col_name}[/] of type [$accent]{dtype}[/]",
+                "Select a column first to use as the label",
                 title="Show Bar Chart",
                 severity="warning",
             )
             return
 
-        col_label = self.get_col_key(0).value
-        cidx_label = self.df.columns.index(col_label)
+        col_label_name = next(col for col in self.df.columns if col in self.selected_columns)
+        col_value_name = self.cursor_col_name
+
+        cidx = self.df.columns.index(col_value_name)
+        dtype = self.df.dtypes[cidx]
+        dc = DtypeConfig(dtype)
+
+        if dc.gtype not in ("integer", "float"):
+            self.notify(
+                f"Cannot show bar chart for non-numeric column [$warning]{col_value_name}[/] of type [$accent]{dtype}[/]",
+                title="Show Bar Chart",
+                severity="warning",
+            )
+            return
+
+        cidx_label = self.df.columns.index(col_label_name)
         self.app.push_screen(BarScreen(self, cidx, cidx_label))
 
     def do_show_statistics(self, cidx: int | None = None) -> None:
