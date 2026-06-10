@@ -1209,8 +1209,8 @@ class SheetScreen(TableModalScreen):
         super().__init__()
         self.tabs = tabs
 
-    def on_mount(self) -> None:
-        """Build the table on mount."""
+    def on_ready(self) -> None:
+        """Build the table after initial layout."""
         self.build_table()
 
     def on_key(self, event) -> None:
@@ -1218,9 +1218,12 @@ class SheetScreen(TableModalScreen):
         if event.key == "enter":
             event.stop()
             self._switch_to_cursor_tab()
-        elif event.key == "x":
+        elif event.key == "d":
             event.stop()
             self._close_cursor_tab()
+        elif event.key == "e":
+            event.stop()
+            self._rename_cursor_tab()
 
     def _switch_to_cursor_tab(self) -> None:
         """Close the SheetScreen and switch to the tab under the cursor."""
@@ -1241,6 +1244,22 @@ class SheetScreen(TableModalScreen):
             self.app.do_close(target_pane)
             self.build_table()
 
+    def _rename_cursor_tab(self) -> None:
+        """Open rename screen for the tab under the cursor."""
+        row_idx = self.table.cursor_row
+        panes = list(self.tabs.keys())
+        if 0 <= row_idx < len(panes):
+            target_pane = panes[row_idx]
+            try:
+                content_tab = self.app.query_one(f"#--content-tab-{target_pane.id}")
+            except Exception:
+                return
+            self.app.do_rename_tab(content_tab)
+
+    def on_screen_resume(self) -> None:
+        """Rebuild the table when returning from a stacked screen."""
+        self.build_table()
+
     def build_table(self) -> None:
         """Build the sheets overview table."""
         rows = []
@@ -1252,7 +1271,6 @@ class SheetScreen(TableModalScreen):
             rows.append(
                 {
                     "Tab": dftable.tabname,
-                    "#Rows_Loaded": dftable.loaded_rows,
                     "#Rows": len(dftable.df),
                     "#Cols": len(dftable.df.select(pl.exclude(RID)).columns),
                     "Filename": dftable.filename,

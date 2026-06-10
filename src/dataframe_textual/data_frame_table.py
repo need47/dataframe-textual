@@ -231,14 +231,14 @@ class DataFrameTable(DataTable):
         - **A** - ➕ Add column with name and optional expression
         - **@** - 🔗 Add a new link column from template
         - **^** - ✏️ Rename current column
-        - **x** - ✖️ Delete current row
-        - **X** - ✖️ Delete row and those below
-        - **Ctrl+X** - ✖️ Delete row and those above
+        - **d** - ✖️ Delete current row
+        - **gd** - ✖️ Delete row and those above
+        - **zd** - ✖️ Delete row and those below
         - **Delete** - ✖️ Clear current cell (set to NULL)
         - **Shift+Delete** - ✖️ Clear current column (set matching cells to NULL)
         - **-** (minus) - ✖️ Delete selected columns or current column
-        - **d** - 📋 Duplicate current column
         - **D** - 📋 Duplicate current row
+        - **zD** - 📋 Duplicate current column
         - **Ctrl+Delete** - 🧹 Remove duplicate rows (keep first occurrence)
         - **o** - 💥 Explode current list column into rows
         - **O** - 💥 Explode current string column by delimiter into rows
@@ -362,12 +362,9 @@ class DataFrameTable(DataTable):
         ("delete", "clear_cell", "Clear cell"),
         ("shift+delete", "clear_column", "Clear cells in current column that match cursor value"),  # `Shift+Delete`
         ("minus", "delete_column", "Delete selected columns or current column"),  # `-`
-        ("x", "delete_row", "Delete row"),
-        ("X", "delete_row_and_below", "Delete row and those below"),
-        ("ctrl+x", "delete_row_and_up", "Delete row and those up"),
+        ("d", "delete_row", "Delete row"),
         # Duplicate
-        ("d", "duplicate_column", "Duplicate column"),
-        ("D", "duplicate_row", "Duplicate row"),
+        ("D", "duplicate_row_column", "Duplicate row or column"),
         ("ctrl+delete", "uniq_rows", "Remove duplicate rows"),
         # Edit
         ("e", "edit_cell", "Edit cell"),
@@ -1121,24 +1118,15 @@ class DataFrameTable(DataTable):
         self.do_toggle_selections()
 
     @with_full_df
+    @with_leader_key
     def action_delete_row(self) -> None:
         """Delete the current row."""
-        self.do_delete_row()
-
-    @with_full_df
-    def action_delete_row_and_below(self) -> None:
-        """Delete the current row and those below."""
-        self.do_delete_row(more="below")
-
-    @with_full_df
-    def action_delete_row_and_up(self) -> None:
-        """Delete the current row and those above."""
-        self.do_delete_row(more="above")
-
-    @with_full_df
-    def action_duplicate_column(self) -> None:
-        """Duplicate the current column."""
-        self.do_duplicate_column()
+        if self.leader_key == "g":
+            self.do_delete_row(more="above")
+        elif self.leader_key == "z":
+            self.do_delete_row(more="below")
+        else:
+            self.do_delete_row()
 
     @with_full_df
     def action_explode_column(self) -> None:
@@ -1150,9 +1138,10 @@ class DataFrameTable(DataTable):
         self.do_explode_column_delim()
 
     @with_full_df
-    def action_duplicate_row(self) -> None:
-        """Duplicate the current row."""
-        self.do_duplicate_row()
+    @with_leader_key
+    def action_duplicate_row_column(self) -> None:
+        """Duplicate the current row or column."""
+        self.do_duplicate_row_column()
 
     @with_full_df
     def action_uniq_rows(self) -> None:
@@ -3075,47 +3064,6 @@ class DataFrameTable(DataTable):
 
         self.notify(message, title="Delete Column")
 
-    def do_duplicate_column(self) -> None:
-        """Duplicate the currently selected column, inserting it right after the current column."""
-        cidx = self.cursor_cidx
-        col_name = self.cursor_col_name
-
-        col_idx = self.cursor_column
-        new_col_name = f"{col_name}_copy"
-
-        # Ensure new column name is unique
-        counter = 1
-        while new_col_name in self.df.columns:
-            new_col_name = f"{new_col_name}{counter}"
-            counter += 1
-
-        # Add to history
-        self.add_history(f"Duplicate column [$success]{col_name}[/]", dirty=True)
-
-        # Create new column and reorder columns to insert after current column
-        cols_before = self.df.columns[: cidx + 1]
-        cols_after = self.df.columns[cidx + 1 :]
-        cols_new = cols_before + [new_col_name] + cols_after
-
-        # Add the new column and reorder columns for insertion after current column
-        self.df = self.df.lazy().with_columns(pl.col(col_name).alias(new_col_name)).select(cols_new).collect()
-
-        # Also update the view if applicable
-        if self.df_view is not None:
-            self.df_view = (
-                self.df_view.lazy().with_columns(pl.col(col_name).alias(new_col_name)).select(cols_new).collect()
-            )
-
-        # Recreate table for display
-        self.setup_table()
-
-        # Move cursor to the new duplicated column
-        self.move_cursor(column=col_idx + 1)
-
-        self.notify(
-            f"Duplicated column [$success]{col_name}[/] as [$accent]{new_col_name}[/]", title="Duplicate Column"
-        )
-
     def do_explode_column(self) -> None:
         """Explode the current list column into multiple rows."""
         col_name = self.cursor_col_name
@@ -3274,6 +3222,13 @@ class DataFrameTable(DataTable):
         if deleted_count > 0:
             self.notify(f"Deleted [$success]{deleted_count}[/] row(s)", title="Delete Row(s)")
 
+    def do_duplicate_row_column(self) -> None:
+        """Duplicate the currently selected row or column."""
+        if self.leader_key == "z":
+            self.do_duplicate_column()
+        else:
+            self.do_duplicate_row()
+
     def do_duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""
         ridx = self.cursor_ridx
@@ -3308,6 +3263,47 @@ class DataFrameTable(DataTable):
         self.move_cursor(row=ridx + 1)
 
         self.notify(f"Duplicated row [$success]{ridx + 1}[/]", title="Duplicate Row")
+
+    def do_duplicate_column(self) -> None:
+        """Duplicate the currently selected column, inserting it right after the current column."""
+        cidx = self.cursor_cidx
+        col_name = self.cursor_col_name
+
+        col_idx = self.cursor_column
+        new_col_name = f"{col_name}_copy"
+
+        # Ensure new column name is unique
+        counter = 1
+        while new_col_name in self.df.columns:
+            new_col_name = f"{new_col_name}{counter}"
+            counter += 1
+
+        # Add to history
+        self.add_history(f"Duplicate column [$success]{col_name}[/]", dirty=True)
+
+        # Create new column and reorder columns to insert after current column
+        cols_before = self.df.columns[: cidx + 1]
+        cols_after = self.df.columns[cidx + 1 :]
+        cols_new = cols_before + [new_col_name] + cols_after
+
+        # Add the new column and reorder columns for insertion after current column
+        self.df = self.df.lazy().with_columns(pl.col(col_name).alias(new_col_name)).select(cols_new).collect()
+
+        # Also update the view if applicable
+        if self.df_view is not None:
+            self.df_view = (
+                self.df_view.lazy().with_columns(pl.col(col_name).alias(new_col_name)).select(cols_new).collect()
+            )
+
+        # Recreate table for display
+        self.setup_table()
+
+        # Move cursor to the new duplicated column
+        self.move_cursor(column=col_idx + 1)
+
+        self.notify(
+            f"Duplicated column [$success]{col_name}[/] as [$accent]{new_col_name}[/]", title="Duplicate Column"
+        )
 
     def do_uniq_rows(self) -> None:
         """Remove duplicate rows from the current dataframe, keeping the first occurrence."""

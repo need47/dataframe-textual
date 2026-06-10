@@ -332,11 +332,10 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `@`            | Add a link column from URL template                           |
 | `^`            | Rename current column                                         |
 | `-` (minus)    | Delete selected columns or current column                     |
-| `x`            | Delete current row                                            |
-| `X`            | Delete current row and all those below                        |
-| `Ctrl+X`       | Delete current row and all those above                        |
-| `d`            | Duplicate current column                                      |
-| `D`            | Duplicate current row                                         |
+| `d`            | Delete current row                                            |
+| `gd`           | Delete current row and all those above                        |
+| `zd`           | Delete current row and all those below                        |
+| `D`            | Duplicate current row (or column with `zD`)                   |
 | `Ctrl+Delete`  | Remove duplicate rows (keep first occurrence)                 |
 | `o`            | Explode current list column into multiple rows                |
 | `O`            | Explode current string column by delimiter into multiple rows |
@@ -450,7 +449,8 @@ The modal displays a table with the following columns:
 | Key     | Action                                                      |
 | ------- | ----------------------------------------------------------- |
 | `Enter` | Close the modal and switch to the tab under the cursor      |
-| `x`     | Close the tab under the cursor (prompts if unsaved changes) |
+| `e`     | Rename the tab under the cursor                             |
+| `d`     | Close the tab under the cursor (prompts if unsaved changes) |
 | `q`     | Dismiss the modal                                           |
 
 This is useful for quickly navigating between tabs, reviewing file sizes at a glance, or closing tabs you no longer need without switching to them first.
@@ -790,17 +790,17 @@ This is useful for:
 
 - Quick rename by double-clicking the column header
 
-**Delete Row** (`x`):
+**Delete Row** (`d`):
 
 - Delete all selected rows (if any) at once
 - Or delete single row at cursor
 
-**Delete Row and Below** (`X`):
+**Delete Row and Below** (`zd`):
 
 - Deletes the current row and all rows below it
 - Useful for removing trailing data or the end of a dataset
 
-**Delete Row and Above** (`Ctrl+X`):
+**Delete Row and Above** (`gd`):
 
 - Deletes the current row and all rows above it
 - Useful for removing leading rows or the beginning of a dataset
@@ -821,17 +821,17 @@ This is useful for:
 - Expression can reference other columns and perform calculations
 - Useful for creating derived columns or adding data with formulas
 
-**Duplicate Column** (`d`):
-
-- Creates a new column immediately after the current column
-- New column has '\_copy' suffix (e.g., 'price' → 'price_copy')
-- Useful for creating backups before transformation
-
 **Duplicate Row** (`D`):
 
 - Creates a new row immediately after the current row
 - Duplicate preserves all data from original row
 - Useful for batch adding similar records
+
+**Duplicate Column** (`zD`):
+
+- Creates a new column immediately after the current column
+- New column has '\_copy' suffix (e.g., 'price' → 'price_copy')
+- Useful for creating backups before transformation
 
 **Remove Duplicate Rows** (`Ctrl+Delete`):
 
