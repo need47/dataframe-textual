@@ -2482,6 +2482,7 @@ class DataFrameTable(DataTable):
     @with_leader_key
     def do_toggle_rid(self) -> None:
         """Toggle display of the internal RID column."""
+        self.add_history("Toggle RID column display")
         self.show_rid = not self.show_rid
 
         # Recreate table for display
@@ -2495,6 +2496,8 @@ class DataFrameTable(DataTable):
     @with_leader_key
     def do_toggle_column_index(self) -> None:
         """Toggle display of column index prefixes in headers."""
+        self.add_history("Toggle column index display")
+
         self.show_column_index = not self.show_column_index
         self.setup_table()
         status = "on" if self.show_column_index else "off"
