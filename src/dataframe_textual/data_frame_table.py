@@ -196,7 +196,7 @@ class DataFrameTable(DataTable):
         - **PgUp/PgDn** - 📜 Page up/down
 
         ## ♻️ Undo/Redo/Reset
-        - **U** - ↩️ Undo last action
+        - **u/U** - ↩️ Undo last action
         - **R** - 🔄 Redo last undone action
         - **Ctrl+U** - 🔁 Reset to initial state
 
@@ -301,8 +301,8 @@ class DataFrameTable(DataTable):
         - **Ctrl+r** - 📝 Copy row to clipboard (tab-separated)
 
         ## ⌨️ SQL Interface
-        - **Q** - 💬 Open simple SQL interface (select columns & where clause)
-        - **zQ** - 🔎 Open advanced SQL interface (full SQL queries)
+        - **Q** - 🔎 Open advanced SQL interface (full SQL queries)
+        - **zQ** - 💬 Open simple SQL interface (select columns & where clause)
     """).strip()
 
     # fmt: off
@@ -318,7 +318,7 @@ class DataFrameTable(DataTable):
         ("ctrl+b", "page_up", "Page up"),
         ("ctrl+f", "page_down", "Page down"),
         # Undo/Redo/Reset
-        ("U", "undo", "Undo"),
+        ("u,U", "undo", "Undo"),
         ("R", "redo", "Redo"),
         ("ctrl+u", "reset", "Reset to initial state"),
         # Display
@@ -1462,9 +1462,9 @@ class DataFrameTable(DataTable):
     def action_sql_query(self) -> None:
         """Open the SQL interface screen."""
         if self.leader_key == "z":
-            self.do_advanced_sql()
-        else:
             self.do_simple_sql()
+        else:
+            self.do_advanced_sql()
 
     def setup_table(self) -> None:
         """Setup the table for display.
@@ -3679,8 +3679,7 @@ class DataFrameTable(DataTable):
 
     def do_transpose(self) -> None:
         """Transpose the dataframe, swapping rows and columns."""
-        data_columns = [col for col in self.df.columns if col != RID]
-        if not data_columns:
+        if not self.visible_columns:
             self.notify("No data columns available to transpose", title="Transpose", severity="warning")
             return
 
@@ -3689,14 +3688,17 @@ class DataFrameTable(DataTable):
 
             # Use apply_frame so reset/rebuild behavior stays consistent with other table-wide mutations.
             transposed = (
-                self.df.lazy().select(data_columns).collect().transpose(include_header=True, header_name="column")
+                self.df.lazy()
+                .select(list(self.visible_columns.keys()))
+                .collect()
+                .transpose(include_header=True, header_name="column")
             )
             self.apply_frame(transposed, dirty=True)
             self.notify("Transposed table", title="Transpose")
         except Exception as e:
             if self.histories_undo:
                 self.histories_undo.pop()
-            self.notify("Failed to transpose table", title="Transpose", severity="error")
+            self.notify(f"Failed to transpose table: {e}", title="Transpose", severity="error")
             self.log(f"Error transposing table: {e}")
 
     # Type casting

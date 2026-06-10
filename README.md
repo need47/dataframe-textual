@@ -269,24 +269,24 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 #### Navigation
 
-| Key                          | Action                              |
-| ---------------------------- | ----------------------------------- |
-| `gg`                         | Go to first row                     |
-| `G`                          | Go to last row                      |
-| `Ctrl + G`                   | Go to specific row                  |
-| `←` / `↓` / `↑` / `→`        | Move left/down/up/right             |
-| `h` / `j` / `k` / `l`        | Move left/down/up/right (Vim-style) |
-| `Home` / `End`               | Go to first/last column             |
-| `Ctrl + Home` / `Ctrl + End` | Go to page top/bottom               |
-| `PageDown` / `PageUp`        | Scroll down/up one page             |
-| `Ctrl+F`                     | Page forward                        |
-| `Ctrl+B`                     | Page backforward                    |
+| Key                      | Action                              |
+| ------------------------ | ----------------------------------- |
+| `gg`                     | Go to first row                     |
+| `G`                      | Go to last row                      |
+| `Ctrl+G`                 | Go to specific row                  |
+| `←` / `↓` / `↑` / `→`    | Move left/down/up/right             |
+| `h` / `j` / `k` / `l`    | Move left/down/up/right (Vim-style) |
+| `Home` / `End`           | Go to first/last column             |
+| `Ctrl+Home` / `Ctrl+End` | Go to page top/bottom               |
+| `PageDown` / `PageUp`    | Scroll down/up one page             |
+| `Ctrl+F`                 | Page forward                        |
+| `Ctrl+B`                 | Page backforward                    |
 
 #### Undo/Redo/Reset
 
 | Key      | Action                  |
 | -------- | ----------------------- |
-| `U`      | Undo last action        |
+| `u`/`U`  | Undo last action        |
 | `R`      | Redo last undone action |
 | `Ctrl+U` | Reset to initial state  |
 
@@ -296,16 +296,16 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | ----------------- | ------------------------------------------------------------------------------ |
 | `Enter`           | Show details for the current row as two-column key–value pairs                 |
 | `Tab`             | Show current cell details; press `Tab` again there to drill deeper             |
-| `C`               | Show column metadata (e.g., name, data type)                                   |
+| `C`               | Show metadata for all columns (name and data type)                             |
 | `F`               | Show frequency distribution for current or selected columns                    |
 | `I`               | Show statistics for current column                                             |
-| `gI`              | Show statistics for entire dataframe                                           |
+| `gI`              | Show statistics for all columns                                                |
 | `m`               | Show histogram for current column                                              |
 | `M`               | Show histogram for current column with custom bins                             |
 | `=`               | Show bar chart using first selected column as label and cursor column as value |
 | `*`               | Hide selected columns or current column                                        |
 | `g*`              | Show all hidden columns                                                        |
-| `z~`              | Toggle 1-based column index prefixes in visible headers                        |
+| `z~`              | Toggle 1-based column index prefixes                                           |
 | `_` (underscore)  | Toggle column full width for current column                                    |
 | `g_` (underscore) | Toggle column full width for all string/list columns                           |
 | `+`               | Toggle freeze rows and/or columns                                              |
@@ -358,23 +358,23 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 #### Find & Replace
 
-| Key  | Action                                                                |
-| ---- | --------------------------------------------------------------------- |
-| `/`  | Find in current column with cursor value and highlight matching cells |
-| `g/` | Find in all columns with cursor value and highlight matching cells    |
-| `?`  | Find in current column with expression and highlight matching cells   |
-| `g?` | Find in all columns with expression and highlight matching cells      |
-| `n`  | Go to next matching cell                                              |
-| `N`  | Go to previous matching cell                                          |
-| `r`  | Find and replace in current column (interactive or replace all)       |
-| `gr` | Find and replace across all columns (interactive or replace all)      |
+| Key  | Action                                                           |
+| ---- | ---------------------------------------------------------------- |
+| `/`  | Find cursor value in current column and highlight matching cells |
+| `g/` | Find cursor value in all columns and highlight matching cells    |
+| `?`  | Find expression in current column and highlight matching cells   |
+| `g?` | Find expression in all columns and highlight matching cells      |
+| `n`  | Go to next matching cell                                         |
+| `N`  | Go to previous matching cell                                     |
+| `r`  | Find and replace in current column (interactive or replace all)  |
+| `gr` | Find and replace in all columns (interactive or replace all)     |
 
 #### Filter & Collect
 
 | Key                | Action                                                 |
 | ------------------ | ------------------------------------------------------ |
-| `v`                | Basic filter using the current cell value              |
-| `V`                | Advanced filter with value or expression               |
+| `v`                | Filter rows with cursor value in the current column    |
+| `V`                | Filter rows with specified value or expression         |
 | `.`                | Filter rows with non-null values in the current column |
 | `f`                | Filter rows using values in the current column         |
 | `"` (double quote) | Collect rows/columns to a new tab                      |
@@ -390,20 +390,20 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 | Key             | Action                    |
 | --------------- | ------------------------- |
-| `Shift+←` / `H` | Move current column left  |
-| `Shift+↓` / `J` | Move current row down     |
-| `Shift+↑` / `K` | Move current row up       |
-| `Shift+→` / `L` | Move current column right |
+| `H` / `Shift+←` | Move current column left  |
+| `J` / `Shift+↓` | Move current row down     |
+| `K` / `Shift+↑` | Move current row up       |
+| `L` / `Shift+→` | Move current column right |
 
 #### Type Casting
 
 | Key | Action                         |
 | --- | ------------------------------ |
-| `#` | Cast current column to integer |
-| `%` | Cast current column to float   |
-| `$` | Cast current column to boolean |
 | `~` | Cast current column to string  |
 | `@` | Cast current column to date    |
+| `#` | Cast current column to integer |
+| `$` | Cast current column to boolean |
+| `%` | Cast current column to float   |
 
 #### Copy
 
@@ -417,8 +417,8 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 | Key  | Action                                                        |
 | ---- | ------------------------------------------------------------- |
-| `Q`  | Simple SQL interface (select columns & where clause)          |
-| `zQ` | Advanced SQL interface (full SQL query with syntax highlight) |
+| `Q`  | Advanced SQL interface (full SQL query with syntax highlight) |
+| `zQ` | Simple SQL interface (select columns & where clause)          |
 
 ## Features in Detail
 
@@ -644,13 +644,13 @@ These options work with plain text searches. Use Polars regex patterns in expres
 Find by value/expression and highlight matching cells:
 
 - `/` - Find cursor value in current column
-- `g/` - Find cursor value across all columns (global search)
+- `g/` - Find cursor value in all columns (global search)
 - `?` - Open dialog to search in current column with expression
-- `g?` - Open dialog to search across all columns with expression (global search)
+- `g?` - Open dialog to search in all columns with expression (global search)
 - `n` - Go to next matching cell
 - `N` - Go to previous matching cell
 
-Replace values in current column (`r`) or across all columns (`gr`).
+Replace values in current column (`r`) or in all columns (`gr`).
 
 **How It Works:**
 
@@ -913,7 +913,7 @@ The output format is determined by the file extension, making it easy to convert
 
 ### 16. Undo/Redo/Reset
 
-**Undo** (`U`):
+**Undo** (`u`/`U`):
 
 - Reverts last action with full state restoration
 - Works for edits, deletions, sorts, searches, etc.
