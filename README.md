@@ -304,7 +304,9 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `M`               | Show histogram for current column with custom bins                             |
 | `=`               | Show bar chart using first selected column as label and cursor column as value |
 | `*`               | Hide selected columns or current column                                        |
-| `g*`              | Show all hidden columns                                                        |
+| `g*`              | Hide current column and all columns before it                                  |
+| `z*`              | Hide current column and all columns after it                                   |
+| `V`               | Show all hidden columns                                                        |
 | `z~`              | Toggle 1-based column index prefixes                                           |
 | `_` (underscore)  | Toggle column full width for current column                                    |
 | `g_` (underscore) | Toggle column full width for all string/list columns                           |
@@ -434,10 +436,12 @@ Columns are automatically styled based on their data types (auto-inferred):
 | boolean   | Blue       | centered  |
 | temporal  | Magenta    | centered  |
 
-**Hide/Show Columns** (`*` / `z*`):
+**Hide/Show Columns** (`*` / `V`):
 
 - `*` - Temporarily hide selected columns, or the current column when no columns are selected (data preserved)
-- `z*` - Restore all hidden columns
+- `g*` - Hide current column and all columns before it
+- `z*` - Hide current column and all columns after it
+- `V` - Restore all hidden columns
 
 **Freeze Rows and Columns** (`+`):
 
@@ -447,16 +451,13 @@ Columns are automatically styled based on their data types (auto-inferred):
 
 - Adds or removes a 1-based index prefix in visible column headers (e.g., `1_colname`)
 - Display-only: does not modify underlying data or column names
-- Shortcut mapping note: use `z~` for column index prefix; use `$` for casting the current column to boolean and `~` for string
 
-**Thousand Separator Toggle** (`,`):
+**Thousand Separator Toggle** (`,` / `g,`):
 
-- Applies to the **current cursor column** (integer and float columns)
+- `,` toggles for the numeric column under cursor
+- `g,` toggles for all numeric columns at once
 - Formats large numbers with commas for readability (e.g., `1000000` → `1,000,000`)
-- Each column can be toggled independently
-- Use `g,` (leader mode) to toggle all numeric columns at once
-- Toggle on/off as needed for different viewing preferences
-- Display-only: does not modify underlying data in the dataframe
+- Display-only: does not modify underlying data
 
 **Float Precision** (`(`/`)`):
 
@@ -464,9 +465,9 @@ Columns are automatically styled based on their data types (auto-inferred):
 - `(` decreases precision (fewer decimal places), `)` increases precision
 - Each column can have its own precision setting
 - Precision of 0 means full (default) display
-- Display-only: does not modify underlying data in the dataframe
+- Display-only: does not modify underlying data
 
-#### Modal Screens (Common Controls)
+#### Modal Screen
 
 Several features open a **modal screen** (an overlay table) for inspection or interaction. The following modals share a common set of keyboard shortcuts:
 
@@ -498,19 +499,18 @@ Individual modals may add extra keys on top of these (documented in each subsect
 
 ### 2. Sheets Overview
 
-Press `S` at the app level to open the **Sheets** modal — a summary view of all currently opened tabs, inspired by VisiData's "Sheets Sheet".
+Press `S` to open the **Sheets** modal — a summary view of all currently opened tabs.
 
 The modal displays a table with the following columns:
 
-| Column           | Description                                      |
-| ---------------- | ------------------------------------------------ |
-| **Tabname**      | Display name of the tab                          |
-| **#Loaded_Rows** | Number of rows currently loaded into the table   |
-| **#Rows**        | Total number of rows in the underlying DataFrame |
-| **#Cols**        | Number of columns (excluding the internal RID)   |
-| **Filename**     | Source file path                                 |
+| Column       | Description             |
+| ------------ | ----------------------- |
+| **Tab**      | Display name of the tab |
+| **#Rows**    | Total number of rows    |
+| **#Cols**    | Number of columns       |
+| **Filename** | Source file path        |
 
-**Keys inside the SheetScreen:**
+**Keys inside the modal:**
 
 | Key     | Action                                                      |
 | ------- | ----------------------------------------------------------- |
@@ -522,15 +522,11 @@ This is useful for quickly navigating between tabs, reviewing file sizes at a gl
 
 ### 3. Column Overview
 
-View quick metadata about your columns to understand their structure and content.
-
-**Column Metadata** (`C`):
-
-- Press `C` to open a modal displaying details for all columns:
+Press `C` to open a modal displaying details for all columns:
   - **Column** - Column name
   - **Type** - Data type (e.g., Int64, String, Float64, Boolean)
 
-**In the Column Metadata Table**
+**Keys inside the modal**
 
 - Press `Enter` to jump to the selected column in the main table and close the modal
 - Press `F` to show the frequency table for the selected column
@@ -547,7 +543,7 @@ Useful for examining wide table where columns don't fit well on screen.
 
 ![Row detail](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/row-detail.png)
 
-**In the Row Detail Modal**:
+**Keys inside the modal**:
 
 - Press `v` to **filter** all rows containing the selected column value
 - Press `"` to **collect** all rows containing the selected column value to a new tab
@@ -577,7 +573,7 @@ Press `F` to see value distributions for the current column. If multiple columns
 - One value column per selected input column, plus Count, Percentage, Histogram
 - **Total row** at the bottom
 
-**In the Frequency Modal**:
+**Keys inside the modal**:
 
 - Press `v` to **filter** rows matching the selected value (or selected value combinations)
 - Press `"` to **collect** rows matching the selected value (or selected value combinations) to a new tab
@@ -595,10 +591,6 @@ Show summary statistics such as count, null count, mean, median, standard deviat
 
 - `I` shows statistics for the current column
 - `gI` shows statistics for all columns in the dataframe
-
-**In the Statistics Modal**:
-
-- Use arrow keys to navigate
 
 This is useful for:
 
@@ -637,7 +629,6 @@ These options work with plain text searches. Use Polars regex patterns in expres
 - Search results highlight matching rows in **red**
 - Use expression for advanced selection (e.g., $attack > $defense)
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
-- Use `u` to undo any search or filter
 
 ### 9. Find & Replace
 
@@ -679,7 +670,6 @@ When you press `r` or `gr`, enter:
 
 - Search are done by string value (i.e., ignoring data type)
 - Type `NULL` to find or replace null values
-- Support undo (`u`)
 
 ### 10. Filter & Collect
 
@@ -693,9 +683,8 @@ Both actions work on a subset of the original dataframe, but they serve differen
 - Edits made in the filtered view still apply to the original dataframe
 - Press `Ctrl+V` to save the current view to a file
 - Press `q` to leave the filtered view and return to the main table
-- Supports undo with `u`
 
-**Advanced Filter** (`V`):
+**Advanced Filter** (`gv`):
 
 - Opens a dialog for value-based or expression-based filtering
 - Useful when you want to define the subset directly

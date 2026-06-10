@@ -211,7 +211,9 @@ class DataFrameTable(DataTable):
         - **=** - 📊 Show bar chart using first selected column as label and cursor column as value
         - **C** - 📋 Show column metadata (ID, name, type)
         - **\\*** - 👁️ Hide selected columns or current column
-        - **z\\*** - 👀 Show all hidden columns
+        - **\\g** - 👁️ Hide current column and those before
+        - **\\z** - 👁️ Hide current column and those after
+        - **V** - 👀 Show all hidden columns
         - **_** (underscore) - 📏 Toggle column full width for current column
         - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
         - **+** - 📌 Freeze rows and/or columns
@@ -272,7 +274,7 @@ class DataFrameTable(DataTable):
 
         ## ⏬ Filter & Collect
         - **v** - ⏬ Filter rows with cursor value in current column
-        - **V** - ⏬ Filter rows with expression
+        - **gv** - ⏬ Filter rows with expression
         - **.** - ⏬ Filter rows with non-null values in current column
         - **f** - ⏬ Filter rows by column value
         - **"** (double quote) - 📤 Collect rows to a new tab
@@ -323,7 +325,8 @@ class DataFrameTable(DataTable):
         ("ctrl+u", "reset", "Reset to initial state"),
         # Display
         ("underscore", "expand_column", "Toggle column full width"),  # `_`
-        ("asterisk", "toggle_column", "Hide/show selected columns or current column"),  # `*`
+        ("asterisk", "hide_column", "Hide selected columns or current column"),  # `*`
+        ("V", "show_hidden_columns", "Show all hidden columns"),  # `V`
         ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
         ("comma", "toggle_thousand_separator", "Toggle thousand separator for column"),  # `,`
         ("left_parenthesis", "adjust_float_precision(-1)", "Decrease float precision for column"),  # `(`
@@ -346,8 +349,7 @@ class DataFrameTable(DataTable):
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
         # Filter & Collect
-        ("v", "filter_rows", "Filter rows with cursor value in current column"),
-        ("V", "filter_rows_expr", "Filter rows with expression"),
+        ("v", "filter_rows", "Filter rows with cursor value or expression"),
         ("full_stop", "filter_rows_non_null", "Filter rows with non-null values in current column"),
         ("f", "filter_rows_value", "Filter rows by value"),  # `f`
         ("quotation_mark", "collect_rows_columns", "Collect rows/columns to a new tab"),  # `"`
@@ -1089,12 +1091,18 @@ class DataFrameTable(DataTable):
             self.do_delete_column()
 
     @with_leader_key
-    def action_toggle_column(self) -> None:
+    def action_hide_column(self) -> None:
         """Hide selected columns or the current column."""
-        if self.leader_key == "z":
-            self.do_show_hidden_columns()
+        if self.leader_key == "g":
+            self.do_hide_column(more="before")
+        elif self.leader_key == "z":
+            self.do_hide_column(more="after")
         else:
             self.do_hide_column()
+
+    def action_show_hidden_columns(self) -> None:
+        """Show all hidden columns."""
+        self.do_show_hidden_columns()
 
     @with_leader_key
     def action_expand_column(self) -> None:
@@ -1136,17 +1144,19 @@ class DataFrameTable(DataTable):
         """Show metadata for the current column."""
         self.do_metadata_column()
 
+    @with_full_df
+    @with_leader_key
     def action_filter_rows(self, result: dict | None = None) -> None:
-        """Filter rows."""
-        self.do_filter_rows(result)
+        """Filter rows by value or expression"""
+        if self.leader_key == "g":
+            self.do_filter_rows_expr(result=result)
+        else:
+            self.do_filter_rows(result)
 
+    @with_full_df
     def action_filter_rows_non_null(self) -> None:
         """Filter rows with non-null values in the current column."""
         self.do_filter_rows_non_null()
-
-    def action_filter_rows_expr(self) -> None:
-        """Open the advanced filter screen."""
-        self.do_filter_rows_expr()
 
     @with_full_df
     def action_filter_rows_value(self) -> None:
@@ -2366,17 +2376,32 @@ class DataFrameTable(DataTable):
 
         self.notify(descr, title="Freeze Row/Column")
 
-    def do_hide_column(self) -> None:
-        """Hide selected columns when present, otherwise hide the current column."""
-        target_columns = [col for col in self.visible_columns if col in self.selected_columns]
-        if not target_columns:
-            target_columns = [self.cursor_col_name]
+    def do_hide_column(self, more: str | None = None) -> None:
+        """Hide columns from the table display.
 
-        descr = (
-            f"Hide column [$success]{target_columns[0]}[/]"
-            if len(target_columns) == 1
-            else f"Hide [$accent]{len(target_columns)}[/] selected columns"
-        )
+        Args:
+            more: If "before", hide current column and all before it.
+                  If "after", hide current column and all after it.
+                  If None, hide selected columns or current column.
+        """
+        col_idx = self.cursor_column
+        col_name = self.cursor_col_name
+
+        if more == "before":
+            target_columns = [self.get_col_key(i).value for i in range(col_idx + 1)]
+            descr = f"Hide column [$success]{col_name}[/] and all columns before"
+        elif more == "after":
+            target_columns = [self.get_col_key(i).value for i in range(col_idx, len(self.columns))]
+            descr = f"Hide column [$success]{col_name}[/] and all columns after"
+        else:
+            target_columns = [col for col in self.visible_columns if col in self.selected_columns]
+            if not target_columns:
+                target_columns = [self.cursor_col_name]
+            descr = (
+                f"Hide column [$success]{target_columns[0]}[/]"
+                if len(target_columns) == 1
+                else f"Hide [$accent]{len(target_columns)}[/] selected columns"
+            )
 
         # Add to history before mutating the display state.
         self.add_history(descr)
