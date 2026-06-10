@@ -447,14 +447,6 @@ class DataFrameViewer(App):
         else:
             self.do_close()
 
-    def action_close_all(self) -> None:
-        """Close all tabs and quit.
-
-        Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.
-        Otherwise, quits immediately.
-        """
-        self.do_close_all()
-
     def action_save_current_view(self) -> None:
         """Open a save dialog to save current view to file."""
         self.do_save_view_to_file()

@@ -304,7 +304,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `C`               | Show column metadata (e.g., data types)                                |
 | `*`               | Hide selected columns or current column                                |
 | `g*`              | Show all hidden columns                                                |
-| `z~`              | Toggle column index prefix                                             |
+| `z~`              | Toggle 1-based column index prefixes in visible headers                |
 | `_` (underscore)  | Toggle column full width for current column                            |
 | `g_` (underscore) | Toggle column full width for all string/list columns                   |
 | `+`               | Toggle freeze rows and/or columns                                      |
@@ -314,6 +314,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `)`               | Increase float precision for current column                            |
 | `g^`              | Set current row as the new header row                                  |
 | `gT`              | Open theme selection screen                                            |
+| `zC`              | Cycle cursor type (cell -> row -> column)                              |
 
 #### Editing
 
@@ -444,7 +445,7 @@ Columns are automatically styled based on their data types (auto-inferred):
 
 **Column Index Prefix Toggle** (`z~`):
 
-- Adds/removes a 1-based index prefix in visible column headers (e.g., `1_colname`)
+- Adds or removes a 1-based index prefix in visible column headers (e.g., `1_colname`)
 - Display-only: does not modify underlying data or column names
 - Shortcut mapping note: use `z~` for column index prefix; use `$` for casting the current column to boolean and `~` for string
 

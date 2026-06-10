@@ -921,8 +921,10 @@ class DataFrameTable(DataTable):
           - ``gT``: Open theme selection.
 
         Leader ``z`` sequences:
+          - ``zC``: Cycle cursor type.
           - ``zT``: Transpose table.
           - ``z^``: Toggle internal row index (RID) column.
+          - ``z~``: Toggle 1-based column index prefixes in visible headers.
 
         Row loading triggers:
           - ``↑``: Load rows above current visible range.
@@ -952,6 +954,12 @@ class DataFrameTable(DataTable):
                 event.prevent_default()
                 self.stop_timer()
                 self.do_transpose()
+                return
+            elif event.key == "C":  # `zC`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_cycle_cursor_type()
                 return
         elif self.leader_key == "g":
             if event.key == "T":  # `gT`:
@@ -1297,17 +1305,9 @@ class DataFrameTable(DataTable):
         """Clear all row/column selections and cell matches."""
         self.do_clear_selections_and_matches()
 
-    def action_cycle_cursor_type(self) -> None:
-        """Cycle through cursor types."""
-        self.do_cycle_cursor_type()
-
     def action_toggle_freeze_row_column(self) -> None:
         """Toggle the freeze."""
         self.do_toggle_freeze_row_column()
-
-    def action_toggle_row_labels(self) -> None:
-        """Backward-compatible alias for toggling column index prefixes."""
-        self.action_toggle_column_index()
 
     @with_full_df
     def action_cast_column_dtype(self, dtype: str | pl.DataType) -> None:
@@ -2192,6 +2192,7 @@ class DataFrameTable(DataTable):
         self.notify("Restored to initial state", title="Reset")
 
     # Display
+    @with_leader_key
     def do_cycle_cursor_type(self) -> None:
         """Cycle through cursor types: cell -> row -> column -> cell."""
         next_type = get_next_item(CURSOR_TYPES, self.cursor_type)
@@ -3675,7 +3676,9 @@ class DataFrameTable(DataTable):
             self.add_history("Transpose table", dirty=True)
 
             # Use apply_frame so reset/rebuild behavior stays consistent with other table-wide mutations.
-            transposed = self.df.lazy().select(data_columns).collect().transpose(include_header=True, header_name="column")
+            transposed = (
+                self.df.lazy().select(data_columns).collect().transpose(include_header=True, header_name="column")
+            )
             self.apply_frame(transposed, dirty=True)
             self.notify("Transposed table", title="Transpose")
         except Exception as e:
