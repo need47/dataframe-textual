@@ -376,7 +376,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | Key                | Action                                                 |
 | ------------------ | ------------------------------------------------------ |
 | `v`                | Filter rows with cursor value in the current column    |
-| `V`                | Filter rows with specified value or expression         |
+| `gv`               | Filter rows with specified value or expression         |
 | `.`                | Filter rows with non-null values in the current column |
 | `f`                | Filter rows using values in the current column         |
 | `"` (double quote) | Collect rows/columns to a new tab                      |
@@ -441,7 +441,7 @@ Columns are automatically styled based on their data types (auto-inferred):
 - `*` - Temporarily hide selected columns, or the current column when no columns are selected (data preserved)
 - `g*` - Hide current column and all columns before it
 - `z*` - Hide current column and all columns after it
-- `V` - Restore all hidden columns
+- `V` - View all hidden columns
 
 **Freeze Rows and Columns** (`+`):
 
@@ -467,7 +467,28 @@ Columns are automatically styled based on their data types (auto-inferred):
 - Precision of 0 means full (default) display
 - Display-only: does not modify underlying data
 
-#### Modal Screen
+### 2. Undo/Redo/Reset
+
+**Undo** (`u`/`U`):
+
+- Reverts last action with full state restoration
+- Works for edits, deletions, sorts, searches, etc.
+- Shows description of reverted action
+
+**Redo** (`R`):
+
+- Reapplies the last undone action
+- Restores the state before the undo was performed
+- Useful for redoing actions you've undone by mistake
+- Useful for alternating between two different states
+
+**Reset** (`Ctrl+U`):
+
+- Reverts all changes and returns to original data state when file was first loaded
+- Clears all edits, deletions, selections, filters, and sorts
+- Useful for starting fresh without reloading the file
+
+### 3. Modal Screen
 
 Several features open a **modal screen** (an overlay table) for inspection or interaction. The following modals share a common set of keyboard shortcuts:
 
@@ -497,7 +518,7 @@ Several features open a **modal screen** (an overlay table) for inspection or in
 
 Individual modals may add extra keys on top of these (documented in each subsection below).
 
-### 2. Sheets Overview
+### 4. Sheets Overview
 
 Press `S` to open the **Sheets** modal — a summary view of all currently opened tabs.
 
@@ -520,7 +541,7 @@ The modal displays a table with the following columns:
 
 This is useful for quickly navigating between tabs, reviewing file sizes at a glance, or closing tabs you no longer need without switching to them first.
 
-### 3. Column Overview
+### 5. Column Overview
 
 Press `C` to open a modal displaying details for all columns:
   - **Column** - Column name
@@ -536,7 +557,7 @@ Press `C` to open a modal displaying details for all columns:
 - Press `e` to rename the selected column
 - Press `d` to delete the selected column from the main table
 
-### 4. Row Detail View
+### 6. Row Detail View
 
 Press `Enter` on any row to open a modal showing all column values for that row.
 Useful for examining wide table where columns don't fit well on screen.
@@ -553,7 +574,7 @@ Useful for examining wide table where columns don't fit well on screen.
 - Press `I` to show the statistics table for the selected column
 - Press `Tab` to open a cell-detail modal for the selected field
 
-### 5. Cell Detail View
+### 7. Cell Detail View
 
 Press `Tab` in the main table to inspect the current cell in its own modal.
 
@@ -566,7 +587,7 @@ Inside the cell-detail modal, press `Tab` again on the selected row/column to ke
 - List-like values are expanded into a one-column table
 - Dict-like values are shown as key/value columns
 
-### 6. Frequency Distribution
+### 8. Frequency Distribution
 
 Press `F` to see value distributions for the current column. If multiple columns are selected, it shows frequency of value combinations across those selected columns.
 
@@ -585,7 +606,7 @@ This is useful for:
 - Identifying rare or common values
 - Finding the most/least frequent entries
 
-### 7. Column & Dataframe Statistics
+### 9. Column Statistics
 
 Show summary statistics such as count, null count, mean, median, standard deviation, min, max, and etc.
 
@@ -600,7 +621,7 @@ This is useful for:
 - Reviewing summary statistics without leaving the TUI
 - Comparing columns at a glance
 
-### 8. Row/Column Selection
+### 10. Row/Column Selection
 
 The application provides multiple ways to select rows (for filtering or collecting) and columns (for hiding or deleting):
 
@@ -630,7 +651,7 @@ These options work with plain text searches. Use Polars regex patterns in expres
 - Use expression for advanced selection (e.g., $attack > $defense)
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 
-### 9. Find & Replace
+### 11. Find & Replace
 
 Find by value/expression and highlight matching cells:
 
@@ -671,7 +692,7 @@ When you press `r` or `gr`, enter:
 - Search are done by string value (i.e., ignoring data type)
 - Type `NULL` to find or replace null values
 
-### 10. Filter & Collect
+### 12. Filter & Collect
 
 Both actions work on a subset of the original dataframe, but they serve different workflows.
 
@@ -710,86 +731,14 @@ For **Basic Filter** (`v`) and **Collect** (`"`), rows are chosen in this order:
 - Otherwise, use rows with active matches from search or find
 - Otherwise, use rows whose current-column value matches the current cell
 
-### 11. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
-
-Complex values, filters, and advanced operations can be specified via Polars expressions, with the following adaptions for convenience:
-
-**Column References:**
-
-- `$_` - Current column (based on cursor position)
-- `$1`, `$2`, etc. - Column by 1-based index
-- `$age`, `$salary` - Column by name (use actual column names)
-- `` $`col name` `` - Column by name with spaces (backtick quoted)
-
-**Row References:**
-
-- `$#` - Current row index (1-based)
-
-**DataFrame References:**
-
-- `self` - Current dataframe
-
-**Basic Comparisons:**
-
-- `$_ > 50` - Current column greater than 50
-- `$salary >= 100000` - Salary at least 100,000
-- `$age < 30` - Age less than 30
-- `$status == 'active'` - Status exactly matches 'active'
-- `$name != 'Unknown'` - Name is not 'Unknown'
-- `$# <= 10` - Top 10 rows
-
-**Logical Operators:**
-
-- `&` - AND
-- `|` - OR
-- `~` - NOT
-
-**Practical Examples:**
-
-- `($age < 30) & ($status == 'active')` - Age less than 30 AND status is active
-- `($name == 'Alice') | ($name == 'Bob')` - Name is Alice or Bob
-- `$salary / 1000 >= 50` - Salary divided by 1,000 is at least 50
-- `($department == 'Sales') & ($bonus > 5000)` - Sales department with bonus over 5,000
-- `($score >= 80) & ($score <= 90)` - Score between 80 and 90
-- `~($status == 'inactive')` - Status is not inactive
-- `$revenue > $expenses` - Revenue exceeds expenses
-- ``$`product id` > 100`` - Product ID with spaces in column name greater than 100
-- `self.drop(RID).is_duplicated()` - Duplicate rows (note: the internal RID column must be excluded)
-
-**String Operations:** ([Polars string API reference](https://docs.pola.rs/api/python/stable/reference/series/string.html))
-
-- `$name.str.contains("John")` - Name contains "John" (case-sensitive)
-- `$name.str.contains("(?i)john")` - Name contains "john" (case-insensitive)
-- `$email.str.ends_with("@company.com")` - Email ends with domain
-- `$code.str.starts_with("ABC")` - Code starts with "ABC"
-- `$name.str.len_chars() < 7` - Length of name shorter than 7
-
-**Number Operations:**
-
-- `$age * 2 > 100` - Double age greater than 100
-- `($salary + $bonus) > 150000` - Total compensation over 150,000
-- `$percentage >= 50` - Percentage at least 50%
-
-**Null Handling:**
-
-- `$column.is_null()` - Find null values
-- `$column.is_not_null()` - Find non-null values
-- `NULL` - a value to represent null for convenience
-
-**Tips:**
-
-- Use column indices (e.g., `$1`, `$2`) for faster column access.
-- Use column names that match exactly (case-sensitive)
-- Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
-
-### 12. Sorting
+### 13. Sorting
 
 - Press `[` to sort current column ascending
 - Press `]` to sort current column descending
 - Multi-column sorting supported (press multiple times on different columns)
 - Press same key twice to remove the current column from sorting
 
-### 13. Editing
+### 14. Editing
 
 **Edit Cell** (`e` or **Double-click**):
 
@@ -865,7 +814,7 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - Useful for quick deduplication before further editing, collecting, or exporting
 - Supports undo with `u`
 
-### 14. Column & Row Reordering
+### 15. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
 
@@ -879,7 +828,7 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - `J` and `K` provide the same down/up movement using Vim-style keys
 - Reorder is preserved when saving
 
-### 15. Save File
+### 16. Save File
 
 The application provides separate save actions for the current tab, all tabs, and the current filtered view.
 
@@ -899,27 +848,6 @@ The application provides separate save actions for the current tab, all tabs, an
 - Useful for exporting a subset without replacing the source dataframe
 
 The output format is determined by the file extension, making it easy to convert between formats such as CSV, TSV, Parquet, or Excel.
-
-### 16. Undo/Redo/Reset
-
-**Undo** (`u`/`U`):
-
-- Reverts last action with full state restoration
-- Works for edits, deletions, sorts, searches, etc.
-- Shows description of reverted action
-
-**Redo** (`R`):
-
-- Reapplies the last undone action
-- Restores the state before the undo was performed
-- Useful for redoing actions you've undone by mistake
-- Useful for alternating between two different states
-
-**Reset** (`Ctrl+U`):
-
-- Reverts all changes and returns to original data state when file was first loaded
-- Clears all edits, deletions, selections, filters, and sorts
-- Useful for starting fresh without reloading the file
 
 ### 17. Column Type Conversion
 
@@ -941,7 +869,114 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 **Note**: Type conversion attempts to preserve data where possible. Conversions may lose data (e.g., float to int rounding).
 
-### 18. SQL Interface
+### 18. Clipboard Operations
+
+Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
+
+**Note**: may require a X server to work.
+
+- Press `c` to copy cursor value
+- Press `Ctrl+C` to copy column values
+- Press `Ctrl+R` to copy row values (delimited by tab)
+- Hold `Shift` to select with mouse
+
+### 19. Link Column Creation
+
+Press `za` (leader `z` then `a`) to create a new column containing dynamically generated URLs using template. Links are typically clickable in a terminal emulator using Ctrl+Click.
+
+**Template Placeholders:**
+
+The link template supports multiple placeholder types for maximum flexibility:
+
+- **`$_`** - Current column, e.g., `https://example.com/search/$_` - Uses values from the current column
+
+- **`$1`, `$2`, `$3`, etc.** - Column by 1-based position index, e.g., `https://example.com/product/$1/details/$2` - Uses 1st and 2nd columns
+
+- **`$name`** - Column by name (use actual column names), e.g., `https://example.com/$region/$city/data` - Uses `region` and `city` columns
+
+**Features:**
+
+- **Multiple Placeholders**: Mix and match placeholders in a single template
+- **URL Prefix**: Automatically prepends `https://` if URL doesn't start with `http://` or `https://`
+
+**Tips:**
+
+- Use full undo (`u`) if template produces unexpected URLs
+- For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
+
+### 20. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
+
+Complex values, filters, and advanced operations can be specified via Polars expressions, with the following adaptions for convenience:
+
+**Column References:**
+
+- `$_` - Current column (based on cursor position)
+- `$1`, `$2`, etc. - Column by 1-based index
+- `$age`, `$salary` - Column by name (use actual column names)
+- `` $`col name` `` - Column by name with spaces (backtick quoted)
+
+**Row References:**
+
+- `$#` - Current row index (1-based)
+
+**DataFrame References:**
+
+- `self` - Current dataframe
+
+**Basic Comparisons:**
+
+- `$_ > 50` - Current column greater than 50
+- `$salary >= 100000` - Salary at least 100,000
+- `$age < 30` - Age less than 30
+- `$status == 'active'` - Status exactly matches 'active'
+- `$name != 'Unknown'` - Name is not 'Unknown'
+- `$# <= 10` - Top 10 rows
+
+**Logical Operators:**
+
+- `&` - AND
+- `|` - OR
+- `~` - NOT
+
+**Practical Examples:**
+
+- `($age < 30) & ($status == 'active')` - Age less than 30 AND status is active
+- `($name == 'Alice') | ($name == 'Bob')` - Name is Alice or Bob
+- `$salary / 1000 >= 50` - Salary divided by 1,000 is at least 50
+- `($department == 'Sales') & ($bonus > 5000)` - Sales department with bonus over 5,000
+- `($score >= 80) & ($score <= 90)` - Score between 80 and 90
+- `~($status == 'inactive')` - Status is not inactive
+- `$revenue > $expenses` - Revenue exceeds expenses
+- ``$`product id` > 100`` - Product ID with spaces in column name greater than 100
+- `self.drop(RID).is_duplicated()` - Duplicate rows (note: the internal RID column must be excluded)
+
+**String Operations:** ([Polars string API reference](https://docs.pola.rs/api/python/stable/reference/series/string.html))
+
+- `$name.str.contains("John")` - Name contains "John" (case-sensitive)
+- `$name.str.contains("(?i)john")` - Name contains "john" (case-insensitive)
+- `$email.str.ends_with("@company.com")` - Email ends with domain
+- `$code.str.starts_with("ABC")` - Code starts with "ABC"
+- `$name.str.len_chars() < 7` - Length of name shorter than 7
+
+**Number Operations:**
+
+- `$age * 2 > 100` - Double age greater than 100
+- `($salary + $bonus) > 150000` - Total compensation over 150,000
+- `$percentage >= 50` - Percentage at least 50%
+
+**Null Handling:**
+
+- `$column.is_null()` - Find null values
+- `$column.is_not_null()` - Find non-null values
+- `NULL` - a value to represent null for convenience
+
+**Tips:**
+
+- Use column indices (e.g., `$1`, `$2`) for faster column access.
+- Use column names that match exactly (case-sensitive)
+- Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
+
+### 21. SQL Interface
 
 The SQL interface provides two modes for querying your dataframe:
 
@@ -976,42 +1011,7 @@ FROM self
 WHERE `product id` = 7
 ```
 
-### 19. Clipboard Operations
-
-Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
-
-**Note**: may require a X server to work.
-
-- Press `c` to copy cursor value
-- Press `Ctrl+C` to copy column values
-- Press `Ctrl+R` to copy row values (delimited by tab)
-- Hold `Shift` to select with mouse
-
-### 20. Link Column Creation
-
-Press `za` (leader `z` then `a`) to create a new column containing dynamically generated URLs using template. Links are typically clickable in a terminal emulator using Ctrl+Click.
-
-**Template Placeholders:**
-
-The link template supports multiple placeholder types for maximum flexibility:
-
-- **`$_`** - Current column, e.g., `https://example.com/search/$_` - Uses values from the current column
-
-- **`$1`, `$2`, `$3`, etc.** - Column by 1-based position index, e.g., `https://example.com/product/$1/details/$2` - Uses 1st and 2nd columns
-
-- **`$name`** - Column by name (use actual column names), e.g., `https://example.com/$region/$city/data` - Uses `region` and `city` columns
-
-**Features:**
-
-- **Multiple Placeholders**: Mix and match placeholders in a single template
-- **URL Prefix**: Automatically prepends `https://` if URL doesn't start with `http://` or `https://`
-
-**Tips:**
-
-- Use full undo (`u`) if template produces unexpected URLs
-- For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
-
-### 21. Python Console
+### 22. Python Console
 
 Use the built-in Python console for quick interactive transformations without leaving the TUI.
 
