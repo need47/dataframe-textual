@@ -745,7 +745,7 @@ For **Basic Filter** (`v`) and **Collect** (`"`), rows are chosen in this order:
 - Opens modal for editing current cell
 - Validates input based on column data type
 
-**Rename Column Header** (**Double-click** column header):
+**Rename Column Header** (`^` or **Double-click** column header):
 
 - Quick rename by double-clicking the column header
 
@@ -855,16 +855,15 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 **Type Conversion Shortcuts**:
 
-- `#` - Cast to **integer**
-- `%` - Cast to **float**
-- `$` - Cast to **boolean**
 - `~` - Cast to **string**
 - `@` - Cast to **date**
+- `#` - Cast to **integer**
+- `$` - Cast to **boolean**
+- `%` - Cast to **float**
 
 **Features**:
 
 - Instant conversion with visual feedback
-- Full undo support - press `U` to revert
 - Leverage Polars' robust type casting
 
 **Note**: Type conversion attempts to preserve data where possible. Conversions may lose data (e.g., float to int rounding).
@@ -880,31 +879,7 @@ Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 - Press `Ctrl+R` to copy row values (delimited by tab)
 - Hold `Shift` to select with mouse
 
-### 19. Link Column Creation
-
-Press `za` (leader `z` then `a`) to create a new column containing dynamically generated URLs using template. Links are typically clickable in a terminal emulator using Ctrl+Click.
-
-**Template Placeholders:**
-
-The link template supports multiple placeholder types for maximum flexibility:
-
-- **`$_`** - Current column, e.g., `https://example.com/search/$_` - Uses values from the current column
-
-- **`$1`, `$2`, `$3`, etc.** - Column by 1-based position index, e.g., `https://example.com/product/$1/details/$2` - Uses 1st and 2nd columns
-
-- **`$name`** - Column by name (use actual column names), e.g., `https://example.com/$region/$city/data` - Uses `region` and `city` columns
-
-**Features:**
-
-- **Multiple Placeholders**: Mix and match placeholders in a single template
-- **URL Prefix**: Automatically prepends `https://` if URL doesn't start with `http://` or `https://`
-
-**Tips:**
-
-- Use full undo (`u`) if template produces unexpected URLs
-- For complex multi-column URLs, use column names (`$name`) for clarity over positions (`$1`)
-
-### 20. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
+### 19. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
 
 Complex values, filters, and advanced operations can be specified via Polars expressions, with the following adaptions for convenience:
 
@@ -975,6 +950,25 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - Use column indices (e.g., `$1`, `$2`) for faster column access.
 - Use column names that match exactly (case-sensitive)
 - Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
+
+### 20. Link Column Creation
+
+Press `za` to create a new column containing dynamically generated URLs using template. Links are typically clickable in a terminal emulator using Ctrl+Click.
+
+**Template Placeholders:**
+
+The link template supports multiple placeholder types for maximum flexibility:
+
+- **`$_`** - Current column, e.g., `https://example.com/search/$_` - Uses values from the current column
+
+- **`$1`, `$2`, `$3`, etc.** - Column by 1-based position index, e.g., `https://example.com/product/$1/details/$2` - Uses 1st and 2nd columns
+
+- **`$name`** - Column by name (use actual column names), e.g., `https://example.com/$region/$city/data` - Uses `region` and `city` columns
+
+**Features:**
+
+- **Multiple Placeholders**: Mix and match placeholders in a single template
+- **URL Prefix**: Automatically prepends `https://` if URL doesn't start with `http://` or `https://`
 
 ### 21. SQL Interface
 
