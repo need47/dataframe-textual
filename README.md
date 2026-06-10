@@ -19,7 +19,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 - 📝 **Data Editing** - Edit cells, delete rows, remove columns, and explode columns
 - 🧹 **Duplicate Removal** - Remove duplicate rows
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
-- ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts
+- ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts or Vim-style aliases
 - 📈 **Sorting & Statistics** - Multi-column sorting, frequency distribution, and histogram analysis
 - 💾 **Save & Undo** - Save edits back to file with full undo/redo support
 
@@ -261,7 +261,6 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | Key                      | Action                               |
 | ------------------------ | ------------------------------------ |
 | `F1`                     | Toggle help panel                    |
-| `k`                      | Select theme                         |
 | `` ` `` (backtick)       | Toggle Python console                |
 | `Ctrl+P` -> `Screenshot` | Capture terminal view as a SVG image |
 
@@ -271,18 +270,18 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 #### Navigation
 
-| Key                          | Action                     |
-| ---------------------------- | -------------------------- |
-| `gg`                         | Go to first row            |
-| `G`                          | Go to last row             |
-| `Ctrl + G`                   | Go to specific row         |
-| `↑` / `↓`                    | Move up/down one row       |
-| `←` / `→`                    | Move left/right one column |
-| `Home` / `End`               | Go to first/last column    |
-| `Ctrl + Home` / `Ctrl + End` | Go to page top/bottom      |
-| `PageDown` / `PageUp`        | Scroll down/up one page    |
-| `Ctrl+F`                     | Page forward               |
-| `Ctrl+B`                     | Page backforward           |
+| Key                          | Action                              |
+| ---------------------------- | ----------------------------------- |
+| `gg`                         | Go to first row                     |
+| `G`                          | Go to last row                      |
+| `Ctrl + G`                   | Go to specific row                  |
+| `←` / `↓` / `↑` / `→`        | Move left/down/up/right             |
+| `h` / `j` / `k` / `l`        | Move left/down/up/right (Vim-style) |
+| `Home` / `End`               | Go to first/last column             |
+| `Ctrl + Home` / `Ctrl + End` | Go to page top/bottom               |
+| `PageDown` / `PageUp`        | Scroll down/up one page             |
+| `Ctrl+F`                     | Page forward                        |
+| `Ctrl+B`                     | Page backforward                    |
 
 #### Undo/Redo/Reset
 
@@ -305,7 +304,8 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `gI`              | Show statistics for entire dataframe                                   |
 | `=`               | Show histogram using first column as label and current column as value |
 | `C`               | Show column metadata (e.g., data types)                                |
-| `K`               | Cycle cursor types: cell → row → column → cell                         |
+| `*`               | Hide selected columns or current column                                |
+| `g*`              | Show all hidden columns                                                |
 | `~`               | Toggle column index prefix                                             |
 | `_` (underscore)  | Toggle column full width for current column                            |
 | `g_` (underscore) | Toggle column full width for all string/list columns                   |
@@ -314,9 +314,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `g,`              | Toggle thousand separator for all numeric columns                      |
 | `(`               | Decrease float precision for current column                            |
 | `)`               | Increase float precision for current column                            |
-| `*`               | Set current row as the new header row                                  |
-| `h`               | Hide selected columns or current column                                |
-| `H`               | Show all hidden columns                                                |
+| `g^`              | Set current row as the new header row                                  |
 
 #### Editing
 
@@ -330,8 +328,11 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `a`            | Add empty column after current                                |
 | `A`            | Add column with name and value/expression                     |
 | `@`            | Add a link column from URL template                           |
+| `i`            | Add index column after current                                |
 | `^`            | Rename current column                                         |
 | `-` (minus)    | Delete selected columns or current column                     |
+| `g-` (minus)   | Delete current column and all columns before it               |
+| `z-` (minus)   | Delete current column and all columns after it                |
 | `d`            | Delete current row                                            |
 | `gd`           | Delete current row and all those above                        |
 | `zd`           | Delete current row and all those below                        |
@@ -389,8 +390,12 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | --------- | ------------------------- |
 | `Shift+↑` | Move current row up       |
 | `Shift+↓` | Move current row down     |
+| `K`       | Move current row up       |
+| `J`       | Move current row down     |
 | `Shift+←` | Move current column left  |
 | `Shift+→` | Move current column right |
+| `H`       | Move current column left  |
+| `L`       | Move current column right |
 
 #### Type Casting
 
@@ -455,10 +460,10 @@ The modal displays a table with the following columns:
 
 This is useful for quickly navigating between tabs, reviewing file sizes at a glance, or closing tabs you no longer need without switching to them first.
 
-**Hide/Show Columns** (`h` / `H`):
+**Hide/Show Columns** (`*` / `g*`):
 
-- `h` - Temporarily hide selected columns, or the current column when no columns are selected (data preserved)
-- `H` - Restore all hidden columns
+- `*` - Temporarily hide selected columns, or the current column when no columns are selected (data preserved)
+- `g*` - Restore all hidden columns
 
 **Freeze Rows and Columns** (`+`):
 
@@ -485,11 +490,6 @@ This is useful for quickly navigating between tabs, reviewing file sizes at a gl
 - Each column can have its own precision setting
 - Precision of 0 means full (default) display
 - Display-only: does not modify underlying data in the dataframe
-
-**Cursor Type Cycling** (`K`):
-
-- Cycles through cell, row, and column selection modes
-- Use it to switch between inspecting a single cell, an entire row, or an entire column
 
 ### 3. Row Detail View
 
@@ -727,11 +727,14 @@ View quick metadata about your columns to understand their structure and content
 
 **In the Column Metadata Table**
 
+- Press `Enter` to jump to the selected column in the main table and close the modal
 - Press `F` to show the frequency table for the selected column
 - Press `I` to show the statistics table for the selected column
-
-**In Metadata Modals**:
-
+- Press `J` or `Shift+↓` to move the selected column right (and move the metadata row down)
+- Press `K` or `Shift+↑` to move the selected column left (and move the metadata row up)
+- Press `e` to rename the selected column
+- Press `g` to scroll to top
+- Press `G` to scroll to bottom
 - Press `q` or `Escape` to close
 
 ### 11. Frequency Distribution
@@ -809,6 +812,16 @@ This is useful for:
 
 - Deletes selected columns when present, otherwise deletes the current column
 
+**Delete Column and Those Before** (`g-`):
+
+- Deletes the current column and every column to its left
+- Useful when you want to trim a dataframe from the current position backward
+
+**Delete Column and Those After** (`z-`):
+
+- Deletes the current column and every column to its right
+- Useful when you want to keep only the leading columns up to the cursor position
+
 **Add Empty Column** (`a`):
 
 - Adds a new empty column after the current column
@@ -820,6 +833,11 @@ This is useful for:
 - Value can be a constant (e.g., `0`, `"text"`) or a Polars expression (e.g., `$age * 2`)
 - Expression can reference other columns and perform calculations
 - Useful for creating derived columns or adding data with formulas
+
+**Add Index Column** (`i`):
+
+- Inserts an index column immediately after the current column
+- Useful when you want a simple row counter without modifying the existing data
 
 **Duplicate Row** (`D`):
 
@@ -845,11 +863,13 @@ This is useful for:
 **Move Columns**: `Shift+←` and `Shift+→`
 
 - Swaps adjacent columns
+- `H` and `L` provide the same left/right movement using Vim-style keys
 - Reorder is preserved when saving
 
 **Move Rows**: `Shift+↑` and `Shift+↓`
 
 - Swaps adjacent rows
+- `J` and `K` provide the same down/up movement using Vim-style keys
 - Reorder is preserved when saving
 
 ### 15. Save File

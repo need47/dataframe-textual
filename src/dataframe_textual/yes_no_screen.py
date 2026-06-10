@@ -132,7 +132,7 @@ class YMNScreen(ModalScreen):
             self.dismiss(None)
 
     def on_key(self, event) -> None:
-        """Handle key press events in the table screen."""
+        """Handle key press events in the modal screen."""
         if event.key in ("q", "escape"):
             event.stop()
             self.dismiss(None)
@@ -926,7 +926,7 @@ class SimpleSqlScreen(YMNScreen):
             yield from super().compose()
 
     def handle_simple(self, new_tab: bool = False) -> tuple[str, str, bool]:
-        """Handle Yes button/Enter key press."""
+        """Build and return the (columns, where_clause, new_tab) tuple from widget state."""
         selections = self.query_one(SelectionList).selected
         if not selections:
             selections = [
@@ -952,10 +952,7 @@ class AdvancedSqlScreen(YMNScreen):
     """
 
     def __init__(self, dftable: "DataFrameTable") -> None:
-        """Initialize the simple SQL screen.
-
-        Sets up the modal screen with reference to the main DataFrameTable widget
-        and stores the DataFrame for display.
+        """Initialize the advanced SQL screen.
 
         Args:
             dftable: Reference to the parent DataFrameTable widget.
@@ -982,7 +979,7 @@ class AdvancedSqlScreen(YMNScreen):
             yield from super().compose()
 
     def handle_advanced(self, new_tab: bool = False) -> tuple[str, bool]:
-        """Handle Yes button/Enter key press."""
+        """Return the (sql_query, new_tab) tuple from the TextArea."""
         return self.query_one(TextArea).text.strip(), new_tab
 
 
@@ -1020,7 +1017,7 @@ class NewTabScreen(YMNScreen):
             yield from super().compose()
 
     def _get_input(self) -> str:
-        """Handle Yes button/Enter key press."""
+        """Return the Polars expression text entered in the TextArea."""
         return self.query_one(TextArea).text.strip()
 
 
@@ -1105,7 +1102,12 @@ class FilterNumericScreen(YMNScreen):
             yield from super().compose()
 
     def _get_input(self) -> tuple[pl.Expr | None, int]:
-        """Handle Yes button/Enter key press."""
+        """Build and return a Polars filter expression from the numeric condition inputs.
+
+        Returns:
+            A tuple of (filter_expression, cidx), where filter_expression is None
+            if no conditions were entered.
+        """
         col = self.s.name
         expr: pl.Expr | None = None
 
@@ -1248,7 +1250,12 @@ class FilterTemporalScreen(YMNScreen):
             return None
 
     def _get_input(self) -> tuple[pl.Expr | None, int]:
-        """Handle Yes button/Enter key press."""
+        """Build and return a Polars filter expression from the temporal condition inputs.
+
+        Returns:
+            A tuple of (filter_expression, cidx), where filter_expression is None
+            if no conditions were entered.
+        """
         col = self.s.name
         expr: pl.Expr | None = None
 
@@ -1392,7 +1399,12 @@ class FilterListScreen(YMNScreen):
         return parsed_value if isinstance(parsed_value, list) else value
 
     def _get_input(self) -> tuple[pl.Expr | None, int]:
-        """Handle Yes button/Enter key press."""
+        """Build and return a Polars filter expression from the list condition inputs.
+
+        Returns:
+            A tuple of (filter_expression, cidx), where filter_expression is None
+            if no conditions were entered.
+        """
         col = self.s.name
         expr: pl.Expr | None = None
 
@@ -1533,7 +1545,12 @@ class FilterStringScreen(YMNScreen):
             yield from super().compose()
 
     def _get_input(self) -> tuple[pl.Expr | None, int]:
-        """Handle Yes button/Enter key press."""
+        """Build and return a Polars filter expression from the string condition inputs.
+
+        Returns:
+            A tuple of (filter_expression, cidx), where filter_expression is None
+            if no conditions were entered.
+        """
         col = self.s.name
         expr: pl.Expr | None = None
 
@@ -1644,7 +1661,12 @@ class FilterBooleanScreen(YMNScreen):
             yield from super().compose()
 
     def _get_input(self) -> tuple[pl.Expr | None, int]:
-        """Handle Yes button/Enter key press."""
+        """Build and return a Polars filter expression from the selected radio button.
+
+        Returns:
+            A tuple of (filter_expression, cidx), where filter_expression is None
+            if no radio button is selected.
+        """
         col = self.s.name
         radio_set = self.query_one("#boolean-radio-set", RadioSet)
 

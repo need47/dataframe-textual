@@ -1,4 +1,4 @@
-"""A theme screen to select theme from a list of available themes."""
+"""Loading and busy indicator modal screens."""
 
 from typing import TYPE_CHECKING, Callable
 
@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
 
 class LoadingScreen(ModalScreen):
+    """Modal overlay that polls for dataframe load completion and auto-dismisses."""
+
     BINDINGS = [
         ("q,escape", "cancel", "Cancel"),
     ]
@@ -28,14 +30,22 @@ class LoadingScreen(ModalScreen):
     """
 
     def __init__(self, dftable: "DataFrameTable", callback: Callable | None = None) -> None:
+        """Initialize the loading screen.
+
+        Args:
+            dftable: The DataFrameTable being loaded.
+            callback: Optional callable invoked after loading completes.
+        """
         super().__init__()
         self.dftable = dftable
         self.callback = callback
 
     def compose(self) -> ComposeResult:
+        """Compose the loading indicator widget."""
         yield LoadingIndicator(id="loading-indicator")
 
     def on_mount(self) -> None:
+        """Start polling for load completion on mount."""
         self.set_interval(0.1, self.check_progress)
 
     def check_progress(self) -> None:
@@ -48,10 +58,13 @@ class LoadingScreen(ModalScreen):
                 self.callback()
 
     def action_cancel(self) -> None:
+        """Dismiss the loading screen on cancel."""
         self.dismiss()
 
 
 class BusyScreen(ModalScreen):
+    """Modal overlay shown while a background task runs, polling for task completion."""
+
     BINDINGS = [
         ("q,escape", "cancel", "Cancel"),
     ]
@@ -69,14 +82,22 @@ class BusyScreen(ModalScreen):
     """
 
     def __init__(self, dftable: "DataFrameTable", task: Callable) -> None:
+        """Initialize the busy screen.
+
+        Args:
+            dftable: The DataFrameTable associated with the running task.
+            task: Callable to invoke on mount that starts the background work.
+        """
         super().__init__()
         self.dftable = dftable
         self.run_task = task
 
     def compose(self) -> ComposeResult:
+        """Compose the loading indicator widget."""
         yield LoadingIndicator(id="loading-indicator")
 
     def on_mount(self) -> None:
+        """Start the task and begin polling for completion on mount."""
         self.run_task()
         self.set_interval(0.1, self.check_progress)
 

@@ -6,6 +6,8 @@ from textual.widgets import TextArea
 
 
 class TextScreen(ModalScreen):
+    """Modal screen to display long read-only text in a scrollable TextArea."""
+
     DEFAULT_CSS = """
         TextScreen {
             align: center middle;
@@ -21,13 +23,20 @@ class TextScreen(ModalScreen):
     """
 
     def __init__(self, text) -> None:
+        """Initialize the text screen.
+
+        Args:
+            text: The text content to display.
+        """
         super().__init__()
         self.text = text
 
     def compose(self) -> ComposeResult:
+        """Compose the read-only TextArea widget."""
         yield TextArea(self.text, id="text-area", read_only=True, show_cursor=False)
 
     def on_key(self, event) -> None:
+        """Close the screen on q or Escape."""
         if event.key in ("q", "escape"):
             self.dismiss()
             event.stop()

@@ -286,8 +286,8 @@ class TableModalScreen(ModalScreen):
 
     def _on_calc_ready(self) -> None:
         self.build_table()
-        self.table.loading = False
         self.table.focus()
+        self.table.loading = False
 
 
 class TableScreen(TableModalScreen):
@@ -985,7 +985,7 @@ class HistogramScreen(TableScreen):
 class MetaColumnScreen(TableScreen):
     """Modal screen to display metadata about the columns in the dataframe."""
 
-    def on_mount(self) -> None:
+    def on_ready(self) -> None:
         """Initialize the column metadata screen.
 
         Populates the table with information about each column in the dataframe,
@@ -997,20 +997,74 @@ class MetaColumnScreen(TableScreen):
         """Handle key press events on the column metadata screen.
 
         Supports keys:
-          - 'F': Show frequency for the selected value.
-          - 's': Show statistics for the selected value.
+          - 'Enter': Jump to the selected column in the main table and close the modal.
+          - 'F': Show frequency for the selected column.
+          - 'I': Show statistics for the selected column.
+          - 'J' / 'Shift+Down': Move the selected column right (row moves down).
+          - 'K' / 'Shift+Up': Move the selected column left (row moves up).
+          - 'e': Rename the selected column.
+          - 'g': Scroll to top.
+          - 'G': Scroll to bottom.
+          - 'q' / 'Escape': Close the modal.
 
         Args:
             event: The key event object.
         """
-        # Show frequency for the selected value
-        if event.key == "F":
+        # Enter key to jump to the column in the main table and close the metadata screen
+        if event.key == "enter":
             event.stop()
+            event.prevent_default()
+            cidx = self.get_cidx()
+            self.app.pop_screen()
+            self.dftable.move_cursor(column=cidx)
+        # Show frequency for the selected value
+        elif event.key == "F":
+            event.stop()
+            event.prevent_default()
             self.show_frequency(self.get_cidx())
         # Show statistics for the selected value
         elif event.key == "I":
             event.stop()
+            event.prevent_default()
             self.show_statistics(self.get_cidx())
+        # Rearrange column
+        elif event.key in ("J", "K", "shift+down", "shift+up"):
+            event.stop()
+            event.prevent_default()
+
+            row_idx, col_idx = self.table.cursor_coordinate
+
+            if event.key in ("J", "shift+down"):
+                self.dftable.action_move_column_right(col_idx=row_idx)
+                new_row_idx = min(row_idx + 1, len(self.dftable.df.columns) - 1)
+            else:
+                self.dftable.action_move_column_left(col_idx=row_idx)
+                new_row_idx = max(row_idx - 1, 0)
+
+            # Refresh metadata to reflect the new column order and keep cursor on moved row.
+            self.build_table()
+            self.table.move_cursor(row=new_row_idx, column=col_idx)
+        # Rename column
+        elif event.key == "e":
+            event.stop()
+            event.prevent_default()
+
+            # Rename is asynchronous (opens a modal), so rebuild on resume.
+            self._resume_row_idx = self.table.cursor_row
+            self.dftable.action_rename_column(col_idx=self._resume_row_idx)
+
+    def on_screen_resume(self) -> None:
+        """Rebuild metadata after returning from stacked screens (e.g., rename dialog)."""
+        row_idx = getattr(self, "_resume_row_idx", self.table.cursor_row)
+
+        # Remove old table and remount a fresh one to avoid stale cached column widths
+        self.table.remove()
+        self.table = DataTable(zebra_stripes=True)
+        self.mount(self.table)
+
+        self.build_table()
+        self.table.focus()
+        self.table.move_cursor(row=row_idx)
 
     def build_table(self) -> None:
         """Build the column metadata table."""

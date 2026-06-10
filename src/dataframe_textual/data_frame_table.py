@@ -185,6 +185,7 @@ class DataFrameTable(DataTable):
 
         ## ⬆️ Navigation
         - **↑↓←→** - 🎯 Move cursor (cell/row/column)
+        - **hjkl** - 🎯 Move cursor left/down/up/right (Vim-style)
         - **gg** - ⬆️ Go to first row
         - **G** - ⬇️ Go to last row
         - **Ctrl+G** - 🎯 Go to row
@@ -193,7 +194,7 @@ class DataFrameTable(DataTable):
         - **Ctrl+F** - 📜 Page down
         - **Ctrl+B** - 📜 Page up
         - **PgUp/PgDn** - 📜 Page up/down
-        - **\\*** - 📌 Mark current row as header
+        - **g^** - 📌 Mark current row as header
 
         ## ♻️ Undo/Redo/Reset
         - **u** - ↩️ Undo last action
@@ -210,8 +211,8 @@ class DataFrameTable(DataTable):
         - **gI** - 📊 Show statistics for entire dataframe
         - **=** - 📊 Show histogram using first column as label and current column as value
         - **C** - 📋 Show column metadata (ID, name, type)
-        - **h** - 👁️ Hide selected columns or current column
-        - **H** - 👀 Show all hidden columns
+        - **\\*** - 👁️ Hide selected columns or current column
+        - **g\\*** - 👀 Show all hidden columns
         - **_** (underscore) - 📏 Toggle column full width for current column
         - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
         - **+** - 📌 Freeze rows and/or columns
@@ -221,7 +222,6 @@ class DataFrameTable(DataTable):
         - **g,** - 🔢 Toggle thousand separator for all numeric columns
         - **(** - 🔢 Decrease float precision for current column
         - **)** - 🔢 Increase float precision for current column
-        - **K** - 🔄 Cycle cursor (cell → row → column → cell)
 
         ## ✏️ Editing
         - **Double-click** - ✍️ Edit cell or rename column header
@@ -230,6 +230,7 @@ class DataFrameTable(DataTable):
         - **a** - ➕ Add empty column after current
         - **A** - ➕ Add column with name and optional expression
         - **@** - 🔗 Add a new link column from template
+        - **i** - ➕ Add an index column after current
         - **^** - ✏️ Rename current column
         - **d** - ✖️ Delete current row
         - **gd** - ✖️ Delete row and those above
@@ -237,6 +238,8 @@ class DataFrameTable(DataTable):
         - **Delete** - ✖️ Clear current cell (set to NULL)
         - **Shift+Delete** - ✖️ Clear current column (set matching cells to NULL)
         - **-** (minus) - ✖️ Delete selected columns or current column
+        - **g-** (minus) - ✖️ Delete column and those before current column
+        - **z-** (minus) - ✖️ Delete column and those after current column
         - **D** - 📋 Duplicate current row
         - **zD** - 📋 Duplicate current column
         - **Ctrl+Delete** - 🧹 Remove duplicate rows (keep first occurrence)
@@ -280,6 +283,8 @@ class DataFrameTable(DataTable):
         ## 🔃 Reorder
         - **Shift+↑↓** - ⬆️⬇️ Move row up/down
         - **Shift+←→** - ⬅️➡️ Move column left/right
+        - **J/K** - ⬇️⬆️ Move row down/up (Vim-style)
+        - **H/L** - ⬅️➡️ Move column left/right (Vim-style)
 
         ## 🎨 Type Casting
         - **#** - 🔢 Cast column to integer
@@ -300,6 +305,10 @@ class DataFrameTable(DataTable):
     # fmt: off
     BINDINGS = [
         # Navigation
+        ("h", "cursor_left", "Move cursor left"),
+        ("j", "cursor_down", "Move cursor down"),
+        ("k", "cursor_up", "Move cursor up"),
+        ("l", "cursor_right", "Move cursor right"),
         ("g", "go_top", "Go to first row"),
         ("G", "go_bottom", "Go to last row"),
         ("ctrl+g", "go_to_row", "Go to row"),
@@ -311,16 +320,13 @@ class DataFrameTable(DataTable):
         ("ctrl+u", "reset", "Reset to initial state"),
         # Display
         ("underscore", "expand_column", "Toggle column full width"),  # `_`
-        ("h", "hide_column", "Hide selected columns or current column"),
-        ("H", "show_hidden_columns", "Show hidden column(s)"),
+        ("asterisk", "toggle_column", "Hide/show selected columns or current column"),  # `*`
         ("tilde", "toggle_column_index", "Toggle column index prefix"),  # `~`
-        ("K", "cycle_cursor_type", "Cycle cursor mode"),  # `K`
         ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
         ("comma", "toggle_thousand_separator", "Toggle thousand separator for column"),  # `,`
         ("left_parenthesis", "adjust_float_precision(-1)", "Decrease float precision for column"),  # `(`
         ("right_parenthesis", "adjust_float_precision(1)", "Increase float precision for column"),  # `)`
         ("circumflex_accent", "rename_column", "Rename current column"),  # `^`
-        ("asterisk", "set_cursor_row_as_header", "Set cursor row as the new header row"),  # `*`
         # Copy
         ("c", "copy_cell", "Copy cell to clipboard"),
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
@@ -372,15 +378,16 @@ class DataFrameTable(DataTable):
         # Explode
         ("o", "explode_column", "Explode column"),
         ("O", "explode_column_delim", "Explode column by delimiter"),
-        # Add
+        # Add Column
         ("a", "add_column", "Add column"),
         ("A", "add_column_expr", "Add column with expression"),
         ("at", "add_link_column", "Add a link column"),  # `@`
+        ("i", "add_index_column", "Add an index column"),  # `i`
         # Reorder
-        ("shift+left", "move_column_left", "Move column left"),
-        ("shift+right", "move_column_right", "Move column right"),
-        ("shift+up", "move_row_up", "Move row up"),
-        ("shift+down", "move_row_down", "Move row down"),
+        ("shift+left,H", "move_column_left", "Move column left"),
+        ("shift+right,L", "move_column_right", "Move column right"),
+        ("shift+up,K", "move_row_up", "Move row up"),
+        ("shift+down,J", "move_row_down", "Move row down"),
         # Type Casting
         ("number_sign", "cast_column_dtype('pl.Int64')", "Cast column dtype to integer"),  # `#`
         ("percent_sign", "cast_column_dtype('pl.Float64')", "Cast column dtype to float"),  # `%`
@@ -516,10 +523,12 @@ class DataFrameTable(DataTable):
                     decision = {"continue": True}
 
                     def on_decision(result: bool | None) -> None:
+                        """Record the user's continue/cancel decision and signal the loader thread."""
                         decision["continue"] = bool(result)
                         decision_ready.set()
 
                     def prompt_continue_loading() -> None:
+                        """Push the confirmation dialog on the main thread."""
                         self.app.push_screen(
                             ConfirmScreen(
                                 "Continue Loading?",
@@ -565,6 +574,7 @@ class DataFrameTable(DataTable):
         """
 
         def wrapper(self, *args, **kwargs):
+            """Invoke the wrapped action only when the dataframe is fully loaded."""
             if self.df_done:
                 return func(self, *args, **kwargs)
 
@@ -672,11 +682,12 @@ class DataFrameTable(DataTable):
 
     @property
     def leader_key(self) -> bool:
-        """Whether the app is currently in leader mode."""
+        """The current leader-mode key (``'g'``, ``'z'``, or ``''`` when inactive)."""
         return self.app.leader_key
 
     @leader_key.setter
     def leader_key(self, value: bool) -> None:
+        """Set the leader-mode key on the app."""
         self.app.leader_key = value
 
     @property
@@ -888,15 +899,85 @@ class DataFrameTable(DataTable):
         # self.setup_table()
         pass
 
+    def stop_timer(self) -> None:
+        """Stop the timeout timer in the app."""
+        if self.app.timeout_timer:
+            self.app.timeout_timer.stop()
+            self.app.timeout_timer = None
+
     def on_key(self, event: Key) -> None:
-        """Handle key press events."""
+        """Handle key press events for leader-key sequences and row loading.
+
+        Handles two-key leader sequences and scroll-triggered row loading:
+
+        Leader ``g`` sequences:
+          - ``gh``: Scroll to leftmost column.
+          - ``gj``: Scroll to last row (bottom).
+          - ``gk``: Scroll to first row (top).
+          - ``gl``: Scroll to rightmost column.
+          - ``g^``: Mark current row as header.
+
+        Leader ``z`` sequences:
+          - ``z^``: Toggle internal row index (RID) column.
+
+        Row loading triggers:
+          - ``↑``: Load rows above current visible range.
+          - ``↓``: Load rows below current visible range.
+
+        All other key actions are handled via BINDINGS and their ``action_*`` methods.
+
+        Args:
+            event: The key event object.
+        """
+        # Toggle internal row index column (RID)
         if self.leader_key == "z" and event.key == "circumflex_accent":  # `z^`:
             event.stop()
-            if self.app.timeout_timer:
-                self.app.timeout_timer.stop()
-                self.app.timeout_timer = None
+            self.stop_timer()
             self.do_toggle_rid()
             return
+        elif self.leader_key == "g":
+            # Go to leftmost column
+            if event.key == "h":  # `gh`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.action_scroll_home()
+                self.leader_key = ""
+                self.notify("Scrolled to [$success]home[/]", title="Scroll")
+                return
+            # Go to last row
+            elif event.key == "j":  # `gj`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.action_scroll_bottom()
+                self.leader_key = ""
+                self.notify("Scrolled to [$success]bottom[/]", title="Scroll")
+                return
+            # Go to top row
+            elif event.key == "k":  # `gk`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.action_scroll_top()
+                self.leader_key = ""
+                self.notify("Scrolled to [$success]top[/]", title="Scroll")
+                return
+            # Go to last column
+            elif event.key == "l":  # `gl`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.action_scroll_end()
+                self.leader_key = ""
+                self.notify("Scrolled to [$success]end[/]", title="Scroll")
+                return
+            elif event.key == "circumflex_accent":  # `g^`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_set_cursor_row_as_header()
+                return
 
         if event.key == "up":
             self.load_rows_up()
@@ -965,27 +1046,28 @@ class DataFrameTable(DataTable):
         self.do_view_cell_detail()
 
     @with_full_df
+    @with_leader_key
     def action_delete_column(self) -> None:
         """Delete selected columns or the current column."""
-        self.do_delete_column()
+        if self.leader_key == "g":
+            self.do_delete_column(more="before")
+        elif self.leader_key == "z":
+            self.do_delete_column(more="after")
+        else:
+            self.do_delete_column()
 
-    def action_hide_column(self) -> None:
+    @with_leader_key
+    def action_toggle_column(self) -> None:
         """Hide selected columns or the current column."""
-        self.do_hide_column()
+        if self.leader_key == "g":
+            self.do_show_hidden_columns()
+        else:
+            self.do_hide_column()
 
     @with_leader_key
     def action_expand_column(self) -> None:
         """Expand the current column to its full width."""
         self.do_expand_column()
-
-    @with_full_df
-    def action_set_cursor_row_as_header(self) -> None:
-        """Set cursor row as the new header row."""
-        self.do_set_cursor_row_as_header()
-
-    def action_show_hidden_columns(self) -> None:
-        """Show all hidden columns."""
-        self.do_show_hidden_columns()
 
     @with_full_df
     def action_sort_ascending(self) -> None:
@@ -1062,13 +1144,18 @@ class DataFrameTable(DataTable):
         self.do_add_column_expr()
 
     @with_full_df
+    def action_add_index_column(self) -> None:
+        """Add an index column after the current column."""
+        self.do_add_index_column()
+
+    @with_full_df
     def action_add_link_column(self) -> None:
         """Open AddLinkScreen to create a new link column from a Polars expression."""
         self.do_add_link_column()
 
-    def action_rename_column(self) -> None:
+    def action_rename_column(self, col_idx: int | None = None) -> None:
         """Rename the current column."""
-        self.do_rename_column()
+        self.do_rename_column(col_idx=col_idx)
 
     @with_full_df
     def action_clear_cell(self) -> None:
@@ -1164,14 +1251,14 @@ class DataFrameTable(DataTable):
         self.do_reset()
 
     @with_full_df
-    def action_move_column_left(self) -> None:
+    def action_move_column_left(self, col_idx: int | None = None) -> None:
         """Move the current column to the left."""
-        self.do_move_column("left")
+        self.do_move_column("left", col_idx=col_idx)
 
     @with_full_df
-    def action_move_column_right(self) -> None:
+    def action_move_column_right(self, col_idx: int | None = None) -> None:
         """Move the current column to the right."""
-        self.do_move_column("right")
+        self.do_move_column("right", col_idx=col_idx)
 
     @with_full_df
     def action_move_row_up(self) -> None:
@@ -2374,6 +2461,8 @@ class DataFrameTable(DataTable):
             title="Toggle RID",
         )
 
+    @with_full_df
+    @with_leader_key
     def do_set_cursor_row_as_header(self) -> None:
         """Set cursor row as the new header row."""
         ridx = self.cursor_ridx
@@ -2716,8 +2805,8 @@ class DataFrameTable(DataTable):
                 cols.remove(col_name)
                 cols.add(new_name)
 
-        # Recreate table for display
-        self.setup_table()
+        # Defer table rebuild until after modal is fully closed
+        self.call_later(self.setup_table)
 
         # Move cursor to the renamed column
         self.move_cursor(column=col_idx)
@@ -2810,18 +2899,26 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to clear column [$error]{col_name}[/]", title="Clear Column", severity="error")
             self.log(f"Error clearing column `{col_name}`: {e}")
 
+    def _get_column_name(self, colname) -> str:
+        """Get a unique column name based on the provided name."""
+        if colname not in self.df.columns:
+            return colname
+
+        base_name = colname
+        counter = 1
+        new_col_name = f"{base_name}_{counter}"
+        while new_col_name in self.df.columns:
+            counter += 1
+            new_col_name = f"{base_name}_{counter}"
+        return new_col_name
+
     def do_add_column(self, col_name: str | None = None) -> None:
         """Add acolumn after the current column."""
         cidx = self.cursor_cidx
 
+        # Generate a unique column name
         if not col_name:
-            # Generate a unique column name
-            base_name = "new_col"
-            new_col_name = base_name
-            counter = 1
-            while new_col_name in self.df.columns:
-                new_col_name = f"{base_name}_{counter}"
-                counter += 1
+            new_col_name = self._get_column_name("new_col")
         else:
             new_col_name = col_name
 
@@ -2906,7 +3003,60 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to add column [$error]{new_col_name}[/]", title="Add Column", severity="error")
             self.log(f"Error adding column `{new_col_name}`: {e}")
 
+    def do_add_index_column(self, start: int = 1, step: int = 1) -> None:
+        """Add an index column after the current column.
+
+        Args:
+            start: Starting value for the sequence. Defaults to 1.
+            step: Step between values in the sequence. Defaults to 1.
+        """
+        cidx = self.cursor_cidx
+        new_col_name = self._get_column_name("index")
+
+        # Add to history
+        self.add_history(
+            f"Add index column [$success]{new_col_name}[/] after column [$accent]{cidx + 1}[/]", dirty=True
+        )
+
+        try:
+            if step == 0:
+                step = 1
+
+            # Create a sequential column using the requested start and step.
+            index_values = pl.Series(new_col_name, range(start, start + (step * len(self.df)), step))
+
+            # Get columns up to current, the new column, then remaining columns.
+            cols = self.df.columns
+            cols_before = cols[: cidx + 1]
+            cols_after = cols[cidx + 1 :]
+
+            # Build the new dataframe with columns reordered.
+            select_cols = cols_before + [new_col_name] + cols_after
+            self.df = self.df.lazy().with_columns(index_values).select(select_cols).collect()
+
+            # Also update the view if applicable.
+            if self.df_view is not None:
+                view_index_values = pl.Series(new_col_name, range(start, start + (step * len(self.df_view)), step))
+                self.df_view = self.df_view.lazy().with_columns(view_index_values).select(select_cols).collect()
+
+            # Recreate table for display.
+            self.setup_table()
+
+            # Move cursor to the new column.
+            self.move_cursor(column=cidx + 1)
+
+            self.notify(
+                f"Added index column [$success]{new_col_name}[/] starting at [$accent]{start}[/] with step [$accent]{step}[/]",
+                title="Add Index Column",
+            )
+        except Exception as e:
+            self.notify(
+                f"Failed to add index column [$error]{new_col_name}[/]", title="Add Index Column", severity="error"
+            )
+            self.log(f"Error adding index column `{new_col_name}`: {e}")
+
     def do_add_link_column(self) -> None:
+        """Open AddLinkScreen to collect a link template and add a new link column."""
         self.app.push_screen(
             AddLinkScreen(self.cursor_cidx, self.df),
             callback=self.add_link_column,
@@ -3092,6 +3242,7 @@ class DataFrameTable(DataTable):
 
     @with_full_df
     def explode_column_delim(self, result) -> None:
+        """Handle result from ExplodeColumnScreen and launch the delimiter-based explode task."""
         if result is None:
             return
         col_name, delimiter = result
@@ -3335,16 +3486,19 @@ class DataFrameTable(DataTable):
             title="Unique Rows",
         )
 
-    def do_move_column(self, direction: str) -> None:
+    def do_move_column(self, direction: str, col_idx: int | None = None) -> None:
         """Move the current column left or right.
 
         Args:
             direction: "left" to move left, "right" to move right.
         """
-        row_idx, col_idx = self.cursor_coordinate
-        col_key = self.cursor_col_key
+        row_idx = self.cursor_row
+        if col_idx is None:
+            col_idx = self.cursor_column
+
+        col_key = self.get_col_key(col_idx)
         col_name = col_key.value
-        cidx = self.cursor_cidx
+        cidx = self.df.columns.index(col_name)
 
         # Validate move is possible
         if direction == "left":

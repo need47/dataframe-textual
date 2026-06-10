@@ -62,7 +62,6 @@ class DataFrameViewer(App):
         ## 🎨 View & Settings
         - **S** - 📋 Show all open sheets/tabs
         - **F1** - ❓ Toggle this help panel
-        - **k** - 🌙 Select theme
         - **` (backtick)** - 🐍 Toggle Python console
         - **Ctrl+P -> Screenshot** - 📸 Capture terminal view as a SVG image
 
@@ -93,7 +92,6 @@ class DataFrameViewer(App):
         ("ctrl+n", "new_tab", "New Tab"),
         ("w", "save_tab_overwrite", "Save Tab (overwrite)"),
         ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
-        ("k", "select_theme", "Select Theme"),
         ("grave_accent", "toggle_python_console", "Python Console"),  # '`'
         ("S", "show_sheets", "Show Sheets"),
     ]
@@ -165,7 +163,25 @@ class DataFrameViewer(App):
         self.timeout_timer: Timer | None = None
 
     def on_key(self, event: Key) -> None:
-        """Handle leader mode key events at the app level."""
+        """Handle leader-mode activation and timeout at the app level.
+
+        Intercepts ``g`` and ``z`` keystrokes to enter leader mode, which allows
+        two-key sequences (e.g., ``gq``, ``gw``, ``z^``) to be dispatched to the
+        active widget's ``on_key`` handler.
+
+        Behaviour:
+          - ``g`` or ``z``: Activate leader mode, start a 3-second timeout timer,
+            and set ``self.leader_key`` to the pressed key.
+          - While in leader mode:
+            - ``Escape``: Cancel leader mode immediately.
+            - Any other key: Stop the timer and let the event propagate to the
+              focused widget (``DataFrameTable.on_key``) for dispatch.
+          - If the timer expires before a second key is pressed,
+            ``cancel_leader_key()`` is called automatically.
+
+        Args:
+            event: The key event object.
+        """
         # Already in leader mode, stop the timer and let action through
         if self.leader_key:
             # User pressed escape, cancel leader mode
@@ -188,7 +204,8 @@ class DataFrameViewer(App):
 
             self.leader_key = event.key
             self.notify(
-                f"Leader mode activated with [{event.key}], waiting for next key in 3 seconds", title="Leader Mode"
+                f"Leader mode activated with [$success]{event.key}[/], waiting for next key in 3 seconds",
+                title="Leader Mode",
             )
             self.timeout_timer = self.set_timer(3, callback=self.cancel_leader_key)
 
@@ -450,6 +467,11 @@ class DataFrameViewer(App):
         self.do_save_to_file(all_tabs=True)
 
     def action_save_tab_overwrite(self) -> None:
+        """Save current tab or all tabs to file, overwriting without prompt.
+
+        With leader key ``g`` active (``gw``): saves all tabs.
+        Otherwise (``w``): saves the current tab only.
+        """
         if self.leader_key == "g":
             self._save_all_tabs_overwrite()
         else:
@@ -946,6 +968,7 @@ class DataFrameViewer(App):
                 return
 
             def _save_and_quit(result: bool) -> None:
+                """Handle confirmation response for save-and-quit dialog."""
                 if result:
                     self.do_save_to_file(all_tabs=True, task_after_save="quit_app")
                 elif result is None:
