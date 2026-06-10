@@ -742,14 +742,14 @@ class StatisticsScreen(TableScreen):
 class FrequencyScreen(TableScreen):
     """Modal screen to display frequency of values in a column."""
 
-    def __init__(self, dftable: "DataFrameTable", cidx: int) -> None:
+    def __init__(self, dftable: "DataFrameTable", cidx: int | list[int]) -> None:
         super().__init__(dftable)
-        self.cidx = cidx
+        self.cidxs = [cidx] if isinstance(cidx, int) else cidx
+        self.is_multi_column = len(self.cidxs) > 1
         self.sorted_columns["Count"] = True  # Count sort by default
         self.total_count = len(dftable.df)
-        self.col_name = self.dftable.df.columns[self.cidx]
-        self.columns = [
-            (self.col_name, "Value"),
+        self.col_names = [self.dftable.df.columns[idx] for idx in self.cidxs]
+        self.columns = [(col_name, col_name) for col_name in self.col_names] + [
             ("Count", "Count"),
             ("%", "%"),
             ("Histogram", "Histogram"),
@@ -763,18 +763,27 @@ class FrequencyScreen(TableScreen):
     @work(thread=True)
     def _calculate_frequency(self) -> None:
         """Calculate frequency."""
-        self.df = (
-            self.dftable.df.lazy().select(pl.col(self.col_name).value_counts(sort=True)).unnest(self.col_name).collect()
-        )
+        if self.is_multi_column:
+            self.df = (
+                self.dftable.df.lazy()
+                .group_by(self.col_names, maintain_order=True)
+                .len(name="Count")
+                .sort("Count", descending=True, nulls_last=True)
+                .collect()
+            )
+        else:
+            col_name = self.col_names[0]
+            self.df = self.dftable.df.lazy().select(pl.col(col_name).value_counts(sort=True)).unnest(col_name).collect()
+
         self.app.call_from_thread(self._on_calc_ready)
 
     def on_key(self, event: Key):
         if event.key == "v":
             event.stop()
-            self.filter_or_collect_selected_value(self.cidx, self.col_name, self.get_values(), action="filter")
+            self.filter_or_collect_selected_values(action="filter")
         elif event.key == "quotation_mark":  # '"'
             event.stop()
-            self.filter_or_collect_selected_value(self.cidx, self.col_name, self.get_values(), action="collect")
+            self.filter_or_collect_selected_values(action="collect")
         elif event.key == "s":
             event.stop()
             self.toggele_row_selection()
@@ -788,8 +797,7 @@ class FrequencyScreen(TableScreen):
         self.table.clear(columns=True)
 
         # Create frequency table
-        dtype = self.dftable.df.dtypes[self.cidx]
-        dc = DtypeConfig(dtype)
+        dcs = {col: DtypeConfig(self.dftable.df.dtypes[self.dftable.df.columns.index(col)]) for col in self.col_names}
 
         for display_name, col_name in self.columns:
             # Check if this column is sorted and add indicator
@@ -800,7 +808,7 @@ class FrequencyScreen(TableScreen):
             else:
                 header_text = display_name
 
-            justify = dc.justify if col_name == "Value" else "right"
+            justify = dcs[col_name].justify if col_name in dcs else "right"
             self.table.add_column(Text(header_text, justify=justify), key=col_name)
 
         # Get style config for Int64 and Float64
@@ -810,13 +818,20 @@ class FrequencyScreen(TableScreen):
 
         # Add rows to the frequency table
         for ridx, row in enumerate(self.df.iter_rows()):
-            column, count = row
+            values = row[: len(self.col_names)]
+            count = row[-1]
+
             percentage = (count / self.total_count) * 100
             is_selected = ridx in self.selected_rows
             style = HIGHLIGHT_COLOR if is_selected else None
 
+            value_cells = [
+                dcs[col].format(value, style=style)
+                for col, value in zip(self.col_names, values, strict=True)
+            ]
+
             self.table.add_row(
-                dc.format(column, style=style),
+                *value_cells,
                 dc_int.format(count, style=style, thousand_separator=self.thousand_separator),
                 dc_float.format(percentage, style=style, thousand_separator=self.thousand_separator),
                 Bar(
@@ -828,8 +843,11 @@ class FrequencyScreen(TableScreen):
             )
 
         # Add a total row
+        total_cells = [Text("", style="bold", justify=dcs[col].justify) for col in self.col_names]
+        total_cells[0] = Text("Total", style="bold", justify=dcs[self.col_names[0]].justify)
+
         self.table.add_row(
-            Text("Total", style="bold", justify=dc.justify),
+            *total_cells,
             Text(
                 f"{self.total_count:,}" if self.thousand_separator else str(self.total_count),
                 style="bold",
@@ -861,8 +879,12 @@ class FrequencyScreen(TableScreen):
         self.sorted_columns.clear()
         self.sorted_columns[col_sort] = descending
 
-        # Percentage and Histogram use Count for sorting
-        col_name = self.df.columns[1 if col_idx >= 1 else 0]
+        # Count/%/Histogram sort by Count; value columns sort by their own column.
+        if col_sort in {"Count", "%", "Histogram"}:
+            col_name = "Count"
+        else:
+            col_name = col_sort
+
         self.df = self.df.sort(col_name, descending=descending, nulls_last=True)
 
         # Rebuild the frequency table
@@ -870,9 +892,26 @@ class FrequencyScreen(TableScreen):
 
         self.table.move_cursor(row=row_idx, column=col_idx)
 
-    def get_values(self) -> Any | list[Any]:
-        col_name = self.dftable.df.columns[self.cidx]
-        values = []
+    def get_values(self) -> list[Any] | list[dict[str, Any]] | None:
+        if self.is_multi_column:
+            values: list[dict[str, Any]] = []
+            if self.selected_rows:
+                row_indices = self.selected_rows
+            else:
+                ridx = self.table.cursor_row
+                if ridx >= len(self.df):
+                    return None
+                row_indices = {ridx}
+
+            for ridx in row_indices:
+                if ridx >= len(self.df):
+                    continue  # Skip the last `Total` row
+                values.append({col: self.df[col][ridx] for col in self.col_names})
+
+            return values or None
+
+        col_name = self.col_names[0]
+        values: list[Any] = []
         if self.selected_rows:
             for ridx in self.selected_rows:
                 if ridx >= len(self.df):
@@ -884,7 +923,80 @@ class FrequencyScreen(TableScreen):
                 return None  # Skip the last `Total` row
             values.append(self.df[col_name][ridx])
 
-        return values[0] if len(values) == 1 else values
+        return values or None
+
+    def _values_to_expr(self, values: list[Any] | list[dict[str, Any]] | None) -> pl.Expr | None:
+        """Convert selected frequency row value(s) into a dataframe filter expression."""
+
+        if not values:
+            return None
+
+        if not self.is_multi_column:
+            col_name = self.col_names[0]
+            expr: pl.Expr | None = None
+
+            for value in values:
+                if value is None or value == NULL:
+                    this_expr = pl.col(col_name).is_null()
+                else:
+                    this_expr = pl.col(col_name) == value
+                expr = this_expr if expr is None else expr | this_expr
+
+            return expr
+
+        value_maps = [value for value in values if isinstance(value, dict)]
+        if not value_maps:
+            return None
+
+        expr: pl.Expr | None = None
+
+        for value_map in value_maps:
+            per_row_expr: pl.Expr | None = None
+            for col in self.col_names:
+                value = value_map.get(col)
+                if value is None or value == NULL:
+                    this_expr = pl.col(col).is_null()
+                elif isinstance(value, list):
+                    this_expr = pl.col(col) == value
+                else:
+                    this_expr = pl.col(col) == value
+
+                per_row_expr = this_expr if per_row_expr is None else per_row_expr & this_expr
+
+            if per_row_expr is not None:
+                expr = per_row_expr if expr is None else expr | per_row_expr
+
+        return expr
+
+    def filter_or_collect_selected_values(self, action: str = "filter") -> None:
+        """Filter or collect rows in the main table using selected frequency row values."""
+        values = self.get_values()
+        expr = self._values_to_expr(values)
+        if expr is None:
+            return
+
+        cidx = self.cidxs[0]
+
+        if action == "collect":
+            self.dftable.action_collect_rows_columns(cidx=cidx, term=expr)
+        else:
+            self.dftable.action_filter_rows(
+                {
+                    "term": expr,
+                    "cidx": cidx,
+                    "match_nocase": False,
+                    "match_whole": True,
+                    "match_literal": True,
+                    "match_reverse": False,
+                }
+            )
+
+        # Dismiss modal screen to return to main table.
+        while len(self.app._screen_stack) > 1:
+            self.app.pop_screen()
+            break
+
+        self.dftable.move_cursor(column=cidx)
 
 
 class HistogramScreen(TableScreen):

@@ -196,14 +196,14 @@ class DataFrameTable(DataTable):
         - **PgUp/PgDn** - 📜 Page up/down
 
         ## ♻️ Undo/Redo/Reset
-        - **u** - ↩️ Undo last action
-        - **U** - 🔄 Redo last undone action
+        - **U** - ↩️ Undo last action
+        - **R** - 🔄 Redo last undone action
         - **Ctrl+U** - 🔁 Reset to initial state
 
         ## 👁️ Display
         - **Enter** - 📋 Show row details in modal
         - **Tab** - 🔍 Show current cell details in modal; use `Tab` again there to drill deeper
-        - **F** - 📊 Show frequency distribution for current column
+        - **F** - 📊 Show frequency distribution for current or selected columns
         - **m** - 📊 Show histogram for current column
         - **M** - 📊 Show histogram for current column with custom bins
         - **I** - 📈 Show statistics for current column
@@ -215,7 +215,7 @@ class DataFrameTable(DataTable):
         - **_** (underscore) - 📏 Toggle column full width for current column
         - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
         - **+** - 📌 Freeze rows and/or columns
-        - **$** - 🏷️ Toggle column index prefix
+        - **z~** - 🏷️ Toggle column index prefix
         - **g^** - 📌 Mark current row as header
         - **z^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for current column
@@ -229,8 +229,8 @@ class DataFrameTable(DataTable):
         - **E** - 📊 Edit entire column with expression
         - **a** - ➕ Add empty column after current
         - **A** - ➕ Add column with name and optional expression
-        - **za** - ➕ Add a link column after current (leader `z` then `a`)
         - **i** - ➕ Add an index column after current
+        - **za** - ➕ Add a link column after current
         - **^** - ✏️ Rename current column
         - **d** - ✖️ Delete current row
         - **gd** - ✖️ Delete row and those above
@@ -316,8 +316,8 @@ class DataFrameTable(DataTable):
         ("ctrl+b", "page_up", "Page up"),
         ("ctrl+f", "page_down", "Page down"),
         # Undo/Redo/Reset
-        ("u", "undo", "Undo"),
-        ("U", "redo", "Redo"),
+        ("U", "undo", "Undo"),
+        ("R", "redo", "Redo"),
         ("ctrl+u", "reset", "Reset to initial state"),
         # Display
         ("underscore", "expand_column", "Toggle column full width"),  # `_`
@@ -2216,9 +2216,23 @@ class DataFrameTable(DataTable):
         elif dtype == pl.Struct and cell_value:
             self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
 
-    def do_show_frequency(self, cidx: int | None = None) -> None:
-        """Show frequency distribution for a given columnn."""
-        cidx = self.cursor_cidx if cidx is None else cidx
+    def do_show_frequency(self, cidx: int | list[int] | None = None) -> None:
+        """Show frequency distribution for one or more columns.
+
+        Args:
+            cidx: Optional target column index or indices. If None and multiple columns are selected,
+                the frequency table is computed over the selected visible columns.
+        """
+        if self.selected_columns:
+            self.app.push_screen(FrequencyScreen(self, [self.df.columns.index(col) for col in self.selected_columns]))
+            return
+
+        if cidx is None:
+            selected_visible = [col for col in self.df.columns if col in self.selected_columns]
+            if len(selected_visible) > 1:
+                cidx = [self.df.columns.index(col) for col in selected_visible]
+            else:
+                cidx = self.cursor_cidx
 
         # Push the frequency modal screen
         self.app.push_screen(FrequencyScreen(self, cidx))
@@ -4603,7 +4617,9 @@ class DataFrameTable(DataTable):
             dtype = self.df.dtypes[cidx]
             term = self.cursor_value if term is None else term
 
-            if term is None or term == NULL:
+            if isinstance(term, pl.Expr):
+                filter_expr = term
+            elif term is None or term == NULL:
                 filter_expr = pl.col(col_name).is_null()
             elif isinstance(dtype, pl.List):
                 filter_expr = pl.col(col_name) == term.to_list()

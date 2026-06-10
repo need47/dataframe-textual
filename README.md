@@ -19,7 +19,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 - 📝 **Data Editing** - Edit cells, delete rows, remove columns, and explode columns
 - 🧹 **Duplicate Removal** - Remove duplicate rows
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
-- ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts or Vim-style aliases
+- ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts
 - 📈 **Sorting & Statistics** - Multi-column sorting, frequency distribution, and histogram analysis
 - 💾 **Save & Undo** - Save edits back to file with full undo/redo support
 
@@ -224,7 +224,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 - Press the leader key `g` or `z` to activate the mode — a 3-second timeout begins
 - Press the next key within the timeout to execute the combined command
-- If no second key is pressed within 3 seconds, leader mode is automatically cancelled
+- If no second key is pressed within 3 seconds or `Esc` is pressed, leader mode is cancelled.
 
 ### App-Level Controls
 
@@ -254,7 +254,6 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 - Tabs with unsaved changes are indicated with a bright background
 - Closing a tab with unsaved changes triggers a save prompt
-- Use `Esc` to bypass save prompts and quit the current tab/view immediately
 
 #### View & Settings
 
@@ -287,8 +286,8 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 | Key      | Action                  |
 | -------- | ----------------------- |
-| `u`      | Undo last action        |
-| `U`      | Redo last undone action |
+| `U`      | Undo last action        |
+| `R`      | Redo last undone action |
 | `Ctrl+U` | Reset to initial state  |
 
 #### Display
@@ -297,7 +296,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | ----------------- | ---------------------------------------------------------------------- |
 | `Enter`           | Show details for the current row as two-column key–value pairs         |
 | `Tab`             | Show current cell details; press `Tab` again there to drill deeper     |
-| `F`               | Show frequency distribution for current column                         |
+| `F`               | Show frequency distribution for current or selected columns            |
 | `m`               | Show histogram for current column                                      |
 | `M`               | Show histogram for current column with custom bins                     |
 | `I`               | Show statistics for current column                                     |
@@ -327,8 +326,8 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `E`            | Edit entire column with value/expression                      |
 | `a`            | Add empty column after current                                |
 | `A`            | Add column with name and value/expression                     |
-| `za`           | Add a link column from URL template                           |
 | `i`            | Add index column after current                                |
+| `za`           | Add a link column from URL template                           |
 | `^`            | Rename current column                                         |
 | `-` (minus)    | Delete selected columns or current column                     |
 | `g-` (minus)   | Delete current column and all columns before it               |
@@ -336,7 +335,8 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `d`            | Delete current row                                            |
 | `gd`           | Delete current row and all those above                        |
 | `zd`           | Delete current row and all those below                        |
-| `D`            | Duplicate current row (or column with `zD`)                   |
+| `D`            | Duplicate current row                                         |
+| `zD`           | Duplicate current column                                      |
 | `Ctrl+Delete`  | Remove duplicate rows (keep first occurrence)                 |
 | `o`            | Explode current list column into multiple rows                |
 | `O`            | Explode current string column by delimiter into multiple rows |
@@ -386,16 +386,12 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 #### Reordering
 
-| Key       | Action                    |
-| --------- | ------------------------- |
-| `Shift+↑` | Move current row up       |
-| `Shift+↓` | Move current row down     |
-| `K`       | Move current row up       |
-| `J`       | Move current row down     |
-| `Shift+←` | Move current column left  |
-| `Shift+→` | Move current column right |
-| `H`       | Move current column left  |
-| `L`       | Move current column right |
+| Key             | Action                    |
+| --------------- | ------------------------- |
+| `Shift+←` / `H` | Move current column left  |
+| `Shift+↓` / `J` | Move current row down     |
+| `Shift+↑` / `K` | Move current row up       |
+| `Shift+→` / `L` | Move current column right |
 
 #### Type Casting
 
@@ -436,7 +432,39 @@ Columns are automatically styled based on their data types (auto-inferred):
 | boolean   | Blue       | centered  |
 | temporal  | Magenta    | centered  |
 
-### 2. Sheets Overview (SheetScreen)
+**Hide/Show Columns** (`*` / `g*`):
+
+- `*` - Temporarily hide selected columns, or the current column when no columns are selected (data preserved)
+- `g*` - Restore all hidden columns
+
+**Freeze Rows and Columns** (`+`):
+
+- Toggle frozen rows and/or columns to keep important headers and fields visible while scrolling
+
+**Column Index Prefix Toggle** (`z~`):
+
+- Adds/removes a 1-based index prefix in visible column headers (e.g., `1_colname`)
+- Display-only: does not modify underlying data or column names
+- Shortcut mapping note: use `z~` for column index prefix; use `$` for casting the current column to boolean and `~` for string
+
+**Thousand Separator Toggle** (`,`):
+
+- Applies to the **current cursor column** (integer and float columns)
+- Formats large numbers with commas for readability (e.g., `1000000` → `1,000,000`)
+- Each column can be toggled independently
+- Use `g,` (leader mode) to toggle all numeric columns at once
+- Toggle on/off as needed for different viewing preferences
+- Display-only: does not modify underlying data in the dataframe
+
+**Float Precision** (`(`/`)`):
+
+- Applies to the **current cursor column** (float columns only)
+- `(` decreases precision (fewer decimal places), `)` increases precision
+- Each column can have its own precision setting
+- Precision of 0 means full (default) display
+- Display-only: does not modify underlying data in the dataframe
+
+### 2. Sheets Overview
 
 Press `S` at the app level to open the **Sheets** modal — a summary view of all currently opened tabs, inspired by VisiData's "Sheets Sheet".
 
@@ -461,39 +489,30 @@ The modal displays a table with the following columns:
 
 This is useful for quickly navigating between tabs, reviewing file sizes at a glance, or closing tabs you no longer need without switching to them first.
 
-**Hide/Show Columns** (`*` / `g*`):
+### 3. Column Overview
 
-- `*` - Temporarily hide selected columns, or the current column when no columns are selected (data preserved)
-- `g*` - Restore all hidden columns
+View quick metadata about your columns to understand their structure and content.
 
-**Freeze Rows and Columns** (`+`):
+**Column Metadata** (`C`):
 
-- Toggle frozen rows and/or columns to keep important headers and fields visible while scrolling
+- Press `C` to open a modal displaying details for all columns:
+  - **Column** - Column name
+  - **Type** - Data type (e.g., Int64, String, Float64, Boolean)
 
-**Column Index Prefix Toggle** (`$`):
+**In the Column Metadata Table**
 
-- Adds/removes a 1-based index prefix in visible column headers (e.g., `1_colname`)
-- Display-only: does not modify underlying data or column names
-- Shortcut mapping note: use `$` for column index prefix and `~` for casting the current column to string
+- Press `Enter` to jump to the selected column in the main table and close the modal
+- Press `F` to show the frequency table for the selected column
+- Press `I` to show the statistics table for the selected column
+- Press `J` or `Shift+↓` to move the selected column right (and move the metadata row down)
+- Press `K` or `Shift+↑` to move the selected column left (and move the metadata row up)
+- Press `e` to rename the selected column
+- Press `d` to delete the selected column from the main table
+- Press `g` to scroll to top
+- Press `G` to scroll to bottom
+- Press `q` or `Escape` to close
 
-**Thousand Separator Toggle** (`,`):
-
-- Applies to the **current cursor column** (integer and float columns)
-- Formats large numbers with commas for readability (e.g., `1000000` → `1,000,000`)
-- Each column can be toggled independently
-- Use `g,` (leader mode) to toggle all numeric columns at once
-- Toggle on/off as needed for different viewing preferences
-- Display-only: does not modify underlying data in the dataframe
-
-**Float Precision** (`(`/`)`):
-
-- Applies to the **current cursor column** (float columns only)
-- `(` decreases precision (fewer decimal places), `)` increases precision
-- Each column can have its own precision setting
-- Precision of 0 means full (default) display
-- Display-only: does not modify underlying data in the dataframe
-
-### 3. Row Detail View
+### 4. Row Detail View
 
 Press `Enter` on any row to open a modal showing all column values for that row.
 Useful for examining wide table where columns don't fit well on screen.
@@ -511,7 +530,7 @@ Useful for examining wide table where columns don't fit well on screen.
 - Press `Tab` to open a cell-detail modal for the selected field
 - Press `q` or `Escape` to close the modal
 
-### 4. Cell Detail View
+### 5. Cell Detail View
 
 Press `Tab` in the main table to inspect the current cell in its own modal.
 
@@ -525,7 +544,52 @@ Inside the cell-detail modal, press `Tab` again on the selected row/column to ke
 - Dict-like values are shown as key/value columns
 - Press `q` or `Escape` to close the modal
 
-### 5. Row/Column Selection
+### 6. Frequency Distribution
+
+Press `F` to see value distributions for the current column. If multiple columns are selected, it shows frequency of value combinations across those selected columns.
+
+- One value column per selected input column, plus Count, Percentage, Histogram
+- **Total row** at the bottom
+
+**In the Frequency Modal**:
+
+- Press `[` and `]` to sort by any displayed value column or by count/percentage
+- Press `v` to **filter** rows matching the selected value (or selected value combinations)
+- Press `"` to **collect** rows matching the selected value (or selected value combinations) to a new tab
+- Press `,` to toggle thousand separator for numeric values
+- Press `g` to scroll to top
+- Press `G` to scroll to bottom
+- Press `Ctrl+S` to save the frequency table to file
+- Press `q` or `Escape` to close the modal
+
+This is useful for:
+
+- Understanding value distributions
+- Quickly filtering to specific values
+- Identifying rare or common values
+- Finding the most/least frequent entries
+
+### 7. Column & Dataframe Statistics
+
+Show summary statistics such as count, null count, mean, median, standard deviation, min, max, and etc.
+
+- `I` shows statistics for the current column
+- `gI` shows statistics for all columns in the dataframe
+
+**In the Statistics Modal**:
+
+- Use arrow keys to navigate
+- Press `q` or `Escape` to close the modal
+
+This is useful for:
+
+- Understanding data distributions and overall column behavior
+- Identifying outliers and anomalies
+- Checking data quality quickly
+- Reviewing summary statistics without leaving the TUI
+- Comparing columns at a glance
+
+### 8. Row/Column Selection
 
 The application provides multiple ways to select rows (for filtering or collecting) and columns (for hiding or deleting):
 
@@ -556,7 +620,7 @@ These options work with plain text searches. Use Polars regex patterns in expres
 - Type-aware matching automatically converts values. Resort to string comparison if conversion fails
 - Use `u` to undo any search or filter
 
-### 6. Find & Replace
+### 9. Find & Replace
 
 Find by value/expression and highlight matching cells:
 
@@ -598,7 +662,7 @@ When you press `r` or `gr`, enter:
 - Type `NULL` to find or replace null values
 - Support undo (`u`)
 
-### 7. Filter & Collect
+### 10. Filter & Collect
 
 Both actions work on a subset of the original dataframe, but they serve different workflows.
 
@@ -638,7 +702,7 @@ For **Basic Filter** (`v`) and **Collect** (`"`), rows are chosen in this order:
 - Otherwise, use rows with active matches from search or find
 - Otherwise, use rows whose current-column value matches the current cell
 
-### 8. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
+### 11. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
 
 Complex values, filters, and advanced operations can be specified via Polars expressions, with the following adaptions for convenience:
 
@@ -710,80 +774,12 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - Use column names that match exactly (case-sensitive)
 - Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
 
-### 9. Sorting
+### 12. Sorting
 
 - Press `[` to sort current column ascending
 - Press `]` to sort current column descending
 - Multi-column sorting supported (press multiple times on different columns)
 - Press same key twice to remove the current column from sorting
-
-### 10. Column Metadata
-
-View quick metadata about your columns to understand their structure and content.
-
-**Column Metadata** (`C`):
-
-- Press `C` to open a modal displaying details for all columns:
-  - **Column** - Column name
-  - **Type** - Data type (e.g., Int64, String, Float64, Boolean)
-
-**In the Column Metadata Table**
-
-- Press `Enter` to jump to the selected column in the main table and close the modal
-- Press `F` to show the frequency table for the selected column
-- Press `I` to show the statistics table for the selected column
-- Press `J` or `Shift+↓` to move the selected column right (and move the metadata row down)
-- Press `K` or `Shift+↑` to move the selected column left (and move the metadata row up)
-- Press `e` to rename the selected column
-- Press `d` to delete the selected column from the main table
-- Press `g` to scroll to top
-- Press `G` to scroll to bottom
-- Press `q` or `Escape` to close
-
-### 11. Frequency Distribution
-
-Press `F` to see value distributions of the current column. The modal shows:
-
-- Value, Count, Percentage, Histogram
-- **Total row** at the bottom
-
-**In the Frequency Modal**:
-
-- Press `[` and `]` to sort by any column (value, count, or percentage)
-- Press `v` to **filter** all rows containing the selected value
-- Press `"` to **collect** all rows containing the selected value to a new tab
-- Press `,` to toggle thousand separator for numeric values
-- Press `g` to scroll to top
-- Press `G` to scroll to bottom
-- Press `Ctrl+S` to save the frequency table to file
-- Press `q` or `Escape` to close the modal
-
-This is useful for:
-
-- Understanding value distributions
-- Quickly filtering to specific values
-- Identifying rare or common values
-- Finding the most/least frequent entries
-
-### 12. Column & Dataframe Statistics
-
-Show summary statistics such as count, null count, mean, median, standard deviation, min, max, and etc.
-
-- `I` shows statistics for the current column
-- `gI` shows statistics for all columns in the dataframe
-
-**In the Statistics Modal**:
-
-- Use arrow keys to navigate
-- Press `q` or `Escape` to close the modal
-
-This is useful for:
-
-- Understanding data distributions and overall column behavior
-- Identifying outliers and anomalies
-- Checking data quality quickly
-- Reviewing summary statistics without leaving the TUI
-- Comparing columns at a glance
 
 ### 13. Editing
 
@@ -898,13 +894,13 @@ The output format is determined by the file extension, making it easy to convert
 
 ### 16. Undo/Redo/Reset
 
-**Undo** (`u`):
+**Undo** (`U`):
 
 - Reverts last action with full state restoration
 - Works for edits, deletions, sorts, searches, etc.
 - Shows description of reverted action
 
-**Redo** (`U`):
+**Redo** (`R`):
 
 - Reapplies the last undone action
 - Restores the state before the undo was performed
@@ -925,13 +921,14 @@ Press the type conversion keys to instantly cast the current column to a differe
 
 - `#` - Cast to **integer**
 - `%` - Cast to **float**
-- `!` - Cast to **boolean**
+- `$` - Cast to **boolean**
 - `~` - Cast to **string**
+- `@` - Cast to **date**
 
 **Features**:
 
 - Instant conversion with visual feedback
-- Full undo support - press `u` to revert
+- Full undo support - press `U` to revert
 - Leverage Polars' robust type casting
 
 **Note**: Type conversion attempts to preserve data where possible. Conversions may lose data (e.g., float to int rounding).
