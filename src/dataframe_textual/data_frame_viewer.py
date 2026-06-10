@@ -63,6 +63,7 @@ class DataFrameViewer(App):
         - **S** - 📋 Show all open sheets/tabs
         - **F1** - ❓ Toggle this help panel
         - **` (backtick)** - 🐍 Toggle Python console
+        - **T** - 🎨 Select theme
         - **Ctrl+P -> Screenshot** - 📸 Capture terminal view as a SVG image
 
         ## ⭐ Features
@@ -572,7 +573,8 @@ class DataFrameViewer(App):
         except Exception as e:
             self.notify(f"Failed to evaluate expression [$error]{result}[/]: {e}", title="New Tab", severity="error")
 
-    def action_select_theme(self) -> None:
+    @with_leader_key
+    def select_theme(self) -> None:
         """Open the theme selection screen."""
         self.push_screen(ThemeScreen())
 

@@ -9,9 +9,9 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 ### Data Viewing
 
 - 🚀 **Fast Loading** - Powered by Polars for efficient batch data handling
-- 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with various data types (e.g., integer, float, string)
+- 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with auto-detected data types (e.g., integer, float, string)
 - ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls
-- 📊 **Flexible Input** - Read from files and/or stdin (pipes/redirects)
+- 📊 **Flexible Input** - Read from files and/or stdin (pipes/redirects) in various formats
 - 🔄 **Smart Pagination** - Lazy load rows on demand for handling large datasets
 
 ### Data Manipulation
@@ -30,7 +30,6 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 - 📑 **Duplicate Tab** - Create a copy of the current tab with the same data
 - 🐍 **Embedded Python Console** - Inspect and transform the active table with `df` and `pl` directly in-app
 - 📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
-- 🎯 **Cursor Type Cycling** - Switch between cell, row, and column selection modes
 - 📸 **Take Screenshot** - Capture terminal view as a SVG image
 
 ## Installation
@@ -314,6 +313,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `(`               | Decrease float precision for current column                            |
 | `)`               | Increase float precision for current column                            |
 | `g^`              | Set current row as the new header row                                  |
+| `gT`              | Open theme selection screen                                            |
 
 #### Editing
 
@@ -340,6 +340,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `Ctrl+Delete`  | Remove duplicate rows (keep first occurrence)                 |
 | `o`            | Explode current list column into multiple rows                |
 | `O`            | Explode current string column by delimiter into multiple rows |
+| `zT`           | Transpose table (swap rows and columns)                       |
 
 #### Row/Column Selection
 

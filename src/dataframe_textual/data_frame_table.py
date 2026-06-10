@@ -217,6 +217,8 @@ class DataFrameTable(DataTable):
         - **+** - 📌 Freeze rows and/or columns
         - **z~** - 🏷️ Toggle column index prefix
         - **g^** - 📌 Mark current row as header
+        - **gT** - 🎨 Open theme selection
+        - **zT** - 🔃 Transpose table (swap rows/columns)
         - **z^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for current column
         - **g,** - 🔢 Toggle thousand separator for all numeric columns
@@ -916,8 +918,10 @@ class DataFrameTable(DataTable):
           - ``gk``: Scroll to first row (top).
           - ``gl``: Scroll to rightmost column.
           - ``g^``: Mark current row as header.
+          - ``gT``: Open theme selection.
 
         Leader ``z`` sequences:
+          - ``zT``: Transpose table.
           - ``z^``: Toggle internal row index (RID) column.
 
         Row loading triggers:
@@ -943,9 +947,21 @@ class DataFrameTable(DataTable):
                 self.stop_timer()
                 self.do_toggle_column_index()
                 return
+            elif event.key == "T":  # `zT`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_transpose()
+                return
         elif self.leader_key == "g":
+            if event.key == "T":  # `gT`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.app.select_theme()
+                return
             # Go to leftmost column
-            if event.key == "h":  # `gh`:
+            elif event.key == "h":  # `gh`:
                 event.stop()
                 event.prevent_default()
                 self.stop_timer()
@@ -3647,6 +3663,26 @@ class DataFrameTable(DataTable):
             ).collect()
 
         self.notify(f"Moved row [$success]{curr_key.value}[/] {direction}", title="Move Row")
+
+    def do_transpose(self) -> None:
+        """Transpose the dataframe, swapping rows and columns."""
+        data_columns = [col for col in self.df.columns if col != RID]
+        if not data_columns:
+            self.notify("No data columns available to transpose", title="Transpose", severity="warning")
+            return
+
+        try:
+            self.add_history("Transpose table", dirty=True)
+
+            # Use apply_frame so reset/rebuild behavior stays consistent with other table-wide mutations.
+            transposed = self.df.lazy().select(data_columns).collect().transpose(include_header=True, header_name="column")
+            self.apply_frame(transposed, dirty=True)
+            self.notify("Transposed table", title="Transpose")
+        except Exception as e:
+            if self.histories_undo:
+                self.histories_undo.pop()
+            self.notify("Failed to transpose table", title="Transpose", severity="error")
+            self.log(f"Error transposing table: {e}")
 
     # Type casting
     def do_cast_column_dtype(self, dtype: str) -> None:
