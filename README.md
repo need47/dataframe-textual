@@ -441,57 +441,25 @@ Columns are automatically styled based on their data types (auto-inferred):
 | boolean   | Blue       | centered  |
 | temporal  | Magenta    | centered  |
 
-**Hide/Show Columns** (`*` / `V`):
+These controls change how the table is shown without changing the underlying data.
 
-- `*` - Temporarily hide selected columns, or the current column when no columns are selected (data preserved)
-- `g*` - Hide current column and all columns before it
-- `z*` - Hide current column and all columns after it
-- `V` - View all hidden columns
-
-**Freeze Rows and Columns** (`+`):
-
-- Toggle frozen rows and/or columns to keep important headers and fields visible while scrolling
-
-**Column Index Prefix Toggle** (`z~`):
-
-- Adds or removes a 1-based index prefix in visible column headers (e.g., `1_colname`)
-- Display-only: does not modify underlying data or column names
-
-**Thousand Separator Toggle** (`,` / `g,`):
-
-- `,` toggles for the numeric column under cursor
-- `g,` toggles for all numeric columns at once
-- Formats large numbers with commas for readability (e.g., `1000000` → `1,000,000`)
-- Display-only: does not modify underlying data
-
-**Float Precision** (`(`/`)`):
-
-- Applies to the **current cursor column** (float columns only)
-- `(` decreases precision (fewer decimal places), `)` increases precision
-- Each column can have its own precision setting
-- Precision of 0 means full (default) display
-- Display-only: does not modify underlying data
+- `*`: Hide selected columns, or the current column if nothing is selected.
+- `g*`: Hide the current column and all columns before it.
+- `z*`: Hide the current column and all columns after it.
+- `V`: Show all hidden columns.
+- `+`: Freeze rows and/or columns to keep important areas visible while scrolling.
+- `z~`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
+- `,`: Toggle the thousand separator for the current numeric column.
+- `g,`: Toggle the thousand separator for all numeric columns.
+- `(` / `)`: Decrease or increase float precision for the current float column. Each column keeps its own precision setting, and `0` means the default full display.
 
 ### 2. Undo/Redo/Reset
 
-**Undo** (`u`/`U`):
+These actions are the fastest way to get out of trouble after a mistaken edit, delete, sort, filter, or other table change.
 
-- Reverts last action with full state restoration
-- Works for edits, deletions, sorts, searches, etc.
-- Shows description of reverted action
-
-**Redo** (`R`):
-
-- Reapplies the last undone action
-- Restores the state before the undo was performed
-- Useful for redoing actions you've undone by mistake
-- Useful for alternating between two different states
-
-**Reset** (`Ctrl+U`):
-
-- Reverts all changes and returns to original data state when file was first loaded
-- Clears all edits, deletions, selections, filters, and sorts
-- Useful for starting fresh without reloading the file
+- `u`/`U`: Undo the last action and restore the previous state.
+- `R`: Redo the last undone action.
+- `Ctrl+U`: Reset the table to its original loaded state if you want to start over.
 
 ### 3. Modal Screen
 
@@ -797,26 +765,7 @@ The application provides separate save actions for the current tab, all tabs, an
 
 The output format is determined by the file extension, making it easy to convert between formats such as CSV, TSV, Parquet, or Excel.
 
-### 17. Column Type Conversion
-
-Press the type conversion keys to instantly cast the current column to a different data type:
-
-**Type Conversion Shortcuts**:
-
-- `~` - Cast to **string**
-- `@` - Cast to **date**
-- `#` - Cast to **integer**
-- `$` - Cast to **boolean**
-- `%` - Cast to **float**
-
-**Features**:
-
-- Instant conversion with visual feedback
-- Leverage Polars' robust type casting
-
-**Note**: Type conversion attempts to preserve data where possible. Conversions may lose data (e.g., float to int rounding).
-
-### 18. Clipboard Operations
+### 17. Clipboard Operations
 
 Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 
@@ -827,7 +776,7 @@ Copies value to system clipboard with `pbcopy` on macOS and `xclip` on Linux.
 - Press `Ctrl+R` to copy row values (delimited by tab)
 - Hold `Shift` to select with mouse
 
-### 19. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
+### 18. [Polars Expressions](https://docs.pola.rs/api/python/stable/reference/expressions/index.html)
 
 Complex values, filters, and advanced operations can be specified via Polars expressions, with the following adaptions for convenience:
 
@@ -899,7 +848,7 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - Use column names that match exactly (case-sensitive)
 - Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
 
-### 20. Link Column Creation
+### 19. Link Column Creation
 
 Press `za` to create a new column containing dynamically generated URLs using template. Links are typically clickable in a terminal emulator using Ctrl+Click.
 
@@ -908,9 +857,7 @@ Press `za` to create a new column containing dynamically generated URLs using te
 The link template supports multiple placeholder types for maximum flexibility:
 
 - **`$_`** - Current column, e.g., `https://example.com/search/$_` - Uses values from the current column
-
 - **`$1`, `$2`, `$3`, etc.** - Column by 1-based position index, e.g., `https://example.com/product/$1/details/$2` - Uses 1st and 2nd columns
-
 - **`$name`** - Column by name (use actual column names), e.g., `https://example.com/$region/$city/data` - Uses `region` and `city` columns
 
 **Features:**
@@ -918,7 +865,7 @@ The link template supports multiple placeholder types for maximum flexibility:
 - **Multiple Placeholders**: Mix and match placeholders in a single template
 - **URL Prefix**: Automatically prepends `https://` if URL doesn't start with `http://` or `https://`
 
-### 21. SQL Interface
+### 20. SQL Interface
 
 The SQL interface provides two modes for querying your dataframe:
 
@@ -953,7 +900,7 @@ FROM self
 WHERE `product id` = 7
 ```
 
-### 22. Python Console
+### 21. Python Console
 
 Use the built-in Python console for quick interactive transformations without leaving the TUI.
 
