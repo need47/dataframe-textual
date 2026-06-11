@@ -745,91 +745,35 @@ For **Basic Filter** (`v`) and **Collect** (`"`), rows are chosen in this order:
 
 ### 14. Editing
 
-**Edit Cell** (`e` or **Double-click**):
+Editing covers cell updates, structural table changes, and quick cleanup.
 
-- Opens modal for editing current cell
-- Validates input based on column data type
-
-**Rename Column Header** (`^` or **Double-click** column header):
-
-- Quick rename by double-clicking the column header
-
-**Delete Row** (`d`):
-
-- Delete all selected rows (if any) at once
-- Or delete single row at cursor
-
-**Delete Row and Below** (`zd`):
-
-- Deletes the current row and all rows below it
-- Useful for removing trailing data or the end of a dataset
-
-**Delete Row and Above** (`gd`):
-
-- Deletes the current row and all rows above it
-- Useful for removing leading rows or the beginning of a dataset
-
-**Delete Column** (`-`):
-
-- Deletes selected columns when present, otherwise deletes the current column
-
-**Delete Column and Those Before** (`g-`):
-
-- Deletes the current column and every column to its left
-- Useful when you want to trim a dataframe from the current position backward
-
-**Delete Column and Those After** (`z-`):
-
-- Deletes the current column and every column to its right
-- Useful when you want to keep only the leading columns up to the cursor position
-
-**Add Empty Column** (`a`):
-
-- Adds a new empty column after the current column
-- Column is initialized with NULL values for all rows
-
-**Add Column with Value/Expression** (`A`):
-
-- Opens dialog to specify column name and initial value/expression
-- Value can be a constant (e.g., `0`, `"text"`) or a Polars expression (e.g., `$age * 2`)
-- Expression can reference other columns and perform calculations
-- Useful for creating derived columns or adding data with formulas
-
-**Add Index Column** (`i`):
-
-- Inserts an index column immediately after the current column
-- Useful when you want a simple row counter without modifying the existing data
-
-**Duplicate Row** (`D`):
-
-- Creates a new row immediately after the current row
-- Duplicate preserves all data from original row
-- Useful for batch adding similar records
-
-**Duplicate Column** (`zD`):
-
-- Creates a new column immediately after the current column
-- New column has '\_copy' suffix (e.g., 'price' → 'price_copy')
-- Useful for creating backups before transformation
-
-**Remove Duplicate Rows** (`Ctrl+Delete`):
-
-- Removes duplicated rows while keeping the first occurrence
-- Compares row values across the visible columns
-- Useful for quick deduplication before further editing, collecting, or exporting
+- `e` or **Double-click**: Edit the current cell with type-aware validation.
+- `^` or **Double-click** column header: Rename the current column.
+- `d`: Delete the selected rows, or the current row if nothing is selected.
+- `gd`: Delete the current row and all rows above it.
+- `zd`: Delete the current row and all rows below it.
+- `-`: Delete selected columns, or the current column if nothing is selected.
+- `g-`: Delete the current column and all columns to its left.
+- `z-`: Delete the current column and all columns to its right.
+- `a`: Add an empty column after the current column.
+- `A`: Add a column after the current column using a constant or a Polars expression such as `$age * 2`.
+- `i`: Insert an index column after the current column.
+- `D`: Duplicate the current row.
+- `zD`: Duplicate the current column using a `_copy` suffix.
+- `Ctrl+Delete`: Remove duplicate rows while keeping the first occurrence, based on visible-column values.
 
 ### 15. Column & Row Reordering
 
 **Move Columns**: `Shift+←` and `Shift+→`
 
 - Swaps adjacent columns
-- `H` and `L` provide the same left/right movement using Vim-style keys
+- `H` and `L` provide the same left/right movement
 - Reorder is preserved when saving
 
 **Move Rows**: `Shift+↑` and `Shift+↓`
 
 - Swaps adjacent rows
-- `J` and `K` provide the same down/up movement using Vim-style keys
+- `J` and `K` provide the same down/up movement
 - Reorder is preserved when saving
 
 ### 16. Save File
