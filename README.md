@@ -315,8 +315,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `_` (underscore)  | Toggle column full width for current column                                    |
 | `g_` (underscore) | Toggle column full width for all string/list columns                           |
 | `+`               | Toggle freeze rows and/or columns                                              |
-| `,`               | Toggle thousand separator for current column                                   |
-| `g,`              | Toggle thousand separator for all numeric columns                              |
+| `z,`              | Toggle thousand separator for current column                                   |
 | `(`               | Expand current list column into indexed columns (e.g. ``col[1]``, ``col[2]``)  |
 | `)`               | Contract indexed sibling columns (``col[N]``) back into a list column          |
 | `<`               | Decrease float precision for current column                                    |
@@ -361,8 +360,12 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 | Key              | Action                                                                         |
 | ---------------- | ------------------------------------------------------------------------------ |
-| `\`              | Select rows with cell matches or those matching cursor value in current column |
-| `\|` (pipe)      | Select rows by expression                                                      |
+| `,`              | Select rows with cell matches or those matching cursor value in current column |
+| `g,`             | Select rows with cell matches or those matching cursor value in all columns    |
+| `\|` (pipe)      | Select rows where expression matches in current column                         |
+| `g\|`            | Select rows where expression matches in all columns                            |
+| `\`              | Unselect selected rows where expression matches in current column              |
+| `g\`             | Unselect selected rows where expression matches in all columns                 |
 | `{`              | Go to previous selected row                                                    |
 | `}`              | Go to next selected row                                                        |
 | `s`              | Select/deselect current row                                                    |
@@ -457,8 +460,7 @@ These controls change how the table is shown without changing the underlying dat
 - `gv`: Show all hidden columns.
 - `+`: Freeze rows and/or columns to keep important areas visible while scrolling.
 - `z~`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
-- `,`: Toggle the thousand separator for the current numeric column.
-- `g,`: Toggle the thousand separator for all numeric columns.
+- `z,`: Toggle the thousand separator for the current numeric column.
 - `(`: Expand the current list column into indexed columns named like `colname[1]`, `colname[2]`, etc.
 - `)`: Contract those indexed sibling columns back into a single list column. Position the cursor on any sibling (e.g. `colname[2]`) and press `)` to merge all `colname[N]` columns back into `colname`.
 - `<` / `>`: Decrease or increase float precision for the current float column. Each column keeps its own precision setting, and `0` means the default full display.
@@ -495,7 +497,7 @@ Several features open a **modal screen** (an overlay table) for inspection or in
 | `G`            | Scroll to bottom                             |
 | `[`            | Sort by current column ascending             |
 | `]`            | Sort by current column descending            |
-| `,`            | Toggle thousand separator for numeric values |
+| `z,`           | Toggle thousand separator for numeric values |
 | `C`            | Cycle cursor type (cell → row → column)      |
 | `Ctrl+S`       | Save the modal table to file                 |
 
@@ -608,8 +610,12 @@ This is useful for:
 
 The application provides multiple ways to select rows (for filtering or collecting) and columns (for hiding or deleting):
 
-- `\` - Select rows with cell matches or those matching cursor value in current column (respects data type)
-- `|` - Opens dialog to select rows with custom expression
+- `,` - Select rows with cell matches or those matching cursor value in current column (respects data type)
+- `g,` - Select rows with cell matches or those matching cursor value in all columns
+- `|` - Select rows where expression matches in the current column
+- `g|` - Select rows where expression matches in all columns
+- `\` - Unselect currently selected rows where expression matches in the current column
+- `g\` - Unselect currently selected rows where expression matches in all columns
 - `s` - Select/deselect current row
 - `'` (apostrophe) - Select/deselect current column
 - `t` - Flip selections of all rows
@@ -879,15 +885,7 @@ The link template supports multiple placeholder types for maximum flexibility:
 
 The SQL interface provides two modes for querying your dataframe:
 
-#### Simple SQL Interface (`Q`)
-
-SELECT specific columns and apply WHERE conditions without writing full SQL:
-
-- Choose which columns to include in results
-- Specify WHERE clause for filtering
-- Ideal for quick filtering and column selection
-
-#### Advanced SQL Interface (`zQ`)
+#### Advanced SQL Interface (`Q`)
 
 Execute complete SQL queries for advanced data manipulation:
 
@@ -895,6 +893,14 @@ Execute complete SQL queries for advanced data manipulation:
 - Access to all SQL capabilities for complex transformations
 - Always use `self` as the table name
 - Syntax highlighted
+
+#### Simple SQL Interface (`zQ`)
+
+SELECT specific columns and apply WHERE conditions without writing full SQL:
+
+- Choose which columns to include in results
+- Specify WHERE clause for filtering
+- Ideal for quick filtering and column selection
 
 **Examples:**
 

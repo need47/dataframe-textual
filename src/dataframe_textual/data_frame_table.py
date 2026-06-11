@@ -226,8 +226,7 @@ class DataFrameTable(DataTable):
         - **g^** - 📌 Mark current row as header
         - **gT** - 🎨 Open theme selection
         - **z^** - 🆔 Toggle internal row index (RID)
-        - **,** - 🔢 Toggle thousand separator for current column
-        - **g,** - 🔢 Toggle thousand separator for all numeric columns
+        - **z,** - 🔢 Toggle thousand separator for current column
         - **<** - 🔢 Decrease float precision for current column
         - **>** - 🔢 Increase float precision for current column
 
@@ -263,10 +262,14 @@ class DataFrameTable(DataTable):
         - **zB** - 🧼 Strip leading and trailing whitespaces in current column
 
         ## ✅ Row/Column Selection
-        - **\\\\** - ✅ Select rows with cell matches or those matching cursor value in current column
-        - **|** - ✅ Select rows with expression
+        - **,** - ✅ Select rows with cell matches or those matching cursor value in current column
+        - **g,** - ✅ Select rows with cell matches or those matching cursor value in all columns
+        - **|** - ✅ Select rows where expression matches in current column
+        - **g|** - ✅ Select rows where expression matches in all columns
         - **s** - ✅ Select/deselect current row
         - **'** (apostrophe) - ✅ Select/deselect current column
+        - **\\** - ➖ Unselect selected rows where expression matches in current column
+        - **g\\** - ➖ Unselect selected rows where expression matches in all columns
         - **t** - 💡 Toggle row selection (invert all)
         - **T** - 🧹 Clear all row/column selections and cell matches
         - **{** - ⬆️ Go to previous selected row
@@ -341,7 +344,6 @@ class DataFrameTable(DataTable):
         ("underscore", "expand_column", "Toggle column full width"),  # `_`
         ("minus", "hide_column", "Hide selected columns or current column"),  # `-`
         ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
-        ("comma", "toggle_thousand_separator", "Toggle thousand separator for column"),  # `,`
         ("left_parenthesis", "expand_list_column", "Expand current list column into indexed columns"),  # `(`
         ("right_parenthesis", "contract_list_column", "Contract current list column from indexed columns"),  # `)`
         ("less_than_sign", "adjust_float_precision(-1)", "Decrease float precision for column"),  # `<`
@@ -370,8 +372,9 @@ class DataFrameTable(DataTable):
         ("f", "filter_rows_value", "Filter rows by value"),  # `f`
         ("quotation_mark", "collect_rows_columns", "Collect rows/columns to a new tab"),  # `"`
         # Row/Column Selection
-        ("backslash", "select_rows", "Select rows with cell matches or those matching cursor value in current column"),  # `\`
-        ("vertical_line", "select_rows_expr", "Select rows with expression"),  # `|`
+        ("comma", "select_rows", "Select rows with cell matches or those matching cursor value in current column"),  # `,`
+        ("vertical_line", "select_rows_expr", "Select rows where expression matches in current column or all columns"),  # `|`
+        ("backslash", "unselect_rows_expr", "Unselect rows where expression matches in current column or all columns"),  # `\\`
         ("right_curly_bracket", "next_selected_row", "Go to next selected row"),  # `}`
         ("left_curly_bracket", "previous_selected_row", "Go to previous selected row"),  # `{`
         ("s", "toggle_selection_current_row", "Toggle row selection"),  # `s`
@@ -1037,6 +1040,12 @@ class DataFrameTable(DataTable):
                 self.stop_timer()
                 self.do_toggle_rid()
                 return
+            elif event.key == "comma":  # `z,`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.action_toggle_thousand_separator()
+                return
             elif event.key == "tilde":  # `z~`:
                 event.stop()
                 event.prevent_default()
@@ -1237,7 +1246,6 @@ class DataFrameTable(DataTable):
         """Edit the entire current column with an expression."""
         self.do_edit_column()
 
-    @with_full_df
     @with_leader_key
     def action_add_column(self) -> None:
         """Add an empty column after the current column."""
@@ -1255,7 +1263,6 @@ class DataFrameTable(DataTable):
         """Add an index column after the current column."""
         self.do_add_index_column()
 
-    @with_full_df
     def action_split_column(self) -> None:
         """Split the current string column into a new column by delimiter."""
         self.do_split_column()
@@ -1284,13 +1291,22 @@ class DataFrameTable(DataTable):
         """Clear cells in the current column that match the cursor value."""
         self.do_clear_column()
 
+    @with_leader_key
     def action_select_rows(self) -> None:
-        """Select rows with cursor value in the current column."""
+        """Select rows by cursor value in current column, or all columns in ``g`` leader mode."""
         self.do_select_rows()
 
+    @with_leader_key
     def action_select_rows_expr(self) -> None:
-        """Select rows by expression."""
-        self.do_select_rows_expr()
+        """Select rows by expression in current column, or all columns in ``g`` leader mode."""
+        scope = "all" if self.leader_key == "g" else "column"
+        self.do_select_rows_expr(scope=scope)
+
+    @with_leader_key
+    def action_unselect_rows_expr(self) -> None:
+        """Unselect rows by expression in current column, or all columns in ``g`` leader mode."""
+        scope = "all" if self.leader_key == "g" else "column"
+        self.do_unselect_rows_expr(scope=scope)
 
     @with_leader_key
     def action_find_cursor_value(self) -> None:
@@ -1457,47 +1473,26 @@ class DataFrameTable(DataTable):
     @with_leader_key
     def action_toggle_thousand_separator(self) -> None:
         """Toggle thousand separator for the current cursor column."""
-        if self.leader_key == "g":
-            if self.thousand_separator_columns:
-                self.thousand_separator_columns.clear()
-                status = "off"
-            else:
-                self.thousand_separator_columns = {
-                    c for c, dtype in self.visible_columns.items() if DtypeConfig(dtype).gtype in ("integer", "float")
-                }
-
-                if not self.thousand_separator_columns:
-                    self.notify(
-                        "No numeric columns to toggle thousand separator on",
-                        title="Toggle Thousand Separator",
-                        severity="warning",
-                    )
-                    return
-
-                status = "on"
+        col_name = self.cursor_col_name
+        if col_name in self.thousand_separator_columns:
+            self.thousand_separator_columns.discard(col_name)
+            status = "off"
         else:
-            col_name = self.cursor_col_name
-            if col_name in self.thousand_separator_columns:
-                self.thousand_separator_columns.discard(col_name)
-                status = "off"
+            dtype = self.df[col_name].dtype
+            dc = DtypeConfig(dtype)
+            if dc.gtype in ("integer", "float"):
+                self.thousand_separator_columns.add(col_name)
+                status = "on"
             else:
-                dtype = self.df[col_name].dtype
-                dc = DtypeConfig(dtype)
-                if dc.gtype in ("integer", "float"):
-                    self.thousand_separator_columns.add(col_name)
-                    status = "on"
-                else:
-                    self.notify(
-                        f"Column [$warning]{col_name}[/] is not a numeric column and cannot be formatted as such",
-                        title="Toggle Thousand Separator",
-                        severity="warning",
-                    )
-                    return
+                self.notify(
+                    f"Column [$warning]{col_name}[/] is not a numeric column and cannot be formatted as such",
+                    title="Toggle Thousand Separator",
+                    severity="warning",
+                )
+                return
 
         self.setup_table()
-        message = f"Thousand separator is [$success]{status}[/] for " + (
-            "[$accesent]all numeric columns[/]" if self.leader_key == "g" else f"column [$accent]{col_name}[/]"
-        )
+        message = f"Thousand separator is [$success]{status}[/] for column [$accent]{col_name}[/]"
 
         self.notify(message, title="Toggle Thousand Separator")
 
@@ -2380,7 +2375,6 @@ class DataFrameTable(DataTable):
         bin_count, bins = result
         self.app.push_screen(HistogramScreen(self, bins=bins, bin_count=bin_count))
 
-    @with_full_df
     def do_show_bar(self) -> None:
         """Show bar chart using first selected column as label and cursor column as value."""
         if not self.selected_columns:
@@ -3072,6 +3066,7 @@ class DataFrameTable(DataTable):
             new_col_name = f"{base_name}_{counter}"
         return new_col_name
 
+    @with_full_df
     def do_add_column(self, col_name: str | None = None) -> None:
         """Add acolumn after the current column."""
         cidx = self.cursor_cidx
@@ -3641,6 +3636,7 @@ class DataFrameTable(DataTable):
             callback=self.add_link_column,
         )
 
+    @with_full_df
     def add_link_column(self, result: tuple[str, str, str] | None) -> None:
         """Handle result from AddLinkScreen.
 
@@ -5335,12 +5331,24 @@ class DataFrameTable(DataTable):
 
         If there are existing cell matches, use those to select rows.
         Otherwise, use the current cell value as the search term and select rows matching that value.
+        In ``g`` leader mode, search all columns instead of only the current column.
         """
         cidx = self.cursor_cidx
 
         # Use existing cell matches if present
         if self.matches:
             term = pl.col(RID).is_in(self.matches)
+        elif self.leader_key == "g":
+            search_term = NULL if self.cursor_value is None else str(self.cursor_value)
+            matches = self.find_matches(
+                term=search_term,
+                cidx=None,
+                match_nocase=False,
+                match_whole=True,
+                match_literal=True,
+                match_reverse=False,
+            )
+            term = pl.col(RID).is_in(matches)
         else:
             col_name = self.cursor_col_name
             dtype = self.cursor_col_dtype
@@ -5365,27 +5373,111 @@ class DataFrameTable(DataTable):
             }
         )
 
-    def do_select_rows_expr(self) -> None:
-        """Select rows by expression."""
+    def do_select_rows_expr(self, scope: str = "column") -> None:
+        """Open screen to select rows by expression in the requested scope.
+
+        Args:
+            scope: ``"column"`` to select by matches in the current column,
+                or ``"all"`` to select by matches across all columns.
+        """
         cidx = self.cursor_cidx
         dtype = self.cursor_col_dtype
         value = self.cursor_value
+
+        if scope not in ("column", "all"):
+            self.notify(f"Invalid select scope: [$error]{scope}[/]", title="Select Rows", severity="error")
+            return
 
         # Use current cell value as default search term
         term = NULL if value is None else (str(value.to_list()) if isinstance(dtype, pl.List) else str(value))
 
         # Push the search modal screen
         self.app.push_screen(
-            SearchScreen("Select Rows", self.df, cidx, term),
-            callback=self.select_rows,
+            SearchScreen("Select Rows (All Columns)" if scope == "all" else "Select Rows", self.df, cidx, term),
+            callback=partial(self.select_rows, scope=scope),
+        )
+
+    def do_unselect_rows_expr(self, scope: str = "column") -> None:
+        """Open screen to unselect rows by expression in the requested scope.
+
+        Args:
+            scope: ``"column"`` to unselect by matches in the current column,
+                or ``"all"`` to unselect by matches across all columns.
+        """
+        cidx = self.cursor_cidx
+        dtype = self.cursor_col_dtype
+        value = self.cursor_value
+
+        if scope not in ("column", "all"):
+            self.notify(f"Invalid unselect scope: [$error]{scope}[/]", title="Unselect Rows", severity="error")
+            return
+
+        # Use current cell value as default search term
+        term = NULL if value is None else (str(value.to_list()) if isinstance(dtype, pl.List) else str(value))
+
+        self.app.push_screen(
+            SearchScreen("Unselect Rows (All Columns)" if scope == "all" else "Unselect Rows", self.df, cidx, term),
+            callback=partial(self.unselect_rows, scope=scope),
         )
 
     @with_full_df
-    def select_rows(self, result: dict) -> None:
+    def unselect_rows(self, result: dict, scope: str = "column") -> None:
+        """Unselect rows where a term/expression matches in the selected scope.
+
+        Args:
+            result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse".
+            scope: ``"column"`` to match in current column, or ``"all"`` to match across all columns.
+        """
+        if result is None:
+            return
+
+        term = result.get("term")
+        cidx = result.get("cidx", self.cursor_cidx)
+        match_nocase = result.get("match_nocase")
+        match_whole = result.get("match_whole")
+        match_literal = result.get("match_literal")
+        match_reverse = result.get("match_reverse")
+
+        matches = self.find_matches(
+            term=term,
+            cidx=cidx if scope == "column" else None,
+            match_nocase=match_nocase,
+            match_whole=match_whole,
+            match_literal=match_literal,
+            match_reverse=match_reverse,
+        )
+        ok_rids = set(matches.keys())
+
+        if not ok_rids:
+            self.notify(
+                f"No matches found for [$warning]{term}[/]. Try other search options.",
+                title="Unselect Rows",
+                severity="warning",
+            )
+            return
+
+        removed_rids = self.selected_rows.intersection(ok_rids)
+        if not removed_rids:
+            self.notify(
+                "No currently selected rows matched the expression.",
+                title="Unselect Rows",
+                severity="warning",
+            )
+            return
+
+        self.add_history("Unselect rows by expression")
+        self.selected_rows.difference_update(removed_rids)
+
+        self.notify(f"Unselected [$success]{len(removed_rids)}[/] row(s)", title="Unselect Rows")
+        self.setup_table()
+
+    @with_full_df
+    def select_rows(self, result: dict, scope: str = "column") -> None:
         """Select rows by value or expression.
 
         Args:
             result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse"
+            scope: ``"column"`` to match in current column, or ``"all"`` to match across all columns.
         """
         if result is None:
             return
@@ -5395,6 +5487,31 @@ class DataFrameTable(DataTable):
         match_whole = result.get("match_whole")
         match_literal = result.get("match_literal")
         match_reverse = result.get("match_reverse")
+
+        if scope == "all":
+            matches = self.find_matches(
+                term=term,
+                cidx=None,
+                match_nocase=match_nocase,
+                match_whole=match_whole,
+                match_literal=match_literal,
+                match_reverse=match_reverse,
+            )
+            ok_rids = set(matches.keys())
+
+            if not ok_rids:
+                self.notify(
+                    f"No matches found for [$warning]{term}[/]. Try other search options.",
+                    title="Select Rows",
+                    severity="warning",
+                )
+                return
+
+            self.add_history("Select rows by expression")
+            self.selected_rows = ok_rids
+            self.notify(f"Found [$success]{len(ok_rids)}[/] matching row(s)", title="Select Rows")
+            self.setup_table()
+            return
 
         col_name = self.df.columns[cidx]
         dtype = self.df.dtypes[cidx]
