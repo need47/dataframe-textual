@@ -228,8 +228,8 @@ class DataFrameTable(DataTable):
         - **z^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for current column
         - **g,** - 🔢 Toggle thousand separator for all numeric columns
-        - **(** - 🔢 Decrease float precision for current column
-        - **)** - 🔢 Increase float precision for current column
+        - **<** - 🔢 Decrease float precision for current column
+        - **>** - 🔢 Increase float precision for current column
 
         ## ✏️ Editing
         - **Double-click** - ✍️ Edit cell or rename column header
@@ -252,6 +252,7 @@ class DataFrameTable(DataTable):
         - **zD** - 📋 Duplicate current column
         - **gU** - 🧹 Remove duplicate rows (keep first occurrence)
         - **zT** - 🔃 Transpose table (swap rows/columns)
+        - **(** - 🧩 Expand current list column into indexed columns
         - **o** - 💥 Explode current list column into rows
         - **O** - 💥 Explode current string column by delimiter into rows
         - **:** - ✂️ Split current string column into a new column by delimiter
@@ -337,8 +338,9 @@ class DataFrameTable(DataTable):
         ("minus", "hide_column", "Hide selected columns or current column"),  # `-`
         ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
         ("comma", "toggle_thousand_separator", "Toggle thousand separator for column"),  # `,`
-        ("left_parenthesis", "adjust_float_precision(-1)", "Decrease float precision for column"),  # `(`
-        ("right_parenthesis", "adjust_float_precision(1)", "Increase float precision for column"),  # `)`
+        ("left_parenthesis", "expand_list_column", "Expand current list column into indexed columns"),  # `(`
+        ("less_than_sign", "adjust_float_precision(-1)", "Decrease float precision for column"),  # `<`
+        ("greater_than_sign", "adjust_float_precision(1)", "Increase float precision for column"),  # `>`
         ("circumflex_accent", "rename_column", "Rename current column"),  # `^`
         # Copy
         ("c", "copy_cell", "Copy cell to clipboard"),
@@ -1228,6 +1230,11 @@ class DataFrameTable(DataTable):
     def action_split_column(self) -> None:
         """Split the current string column into a new column by delimiter."""
         self.do_split_column()
+
+    @with_full_df
+    def action_expand_list_column(self) -> None:
+        """Expand the current list column into indexed columns."""
+        self.do_expand_list_column()
 
     def action_rename_column(self, col_idx: int | None = None) -> None:
         """Rename the current column."""
@@ -3249,6 +3256,81 @@ class DataFrameTable(DataTable):
                 severity="error",
             )
             self.log(f"Error splitting column `{col_name}` with delimiter `{delimiter}`: {e}")
+
+    @with_full_df
+    def do_expand_list_column(self) -> None:
+        """Expand the current list column into multiple indexed columns.
+
+        Example: ``items`` -> ``items_1``, ``items_2``, ... based on the
+        maximum list length found in the column.
+        """
+        cidx = self.cursor_cidx
+        col_name = self.cursor_col_name
+        dtype = self.cursor_col_dtype
+
+        if dtype != pl.List:
+            self.notify(
+                f"Column [$warning]{col_name}[/] is not a list column",
+                title="Expand List Column",
+                severity="warning",
+            )
+            return
+
+        max_len = self.df[col_name].list.len().max()
+        if not max_len:
+            self.notify(
+                f"Column [$warning]{col_name}[/] has no list items to expand",
+                title="Expand List Column",
+                severity="warning",
+            )
+            return
+
+        max_len = int(max_len)
+        used_names = set(self.df.columns)
+        new_col_names: list[str] = []
+
+        for idx in range(1, max_len + 1):
+            base_name = f"{col_name}_{idx}"
+            new_name = base_name
+            suffix = 1
+            while new_name in used_names:
+                new_name = f"{base_name}_{suffix}"
+                suffix += 1
+            used_names.add(new_name)
+            new_col_names.append(new_name)
+
+        self.add_history(
+            f"Expand list column [$success]{col_name}[/] into [$accent]{len(new_col_names)}[/] columns",
+            dirty=True,
+        )
+
+        try:
+            new_exprs = [pl.col(col_name).list.get(i).alias(new_col_names[i]) for i in range(max_len)]
+
+            cols = self.df.columns
+            select_cols = cols[:cidx] + new_col_names + cols[cidx + 1 :]
+
+            self.df = self.df.lazy().with_columns(new_exprs).select(select_cols).collect()
+
+            if self.df_view is not None:
+                self.df_view = self.df_view.lazy().with_columns(new_exprs).select(select_cols).collect()
+
+            self.setup_table()
+            self.move_cursor(column=cidx)
+
+            self.notify(
+                f"Expanded [$success]{col_name}[/] into [$accent]{len(new_col_names)}[/] indexed columns",
+                title="Expand List Column",
+            )
+        except Exception as e:
+            if self.histories_undo:
+                self.histories_undo.pop()
+            self.notify(
+                f"Failed to expand list column [$error]{col_name}[/]",
+                title="Expand List Column",
+                severity="error",
+            )
+            self.log(f"Error expanding list column `{col_name}`: {e}")
 
     def do_add_link_column(self) -> None:
         """Open AddLinkScreen to collect a link template and add a new link column."""

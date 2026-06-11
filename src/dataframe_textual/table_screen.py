@@ -132,7 +132,7 @@ class TableModalScreen(ModalScreen):
         raise NotImplementedError("Subclasses must implement build_table method.")
 
     def save_table(self) -> None:
-        """Save the frequency table to file."""
+        """Save the table to file."""
         filename = self.filename or "untitled.csv"
 
         self.app.push_screen(

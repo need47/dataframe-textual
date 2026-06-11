@@ -237,11 +237,10 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `Space`        | Toggle tab bar visibility                                  |
 | `b`            | Next tab                                                   |
 | `B`            | Previous tab                                               |
-| `>`            | Move current tab right (wrap to first)                     |
-| `<`            | Move current tab left (wrap to last)                       |
-| `Ctrl+T`       | Save current tab to file                                   |
+| `zb`           | Move current tab right (wrap to first)                     |
+| `zB`           | Move current tab left (wrap to last)                       |
+| `Ctrl+T`       | Save current tab (or current view) to file                 |
 | `Ctrl+S`       | Save all tabs to file                                      |
-| `Ctrl+V`       | Save current view to file                                  |
 | `w`            | Save current tab to file (overwrite without prompt)        |
 | `gw`           | Save all tabs to file (overwrite without prompt)           |
 | `Ctrl+D`       | Duplicate current tab                                      |
@@ -318,8 +317,9 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `+`               | Toggle freeze rows and/or columns                                              |
 | `,`               | Toggle thousand separator for current column                                   |
 | `g,`              | Toggle thousand separator for all numeric columns                              |
-| `(`               | Decrease float precision for current column                                    |
-| `)`               | Increase float precision for current column                                    |
+| `(`               | Expand current list column into indexed columns                                |
+| `<`               | Decrease float precision for current column                                    |
+| `>`               | Increase float precision for current column                                    |
 | `g^`              | Set current row as the new header row                                          |
 | `zC`              | Cycle cursor type (cell -> row -> column)                                      |
 
@@ -454,7 +454,8 @@ These controls change how the table is shown without changing the underlying dat
 - `z~`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
 - `,`: Toggle the thousand separator for the current numeric column.
 - `g,`: Toggle the thousand separator for all numeric columns.
-- `(` / `)`: Decrease or increase float precision for the current float column. Each column keeps its own precision setting, and `0` means the default full display.
+- `(`: Expand the current list column into indexed columns named like `colname_1`, `colname_2`, etc.
+- `<` / `>`: Decrease or increase float precision for the current float column. Each column keeps its own precision setting, and `0` means the default full display.
 
 ### 2. Undo/Redo/Reset
 
@@ -678,7 +679,7 @@ Both actions work on a subset of the original dataframe, but they serve differen
 
 - Opens the chose subset as a derived view inside the current workflow
 - Edits made in the filtered view still apply to the original dataframe
-- Press `Ctrl+V` to save the current view to a file
+- Press `Ctrl+T` to save the current view to a file
 - Press `q` to leave the filtered view and return to the main table
 
 **Advanced Filter** (`V`):
@@ -752,22 +753,18 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 
 ### 16. Save File
 
-The application provides separate save actions for the current tab, all tabs, and the current filtered view.
+The application provides save actions for the current tab (or active view) and all tabs.
 
 **Save Current Tab** (`Ctrl+T`):
 
 - Saves the active tab to file
+- If currently in a derived/filtered view, saves the current view instead
 - Useful when you want to export only the dataframe you are currently working on
 
 **Save All Tabs** (`Ctrl+S`):
 
 - Saves every open tab to file
 - Useful after editing multiple datasets in the same session
-
-**Save Current View** (`Ctrl+V`):
-
-- Saves only the current filtered or derived view to file
-- Useful for exporting a subset without replacing the source dataframe
 
 The output format is determined by the file extension, making it easy to convert between formats such as CSV, TSV, Parquet, or Excel.
 

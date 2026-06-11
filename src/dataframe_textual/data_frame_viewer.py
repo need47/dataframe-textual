@@ -47,11 +47,10 @@ class DataFrameViewer(App):
         - **Space** - 👁️ Toggle tab bar visibility
         - **b** - ⏭️ Next Tab
         - **B** - ⏮️ Previous Tab
-        - **>** - ▶️ Move current tab right (wrap to first)
-        - **<** - ◀️ Move current tab left (wrap to last)
-        - **Ctrl+T** - 💾 Save current tab to file
+        - **zb** - ▶️ Move current tab right (wrap to first)
+        - **zB** - ◀️ Move current tab left (wrap to last)
+        - **Ctrl+T** - 💾 Save current tab (or current view) to file
         - **Ctrl+S** - 💾 Save all tabs to file
-        - **Ctrl+V** - 💾 Save current view to file
         - **w** - 💾 Save current tab to file (overwrite without prompt)
         - **gw** - 💾 Save all tabs to file (overwrite without prompt)
         - **Ctrl+D** - 📋 Duplicate current tab
@@ -81,13 +80,10 @@ class DataFrameViewer(App):
     BINDINGS = [
         ("q", "close", "Quit tab or view"),
         ("space", "toggle_tab_bar", "Toggle Tab Bar"),
-        ("b", "next_tab(1)", "Next Tab"),
-        ("B", "next_tab(-1)", "Previous Tab"),
-        ("greater_than_sign", "move_tab(1)", "Move tab right"),  # '>'
-        ("less_than_sign", "move_tab(-1)", "Move tab left"),  # '<'
+        ("b", "next_or_move_tab(1)", "Next Tab"),
+        ("B", "next_or_move_tab(-1)", "Previous Tab"),
         ("f1", "toggle_help_panel", "Help"),
         ("ctrl+o", "open_file", "Open File"),
-        ("ctrl+v", "save_current_view", "Save Current View"),
         ("ctrl+t", "save_current_tab", "Save Current Tab"),
         ("ctrl+s", "save_all_tabs", "Save All Tabs"),
         ("ctrl+n", "new_tab", "New Tab"),
@@ -189,6 +185,7 @@ class DataFrameViewer(App):
             if event.key == "escape":
                 event.stop()
                 self.cancel_leader_key()
+                return
             # User pressed a non-escape key, reset the timer and let action through
             elif self.timeout_timer:
                 self.timeout_timer.stop()
@@ -447,13 +444,17 @@ class DataFrameViewer(App):
         else:
             self.do_close()
 
-    def action_save_current_view(self) -> None:
-        """Open a save dialog to save current view to file."""
-        self.do_save_view_to_file()
-
     def action_save_current_tab(self) -> None:
-        """Open a save dialog to save current tab to file."""
-        self.do_save_to_file(all_tabs=False)
+        """Open a save dialog for the active tab or active view.
+
+        When currently in a derived view, this action saves that view.
+        Otherwise, it saves the active tab dataframe.
+        """
+        if table := self.active_table:
+            if table.df_view is not None:
+                self.do_save_view_to_file()
+            else:
+                self.do_save_to_file(all_tabs=False)
 
     def action_save_all_tabs(self) -> None:
         """Open a save dialog to save all tabs to file."""
@@ -631,25 +632,20 @@ class DataFrameViewer(App):
 
         self.notify("Updated table from console", title="Python Console")
 
-    def action_next_tab(self, offset: int = 1) -> None:
-        """Switch to the next tab or previous tab.
+    @with_leader_key
+    def action_next_or_move_tab(self, offset: int = 1) -> None:
+        """Switch tabs, or move the current tab when ``z`` leader mode is active.
 
-        Cycles through tabs by the specified offset. With offset=1, moves to next tab.
-        With offset=-1, moves to previous tab. Wraps around when reaching edges.
-
-        Args:
-            offset: Number of tabs to advance (+1 for next, -1 for previous). Defaults to 1.
-        """
-        self.do_next_tab(offset)
-
-    def action_move_tab(self, offset: int = 1) -> None:
-        """Move the current tab left or right with wrap.
+        - Normal mode: cycles through tabs by ``offset``.
+        - ``z`` leader mode: moves the current tab by ``offset``.
 
         Args:
-            offset: Direction to move (+1 right, -1 left). Defaults to 1.
+            offset: Direction/step (+1 for right/next, -1 for left/previous). Defaults to 1.
         """
-
-        self.do_move_tab(offset)
+        if self.leader_key == "z":
+            self.do_move_tab(offset)
+        else:
+            self.do_next_tab(offset)
 
     def action_toggle_tab_bar(self) -> None:
         """Toggle the tab bar visibility.
