@@ -288,6 +288,7 @@ class DataFrameTable(DataTable):
         - **v** - ⏬ Filter rows with cursor value in current column
         - **V** - ⏬ Filter rows with expression
         - **.** - ⏬ Filter rows with non-null values in current column
+        - **z.** - ⏬ Filter rows with null values in current column
         - **f** - ⏬ Filter rows by column value
         - **"** (double quote) - 📤 Collect rows to a new tab
 
@@ -365,7 +366,7 @@ class DataFrameTable(DataTable):
         # Filter & Collect
         ("v", "filter_rows", "Filter rows"),
         ("V", "filter_rows_expr", "Filter rows with specified value or expression"),  # `V`
-        ("full_stop", "filter_rows_non_null", "Filter rows with non-null values in current column"),
+        ("full_stop", "filter_rows_null", "Filter rows with null/non-null values in current column"),
         ("f", "filter_rows_value", "Filter rows by value"),  # `f`
         ("quotation_mark", "collect_rows_columns", "Collect rows/columns to a new tab"),  # `"`
         # Row/Column Selection
@@ -944,6 +945,7 @@ class DataFrameTable(DataTable):
           - ``zC``: Cycle cursor type.
           - ``zT``: Transpose table.
           - ``zB``: Strip leading/trailing whitespace in current string column.
+                    - ``z.``: Filter rows with null values in current column.
           - ``z^``: Toggle internal row index (RID) column.
           - ``z~``: Toggle 1-based column index prefixes in visible headers.
 
@@ -1209,9 +1211,13 @@ class DataFrameTable(DataTable):
         self.do_filter_rows_expr()
 
     @with_full_df
-    def action_filter_rows_non_null(self) -> None:
-        """Filter rows with non-null values in the current column."""
-        self.do_filter_rows_non_null()
+    @with_leader_key
+    def action_filter_rows_null(self) -> None:
+        """Filter rows with null or non-null values in the current column.
+
+        Press ``.`` for non-null rows and ``z.`` for null rows.
+        """
+        self.do_filter_rows_null(with_null=self.leader_key == "z")
 
     @with_full_df
     def action_filter_rows_value(self) -> None:
@@ -4996,12 +5002,22 @@ class DataFrameTable(DataTable):
                 }
             )
 
-    def do_filter_rows_non_null(self) -> None:
-        """Filter non-null rows."""
+    def do_filter_rows_null(self, with_null: bool = False) -> None:
+        """Filter rows by nullness in the current column.
+
+        Args:
+            with_null: When True, keep rows with null values. When False,
+                keep rows with non-null values.
+        """
         cidx = self.cursor_cidx
         col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
-        term = pl.col(col_name).list.len() > 0 if isinstance(dtype, pl.List) else pl.col(col_name).is_not_null()
+
+        if isinstance(dtype, pl.List):
+            null_like = pl.col(col_name).is_null() | (pl.col(col_name).list.len() == 0)
+            term = null_like if with_null else ~null_like
+        else:
+            term = pl.col(col_name).is_null() if with_null else pl.col(col_name).is_not_null()
 
         self.filter_rows(
             {

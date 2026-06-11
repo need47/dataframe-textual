@@ -390,6 +390,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `v`                | Filter rows with cursor value in the current column    |
 | `V`                | Filter rows with specified value or expression         |
 | `.`                | Filter rows with non-null values in the current column |
+| `z.`               | Filter rows with null values in the current column     |
 | `f`                | Filter rows using values in the current column         |
 | `"` (double quote) | Collect rows/columns to a new tab                      |
 
