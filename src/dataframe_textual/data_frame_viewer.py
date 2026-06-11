@@ -44,11 +44,11 @@ class DataFrameViewer(App):
         - **q** - 🚪 Quit tab (prompts to save unsaved changes) or view
         - **gq** - 🚪 Quit all tabs (prompts to save unsaved changes)
         - **Ctrl+Q** - ⚠️ Force to quit app (discards unsaved changes)
-        - **Space** - 👁️ Toggle tab bar visibility
-        - **b** - ⏭️ Next Tab
+        - **gB** - 👁️ Toggle tab bar visibility
         - **B** - ⏮️ Previous Tab
+        - **b** - ⏭️ Next Tab
+        - **gb** - ◀️ Move current tab left (wrap to last)
         - **zb** - ▶️ Move current tab right (wrap to first)
-        - **zB** - ◀️ Move current tab left (wrap to last)
         - **Ctrl+T** - 💾 Save current tab (or current view) to file
         - **Ctrl+S** - 💾 Save all tabs to file
         - **w** - 💾 Save current tab to file (overwrite without prompt)
@@ -62,7 +62,7 @@ class DataFrameViewer(App):
         - **S** - 📋 Show all open sheets/tabs
         - **F1** - ❓ Toggle this help panel
         - **` (backtick)** - 🐍 Toggle Python console
-        - **T** - 🎨 Select theme
+        - **gT** - 🎨 Select theme
         - **Ctrl+P -> Screenshot** - 📸 Capture terminal view as a SVG image
 
         ## ⭐ Features
@@ -79,7 +79,6 @@ class DataFrameViewer(App):
 
     BINDINGS = [
         ("q", "close", "Quit tab or view"),
-        ("space", "toggle_tab_bar", "Toggle Tab Bar"),
         ("b", "next_or_move_tab(1)", "Next Tab"),
         ("B", "next_or_move_tab(-1)", "Previous Tab"),
         ("f1", "toggle_help_panel", "Help"),
@@ -634,16 +633,22 @@ class DataFrameViewer(App):
 
     @with_leader_key
     def action_next_or_move_tab(self, offset: int = 1) -> None:
-        """Switch tabs, or move the current tab when ``z`` leader mode is active.
+        """Switch tabs, or move the current tab with leader shortcuts.
 
         - Normal mode: cycles through tabs by ``offset``.
-        - ``z`` leader mode: moves the current tab by ``offset``.
+        - ``gB``: toggles tab bar visibility.
+        - ``gb``: moves current tab left.
+        - ``zb``: moves current tab right.
 
         Args:
             offset: Direction/step (+1 for right/next, -1 for left/previous). Defaults to 1.
         """
-        if self.leader_key == "z":
-            self.do_move_tab(offset)
+        if offset == -1 and self.leader_key == "g":
+            self.action_toggle_tab_bar()
+        elif offset == 1 and self.leader_key == "g":
+            self.do_move_tab(-1)
+        elif offset == 1 and self.leader_key == "z":
+            self.do_move_tab(1)
         else:
             self.do_next_tab(offset)
 

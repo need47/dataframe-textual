@@ -255,11 +255,12 @@ class DataFrameTable(DataTable):
         - **(** - 🧩 Expand current list column into indexed columns (e.g. ``col[1]``, ``col[2]``, ...)
         - **)** - 🧩 Contract indexed sibling columns back into a list column
         - **o** - 💥 Explode current list column into rows
-        - **O** - 💥 Explode current string column by delimiter into rows
-        - **:** - ✂️ Split current string column into a new column by delimiter
-        - **z:** - 🔗 Join all selected columns into a new string column
-        - **Ctrl+U** - 🔠 Convert current or selected string column(s) to uppercase
-        - **Ctrl+L** - 🔡 Convert current or selected string column(s) to lowercase
+        - **O** - 💥 Explode current column by delimiter into rows
+        - **:** - ✂️ Split current column into a new column by delimiter
+        - **z:** - 🔗 Join all selected columns into a new column
+        - **Ctrl+U** - 🔠 Convert current or selected column(s) to uppercase
+        - **Ctrl+L** - 🔡 Convert current or selected column(s) to lowercase
+        - **zB** - 🧼 Strip leading and trailing whitespaces in current column
 
         ## ✅ Row/Column Selection
         - **\\\\** - ✅ Select rows with cell matches or those matching cursor value in current column
@@ -942,6 +943,7 @@ class DataFrameTable(DataTable):
         Leader ``z`` sequences:
           - ``zC``: Cycle cursor type.
           - ``zT``: Transpose table.
+          - ``zB``: Strip leading/trailing whitespace in current string column.
           - ``z^``: Toggle internal row index (RID) column.
           - ``z~``: Toggle 1-based column index prefixes in visible headers.
 
@@ -1050,6 +1052,12 @@ class DataFrameTable(DataTable):
                 event.prevent_default()
                 self.stop_timer()
                 self.do_cycle_cursor_type()
+                return
+            elif event.key == "B":  # `zB`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_strip_whitespace_column()
                 return
             elif event.key == "colon":  # `z:`:
                 event.stop()
@@ -4318,6 +4326,44 @@ class DataFrameTable(DataTable):
 
         self.setup_table()
         self.notify(descr, title=f"Convert to {label.capitalize()}")
+
+    @with_full_df
+    @with_leader_key
+    def do_strip_whitespace_column(self) -> None:
+        """Strip leading and trailing whitespace in the current string column."""
+        col_name = self.cursor_col_name
+        cidx = self.cursor_cidx
+
+        if self.cursor_col_dtype != pl.String:
+            self.notify(
+                f"Column [$warning]{col_name}[/] is not a string column",
+                title="Strip Whitespace",
+                severity="warning",
+            )
+            return
+
+        descr = f"Strip leading/trailing whitespaces in column [$success]{col_name}[/]"
+        self.add_history(descr, dirty=True)
+
+        try:
+            trimmed_expr = pl.col(col_name).str.strip_chars().alias(col_name)
+            self.df = self.df.with_columns(trimmed_expr)
+
+            if self.df_view is not None:
+                self.df_view = self.df_view.with_columns(trimmed_expr)
+
+            self.setup_table()
+            self.move_cursor(column=cidx)
+            self.notify(descr, title="Strip Whitespace")
+        except Exception as e:
+            if self.histories_undo:
+                self.histories_undo.pop()
+            self.notify(
+                f"Failed to strip whitespace in column [$error]{col_name}[/]",
+                title="Strip Whitespace",
+                severity="error",
+            )
+            self.log(f"Error stripping whitespace in column `{col_name}`: {e}")
 
     # Find & Replace
     @with_full_df

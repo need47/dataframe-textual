@@ -234,11 +234,11 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `q`            | Quit current tab (prompts to save unsaved changes) or view |
 | `gq`           | Quit all tabs then app (prompts to save unsaved changes)   |
 | `S`            | Show all open sheets/tabs                                  |
-| `Space`        | Toggle tab bar visibility                                  |
-| `b`            | Next tab                                                   |
+| `gB`           | Toggle tab bar visibility                                  |
 | `B`            | Previous tab                                               |
+| `b`            | Next tab                                                   |
+| `gb`           | Move current tab left (wrap to last)                       |
 | `zb`           | Move current tab right (wrap to first)                     |
-| `zB`           | Move current tab left (wrap to last)                       |
 | `Ctrl+T`       | Save current tab (or current view) to file                 |
 | `Ctrl+S`       | Save all tabs to file                                      |
 | `w`            | Save current tab to file (overwrite without prompt)        |
@@ -352,6 +352,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `g:`           | Glue items of a list column into a string column by delimiter   |
 | `Ctrl+U`       | Convert current or selected string column(s) to uppercase       |
 | `Ctrl+L`       | Convert current or selected string column(s) to lowercase       |
+| `zB`           | Strip leading and trailing whitespaces in current string column |
 | `o`            | Explode current list column into multiple rows                  |
 | `O`            | Explode current string column by delimiter into multiple rows   |
 | `zT`           | Transpose table (swap rows and columns)                         |
@@ -740,6 +741,7 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 - `:`: Split the current string column into a new list column using a delimiter.
 - `Ctrl+U`: Convert the current column, or all selected columns that are string type, to uppercase.
 - `Ctrl+L`: Convert the current column, or all selected columns that are string type, to lowercase.
+- `zB`: Strip leading and trailing whitespaces in the current string column.
 
 ### 15. Column & Row Reordering
 
