@@ -257,6 +257,7 @@ class DataFrameTable(DataTable):
         - **o** - 💥 Explode current list column into rows
         - **O** - 💥 Explode current string column by delimiter into rows
         - **:** - ✂️ Split current string column into a new column by delimiter
+        - **z:** - 🔗 Join all selected columns into a new string column
         - **Ctrl+U** - 🔠 Convert current or selected string column(s) to uppercase
         - **Ctrl+L** - 🔡 Convert current or selected string column(s) to lowercase
 
@@ -1016,6 +1017,12 @@ class DataFrameTable(DataTable):
                 self.leader_key = ""
                 self.notify("Scrolled to [$success]end[/]", title="Scroll")
                 return
+            elif event.key == "colon":  # `g:`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_glue_list_column()
+                return
 
         # Handle leader key sequences for `z`
         elif self.leader_key == "z":
@@ -1043,6 +1050,12 @@ class DataFrameTable(DataTable):
                 event.prevent_default()
                 self.stop_timer()
                 self.do_cycle_cursor_type()
+                return
+            elif event.key == "colon":  # `z:`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_join_columns()
                 return
 
         if event.key == "up":
@@ -3265,6 +3278,180 @@ class DataFrameTable(DataTable):
             self.log(f"Error splitting column `{col_name}` with delimiter `{delimiter}`: {e}")
 
     @with_full_df
+    @with_leader_key
+    def do_join_columns(self) -> None:
+        """Prompt for a delimiter and join all selected columns into a new string column.
+
+        The new column is inserted after the current cursor column.  At least two
+        columns must be selected beforehand (via the ``'`` key).
+        """
+        if len(self.selected_columns) < 2:
+            self.notify(
+                "Select at least [$warning]2[/] columns first (use [$accent]'[/] to select)",
+                title="Join Columns",
+                severity="warning",
+            )
+            return
+
+        col_list = ", ".join(f"[$accent]{c}[/]" for c in self.df.columns if c in self.selected_columns)
+        self.app.push_screen(
+            ConfirmScreen(
+                "Join Columns",
+                label=f"Enter the delimiter to join {col_list} into a new column",
+                input="|",
+            ),
+            callback=self.join_columns,
+        )
+
+    @with_full_df
+    def join_columns(self, result: str | None) -> None:
+        """Create a new column by joining all selected columns with *result* as delimiter.
+
+        The new column is inserted after the current cursor column and the
+        selected-column state is cleared afterwards.
+
+        Args:
+            result: Delimiter string entered by the user, or ``None`` if cancelled.
+        """
+        if result is None:
+            return
+
+        delimiter = result  # empty string is a valid delimiter (no separator)
+
+        # Preserve the order columns appear in the dataframe
+        ordered_selected = [c for c in self.df.columns if c in self.selected_columns]
+        if len(ordered_selected) < 2:
+            self.notify(
+                "Need at least [$warning]2[/] selected columns to join",
+                title="Join Columns",
+                severity="warning",
+            )
+            return
+
+        cidx = self.cursor_cidx
+        base_name = "_".join(ordered_selected)
+        new_col_name = self._get_column_name(base_name)
+
+        self.add_history(
+            f"Join [$accent]{len(ordered_selected)}[/] columns into [$success]{new_col_name}[/] with delimiter [$accent]{delimiter!r}[/]",
+            dirty=True,
+        )
+
+        try:
+            # Cast every selected column to String, then concatenate with the delimiter
+            str_exprs = [pl.col(c).cast(pl.String) for c in ordered_selected]
+            if delimiter:
+                join_expr = pl.concat_str(str_exprs, separator=delimiter).alias(new_col_name)
+            else:
+                join_expr = pl.concat_str(str_exprs).alias(new_col_name)
+
+            # Insert after current cursor column
+            cols = self.df.columns
+            insert_pos = cidx + 1
+            select_cols = cols[:insert_pos] + [new_col_name] + cols[insert_pos:]
+
+            self.df = self.df.lazy().with_columns(join_expr).select(select_cols).collect()
+
+            if self.df_view is not None:
+                self.df_view = self.df_view.lazy().with_columns(join_expr).select(select_cols).collect()
+
+            # Clear column selection
+            self.selected_columns.clear()
+
+            self.setup_table()
+            self.move_cursor(column=insert_pos)
+
+            self.notify(
+                f"Joined [$accent]{len(ordered_selected)}[/] columns into [$success]{new_col_name}[/]",
+                title="Join Columns",
+            )
+        except Exception as e:
+            if self.histories_undo:
+                self.histories_undo.pop()
+            self.notify(
+                f"Failed to join columns into [$error]{new_col_name}[/]",
+                title="Join Columns",
+                severity="error",
+            )
+            self.log(f"Error joining columns into `{new_col_name}`: {e}")
+
+    @with_full_df
+    @with_leader_key
+    def do_glue_list_column(self) -> None:
+        """Prompt for a delimiter and glue the items of the current list column into a string column.
+
+        A new string column is inserted after the current cursor column, replacing
+        the list column in-place by joining each row's list items with the delimiter.
+        """
+        col_name = self.cursor_col_name
+        dtype = self.cursor_col_dtype
+
+        if dtype != pl.List:
+            self.notify(
+                f"Column [$warning]{col_name}[/] is not a list column",
+                title="Glue List Column",
+                severity="warning",
+            )
+            return
+
+        self.app.push_screen(
+            ConfirmScreen(
+                "Glue List Column",
+                label=f"Enter the delimiter to join items of [$success]{col_name}[/] into a string",
+                input="|",
+            ),
+            callback=self.glue_columns,
+        )
+
+    @with_full_df
+    def glue_columns(self, result: str | None) -> None:
+        """Glue list items of the current column into a single string per row.
+
+        Args:
+            result: Delimiter entered by the user, or ``None`` if cancelled.
+        """
+        if result is None:
+            return
+
+        delimiter = result  # empty string is a valid delimiter
+        cidx = self.cursor_cidx
+        col_name = self.cursor_col_name
+        new_col_name = self._get_column_name(f"{col_name}_glued")
+
+        self.add_history(
+            f"Glue list column [$success]{col_name}[/] into [$success]{new_col_name}[/] with delimiter [$accent]{delimiter!r}[/]",
+            dirty=True,
+        )
+
+        try:
+            # Join list items into a single string per row; nulls inside lists become ""
+            glue_expr = pl.col(col_name).list.join(delimiter).alias(new_col_name)
+
+            cols = self.df.columns
+            select_cols = cols[: cidx + 1] + [new_col_name] + cols[cidx + 1 :]
+
+            self.df = self.df.lazy().with_columns(glue_expr).select(select_cols).collect()
+
+            if self.df_view is not None:
+                self.df_view = self.df_view.lazy().with_columns(glue_expr).select(select_cols).collect()
+
+            self.setup_table()
+            self.move_cursor(column=cidx + 1)
+
+            self.notify(
+                f"Glued list column [$success]{col_name}[/] into [$success]{new_col_name}[/]",
+                title="Glue List Column",
+            )
+        except Exception as e:
+            if self.histories_undo:
+                self.histories_undo.pop()
+            self.notify(
+                f"Failed to glue list column [$error]{col_name}[/]",
+                title="Glue List Column",
+                severity="error",
+            )
+            self.log(f"Error gluing list column `{col_name}`: {e}")
+
     def do_expand_list_column(self) -> None:
         """Expand the current list column into multiple indexed columns.
 

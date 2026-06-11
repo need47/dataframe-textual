@@ -287,11 +287,11 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 #### Undo/Redo/Reset
 
-| Key      | Action                  |
-| -------- | ----------------------- |
-| `u`/`U`  | Undo last action        |
-| `R`      | Redo last undone action |
-| `gu`     | Reset to initial state  |
+| Key     | Action                  |
+| ------- | ----------------------- |
+| `u`/`U` | Undo last action        |
+| `R`     | Redo last undone action |
+| `gu`    | Reset to initial state  |
 
 #### Display
 
@@ -326,33 +326,35 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 #### Editing
 
-| Key            | Action                                                        |
-| -------------- | ------------------------------------------------------------- |
-| `Double-click` | Edit cell or rename column header                             |
-| `Delete`       | Clear current cell (set to NULL)                              |
-| `Shift+Delete` | Clear current column (set matching cells to NULL)             |
-| `e`            | Edit current cell (respects data type)                        |
-| `E`            | Edit entire column with value/expression                      |
-| `a`            | Add empty column after current                                |
-| `A`            | Add column with name and value/expression                     |
-| `i`            | Add index column after current                                |
-| `za`           | Add a link column from URL template                           |
-| `^`            | Rename current column                                         |
-| `*`            | Delete selected columns or current column                     |
-| `g*`           | Delete current column and all columns before it               |
-| `z*`           | Delete current column and all columns after it                |
-| `d`            | Delete current row                                            |
-| `gd`           | Delete current row and all those above                        |
-| `zd`           | Delete current row and all those below                        |
-| `D`            | Duplicate current row                                         |
-| `zD`           | Duplicate current column                                      |
-| `gU`           | Remove duplicate rows (keep first occurrence)                 |
-| `:`            | Split current string column into a new column by delimiter    |
-| `Ctrl+U`       | Convert current or selected string column(s) to uppercase     |
-| `Ctrl+L`       | Convert current or selected string column(s) to lowercase     |
-| `o`            | Explode current list column into multiple rows                |
-| `O`            | Explode current string column by delimiter into multiple rows |
-| `zT`           | Transpose table (swap rows and columns)                       |
+| Key            | Action                                                          |
+| -------------- | --------------------------------------------------------------- |
+| `Double-click` | Edit cell or rename column header                               |
+| `Delete`       | Clear current cell (set to NULL)                                |
+| `Shift+Delete` | Clear current column (set matching cells to NULL)               |
+| `e`            | Edit current cell (respects data type)                          |
+| `E`            | Edit entire column with value/expression                        |
+| `a`            | Add empty column after current                                  |
+| `A`            | Add column with name and value/expression                       |
+| `i`            | Add index column after current                                  |
+| `za`           | Add a link column from URL template                             |
+| `^`            | Rename current column                                           |
+| `*`            | Delete selected columns or current column                       |
+| `g*`           | Delete current column and all columns before it                 |
+| `z*`           | Delete current column and all columns after it                  |
+| `d`            | Delete current row                                              |
+| `gd`           | Delete current row and all those above                          |
+| `zd`           | Delete current row and all those below                          |
+| `D`            | Duplicate current row                                           |
+| `zD`           | Duplicate current column                                        |
+| `gU`           | Remove duplicate rows (keep first occurrence)                   |
+| `:`            | Split current string column into a new column by delimiter      |
+| `z:`           | Join all selected columns into a new string column by delimiter |
+| `g:`           | Glue items of a list column into a string column by delimiter   |
+| `Ctrl+U`       | Convert current or selected string column(s) to uppercase       |
+| `Ctrl+L`       | Convert current or selected string column(s) to lowercase       |
+| `o`            | Explode current list column into multiple rows                  |
+| `O`            | Explode current string column by delimiter into multiple rows   |
+| `zT`           | Transpose table (swap rows and columns)                         |
 
 #### Row/Column Selection
 
