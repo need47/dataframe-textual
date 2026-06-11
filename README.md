@@ -317,7 +317,8 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `+`               | Toggle freeze rows and/or columns                                              |
 | `,`               | Toggle thousand separator for current column                                   |
 | `g,`              | Toggle thousand separator for all numeric columns                              |
-| `(`               | Expand current list column into indexed columns                                |
+| `(`               | Expand current list column into indexed columns (e.g. ``col[1]``, ``col[2]``)  |
+| `)`               | Contract indexed sibling columns (``col[N]``) back into a list column          |
 | `<`               | Decrease float precision for current column                                    |
 | `>`               | Increase float precision for current column                                    |
 | `g^`              | Set current row as the new header row                                          |
@@ -454,7 +455,8 @@ These controls change how the table is shown without changing the underlying dat
 - `z~`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
 - `,`: Toggle the thousand separator for the current numeric column.
 - `g,`: Toggle the thousand separator for all numeric columns.
-- `(`: Expand the current list column into indexed columns named like `colname_1`, `colname_2`, etc.
+- `(`: Expand the current list column into indexed columns named like `colname[1]`, `colname[2]`, etc.
+- `)`: Contract those indexed sibling columns back into a single list column. Position the cursor on any sibling (e.g. `colname[2]`) and press `)` to merge all `colname[N]` columns back into `colname`.
 - `<` / `>`: Decrease or increase float precision for the current float column. Each column keeps its own precision setting, and `0` means the default full display.
 
 ### 2. Undo/Redo/Reset

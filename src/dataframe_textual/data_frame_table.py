@@ -252,7 +252,8 @@ class DataFrameTable(DataTable):
         - **zD** - 📋 Duplicate current column
         - **gU** - 🧹 Remove duplicate rows (keep first occurrence)
         - **zT** - 🔃 Transpose table (swap rows/columns)
-        - **(** - 🧩 Expand current list column into indexed columns
+        - **(** - 🧩 Expand current list column into indexed columns (e.g. ``col[1]``, ``col[2]``, ...)
+        - **)** - 🧩 Contract indexed sibling columns back into a list column
         - **o** - 💥 Explode current list column into rows
         - **O** - 💥 Explode current string column by delimiter into rows
         - **:** - ✂️ Split current string column into a new column by delimiter
@@ -339,6 +340,7 @@ class DataFrameTable(DataTable):
         ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
         ("comma", "toggle_thousand_separator", "Toggle thousand separator for column"),  # `,`
         ("left_parenthesis", "expand_list_column", "Expand current list column into indexed columns"),  # `(`
+        ("right_parenthesis", "contract_list_column", "Contract current list column from indexed columns"),  # `)`
         ("less_than_sign", "adjust_float_precision(-1)", "Decrease float precision for column"),  # `<`
         ("greater_than_sign", "adjust_float_precision(1)", "Increase float precision for column"),  # `>`
         ("circumflex_accent", "rename_column", "Rename current column"),  # `^`
@@ -1235,6 +1237,11 @@ class DataFrameTable(DataTable):
     def action_expand_list_column(self) -> None:
         """Expand the current list column into indexed columns."""
         self.do_expand_list_column()
+
+    @with_full_df
+    def action_contract_list_column(self) -> None:
+        """Contract indexed sibling columns back into a single list column."""
+        self.do_contract_list_column()
 
     def action_rename_column(self, col_idx: int | None = None) -> None:
         """Rename the current column."""
@@ -3290,7 +3297,7 @@ class DataFrameTable(DataTable):
         new_col_names: list[str] = []
 
         for idx in range(1, max_len + 1):
-            base_name = f"{col_name}_{idx}"
+            base_name = f"{col_name}[{idx}]"
             new_name = base_name
             suffix = 1
             while new_name in used_names:
@@ -3331,6 +3338,100 @@ class DataFrameTable(DataTable):
                 severity="error",
             )
             self.log(f"Error expanding list column `{col_name}`: {e}")
+
+    def do_contract_list_column(self) -> None:
+        """Contract indexed sibling columns back into a single list column.
+
+        Detects sibling columns by the ``base[N]`` naming pattern produced by
+        :meth:`do_expand_list_column`.  The cursor must be on one of those
+        indexed columns (e.g. ``items[2]``).  All siblings are collected in
+        index order, combined into a Polars ``List`` column at the position of
+        the first sibling, and the individual indexed columns are removed.
+
+        Example::
+
+            items[1], items[2], items[3]  ->  items  (List column)
+        """
+        import re
+
+        col_name = self.cursor_col_name
+
+        # Detect pattern: base_name[N]
+        m = re.fullmatch(r"^(.+)\[(\d+)\]$", col_name)
+        if not m:
+            self.notify(
+                f"Column [$warning]{col_name}[/] does not look like an indexed column (expected [$accent]name[N][/] format)",
+                title="Contract List Column",
+                severity="warning",
+            )
+            return
+
+        base_name = m.group(1)
+
+        # Collect all sibling columns matching base_name[N] in index order
+        pattern = re.compile(r"^" + re.escape(base_name) + r"\[(\d+)\]$")
+        siblings: list[tuple[int, str]] = []
+        for c in self.df.columns:
+            sm = pattern.fullmatch(c)
+            if sm:
+                siblings.append((int(sm.group(1)), c))
+
+        if not siblings:
+            self.notify(
+                f"No sibling indexed columns found for [$warning]{base_name}[/]",
+                title="Contract List Column",
+                severity="warning",
+            )
+            return
+
+        siblings.sort(key=lambda t: t[0])
+        sibling_names = [s[1] for s in siblings]
+
+        # Insertion position: where the first sibling sits in the dataframe
+        insert_cidx = self.df.columns.index(sibling_names[0])
+
+        # Ensure the new column name is unique (the base_name might already exist)
+        new_col_name = base_name
+        if new_col_name in self.df.columns and new_col_name not in sibling_names:
+            suffix = 1
+            while f"{base_name}_{suffix}" in self.df.columns:
+                suffix += 1
+            new_col_name = f"{base_name}_{suffix}"
+
+        self.add_history(
+            f"Contract [$accent]{len(sibling_names)}[/] indexed columns into list column [$success]{new_col_name}[/]",
+            dirty=True,
+        )
+
+        try:
+            # Build the list column by zipping sibling columns
+            list_expr = pl.concat_list([pl.col(c) for c in sibling_names]).alias(new_col_name)
+
+            # Build final column order: insert new col where first sibling was, drop all siblings
+            remaining_cols = [c for c in self.df.columns if c not in sibling_names]
+            select_cols = remaining_cols[:insert_cidx] + [new_col_name] + remaining_cols[insert_cidx:]
+
+            self.df = self.df.lazy().with_columns(list_expr).select(select_cols).collect()
+
+            if self.df_view is not None:
+                self.df_view = self.df_view.lazy().with_columns(list_expr).select(select_cols).collect()
+
+            self.setup_table()
+            self.move_cursor(column=insert_cidx)
+
+            self.notify(
+                f"Contracted [$accent]{len(sibling_names)}[/] columns into list column [$success]{new_col_name}[/]",
+                title="Contract List Column",
+            )
+        except Exception as e:
+            if self.histories_undo:
+                self.histories_undo.pop()
+            self.notify(
+                f"Failed to contract columns for [$error]{base_name}[/]",
+                title="Contract List Column",
+                severity="error",
+            )
+            self.log(f"Error contracting list column `{base_name}`: {e}")
 
     def do_add_link_column(self) -> None:
         """Open AddLinkScreen to collect a link template and add a new link column."""
