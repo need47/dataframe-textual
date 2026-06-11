@@ -202,7 +202,7 @@ class DataFrameTable(DataTable):
         ## ♻️ Undo/Redo/Reset
         - **u/U** - ↩️ Undo last action
         - **R** - 🔄 Redo last undone action
-        - **Ctrl+U** - 🔁 Reset to initial state
+        - **gu** - 🔁 Reset to initial state
 
         ## 👁️ Display
         - **Enter** - 📋 Show row details in modal
@@ -250,10 +250,13 @@ class DataFrameTable(DataTable):
         - **z\\*** - ✖️ Delete column and those after current column
         - **D** - 📋 Duplicate current row
         - **zD** - 📋 Duplicate current column
-        - **Ctrl+Delete** - 🧹 Remove duplicate rows (keep first occurrence)
+        - **gU** - 🧹 Remove duplicate rows (keep first occurrence)
         - **zT** - 🔃 Transpose table (swap rows/columns)
         - **o** - 💥 Explode current list column into rows
         - **O** - 💥 Explode current string column by delimiter into rows
+        - **:** - ✂️ Split current string column into a new column by delimiter
+        - **Ctrl+U** - 🔠 Convert current or selected string column(s) to uppercase
+        - **Ctrl+L** - 🔡 Convert current or selected string column(s) to lowercase
 
         ## ✅ Row/Column Selection
         - **\\\\** - ✅ Select rows with cell matches or those matching cursor value in current column
@@ -327,7 +330,8 @@ class DataFrameTable(DataTable):
         # Undo/Redo/Reset
         ("u,U", "undo", "Undo"),
         ("R", "redo", "Redo"),
-        ("ctrl+u", "reset", "Reset to initial state"),
+        ("ctrl+u", "upper_case_column", "Convert string column(s) to uppercase"),  # `Ctrl+U`
+        ("ctrl+l", "lower_case_column", "Convert string column(s) to lowercase"),  # `Ctrl+L`
         # Display
         ("underscore", "expand_column", "Toggle column full width"),  # `_`
         ("minus", "hide_column", "Hide selected columns or current column"),  # `-`
@@ -380,7 +384,6 @@ class DataFrameTable(DataTable):
         ("d", "delete_row", "Delete row"),
         # Duplicate
         ("D", "duplicate_row_column", "Duplicate row or column"),
-        ("ctrl+delete", "uniq_rows", "Remove duplicate rows"),
         # Edit
         ("e", "edit_cell", "Edit cell"),
         ("E", "edit_column", "Edit column"),
@@ -391,6 +394,8 @@ class DataFrameTable(DataTable):
         ("a", "add_column", "Add column"),
         ("A", "add_column_expr", "Add column with expression"),
         ("i", "add_index_column", "Add an index column"),  # `i`
+        # Split Column
+        ("colon", "split_column", "Split column"),
         # Reorder
         ("shift+left,H", "move_column_left", "Move column left"),
         ("shift+right,L", "move_column_right", "Move column right"),
@@ -922,6 +927,7 @@ class DataFrameTable(DataTable):
         Leader ``g`` sequences:
           - ``gv``: Show all hidden columns.
           - ``gT``: Open theme selection.
+          - ``gU``: Remove duplicate rows.
           - ``g^``: Mark current row as header.
           - ``gh``: Scroll to leftmost column.
           - ``gj``: Scroll to last row (bottom).
@@ -956,6 +962,12 @@ class DataFrameTable(DataTable):
                 event.prevent_default()
                 self.stop_timer()
                 self.app.select_theme()
+                return
+            elif event.key == "U":  # `gU`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_uniq_rows()
                 return
             # Set current row as header
             elif event.key == "circumflex_accent":  # `g^`:
@@ -1212,6 +1224,11 @@ class DataFrameTable(DataTable):
         """Add an index column after the current column."""
         self.do_add_index_column()
 
+    @with_full_df
+    def action_split_column(self) -> None:
+        """Split the current string column into a new column by delimiter."""
+        self.do_split_column()
+
     def action_rename_column(self, col_idx: int | None = None) -> None:
         """Rename the current column."""
         self.do_rename_column(col_idx=col_idx)
@@ -1290,24 +1307,18 @@ class DataFrameTable(DataTable):
         self.do_duplicate_row_column()
 
     @with_full_df
-    def action_uniq_rows(self) -> None:
-        """Remove duplicate rows while keeping the first occurrence."""
-        self.do_uniq_rows()
-
-    @with_full_df
+    @with_leader_key
     def action_undo(self) -> None:
         """Undo the last action."""
-        self.do_undo()
+        if self.leader_key == "g":
+            self.do_reset()
+        else:
+            self.do_undo()
 
     @with_full_df
     def action_redo(self) -> None:
         """Redo the last undone action."""
         self.do_redo()
-
-    @with_full_df
-    def action_reset(self) -> None:
-        """Reset to the initial state."""
-        self.do_reset()
 
     @with_full_df
     def action_move_column_left(self, col_idx: int | None = None) -> None:
@@ -1341,6 +1352,16 @@ class DataFrameTable(DataTable):
     def action_cast_column_dtype(self, dtype: str | pl.DataType) -> None:
         """Cast the current column to a different data type."""
         self.do_cast_column_dtype(dtype)
+
+    @with_full_df
+    def action_upper_case_column(self) -> None:
+        """Convert the current or selected string column(s) to uppercase."""
+        self.do_case_column("upper")
+
+    @with_full_df
+    def action_lower_case_column(self) -> None:
+        """Convert the current or selected string column(s) to lowercase."""
+        self.do_case_column("lower")
 
     def action_copy_cell(self) -> None:
         """Copy the current cell to clipboard."""
@@ -1598,7 +1619,8 @@ class DataFrameTable(DataTable):
         # If there's still available width, distribute it proportionally to columns that are above the cap
         if available_width > BUFFER_SIZE:
             flexible_cols = [col for col in col_widths if col_widths[col] >= COLUMN_WIDTH_CAP]
-            if flexible_cols:
+            # Only distribute if there's more than one flexible column to avoid giving all extra space to a single column
+            if len(flexible_cols) > 1:
                 extra_width_per_col = (available_width - BUFFER_SIZE) // len(flexible_cols)
                 for col in flexible_cols:
                     new_width = col_widths[col] + extra_width_per_col
@@ -2199,15 +2221,18 @@ class DataFrameTable(DataTable):
         self.df_view = None
         self.loaded_rows = 0
         self.loaded_ranges.clear()
-        self.selected_rows.clear()
-        self.matches.clear()
-        self.sorted_columns.clear()
         self.hidden_columns.clear()
+        self.selected_rows.clear()
+        self.selected_columns.clear()
+        self.sorted_columns.clear()
+        self.matches.clear()
+        self.fixed_rows = 0
+        self.fixed_columns = 0
+        self.histories_undo.clear()
+        self.histories_redo.clear()
         self.expanded_columns.clear()
         self.thousand_separator_columns = set()
         self.float_precision_columns = {}
-        self.fixed_rows = 0
-        self.fixed_columns = 0
         self.df_done = True
         self.dirty = dirty
         self.show_rid = False
@@ -3149,6 +3174,82 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error adding index column `{new_col_name}`: {e}")
 
+    def do_split_column(self) -> None:
+        """Open a confirmation screen to split the current string column into a new column."""
+        col_name = self.cursor_col_name
+        dtype = self.cursor_col_dtype
+
+        if dtype != pl.String:
+            self.notify(
+                f"Column [$warning]{col_name}[/] is not a string column",
+                title="Split Column",
+                severity="warning",
+            )
+            return
+
+        self.app.push_screen(
+            ConfirmScreen(
+                "Split Column",
+                label=f"Enter the delimiter to split [$success]{col_name}[/] into a new column",
+                input="|",
+            ),
+            callback=self.split_column,
+        )
+
+    @with_full_df
+    def split_column(self, result: str | None) -> None:
+        """Split the current string column into a new list column.
+
+        Args:
+            result: Delimiter entered by the user.
+        """
+        if result is None:
+            return
+
+        delimiter = result
+        if delimiter == "":
+            self.notify("Delimiter cannot be empty", title="Split Column", severity="warning")
+            return
+
+        cidx = self.cursor_cidx
+        col_name = self.cursor_col_name
+        new_col_name = self._get_column_name(f"{col_name}_split")
+
+        self.add_history(
+            f"Split column [$success]{col_name}[/] into [$success]{new_col_name}[/] using delimiter [$accent]{delimiter}[/]",
+            dirty=True,
+        )
+
+        try:
+            new_col = pl.col(col_name).str.split(delimiter).alias(new_col_name)
+
+            cols = self.df.columns
+            cols_before = cols[: cidx + 1]
+            cols_after = cols[cidx + 1 :]
+            select_cols = cols_before + [new_col_name] + cols_after
+
+            self.df = self.df.lazy().with_columns(new_col).select(select_cols).collect()
+
+            if self.df_view is not None:
+                self.df_view = self.df_view.lazy().with_columns(new_col).select(select_cols).collect()
+
+            self.setup_table()
+            self.move_cursor(column=self.cursor_column + 1)
+
+            self.notify(
+                f"Split column [$success]{col_name}[/] into [$success]{new_col_name}[/] using delimiter [$accent]{delimiter}[/]",
+                title="Split Column",
+            )
+        except Exception as e:
+            if self.histories_undo:
+                self.histories_undo.pop()
+            self.notify(
+                f"Failed to split column [$error]{col_name}[/] with delimiter [$accent]{delimiter}[/]",
+                title="Split Column",
+                severity="error",
+            )
+            self.log(f"Error splitting column `{col_name}` with delimiter `{delimiter}`: {e}")
+
     def do_add_link_column(self) -> None:
         """Open AddLinkScreen to collect a link template and add a new link column."""
         self.app.push_screen(
@@ -3547,6 +3648,7 @@ class DataFrameTable(DataTable):
             f"Duplicated column [$success]{col_name}[/] as [$accent]{new_col_name}[/]", title="Duplicate Column"
         )
 
+    @with_full_df
     def do_uniq_rows(self) -> None:
         """Remove duplicate rows from the current dataframe, keeping the first occurrence."""
         subset = list(self.visible_columns.keys())
@@ -3801,6 +3903,51 @@ class DataFrameTable(DataTable):
                 severity="error",
             )
             self.log(f"Error casting column `{col_name}`: {e}")
+
+    def do_case_column(self, case: str) -> None:
+        """Convert string column(s) to uppercase or lowercase.
+
+        Applies the transformation to all selected string columns when a column
+        selection is active; otherwise applies to the current cursor column.
+
+        Args:
+            case: ``"upper"`` to convert to uppercase, ``"lower"`` to convert to lowercase.
+        """
+        label = "uppercase" if case == "upper" else "lowercase"
+
+        # Resolve target columns: selected string columns or current column.
+        target_cols = [
+            col for col, dtype in self.visible_columns.items() if col in self.selected_columns and dtype == pl.String
+        ]
+        if not target_cols:
+            col_name = self.cursor_col_name
+            if self.cursor_col_dtype != pl.String:
+                self.notify(
+                    f"Column [$warning]{col_name}[/] is not a string column",
+                    title=f"Convert to {label.capitalize()}",
+                    severity="warning",
+                )
+                return
+            target_cols = [col_name]
+
+        if len(target_cols) == 1:
+            descr = f"Convert column [$success]{target_cols[0]}[/] to {label}"
+        else:
+            descr = f"Convert [$accent]{len(target_cols)}[/] columns to {label}"
+
+        self.add_history(descr, dirty=True)
+
+        transforms = [
+            (pl.col(c).str.to_uppercase() if case == "upper" else pl.col(c).str.to_lowercase()).alias(c)
+            for c in target_cols
+        ]
+        self.df = self.df.with_columns(transforms)
+
+        if self.df_view is not None:
+            self.df_view = self.df_view.with_columns(transforms)
+
+        self.setup_table()
+        self.notify(descr, title=f"Convert to {label.capitalize()}")
 
     # Find & Replace
     @with_full_df

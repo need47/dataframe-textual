@@ -292,7 +292,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | -------- | ----------------------- |
 | `u`/`U`  | Undo last action        |
 | `R`      | Redo last undone action |
-| `Ctrl+U` | Reset to initial state  |
+| `gu`     | Reset to initial state  |
 
 #### Display
 
@@ -345,7 +345,10 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `zd`           | Delete current row and all those below                        |
 | `D`            | Duplicate current row                                         |
 | `zD`           | Duplicate current column                                      |
-| `Ctrl+Delete`  | Remove duplicate rows (keep first occurrence)                 |
+| `gU`           | Remove duplicate rows (keep first occurrence)                 |
+| `:`            | Split current string column into a new column by delimiter    |
+| `Ctrl+U`       | Convert current or selected string column(s) to uppercase     |
+| `Ctrl+L`       | Convert current or selected string column(s) to lowercase     |
 | `o`            | Explode current list column into multiple rows                |
 | `O`            | Explode current string column by delimiter into multiple rows |
 | `zT`           | Transpose table (swap rows and columns)                       |
@@ -459,7 +462,7 @@ These actions are the fastest way to get out of trouble after a mistaken edit, d
 
 - `u`/`U`: Undo the last action and restore the previous state.
 - `R`: Redo the last undone action.
-- `Ctrl+U`: Reset the table to its original loaded state if you want to start over.
+- `gu`: Reset the table to its original loaded state if you want to start over.
 
 ### 3. Modal Screen
 
@@ -728,7 +731,10 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 - `i`: Insert an index column after the current column.
 - `D`: Duplicate the current row.
 - `zD`: Duplicate the current column using a `_copy` suffix.
-- `Ctrl+Delete`: Remove duplicate rows while keeping the first occurrence, based on visible-column values.
+- `gU`: Remove duplicate rows while keeping the first occurrence, based on visible-column values.
+- `:`: Split the current string column into a new list column using a delimiter.
+- `Ctrl+U`: Convert the current column, or all selected columns that are string type, to uppercase.
+- `Ctrl+L`: Convert the current column, or all selected columns that are string type, to lowercase.
 
 ### 15. Column & Row Reordering
 

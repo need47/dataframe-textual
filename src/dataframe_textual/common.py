@@ -939,7 +939,7 @@ def load_file(
     if fmt:
         delimiter = SUPPORTED_FORMATS.get(fmt)
 
-    filename = f"stdin.{fmt}" if isinstance(source, StringIO) else source
+    filename = (f"stdin.{fmt}" if fmt else "stdin") if isinstance(source, StringIO) else source
     filepath = Path(filename)
 
     # check header

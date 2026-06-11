@@ -374,14 +374,21 @@ class ConfirmScreen(YesNoScreen):
         }
     """
 
-    def __init__(self, title: str, label=None, yes="Yes", maybe: str | None = None, no="No"):
+    def __init__(self, title: str, label=None, input=None, yes="Yes", maybe: str | None = None, no="No"):
         super().__init__(
             title=title,
             label=label,
+            input=input,
             yes=yes,
             maybe=maybe,
             no=no,
+            on_yes_callback=self._get_input,
         )
+
+    def _get_input(self):
+        """Get input value when Yes is pressed."""
+        # Do not strip to preserve spaces
+        return self.input.value if self.input else None
 
 
 class EditCellScreen(YesNoScreen):
