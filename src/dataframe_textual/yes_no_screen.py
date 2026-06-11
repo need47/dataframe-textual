@@ -388,7 +388,7 @@ class ConfirmScreen(YesNoScreen):
     def _get_input(self):
         """Get input value when Yes is pressed."""
         # Do not strip to preserve spaces
-        return self.input.value if self.input else None
+        return self.input.value if self.input else True
 
 
 class EditCellScreen(YesNoScreen):
