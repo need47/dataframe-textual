@@ -184,16 +184,20 @@ class DataFrameTable(DataTable):
         # 📊 DataFrame Viewer - Table Controls
 
         ## ⬆️ Navigation
-        - **↑↓←→** - 🎯 Move cursor (cell/row/column)
-        - **hjkl** - 🎯 Move cursor left/down/up/right (Vim-style)
         - **gg** - ⬆️ Go to first row
         - **G** - ⬇️ Go to last row
         - **Ctrl+G** - 🎯 Go to row
+        - **↑↓←→** - 🎯 Move cursor (cell/row/column)
+        - **hjkl** - 🎯 Move cursor left/down/up/right (Vim-style)
+        - **gh** - ⬅️ Scroll to leftmost column
+        - **gj** - ⬇️ Scroll to last row
+        - **gk** - ⬆️ Scroll to first row
+        - **gl** - ➡️ Scroll to rightmost column
         - **HOME/END** - 🎯 Go to first/last column
         - **Ctrl+HOME/END** - 🎯 Go to page top/bottom
+        - **PgUp/PgDn** - 📜 Page up/down
         - **Ctrl+F** - 📜 Page down
         - **Ctrl+B** - 📜 Page up
-        - **PgUp/PgDn** - 📜 Page up/down
 
         ## ♻️ Undo/Redo/Reset
         - **u/U** - ↩️ Undo last action
@@ -208,11 +212,12 @@ class DataFrameTable(DataTable):
         - **M** - 📊 Show histogram for current column with custom bins
         - **I** - 📈 Show statistics for current column
         - **gI** - 📊 Show statistics for entire dataframe
+        - **zC** - 🎯 Cycle cursor type (cell → row → column)
         - **=** - 📊 Show bar chart using first selected column as label and cursor column as value
         - **C** - 📋 Show column metadata (ID, name, type)
-        - **\\*** - 👁️ Hide selected columns or current column
-        - **\\g** - 👁️ Hide current column and those before
-        - **\\z** - 👁️ Hide current column and those after
+        - **\*** - 👁️ Hide selected columns or current column
+        - **g\*** - 👁️ Hide current column and those before
+        - **z\*** - 👁️ Hide current column and those after
         - **V** - 👀 Show all hidden columns
         - **_** (underscore) - 📏 Toggle column full width for current column
         - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
@@ -220,7 +225,6 @@ class DataFrameTable(DataTable):
         - **z~** - 🏷️ Toggle column index prefix
         - **g^** - 📌 Mark current row as header
         - **gT** - 🎨 Open theme selection
-        - **zT** - 🔃 Transpose table (swap rows/columns)
         - **z^** - 🆔 Toggle internal row index (RID)
         - **,** - 🔢 Toggle thousand separator for current column
         - **g,** - 🔢 Toggle thousand separator for all numeric columns
@@ -247,6 +251,7 @@ class DataFrameTable(DataTable):
         - **D** - 📋 Duplicate current row
         - **zD** - 📋 Duplicate current column
         - **Ctrl+Delete** - 🧹 Remove duplicate rows (keep first occurrence)
+        - **zT** - 🔃 Transpose table (swap rows/columns)
         - **o** - 💥 Explode current list column into rows
         - **O** - 💥 Explode current string column by delimiter into rows
 
@@ -337,7 +342,7 @@ class DataFrameTable(DataTable):
         ("ctrl+c", "copy_column", "Copy column to clipboard"),
         ("ctrl+r", "copy_row", "Copy row to clipboard"),
         # Column Metadata, Row Detail, Frequency, and Statistics
-        ("C", "metadata_column", "Show metadata for current column"),
+        ("C", "metadata_column", "Show metadata for all columns"),
         ("enter", "view_row_detail", "View row details"),
         ("tab", "view_cell_detail", "View cell details"),
         ("F", "show_frequency", "Show frequency for current column"),
@@ -349,7 +354,7 @@ class DataFrameTable(DataTable):
         ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
         # Filter & Collect
-        ("v", "filter_rows", "Filter rows with cursor value or expression"),
+        ("v", "filter_rows", "Filter rows"),
         ("full_stop", "filter_rows_non_null", "Filter rows with non-null values in current column"),
         ("f", "filter_rows_value", "Filter rows by value"),  # `f`
         ("quotation_mark", "collect_rows_columns", "Collect rows/columns to a new tab"),  # `"`

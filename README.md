@@ -276,6 +276,10 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `Ctrl+G`                 | Go to specific row                  |
 | `←` / `↓` / `↑` / `→`    | Move left/down/up/right             |
 | `h` / `j` / `k` / `l`    | Move left/down/up/right (Vim-style) |
+| `gh`                     | Scroll to leftmost column           |
+| `gj`                     | Scroll to last row                  |
+| `gk`                     | Scroll to first row                 |
+| `gl`                     | Scroll to rightmost column          |
 | `Home` / `End`           | Go to first/last column             |
 | `Ctrl+Home` / `Ctrl+End` | Go to page top/bottom               |
 | `PageDown` / `PageUp`    | Scroll down/up one page             |
@@ -308,6 +312,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `z*`              | Hide current column and all columns after it                                   |
 | `V`               | Show all hidden columns                                                        |
 | `z~`              | Toggle 1-based column index prefixes                                           |
+| `z^`              | Toggle internal row index (RID) column display                                 |
 | `_` (underscore)  | Toggle column full width for current column                                    |
 | `g_` (underscore) | Toggle column full width for all string/list columns                           |
 | `+`               | Toggle freeze rows and/or columns                                              |
@@ -520,7 +525,7 @@ Individual modals may add extra keys on top of these (documented in each subsect
 
 ### 4. Sheets Overview
 
-Press `S` to open the **Sheets** modal — a summary view of all currently opened tabs.
+Press `S` to open a modal providing a summary view of all currently opened tabs.
 
 The modal displays a table with the following columns:
 
@@ -557,7 +562,22 @@ Press `C` to open a modal displaying details for all columns:
 - Press `e` to rename the selected column
 - Press `d` to delete the selected column from the main table
 
-### 6. Row Detail View
+### 6. Column Statistics
+
+Show summary statistics such as count, null count, mean, median, standard deviation, min, max, and etc.
+
+- `I` shows statistics for the current column
+- `gI` shows statistics for all columns in the dataframe
+
+This is useful for:
+
+- Understanding data distributions and overall column behavior
+- Identifying outliers and anomalies
+- Checking data quality quickly
+- Reviewing summary statistics without leaving the TUI
+- Comparing columns at a glance
+
+### 7. Row Detail View
 
 Press `Enter` on any row to open a modal showing all column values for that row.
 Useful for examining wide table where columns don't fit well on screen.
@@ -574,9 +594,9 @@ Useful for examining wide table where columns don't fit well on screen.
 - Press `I` to show the statistics table for the selected column
 - Press `Tab` to open a cell-detail modal for the selected field
 
-### 7. Cell Detail View
+### 8. Cell Detail View
 
-Press `Tab` in the main table to inspect the current cell in its own modal.
+Press `Tab` in the main table to inspect the current cell in its own modal for complex data or long text
 
 You can also press `Tab` from the Row Detail modal to drill into the selected field.
 
@@ -587,7 +607,7 @@ Inside the cell-detail modal, press `Tab` again on the selected row/column to ke
 - List-like values are expanded into a one-column table
 - Dict-like values are shown as key/value columns
 
-### 8. Frequency Distribution
+### 9. Frequency Distribution
 
 Press `F` to see value distributions for the current column. If multiple columns are selected, it shows frequency of value combinations across those selected columns.
 
@@ -605,21 +625,6 @@ This is useful for:
 - Quickly filtering to specific values
 - Identifying rare or common values
 - Finding the most/least frequent entries
-
-### 9. Column Statistics
-
-Show summary statistics such as count, null count, mean, median, standard deviation, min, max, and etc.
-
-- `I` shows statistics for the current column
-- `gI` shows statistics for all columns in the dataframe
-
-This is useful for:
-
-- Understanding data distributions and overall column behavior
-- Identifying outliers and anomalies
-- Checking data quality quickly
-- Reviewing summary statistics without leaving the TUI
-- Comparing columns at a glance
 
 ### 10. Row/Column Selection
 
@@ -812,7 +817,6 @@ For **Basic Filter** (`v`) and **Collect** (`"`), rows are chosen in this order:
 - Removes duplicated rows while keeping the first occurrence
 - Compares row values across the visible columns
 - Useful for quick deduplication before further editing, collecting, or exporting
-- Supports undo with `u`
 
 ### 15. Column & Row Reordering
 
