@@ -307,10 +307,10 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `m`               | Show histogram for current column                                              |
 | `M`               | Show histogram for current column with custom bins                             |
 | `=`               | Show bar chart using first selected column as label and cursor column as value |
-| `*`               | Hide selected columns or current column                                        |
-| `g*`              | Hide current column and all columns before it                                  |
-| `z*`              | Hide current column and all columns after it                                   |
-| `V`               | Show all hidden columns                                                        |
+| `-` (minus)       | Hide selected columns or current column                                        |
+| `g-` (minus)      | Hide current column and all columns before it                                  |
+| `z-` (minus)      | Hide current column and all columns after it                                   |
+| `gv`              | Show all hidden columns                                                        |
 | `z~`              | Toggle 1-based column index prefixes                                           |
 | `z^`              | Toggle internal row index (RID) column display                                 |
 | `_` (underscore)  | Toggle column full width for current column                                    |
@@ -337,9 +337,9 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `i`            | Add index column after current                                |
 | `za`           | Add a link column from URL template                           |
 | `^`            | Rename current column                                         |
-| `-` (minus)    | Delete selected columns or current column                     |
-| `g-` (minus)   | Delete current column and all columns before it               |
-| `z-` (minus)   | Delete current column and all columns after it                |
+| `*`            | Delete selected columns or current column                     |
+| `g*`           | Delete current column and all columns before it               |
+| `z*`           | Delete current column and all columns after it                |
 | `d`            | Delete current row                                            |
 | `gd`           | Delete current row and all those above                        |
 | `zd`           | Delete current row and all those below                        |
@@ -381,7 +381,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | Key                | Action                                                 |
 | ------------------ | ------------------------------------------------------ |
 | `v`                | Filter rows with cursor value in the current column    |
-| `gv`               | Filter rows with specified value or expression         |
+| `V`                | Filter rows with specified value or expression         |
 | `.`                | Filter rows with non-null values in the current column |
 | `f`                | Filter rows using values in the current column         |
 | `"` (double quote) | Collect rows/columns to a new tab                      |
@@ -443,10 +443,10 @@ Columns are automatically styled based on their data types (auto-inferred):
 
 These controls change how the table is shown without changing the underlying data.
 
-- `*`: Hide selected columns, or the current column if nothing is selected.
-- `g*`: Hide the current column and all columns before it.
-- `z*`: Hide the current column and all columns after it.
-- `V`: Show all hidden columns.
+- `-`: Hide selected columns, or the current column if nothing is selected.
+- `g-`: Hide the current column and all columns before it.
+- `z-`: Hide the current column and all columns after it.
+- `gv`: Show all hidden columns.
 - `+`: Freeze rows and/or columns to keep important areas visible while scrolling.
 - `z~`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
 - `,`: Toggle the thousand separator for the current numeric column.
@@ -678,7 +678,7 @@ Both actions work on a subset of the original dataframe, but they serve differen
 - Press `Ctrl+V` to save the current view to a file
 - Press `q` to leave the filtered view and return to the main table
 
-**Advanced Filter** (`gv`):
+**Advanced Filter** (`V`):
 
 - Opens a dialog for value-based or expression-based filtering
 - Useful when you want to define the subset directly
@@ -720,9 +720,9 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 - `d`: Delete the selected rows, or the current row if nothing is selected.
 - `gd`: Delete the current row and all rows above it.
 - `zd`: Delete the current row and all rows below it.
-- `-`: Delete selected columns, or the current column if nothing is selected.
-- `g-`: Delete the current column and all columns to its left.
-- `z-`: Delete the current column and all columns to its right.
+- `*`: Delete selected columns, or the current column if nothing is selected.
+- `g*`: Delete the current column and all columns to its left.
+- `z*`: Delete the current column and all columns to its right.
 - `a`: Add an empty column after the current column.
 - `A`: Add a column after the current column using a constant or a Polars expression such as `$age * 2`.
 - `i`: Insert an index column after the current column.

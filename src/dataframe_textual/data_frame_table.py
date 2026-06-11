@@ -215,10 +215,10 @@ class DataFrameTable(DataTable):
         - **zC** - 🎯 Cycle cursor type (cell → row → column)
         - **=** - 📊 Show bar chart using first selected column as label and cursor column as value
         - **C** - 📋 Show column metadata (ID, name, type)
-        - **\\*** - 👁️ Hide selected columns or current column
-        - **g\\*** - 👁️ Hide current column and those before
-        - **z\\*** - 👁️ Hide current column and those after
-        - **V** - 👀 Show all hidden columns
+        - **-** (minus) - 👁️ Hide selected columns or current column
+        - **g-** (minus) - 👁️ Hide current column and those before
+        - **z-** (minus) - 👁️ Hide current column and those after
+        - **gv** - 👀 Show all hidden columns
         - **_** (underscore) - 📏 Toggle column full width for current column
         - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
         - **+** - 📌 Freeze rows and/or columns
@@ -245,9 +245,9 @@ class DataFrameTable(DataTable):
         - **zd** - ✖️ Delete row and those below
         - **Delete** - ✖️ Clear current cell (set to NULL)
         - **Shift+Delete** - ✖️ Clear current column (set matching cells to NULL)
-        - **-** (minus) - ✖️ Delete selected columns or current column
-        - **g-** (minus) - ✖️ Delete column and those before current column
-        - **z-** (minus) - ✖️ Delete column and those after current column
+        - **\\*** - ✖️ Delete selected columns or current column
+        - **g\\*** - ✖️ Delete column and those before current column
+        - **z\\*** - ✖️ Delete column and those after current column
         - **D** - 📋 Duplicate current row
         - **zD** - 📋 Duplicate current column
         - **Ctrl+Delete** - 🧹 Remove duplicate rows (keep first occurrence)
@@ -279,7 +279,7 @@ class DataFrameTable(DataTable):
 
         ## ⏬ Filter & Collect
         - **v** - ⏬ Filter rows with cursor value in current column
-        - **gv** - ⏬ Filter rows with expression
+        - **V** - ⏬ Filter rows with expression
         - **.** - ⏬ Filter rows with non-null values in current column
         - **f** - ⏬ Filter rows by column value
         - **"** (double quote) - 📤 Collect rows to a new tab
@@ -330,8 +330,7 @@ class DataFrameTable(DataTable):
         ("ctrl+u", "reset", "Reset to initial state"),
         # Display
         ("underscore", "expand_column", "Toggle column full width"),  # `_`
-        ("asterisk", "hide_column", "Hide selected columns or current column"),  # `*`
-        ("V", "show_hidden_columns", "Show all hidden columns"),  # `V`
+        ("minus", "hide_column", "Hide selected columns or current column"),  # `-`
         ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
         ("comma", "toggle_thousand_separator", "Toggle thousand separator for column"),  # `,`
         ("left_parenthesis", "adjust_float_precision(-1)", "Decrease float precision for column"),  # `(`
@@ -355,6 +354,7 @@ class DataFrameTable(DataTable):
         ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
         # Filter & Collect
         ("v", "filter_rows", "Filter rows"),
+        ("V", "filter_rows_expr", "Filter rows with specified value or expression"),  # `V`
         ("full_stop", "filter_rows_non_null", "Filter rows with non-null values in current column"),
         ("f", "filter_rows_value", "Filter rows by value"),  # `f`
         ("quotation_mark", "collect_rows_columns", "Collect rows/columns to a new tab"),  # `"`
@@ -376,7 +376,7 @@ class DataFrameTable(DataTable):
         # Delete
         ("delete", "clear_cell", "Clear cell"),
         ("shift+delete", "clear_column", "Clear cells in current column that match cursor value"),  # `Shift+Delete`
-        ("minus", "delete_column", "Delete selected columns or current column"),  # `-`
+        ("asterisk", "delete_column", "Delete selected columns or current column"),  # `*`
         ("d", "delete_row", "Delete row"),
         # Duplicate
         ("D", "duplicate_row_column", "Duplicate row or column"),
@@ -920,12 +920,13 @@ class DataFrameTable(DataTable):
         Handles two-key leader sequences and scroll-triggered row loading:
 
         Leader ``g`` sequences:
+          - ``gv``: Show all hidden columns.
+          - ``gT``: Open theme selection.
+          - ``g^``: Mark current row as header.
           - ``gh``: Scroll to leftmost column.
           - ``gj``: Scroll to last row (bottom).
           - ``gk``: Scroll to first row (top).
           - ``gl``: Scroll to rightmost column.
-          - ``g^``: Mark current row as header.
-          - ``gT``: Open theme selection.
 
         Leader ``z`` sequences:
           - ``zC``: Cycle cursor type.
@@ -942,38 +943,26 @@ class DataFrameTable(DataTable):
         Args:
             event: The key event object.
         """
-        # Toggle internal row index column (RID)
-        if self.leader_key == "z":
-            if event.key == "circumflex_accent":  # `z^`:
+        # Handle leader key sequences for `g`
+        if self.leader_key == "g":
+            if event.key == "v":  # `gv`:
                 event.stop()
                 event.prevent_default()
                 self.stop_timer()
-                self.do_toggle_rid()
+                self.do_show_hidden_columns()
                 return
-            elif event.key == "tilde":  # `z~`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_toggle_column_index()
-                return
-            elif event.key == "T":  # `zT`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_transpose()
-                return
-            elif event.key == "C":  # `zC`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_cycle_cursor_type()
-                return
-        elif self.leader_key == "g":
-            if event.key == "T":  # `gT`:
+            elif event.key == "T":  # `gT`:
                 event.stop()
                 event.prevent_default()
                 self.stop_timer()
                 self.app.select_theme()
+                return
+            # Set current row as header
+            elif event.key == "circumflex_accent":  # `g^`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_set_cursor_row_as_header()
                 return
             # Go to leftmost column
             elif event.key == "h":  # `gh`:
@@ -1011,11 +1000,33 @@ class DataFrameTable(DataTable):
                 self.leader_key = ""
                 self.notify("Scrolled to [$success]end[/]", title="Scroll")
                 return
-            elif event.key == "circumflex_accent":  # `g^`:
+
+        # Handle leader key sequences for `z`
+        elif self.leader_key == "z":
+            # Toggle internal row index column (RID)
+            if event.key == "circumflex_accent":  # `z^`:
                 event.stop()
                 event.prevent_default()
                 self.stop_timer()
-                self.do_set_cursor_row_as_header()
+                self.do_toggle_rid()
+                return
+            elif event.key == "tilde":  # `z~`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_toggle_column_index()
+                return
+            elif event.key == "T":  # `zT`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_transpose()
+                return
+            elif event.key == "C":  # `zC`:
+                event.stop()
+                event.prevent_default()
+                self.stop_timer()
+                self.do_cycle_cursor_type()
                 return
 
         if event.key == "up":
@@ -1153,10 +1164,12 @@ class DataFrameTable(DataTable):
     @with_leader_key
     def action_filter_rows(self, result: dict | None = None) -> None:
         """Filter rows by value or expression"""
-        if self.leader_key == "g":
-            self.do_filter_rows_expr(result=result)
-        else:
-            self.do_filter_rows(result)
+        self.do_filter_rows(result)
+
+    @with_full_df
+    def action_filter_rows_expr(self) -> None:
+        """Filter rows by value or expression."""
+        self.do_filter_rows_expr()
 
     @with_full_df
     def action_filter_rows_non_null(self) -> None:
@@ -2429,7 +2442,7 @@ class DataFrameTable(DataTable):
         if self.columns and self.cursor_column >= len(self.columns):
             self.move_cursor(column=len(self.columns) - 1)
 
-        self.notify(f"{descr}. Press [$accent]H[/] to show hidden columns", title="Hide Column")
+        self.notify(f"{descr}. Press [$success]g[/][$accent]v[/] to show hidden columns", title="Hide Column")
 
     def _expand_single_column(self, col_name: str) -> str | None:
         """Expand or unexpand a single column. Returns a status message fragment, or None on failure."""
@@ -2528,7 +2541,7 @@ class DataFrameTable(DataTable):
         self.setup_table()
 
         self.notify(
-            f"{'Showing' if self.show_rid else 'Hiding'} internal RID column. Press [$success]g[/][$accent]^[/] to toggle.",
+            f"{'Showing' if self.show_rid else 'Hiding'} internal RID column. Press [$success]z[/][$accent]^[/] to toggle.",
             title="Toggle RID",
         )
 
