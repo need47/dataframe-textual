@@ -215,9 +215,9 @@ class DataFrameTable(DataTable):
         - **zC** - 🎯 Cycle cursor type (cell → row → column)
         - **=** - 📊 Show bar chart using first selected column as label and cursor column as value
         - **C** - 📋 Show column metadata (ID, name, type)
-        - **\*** - 👁️ Hide selected columns or current column
-        - **g\*** - 👁️ Hide current column and those before
-        - **z\*** - 👁️ Hide current column and those after
+        - **\\*** - 👁️ Hide selected columns or current column
+        - **g\\*** - 👁️ Hide current column and those before
+        - **z\\*** - 👁️ Hide current column and those after
         - **V** - 👀 Show all hidden columns
         - **_** (underscore) - 📏 Toggle column full width for current column
         - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
