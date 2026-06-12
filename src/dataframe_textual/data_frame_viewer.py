@@ -2,7 +2,6 @@
 
 from functools import partial
 from pathlib import Path
-from textwrap import dedent
 from typing import Any
 
 import polars as pl
@@ -15,6 +14,7 @@ from textual.widgets.tabbed_content import ContentTab, ContentTabs
 
 from dataframe_textual.theme_screen import ThemeScreen
 
+from .commands import Scope
 from .common import (
     RID,
     SUPPORTED_FORMATS,
@@ -23,12 +23,12 @@ from .common import (
     guess_file_format,
     load_file,
     validate_expr,
-    with_leader_key,
 )
 from .console_panel import ConsolePanel
 from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
 from .file_picker_screen import OpenFileScreen, SaveFileScreen
+from .keybindings import KeyBindingConflict, key_registry
 from .status_bar import StatusBar
 from .table_screen import SheetScreen
 from .yes_no_screen import ConfirmScreen, NewTabScreen, RenameTabScreen
@@ -37,60 +37,10 @@ from .yes_no_screen import ConfirmScreen, NewTabScreen, RenameTabScreen
 class DataFrameViewer(App):
     """A Textual app to interact with multiple Polars DataFrames via tabbed interface."""
 
-    HELP = dedent("""
-        # 📊 DataFrame Viewer - App Controls
-
-        ## ⚙️ File & Tab Management
-        - **q** - 🚪 Quit tab (prompts to save unsaved changes) or view
-        - **gq** - 🚪 Quit all tabs (prompts to save unsaved changes)
-        - **Ctrl+Q** - ⚠️ Force to quit app (discards unsaved changes)
-        - **gB** - 👁️ Toggle tab bar visibility
-        - **B** - ⏮️ Previous Tab
-        - **b** - ⏭️ Next Tab
-        - **gb** - ◀️ Move current tab left (wrap to last)
-        - **zb** - ▶️ Move current tab right (wrap to first)
-        - **Ctrl+T** - 💾 Save current tab (or current view) to file
-        - **Ctrl+S** - 💾 Save all tabs to file
-        - **w** - 💾 Save current tab to file (overwrite without prompt)
-        - **gw** - 💾 Save all tabs to file (overwrite without prompt)
-        - **Ctrl+D** - 📋 Duplicate current tab
-        - **Ctrl+O** - 📁 Open a file
-        - **Ctrl+N** - 📋 Create new tab from Polars expression
-        - **Double-click** - ✏️ Rename tab
-
-        ## 🎨 View & Settings
-        - **S** - 📋 Show all open sheets/tabs
-        - **F1** - ❓ Toggle this help panel
-        - **` (backtick)** - 🐍 Toggle Python console
-        - **gT** - 🎨 Select theme
-        - **Ctrl+P -> Screenshot** - 📸 Capture terminal view as a SVG image
-
-        ## ⭐ Features
-        - **Multi-file support** - 📂 Open multiple CSV/Excel files as tabs
-        - **Lazy loading** - ⚡ Large files load on demand
-        - **Sticky tabs** - 📌 Tab bar stays visible when scrolling
-        - **Unsaved changes** - 🔴 Tabs with unsaved changes have a bright bottom border
-        - **Rich formatting** - 🎨 Color-coded data types
-        - **Search & filter** - 🔍 Find and filter data quickly
-        - **Sort & reorder** - ⬆️ Multi-column sort, reorder rows/columns
-        - **Undo/Redo/Reset** - 🔄 Full history of operations
-        - **Freeze rows/cols** - 🔒 Pin header rows and columns
-    """).strip()
-
-    BINDINGS = [
-        ("q", "close", "Quit tab or view"),
-        ("b", "next_or_move_tab(1)", "Next Tab"),
-        ("B", "next_or_move_tab(-1)", "Previous Tab"),
-        ("f1", "toggle_help_panel", "Help"),
-        ("ctrl+o", "open_file", "Open File"),
-        ("ctrl+t", "save_current_tab", "Save Current Tab"),
-        ("ctrl+s", "save_all_tabs", "Save All Tabs"),
-        ("ctrl+n", "new_tab", "New Tab"),
-        ("w", "save_tab_overwrite", "Save Tab (overwrite)"),
-        ("ctrl+d", "duplicate_tab", "Duplicate Tab"),
-        ("grave_accent", "toggle_python_console", "Python Console"),  # '`'
-        ("S", "show_sheets", "Show Sheets"),
-    ]
+    @property
+    def HELP(self) -> str:
+        """Generate dynamic help text from the key binding registry."""
+        return key_registry.generate_help_text(Scope.APP)
 
     CSS = """
         TabbedContent > ContentTabs {
@@ -154,50 +104,50 @@ class DataFrameViewer(App):
         self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel: DataFrameHelpPanel | None = None
 
+        # Key binding registry
+        self.key_registry = key_registry
+
         # Global leader mode state
         self.leader_key = ""
         self.timeout_timer: Timer | None = None
 
     def on_key(self, event: Key) -> None:
-        """Handle leader-mode activation and timeout at the app level.
+        """Handle leader-mode activation and app-scope command dispatch.
 
         Intercepts ``g`` and ``z`` keystrokes to enter leader mode, which allows
-        two-key sequences (e.g., ``gq``, ``gw``, ``z^``) to be dispatched to the
-        active widget's ``on_key`` handler.
+        two-key sequences (e.g., ``gq``, ``gw``, ``z^``) to be dispatched.
 
-        Behaviour:
-          - ``g`` or ``z``: Activate leader mode, start a 3-second timeout timer,
-            and set ``self.leader_key`` to the pressed key.
-          - While in leader mode:
-            - ``Escape``: Cancel leader mode immediately.
-            - Any other key: Stop the timer and let the event propagate to the
-              focused widget (``DataFrameTable.on_key``) for dispatch.
-          - If the timer expires before a second key is pressed,
-            ``cancel_leader_key()`` is called automatically.
+        After leader logic, attempts to dispatch app-scope bindings via the registry.
 
         Args:
             event: The key event object.
         """
-        # Already in leader mode, stop the timer and let action through
+        # Already in leader mode
         if self.leader_key:
-            # User pressed escape, cancel leader mode
             if event.key == "escape":
                 event.stop()
                 self.cancel_leader_key()
                 return
-            # User pressed a non-escape key, reset the timer and let action through
             elif self.timeout_timer:
                 self.timeout_timer.stop()
                 self.timeout_timer = None
                 self.notify(f"[$success]{self.leader_key}[/]+[$accent]{event.key}[/] were pressed", title="Leader Mode")
 
-            # Let the event through and continue to the binding phase
+            # Try dispatching as an app-scope command
+            leader = self.leader_key
+            self.leader_key = ""
+            if key_registry.dispatch(event.key, leader=leader, scope=Scope.APP, target=self):
+                event.stop()
+                event.prevent_default()
+                return
+            # Not an app command — restore leader for widget dispatch
+            self.leader_key = leader
             return
 
         # Enter leader mode on `g` or `z` key
         if event.key in ("g", "z"):
             event.stop()
-            event.prevent_default()  # Required because of the default action of the `g` key that goes to the top
+            event.prevent_default()
 
             self.leader_key = event.key
             self.notify(
@@ -205,6 +155,12 @@ class DataFrameViewer(App):
                 title="Leader Mode",
             )
             self.timeout_timer = self.set_timer(3, callback=self.cancel_leader_key)
+            return
+
+        # Non-leader single keys: try app-scope dispatch
+        if key_registry.dispatch(event.key, leader="", scope=Scope.APP, target=self):
+            event.stop()
+            event.prevent_default()
 
     def cancel_leader_key(self) -> None:
         """Cancel leader mode and reset the timeout timer."""
@@ -408,11 +364,42 @@ class DataFrameViewer(App):
         #         markup=markup,
         #     )
 
-    def action_show_sheets(self) -> None:
+    def cmd_show_sheets(self) -> None:
         """Show a modal with information about all currently opened tables."""
         self.push_screen(SheetScreen(self.tabs))
 
-    def action_toggle_help_panel(self) -> None:
+    def cmd_show_commands(self) -> None:
+        """Show all commands and key bindings in a new tab."""
+        from .commands import Category
+        from .keybindings import Command, KeyBinding
+
+        all_items = self.key_registry.get_all_with_commands()
+
+        by_category: dict[Category, list[tuple[KeyBinding, Command]]] = {}
+        for binding, cmd in all_items:
+            by_category.setdefault(cmd.category, []).append((binding, cmd))
+
+        rows: list[dict[str, str]] = []
+        for category in Category:
+            items = by_category.get(category)
+            if not items:
+                continue
+            for binding, cmd in items:
+                rows.append(
+                    {
+                        "Key": binding.display_key,
+                        "Leader": binding.leader if binding.leader else "",
+                        "Command": cmd.cmd,
+                        "Description": f"{cmd.emoji} {cmd.description}" if cmd.emoji else cmd.description,
+                        "Scope": binding.scope.value,
+                        "Category": cmd.category.value,
+                    }
+                )
+
+        df = pl.DataFrame(rows)
+        self.add_tab(df, filename="commands.csv", tabname="commands", after=self.tabbed.active_pane)
+
+    def cmd_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.
 
         Shows or hides the context-sensitive help panel. Creates it on first use.
@@ -423,7 +410,7 @@ class DataFrameViewer(App):
             self.help_panel = DataFrameHelpPanel()
             self.mount(self.help_panel)
 
-    def action_open_file(self) -> None:
+    def cmd_open_file(self) -> None:
         """Open file browser to load a file in a new tab.
 
         Displays the file open dialog for the user to select a file to load
@@ -431,19 +418,23 @@ class DataFrameViewer(App):
         """
         self.push_screen(OpenFileScreen(), self.do_open_file)
 
-    @with_leader_key
-    def action_close(self) -> None:
+    def cmd_close(self) -> None:
         """Close current tab or view.
 
         Checks for unsaved changes and prompts the user to save if needed.
         If this is the last tab, exits the app.
         """
-        if self.leader_key == "g":
-            self.do_close_all()
-        else:
-            self.do_close()
+        self.do_close()
 
-    def action_save_current_tab(self) -> None:
+    def cmd_close_all(self) -> None:
+        """Close all tabs."""
+        self.do_close_all()
+
+    def cmd_force_quit(self) -> None:
+        """Force quit the app, discarding unsaved changes."""
+        self.exit()
+
+    def cmd_save_current_tab(self) -> None:
         """Open a save dialog for the active tab or active view.
 
         When currently in a derived view, this action saves that view.
@@ -455,20 +446,17 @@ class DataFrameViewer(App):
             else:
                 self.do_save_to_file(all_tabs=False)
 
-    def action_save_all_tabs(self) -> None:
+    def cmd_save_all_tabs(self) -> None:
         """Open a save dialog to save all tabs to file."""
         self.do_save_to_file(all_tabs=True)
 
-    def action_save_tab_overwrite(self) -> None:
-        """Save current tab or all tabs to file, overwriting without prompt.
+    def cmd_save_tab_overwrite(self) -> None:
+        """Save current tab to file, overwriting without prompt."""
+        self._save_current_tab_overwrite()
 
-        With leader key ``g`` active (``gw``): saves all tabs.
-        Otherwise (``w``): saves the current tab only.
-        """
-        if self.leader_key == "g":
-            self._save_all_tabs_overwrite()
-        else:
-            self._save_current_tab_overwrite()
+    def cmd_save_all_tabs_overwrite(self) -> None:
+        """Save all tabs to file, overwriting without prompt."""
+        self._save_all_tabs_overwrite()
 
     def _save_current_tab_overwrite(self) -> None:
         """Save current tab to file, overwrite if exists."""
@@ -503,7 +491,7 @@ class DataFrameViewer(App):
             filename = Path(filename).resolve()
             self.save_to_file(filename, all_tabs=True, overwrite_prompt=False)
 
-    def action_duplicate_tab(self) -> None:
+    def cmd_duplicate_tab(self) -> None:
         """Duplicate the currently active tab.
 
         Creates a copy of the current tab with the same data and filename.
@@ -511,7 +499,7 @@ class DataFrameViewer(App):
         """
         self.do_duplicate_tab()
 
-    def action_new_tab(self) -> None:
+    def cmd_new_tab(self) -> None:
         """Open screen to create a new tab from a Polars expression.
 
         Opens NewTabScreen to allow the user to input a Polars expression.
@@ -565,12 +553,11 @@ class DataFrameViewer(App):
         except Exception as e:
             self.notify(f"Failed to evaluate expression [$error]{result}[/]: {e}", title="New Tab", severity="error")
 
-    @with_leader_key
-    def select_theme(self) -> None:
+    def cmd_select_theme(self) -> None:
         """Open the theme selection screen."""
         self.push_screen(ThemeScreen())
 
-    def action_toggle_python_console(self) -> None:
+    def cmd_toggle_python_console(self) -> None:
         """Toggle the embedded Python console for the current tab."""
         if not self.console_panel:
             return
@@ -587,6 +574,37 @@ class DataFrameViewer(App):
 
         self.console_panel.display = True
         self.console_panel.focus_input()
+
+    def bind_key(
+        self, key: str, command_id: str, leader: str = "", scope: str = "MainTable", force: bool = False
+    ) -> None:
+        """Bind a key to a command, with conflict notification.
+
+        Convenience wrapper for use in the Python console.
+
+        Args:
+            key: The Textual key name (e.g. "q", "ctrl+g", "slash").
+            command_id: The command ID to bind to.
+            leader: Optional leader key prefix ("g" or "z").
+            scope: "App" or "MainTable".
+            force: If True, replace existing binding silently.
+        """
+        from .commands import Scope
+
+        scope_enum = Scope(scope)
+        try:
+            old = self.key_registry.bind(key, command_id, leader=leader, scope=scope_enum, force=force)
+        except KeyBindingConflict as e:
+            self.notify(str(e), title="Key Conflict", severity="error", timeout=5)
+            return
+        except ValueError as e:
+            self.notify(str(e), title="Bind Error", severity="error", timeout=5)
+            return
+
+        if old:
+            self.notify(f"Replaced '{old.command_id}' with '{command_id}'", title="Key Rebound")
+        else:
+            self.notify(f"Bound {leader}{key} → {command_id}", title="Key Bound")
 
     def _get_console_context(self) -> dict[str, Any]:
         """Build the execution context for the Python console.
@@ -631,28 +649,23 @@ class DataFrameViewer(App):
 
         self.notify("Updated table from console", title="Python Console")
 
-    @with_leader_key
-    def action_next_or_move_tab(self, offset: int = 1) -> None:
-        """Switch tabs, or move the current tab with leader shortcuts.
+    def cmd_next_tab(self) -> None:
+        """Switch to the next tab."""
+        self.do_next_tab(1)
 
-        - Normal mode: cycles through tabs by ``offset``.
-        - ``gB``: toggles tab bar visibility.
-        - ``gb``: moves current tab left.
-        - ``zb``: moves current tab right.
+    def cmd_prev_tab(self) -> None:
+        """Switch to the previous tab."""
+        self.do_next_tab(-1)
 
-        Args:
-            offset: Direction/step (+1 for right/next, -1 for left/previous). Defaults to 1.
-        """
-        if offset == -1 and self.leader_key == "g":
-            self.action_toggle_tab_bar()
-        elif offset == 1 and self.leader_key == "g":
-            self.do_move_tab(-1)
-        elif offset == 1 and self.leader_key == "z":
-            self.do_move_tab(1)
-        else:
-            self.do_next_tab(offset)
+    def cmd_move_tab_left(self) -> None:
+        """Move current tab to the left."""
+        self.do_move_tab(-1)
 
-    def action_toggle_tab_bar(self) -> None:
+    def cmd_move_tab_right(self) -> None:
+        """Move current tab to the right."""
+        self.do_move_tab(1)
+
+    def cmd_toggle_tab_bar(self) -> None:
         """Toggle the tab bar visibility.
 
         Shows or hides the tab bar at the bottom of the window. Useful for maximizing
@@ -1202,7 +1215,7 @@ class DataFrameViewer(App):
 
                 if hasattr(self, "_task_after_save"):
                     if self._task_after_save == "close_tab":
-                        self.do_close_tab()
+                        self.close_tab()
                     elif self._task_after_save == "quit_app":
                         self.exit()
 

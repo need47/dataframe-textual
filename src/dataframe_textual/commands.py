@@ -1,0 +1,312 @@
+"""Command registry for all available actions in the application.
+
+Each command has:
+- A unique ID (used as a stable reference for key bindings and dispatch).
+- A human-readable description (shown in help and commands sheet).
+- A ``cmd`` method name (the ``cmd_*`` method to call on the dispatch target).
+- One or more scopes where it is available.
+- A category for grouping in help and commands sheets.
+
+The ``cmd`` field is the method name (e.g. ``"cmd_close"``) that will be called
+on the appropriate widget/app when dispatched via the key binding registry.
+All dispatchable methods use the ``cmd_`` prefix so they are easily identifiable
+and can be introspected for dynamic registration.
+"""
+
+from dataclasses import dataclass
+from enum import Enum
+
+
+class Scope(str, Enum):
+    """Scopes where commands can be active."""
+
+    APP = "App"
+    MAIN_TABLE = "MainTable"
+    FREQUENCY_SCREEN = "FrequencyScreen"
+    ROW_DETAIL_SCREEN = "RowDetailScreen"
+    META_COLUMN_SCREEN = "MetaColumnScreen"
+    CELL_DETAIL_SCREEN = "CellDetailScreen"
+    TABLE_SCREEN = "TableScreen"
+    SHEET_SCREEN = "SheetScreen"
+
+
+class Category(str, Enum):
+    """Categories for grouping commands in help and commands sheet."""
+
+    FILE_TAB = "File & Tab Management"
+    NAVIGATION = "Navigation"
+    UNDO_REDO = "Undo/Redo/Reset"
+    DISPLAY = "Display"
+    EDITING = "Editing"
+    SELECTION = "Row/Column Selection"
+    FIND_REPLACE = "Find & Replace"
+    FILTER_COLLECT = "Filter & Collect"
+    SORTING = "Sorting"
+    REORDER = "Reorder"
+    TYPE_CASTING = "Type Casting"
+    COPY = "Copy"
+    SQL = "SQL Interface"
+    VIEW_SETTINGS = "View & Settings"
+
+
+@dataclass(frozen=True)
+class Command:
+    """A registered command in the application.
+
+    Attributes:
+        cmd: Unique command identifier using hyphens (e.g., ``"toggle-rid"``).
+            The corresponding ``cmd_*`` method name is derived automatically.
+        description: Human-readable description of what the command does.
+        scopes: Set of scopes where this command is available.
+        category: Category for grouping in help displays.
+        emoji: Optional emoji icon for display in help text.
+    """
+
+    cmd: str
+    description: str
+    scopes: frozenset[Scope]
+    category: Category
+    emoji: str = ""
+
+    @property
+    def method_name(self) -> str:
+        """Derive the ``cmd_*`` method name from the command identifier.
+
+        Returns:
+            The Python method name (e.g., ``"cmd_toggle_rid"`` for ``"toggle-rid"``).
+        """
+        return f"cmd_{self.cmd.replace('-', '_')}"
+
+
+def _scopes(*scopes: Scope) -> frozenset[Scope]:
+    """Helper to create a frozenset of scopes."""
+    return frozenset(scopes)
+
+
+# fmt: off
+# ─── All registered commands ──────────────────────────────────────────────────
+
+COMMANDS: dict[str, Command] = {}
+
+
+def _reg(cmd: str, description: str, scopes: frozenset[Scope], category: Category, emoji: str = "") -> None:
+    """Register a command in the global registry."""
+    COMMANDS[cmd] = Command(cmd=cmd, description=description, scopes=scopes, category=category, emoji=emoji)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# File & Tab Management (App scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("close",              "Quit tab (prompts to save unsaved changes) or view",     _scopes(Scope.APP), Category.FILE_TAB, "🚪")
+_reg("close-all",          "Quit all tabs (prompts to save unsaved changes)",        _scopes(Scope.APP), Category.FILE_TAB, "🚪")
+_reg("force-quit",         "Force quit app (discards unsaved changes)",              _scopes(Scope.APP), Category.FILE_TAB, "⚠️")
+_reg("toggle-tab-bar",     "Toggle tab bar visibility",                              _scopes(Scope.APP), Category.FILE_TAB, "👁️")
+_reg("prev-tab",           "Previous Tab",                                           _scopes(Scope.APP), Category.FILE_TAB, "⏮️")
+_reg("next-tab",           "Next Tab",                                               _scopes(Scope.APP), Category.FILE_TAB, "⏭️")
+_reg("move-tab-left",      "Move current tab left (wrap to last)",                   _scopes(Scope.APP), Category.FILE_TAB, "◀️")
+_reg("move-tab-right",     "Move current tab right (wrap to first)",                 _scopes(Scope.APP), Category.FILE_TAB, "▶️")
+_reg("save-current-tab",   "Save current tab (or current view) to file",             _scopes(Scope.APP), Category.FILE_TAB, "💾")
+_reg("save-all-tabs",      "Save all tabs to file",                                  _scopes(Scope.APP), Category.FILE_TAB, "💾")
+_reg("save-tab-overwrite", "Save current tab to file (overwrite without prompt)",    _scopes(Scope.APP), Category.FILE_TAB, "💾")
+_reg("save-all-overwrite", "Save all tabs to file (overwrite without prompt)",       _scopes(Scope.APP), Category.FILE_TAB, "💾")
+_reg("duplicate-tab",      "Duplicate current tab",                                  _scopes(Scope.APP), Category.FILE_TAB, "📋")
+_reg("open-file",          "Open a file",                                            _scopes(Scope.APP), Category.FILE_TAB, "📁")
+_reg("new-tab",            "Create new tab from Polars expression",                  _scopes(Scope.APP), Category.FILE_TAB, "📋")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# View & Settings (App scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("show-sheets",           "Show all open sheets/tabs",                              _scopes(Scope.APP), Category.VIEW_SETTINGS, "📋")
+_reg("toggle-help-panel",     "Toggle help panel",                                      _scopes(Scope.APP), Category.VIEW_SETTINGS, "❓")
+_reg("toggle-python-console", "Toggle Python console",                                  _scopes(Scope.APP), Category.VIEW_SETTINGS, "🐍")
+_reg("select-theme",          "Select theme",                                           _scopes(Scope.APP, Scope.MAIN_TABLE), Category.VIEW_SETTINGS, "🎨")
+_reg("show-commands",         "Show all commands and key bindings",                     _scopes(Scope.APP), Category.VIEW_SETTINGS, "⌨️")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Navigation (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("cursor-left",     "Move cursor left",              _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "🎯")
+_reg("cursor-down",     "Move cursor down",              _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "🎯")
+_reg("cursor-up",       "Move cursor up",                _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "🎯")
+_reg("cursor-right",    "Move cursor right",             _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "🎯")
+_reg("go-top",          "Go to first row",               _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "⬆️")
+_reg("go-bottom",       "Go to last row",                _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "⬇️")
+_reg("go-to-row",       "Go to row",                     _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "🎯")
+_reg("page-up",         "Page up",                       _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "📜")
+_reg("page-down",       "Page down",                     _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "📜")
+_reg("page-backward",   "Page backward",                 _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "📜")
+_reg("page-forward",    "Page forward",                  _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "📜")
+_reg("scroll-home",     "Scroll to leftmost column",     _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "⬅️")
+_reg("scroll-end",      "Scroll to rightmost column",    _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "➡️")
+_reg("scroll-top",      "Scroll to first row",           _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "⬆️")
+_reg("scroll-bottom",   "Scroll to last row",            _scopes(Scope.MAIN_TABLE), Category.NAVIGATION, "⬇️")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Undo/Redo/Reset (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("undo",   "Undo last action",      _scopes(Scope.MAIN_TABLE), Category.UNDO_REDO, "↩️")
+_reg("redo",   "Redo last undone action",_scopes(Scope.MAIN_TABLE), Category.UNDO_REDO, "🔄")
+_reg("reset",  "Reset to initial state", _scopes(Scope.MAIN_TABLE), Category.UNDO_REDO, "🔁")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Display (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("view-row-detail",        "Show row details in modal",                                _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "📋")
+_reg("view-cell-detail",       "Show current cell details in modal",                       _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "🔍")
+_reg("show-frequency",         "Show frequency distribution for current/selected columns", _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "📊")
+_reg("show-histogram",         "Show histogram for current column",                        _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "📊")
+_reg("show-histogram-custom",  "Show histogram for current column with custom bins",       _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "📊")
+_reg("show-statistics",        "Show statistics for current column",                       _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "📈")
+_reg("show-statistics-all",    "Show statistics for entire dataframe",                     _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "📊")
+_reg("cycle-cursor-type",      "Cycle cursor type (cell → row → column)",                 _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "🎯")
+_reg("show-bar",               "Show bar chart (first selected col as label, cursor col as value)", _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "📊")
+_reg("metadata-column",        "Show column metadata (ID, name, type)",                    _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "📋")
+_reg("hide-column",            "Hide selected columns or current column",                  _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "👁️")
+_reg("hide-column-before",     "Hide current column and those before",                     _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "👁️")
+_reg("hide-column-after",      "Hide current column and those after",                      _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "👁️")
+_reg("show-hidden-columns",    "Show all hidden columns",                                  _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "👀")
+_reg("expand-column",          "Toggle column full width for current column",              _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "📏")
+_reg("expand-all-columns",     "Toggle column full width for all string/list columns",     _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "📏")
+_reg("toggle-freeze",          "Freeze rows and/or columns",                               _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "📌")
+_reg("toggle-column-index",    "Toggle column index prefix",                               _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "🏷️")
+_reg("set-row-as-header",      "Mark current row as header",                               _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "📌")
+_reg("toggle-rid",             "Toggle internal row index (RID)",                          _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "🆔")
+_reg("toggle-thousand-separator", "Toggle thousand separator for current column",          _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "🔢")
+_reg("decrease-float-precision",  "Decrease float precision for current column",           _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "🔢")
+_reg("increase-float-precision",  "Increase float precision for current column",           _scopes(Scope.MAIN_TABLE), Category.DISPLAY, "🔢")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Editing (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("edit-cell",              "Edit current cell",                                        _scopes(Scope.MAIN_TABLE), Category.EDITING, "✍️")
+_reg("edit-column",            "Edit entire column with expression",                       _scopes(Scope.MAIN_TABLE), Category.EDITING, "📊")
+_reg("add-column",             "Add empty column after current",                           _scopes(Scope.MAIN_TABLE), Category.EDITING, "➕")
+_reg("add-column-expr",        "Add column with name and optional expression",             _scopes(Scope.MAIN_TABLE), Category.EDITING, "➕")
+_reg("add-index-column",       "Add an index column after current",                        _scopes(Scope.MAIN_TABLE), Category.EDITING, "➕")
+_reg("add-link-column",        "Add a link column after current",                          _scopes(Scope.MAIN_TABLE), Category.EDITING, "➕")
+_reg("rename-column",          "Rename current column",                                    _scopes(Scope.MAIN_TABLE), Category.EDITING, "✏️")
+_reg("delete-row",             "Delete current row",                                       _scopes(Scope.MAIN_TABLE), Category.EDITING, "✖️")
+_reg("delete-row-above",       "Delete row and those above",                               _scopes(Scope.MAIN_TABLE), Category.EDITING, "✖️")
+_reg("delete-row-below",       "Delete row and those below",                               _scopes(Scope.MAIN_TABLE), Category.EDITING, "✖️")
+_reg("clear-cell",             "Clear current cell (set to NULL)",                          _scopes(Scope.MAIN_TABLE), Category.EDITING, "✖️")
+_reg("clear-column",           "Clear current column (set matching cells to NULL)",         _scopes(Scope.MAIN_TABLE), Category.EDITING, "✖️")
+_reg("delete-column",          "Delete selected columns or current column",                _scopes(Scope.MAIN_TABLE), Category.EDITING, "✖️")
+_reg("delete-column-before",   "Delete column and those before current column",            _scopes(Scope.MAIN_TABLE), Category.EDITING, "✖️")
+_reg("delete-column-after",    "Delete column and those after current column",             _scopes(Scope.MAIN_TABLE), Category.EDITING, "✖️")
+_reg("duplicate-row",          "Duplicate current row",                                    _scopes(Scope.MAIN_TABLE), Category.EDITING, "📋")
+_reg("duplicate-column",       "Duplicate current column",                                 _scopes(Scope.MAIN_TABLE), Category.EDITING, "📋")
+_reg("remove-duplicates",      "Remove duplicate rows (keep first occurrence)",            _scopes(Scope.MAIN_TABLE), Category.EDITING, "🧹")
+_reg("transpose",              "Transpose table (swap rows/columns)",                      _scopes(Scope.MAIN_TABLE), Category.EDITING, "🔃")
+_reg("expand-list-column",     "Expand current list column into indexed columns",          _scopes(Scope.MAIN_TABLE), Category.EDITING, "🧩")
+_reg("contract-list-column",   "Contract indexed sibling columns back into a list column", _scopes(Scope.MAIN_TABLE), Category.EDITING, "🧩")
+_reg("explode-column",         "Explode current list column into rows",                    _scopes(Scope.MAIN_TABLE), Category.EDITING, "💥")
+_reg("explode-column-delim",   "Explode current column by delimiter into rows",            _scopes(Scope.MAIN_TABLE), Category.EDITING, "💥")
+_reg("split-column",           "Split current column into a new column by delimiter",      _scopes(Scope.MAIN_TABLE), Category.EDITING, "✂️")
+_reg("join-columns",           "Join all selected columns into a new column",              _scopes(Scope.MAIN_TABLE), Category.EDITING, "🔗")
+_reg("glue-list-column",       "Glue list column values with separator",                   _scopes(Scope.MAIN_TABLE), Category.EDITING, "🔗")
+_reg("upper-case-column",      "Convert current or selected column(s) to uppercase",       _scopes(Scope.MAIN_TABLE), Category.EDITING, "🔠")
+_reg("lower-case-column",      "Convert current or selected column(s) to lowercase",       _scopes(Scope.MAIN_TABLE), Category.EDITING, "🔡")
+_reg("strip-whitespace",       "Strip leading and trailing whitespaces in current column", _scopes(Scope.MAIN_TABLE), Category.EDITING, "🧼")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Row/Column Selection (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("select-rows",            "Select rows matching cursor value in current column",       _scopes(Scope.MAIN_TABLE), Category.SELECTION, "✅")
+_reg("select-rows-all",        "Select rows matching cursor value in all columns",          _scopes(Scope.MAIN_TABLE), Category.SELECTION, "✅")
+_reg("select-rows-expr",       "Select rows where expression matches in current column",    _scopes(Scope.MAIN_TABLE), Category.SELECTION, "✅")
+_reg("select-rows-expr-all",   "Select rows where expression matches in all columns",       _scopes(Scope.MAIN_TABLE), Category.SELECTION, "✅")
+_reg("unselect-rows-expr",     "Unselect rows where expression matches in current column",  _scopes(Scope.MAIN_TABLE), Category.SELECTION, "➖")
+_reg("unselect-rows-expr-all", "Unselect rows where expression matches in all columns",     _scopes(Scope.MAIN_TABLE), Category.SELECTION, "➖")
+_reg("toggle-selection-row",   "Select/deselect current row",                               _scopes(Scope.MAIN_TABLE), Category.SELECTION, "✅")
+_reg("toggle-selection-col",   "Select/deselect current column",                            _scopes(Scope.MAIN_TABLE), Category.SELECTION, "✅")
+_reg("toggle-selections",      "Toggle row selection (invert all)",                         _scopes(Scope.MAIN_TABLE), Category.SELECTION, "💡")
+_reg("clear-selections",       "Clear all row/column selections and cell matches",          _scopes(Scope.MAIN_TABLE), Category.SELECTION, "🧹")
+_reg("prev-selected-row",      "Go to previous selected row",                              _scopes(Scope.MAIN_TABLE), Category.SELECTION, "⬆️")
+_reg("next-selected-row",      "Go to next selected row",                                  _scopes(Scope.MAIN_TABLE), Category.SELECTION, "⬇️")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Find & Replace (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("find-forward",           "Search forward in current column with expression",          _scopes(Scope.MAIN_TABLE), Category.FIND_REPLACE, "🔎")
+_reg("find-forward-all",       "Search forward in all columns with expression",             _scopes(Scope.MAIN_TABLE), Category.FIND_REPLACE, "🌐")
+_reg("find-forward-cursor",    "Search forward in current column with cursor value",        _scopes(Scope.MAIN_TABLE), Category.FIND_REPLACE, "🔎")
+_reg("find-backward",          "Search backward in current column with expression",         _scopes(Scope.MAIN_TABLE), Category.FIND_REPLACE, "🔎")
+_reg("find-backward-all",      "Search backward in all columns with expression",            _scopes(Scope.MAIN_TABLE), Category.FIND_REPLACE, "🌐")
+_reg("find-backward-cursor",   "Search backward in current column with cursor value",       _scopes(Scope.MAIN_TABLE), Category.FIND_REPLACE, "🔎")
+_reg("next-match",             "Go to next match",                                          _scopes(Scope.MAIN_TABLE), Category.FIND_REPLACE, "⬇️")
+_reg("prev-match",             "Go to previous match",                                      _scopes(Scope.MAIN_TABLE), Category.FIND_REPLACE, "⬆️")
+_reg("replace-column",         "Replace in current column (interactive or all)",             _scopes(Scope.MAIN_TABLE), Category.FIND_REPLACE, "🔄")
+_reg("replace-all-columns",    "Replace across all columns (interactive or all)",            _scopes(Scope.MAIN_TABLE), Category.FIND_REPLACE, "🔄")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Filter & Collect (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("filter-rows",            "Filter rows with cursor value in current column",           _scopes(Scope.MAIN_TABLE), Category.FILTER_COLLECT, "⏬")
+_reg("filter-rows-expr",       "Filter rows with expression",                               _scopes(Scope.MAIN_TABLE), Category.FILTER_COLLECT, "⏬")
+_reg("filter-rows-nonnull",    "Filter rows with non-null values in current column",        _scopes(Scope.MAIN_TABLE), Category.FILTER_COLLECT, "⏬")
+_reg("filter-rows-null",       "Filter rows with null values in current column",            _scopes(Scope.MAIN_TABLE), Category.FILTER_COLLECT, "⏬")
+_reg("filter-rows-value",      "Filter rows by column value",                               _scopes(Scope.MAIN_TABLE), Category.FILTER_COLLECT, "⏬")
+_reg("collect-rows",           "Collect rows to a new tab",                                 _scopes(Scope.MAIN_TABLE), Category.FILTER_COLLECT, "📤")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sorting (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("sort-ascending",  "Sort column ascending",  _scopes(Scope.MAIN_TABLE), Category.SORTING, "🔼")
+_reg("sort-descending", "Sort column descending", _scopes(Scope.MAIN_TABLE), Category.SORTING, "🔽")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Reorder (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("move-row-up",       "Move row up",       _scopes(Scope.MAIN_TABLE), Category.REORDER, "⬆️")
+_reg("move-row-down",     "Move row down",     _scopes(Scope.MAIN_TABLE), Category.REORDER, "⬇️")
+_reg("move-column-left",  "Move column left",  _scopes(Scope.MAIN_TABLE), Category.REORDER, "⬅️")
+_reg("move-column-right", "Move column right", _scopes(Scope.MAIN_TABLE), Category.REORDER, "➡️")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Type Casting (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("cast-integer",  "Cast column to integer", _scopes(Scope.MAIN_TABLE), Category.TYPE_CASTING, "🔢")
+_reg("cast-float",    "Cast column to float",   _scopes(Scope.MAIN_TABLE), Category.TYPE_CASTING, "🔢")
+_reg("cast-boolean",  "Cast column to boolean", _scopes(Scope.MAIN_TABLE), Category.TYPE_CASTING, "✅")
+_reg("cast-string",   "Cast column to string",  _scopes(Scope.MAIN_TABLE), Category.TYPE_CASTING, "📝")
+_reg("cast-date",     "Cast column to date",    _scopes(Scope.MAIN_TABLE), Category.TYPE_CASTING, "📅")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Copy (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("copy-cell",   "Copy cell to clipboard",                 _scopes(Scope.MAIN_TABLE), Category.COPY, "📋")
+_reg("copy-column", "Copy column to clipboard",               _scopes(Scope.MAIN_TABLE), Category.COPY, "📊")
+_reg("copy-row",    "Copy row to clipboard (tab-separated)",  _scopes(Scope.MAIN_TABLE), Category.COPY, "📝")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SQL Interface (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("sql-advanced", "Open advanced SQL interface (full SQL queries)",           _scopes(Scope.MAIN_TABLE), Category.SQL, "🔎")
+_reg("sql-simple",   "Open simple SQL interface (select columns & where clause)",_scopes(Scope.MAIN_TABLE), Category.SQL, "💬")
+_reg("run-command",  "Run a command by name with optional arguments",            _scopes(Scope.MAIN_TABLE), Category.VIEW_SETTINGS, "▶️")
+
+# fmt: on
+
+
+def get_commands_by_scope(scope: Scope) -> list[Command]:
+    """Get all commands available in a given scope."""
+    return [cmd for cmd in COMMANDS.values() if scope in cmd.scopes]
+
+
+def get_commands_by_category(category: Category) -> list[Command]:
+    """Get all commands in a given category."""
+    return [cmd for cmd in COMMANDS.values() if cmd.category == category]

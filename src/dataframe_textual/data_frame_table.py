@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from functools import partial
 from itertools import zip_longest
 from pathlib import Path
-from textwrap import dedent
 from threading import Event
 from typing import Any, Callable
 
@@ -32,6 +31,7 @@ from textual.widgets.data_table import (
     RowKey,
 )
 
+from .commands import Scope
 from .common import (
     COLUMN_WIDTH_CAP,
     CURSOR_TYPES,
@@ -50,9 +50,9 @@ from .common import (
     round_to_nearest_hundreds,
     tentative_expr,
     validate_expr,
-    with_leader_key,
 )
 from .loading_screen import BusyScreen, LoadingScreen
+from .run_command_screen import RunCommandScreen
 from .table_screen import (
     BarScreen,
     CellDetailScreen,
@@ -179,249 +179,13 @@ def handle_term(
 class DataFrameTable(DataTable):
     """Custom DataTable to highlight row/column labels based on cursor position."""
 
-    # Help text for the DataTable which will be shown in the HelpPanel
-    HELP = dedent("""
-        # 📊 DataFrame Viewer - Table Controls
-
-        ## ⬆️ Navigation
-        - **gg** - ⬆️ Go to first row
-        - **G** - ⬇️ Go to last row
-        - **Ctrl+G** - 🎯 Go to row
-        - **↑↓←→** - 🎯 Move cursor (cell/row/column)
-        - **hjkl** - 🎯 Move cursor left/down/up/right (Vim-style)
-        - **gh** - ⬅️ Scroll to leftmost column
-        - **gj** - ⬇️ Scroll to last row
-        - **gk** - ⬆️ Scroll to first row
-        - **gl** - ➡️ Scroll to rightmost column
-        - **HOME/END** - 🎯 Go to first/last column
-        - **Ctrl+HOME/END** - 🎯 Go to page top/bottom
-        - **PgUp/PgDn** - 📜 Page up/down
-        - **Ctrl+F** - 📜 Page down
-        - **Ctrl+B** - 📜 Page up
-
-        ## ♻️ Undo/Redo/Reset
-        - **u/U** - ↩️ Undo last action
-        - **R** - 🔄 Redo last undone action
-        - **gu** - 🔁 Reset to initial state
-
-        ## 👁️ Display
-        - **Enter** - 📋 Show row details in modal
-        - **Tab** - 🔍 Show current cell details in modal; use `Tab` again there to drill deeper
-        - **F** - 📊 Show frequency distribution for current or selected columns
-        - **m** - 📊 Show histogram for current column
-        - **gm** - 📊 Show histogram for current column with custom bins
-        - **I** - 📈 Show statistics for current column
-        - **gI** - 📊 Show statistics for entire dataframe
-        - **zC** - 🎯 Cycle cursor type (cell → row → column)
-        - **=** - 📊 Show bar chart using first selected column as label and cursor column as value
-        - **C** - 📋 Show column metadata (ID, name, type)
-        - **-** (minus) - 👁️ Hide selected columns or current column
-        - **g-** (minus) - 👁️ Hide current column and those before
-        - **z-** (minus) - 👁️ Hide current column and those after
-        - **gv** - 👀 Show all hidden columns
-        - **_** (underscore) - 📏 Toggle column full width for current column
-        - **g_** (underscore) - 📏 Toggle column full width for all string/list columns
-        - **+** - 📌 Freeze rows and/or columns
-        - **z~** - 🏷️ Toggle column index prefix
-        - **g^** - 📌 Mark current row as header
-        - **gT** - 🎨 Open theme selection
-        - **z^** - 🆔 Toggle internal row index (RID)
-        - **z,** - 🔢 Toggle thousand separator for current column
-        - **<** - 🔢 Decrease float precision for current column
-        - **>** - 🔢 Increase float precision for current column
-
-        ## ✏️ Editing
-        - **Double-click** - ✍️ Edit cell or rename column header
-        - **e** - ✍️ Edit current cell
-        - **E** - 📊 Edit entire column with expression
-        - **a** - ➕ Add empty column after current
-        - **A** - ➕ Add column with name and optional expression
-        - **i** - ➕ Add an index column after current
-        - **za** - ➕ Add a link column after current
-        - **^** - ✏️ Rename current column
-        - **d** - ✖️ Delete current row
-        - **gd** - ✖️ Delete row and those above
-        - **zd** - ✖️ Delete row and those below
-        - **Delete** - ✖️ Clear current cell (set to NULL)
-        - **Shift+Delete** - ✖️ Clear current column (set matching cells to NULL)
-        - **\\*** - ✖️ Delete selected columns or current column
-        - **g\\*** - ✖️ Delete column and those before current column
-        - **z\\*** - ✖️ Delete column and those after current column
-        - **D** - 📋 Duplicate current row
-        - **zD** - 📋 Duplicate current column
-        - **gU** - 🧹 Remove duplicate rows (keep first occurrence)
-        - **zT** - 🔃 Transpose table (swap rows/columns)
-        - **(** - 🧩 Expand current list column into indexed columns (e.g. ``col[1]``, ``col[2]``, ...)
-        - **)** - 🧩 Contract indexed sibling columns back into a list column
-        - **o** - 💥 Explode current list column into rows
-        - **O** - 💥 Explode current column by delimiter into rows
-        - **:** - ✂️ Split current column into a new column by delimiter
-        - **z:** - 🔗 Join all selected columns into a new column
-        - **Ctrl+U** - 🔠 Convert current or selected column(s) to uppercase
-        - **Ctrl+L** - 🔡 Convert current or selected column(s) to lowercase
-        - **zB** - 🧼 Strip leading and trailing whitespaces in current column
-
-        ## ✅ Row/Column Selection
-        - **,** - ✅ Select rows with cell matches or those matching cursor value in current column
-        - **g,** - ✅ Select rows with cell matches or those matching cursor value in all columns
-        - **|** - ✅ Select rows where expression matches in current column
-        - **g|** - ✅ Select rows where expression matches in all columns
-        - **s** - ✅ Select/deselect current row
-        - **'** (apostrophe) - ✅ Select/deselect current column
-        - **\\** - ➖ Unselect selected rows where expression matches in current column
-        - **g\\** - ➖ Unselect selected rows where expression matches in all columns
-        - **t** - 💡 Toggle row selection (invert all)
-        - **T** - 🧹 Clear all row/column selections and cell matches
-        - **{** - ⬆️ Go to previous selected row
-        - **}** - ⬇️ Go to next selected row
-        - *(Supports case-insensitive & whole-word matching)*
-
-        ## 🔎 Find & Replace
-        - **/** - 🔎 Search forward in current column with expression
-        - **g/** - 🌐 Search forward in all columns with expression
-        - **z/** - 🔎 Search forward in current column with cursor value
-        - **?** - 🔎 Search backward in current column with expression
-        - **g?** - 🌐 Search backward in all columns with expression
-        - **z?** - 🔎 Search backward in current column with cursor value
-        - **n** - ⬇️ Go to next match
-        - **N** - ⬆️ Go to previous match
-        - **r** - 🔄 Replace in current column (interactive or all)
-        - **gr** - 🔄 Replace across all columns (interactive or all)
-        - *(Supports case-insensitive & whole-word matching)*
-
-        ## ⏬ Filter & Collect
-        - **v** - ⏬ Filter rows with cursor value in current column
-        - **V** - ⏬ Filter rows with expression
-        - **.** - ⏬ Filter rows with non-null values in current column
-        - **z.** - ⏬ Filter rows with null values in current column
-        - **f** - ⏬ Filter rows by column value
-        - **"** (double quote) - 📤 Collect rows to a new tab
-
-        ## 🔀 Sorting
-        - **[** - 🔼 Sort column ascending
-        - **]** - 🔽 Sort column descending
-        - *(Multi-column sort supported)*
-
-        ## 🔃 Reorder
-        - **Shift+↑↓** - ⬆️⬇️ Move row up/down
-        - **Shift+←→** - ⬅️➡️ Move column left/right
-        - **J/K** - ⬇️⬆️ Move row down/up (Vim-style)
-        - **H/L** - ⬅️➡️ Move column left/right (Vim-style)
-
-        ## 🎨 Type Casting
-        - **#** - 🔢 Cast column to integer
-        - **%** - 🔢 Cast column to float
-        - **$** - ✅ Cast column to boolean
-        - **~** - 📝 Cast column to string
-        - **@** - 📅 Cast column to date
-
-        ## 📋 Copy
-        - **c** - 📋 Copy cell to clipboard
-        - **Ctrl+c** - 📊 Copy column to clipboard
-        - **Ctrl+r** - 📝 Copy row to clipboard (tab-separated)
-
-        ## ⌨️ SQL Interface
-        - **Q** - 🔎 Open advanced SQL interface (full SQL queries)
-        - **zQ** - 💬 Open simple SQL interface (select columns & where clause)
-    """).strip()
-
-    # fmt: off
-    BINDINGS = [
-        # Navigation
-        ("h", "cursor_left", "Move cursor left"),
-        ("j", "cursor_down", "Move cursor down"),
-        ("k", "cursor_up", "Move cursor up"),
-        ("l", "cursor_right", "Move cursor right"),
-        ("g", "go_top", "Go to first row"),
-        ("G", "go_bottom", "Go to last row"),
-        ("ctrl+g", "go_to_row", "Go to row"),
-        ("ctrl+b", "page_up", "Page up"),
-        ("ctrl+f", "page_down", "Page down"),
-        # Undo/Redo/Reset
-        ("u,U", "undo", "Undo"),
-        ("R", "redo", "Redo"),
-        ("ctrl+u", "upper_case_column", "Convert string column(s) to uppercase"),  # `Ctrl+U`
-        ("ctrl+l", "lower_case_column", "Convert string column(s) to lowercase"),  # `Ctrl+L`
-        # Display
-        ("underscore", "expand_column", "Toggle column full width"),  # `_`
-        ("minus", "hide_column", "Hide selected columns or current column"),  # `-`
-        ("+", "toggle_freeze_row_column", "Freeze rows/columns"), # `+`
-        ("left_parenthesis", "expand_list_column", "Expand current list column into indexed columns"),  # `(`
-        ("right_parenthesis", "contract_list_column", "Contract current list column from indexed columns"),  # `)`
-        ("less_than_sign", "adjust_float_precision(-1)", "Decrease float precision for column"),  # `<`
-        ("greater_than_sign", "adjust_float_precision(1)", "Increase float precision for column"),  # `>`
-        ("circumflex_accent", "rename_column", "Rename current column"),  # `^`
-        # Copy
-        ("c", "copy_cell", "Copy cell to clipboard"),
-        ("ctrl+c", "copy_column", "Copy column to clipboard"),
-        ("ctrl+r", "copy_row", "Copy row to clipboard"),
-        # Column Metadata, Row Detail, Frequency, and Statistics
-        ("C", "metadata_column", "Show metadata for all columns"),
-        ("enter", "view_row_detail", "View row details"),
-        ("tab", "view_cell_detail", "View cell details"),
-        ("F", "show_frequency", "Show frequency for current column"),
-        ("m", "show_histogram", "Show histogram for current column"),
-        ("I", "show_statistics", "Show statistics"),
-        ("equals_sign", "show_bar", "Show bar chart using first selected column as label and cursor column as value"),  # `=`
-        # Sort
-        ("left_square_bracket", "sort_ascending", "Sort ascending"),  # `[`
-        ("right_square_bracket", "sort_descending", "Sort descending"),  # `]`
-        # Filter & Collect
-        ("v", "filter_rows", "Filter rows"),
-        ("V", "filter_rows_expr", "Filter rows with specified value or expression"),  # `V`
-        ("full_stop", "filter_rows_null", "Filter rows with null/non-null values in current column"),
-        ("f", "filter_rows_value", "Filter rows by value"),  # `f`
-        ("quotation_mark", "collect_rows_columns", "Collect rows/columns to a new tab"),  # `"`
-        # Row/Column Selection
-        ("comma", "select_rows", "Select rows with cell matches or those matching cursor value in current column"),  # `,`
-        ("vertical_line", "select_rows_expr", "Select rows where expression matches in current column or all columns"),  # `|`
-        ("backslash", "unselect_rows_expr", "Unselect rows where expression matches in current column or all columns"),  # `\\`
-        ("right_curly_bracket", "next_selected_row", "Go to next selected row"),  # `}`
-        ("left_curly_bracket", "previous_selected_row", "Go to previous selected row"),  # `{`
-        ("s", "toggle_selection_current_row", "Toggle row selection"),  # `s`
-        ("apostrophe", "toggle_selection_current_column", "Toggle column selection"),  # `'`
-        ("t", "toggle_selections", "Toggle row selections"),
-        ("T", "clear_selections_and_matches", "Clear row/column selections and cell matches"),
-        # Find & Replace
-        ("slash", "find_cursor_value", "Search forward with expression"),  # `/`
-        ("question_mark", "find_expr", "Search backward with expression"),  # `?`
-        ("n", "next_match", "Go to next match"),
-        ("N", "previous_match", "Go to previous match"),
-        ("r", "replace", "Replace with value"),
-        # Delete
-        ("delete", "clear_cell", "Clear cell"),
-        ("shift+delete", "clear_column", "Clear cells in current column that match cursor value"),  # `Shift+Delete`
-        ("asterisk", "delete_column", "Delete selected columns or current column"),  # `*`
-        ("d", "delete_row", "Delete row"),
-        # Duplicate
-        ("D", "duplicate_row_column", "Duplicate row or column"),
-        # Edit
-        ("e", "edit_cell", "Edit cell"),
-        ("E", "edit_column", "Edit column"),
-        # Explode
-        ("o", "explode_column", "Explode column"),
-        ("O", "explode_column_delim", "Explode column by delimiter"),
-        # Add Column
-        ("a", "add_column", "Add column"),
-        ("A", "add_column_expr", "Add column with expression"),
-        ("i", "add_index_column", "Add an index column"),  # `i`
-        # Split Column
-        ("colon", "split_column", "Split column"),
-        # Reorder
-        ("shift+left,H", "move_column_left", "Move column left"),
-        ("shift+right,L", "move_column_right", "Move column right"),
-        ("shift+up,K", "move_row_up", "Move row up"),
-        ("shift+down,J", "move_row_down", "Move row down"),
-        # Type Casting
-        ("number_sign", "cast_column_dtype('pl.Int64')", "Cast column dtype to integer"),  # `#`
-        ("percent_sign", "cast_column_dtype('pl.Float64')", "Cast column dtype to float"),  # `%`
-        ("dollar_sign", "cast_column_dtype('pl.Boolean')", "Cast column dtype to bool"),  # `$`
-        ("tilde", "cast_column_dtype('pl.String')", "Cast column dtype to string"),  # `~`
-        ("at", "cast_column_dtype('pl.Date')", "Cast column dtype to date"),  # `@`
-        # Sql
-        ("Q", "sql_query", "Open SQL interface"),  # `Q`
-    ]
-    # fmt: on
+    @property
+    def HELP(self) -> str:
+        """Generate help text dynamically from the key binding registry."""
+        registry = getattr(self.app, "key_registry", None)
+        if registry is None:
+            return "# 📊 DataFrame Viewer - Table Controls\n\nKey binding registry not available."
+        return "# 📊 DataFrame Viewer - Table Controls\n" + registry.generate_help_text(Scope.MAIN_TABLE)
 
     # Track if dataframe has unsaved changes
     dirty: reactive[bool] = reactive(False)
@@ -931,153 +695,46 @@ class DataFrameTable(DataTable):
             self.app.timeout_timer = None
 
     def on_key(self, event: Key) -> None:
-        """Handle key press events for leader-key sequences and row loading.
+        """Handle all key press events via the key binding registry.
 
-        Handles two-key leader sequences and scroll-triggered row loading:
+        All command dispatch goes through ``app.key_registry.dispatch()``.
+        Leader-key sequences (g+key, z+key) are resolved by combining leader state
+        from ``self.leader_key`` with the incoming key event.
 
-        Leader ``g`` sequences:
-          - ``gv``: Show all hidden columns.
-          - ``gT``: Open theme selection.
-          - ``gU``: Remove duplicate rows.
-          - ``g^``: Mark current row as header.
-          - ``gh``: Scroll to leftmost column.
-          - ``gj``: Scroll to last row (bottom).
-          - ``gk``: Scroll to first row (top).
-          - ``gl``: Scroll to rightmost column.
-
-        Leader ``z`` sequences:
-          - ``zC``: Cycle cursor type.
-          - ``zT``: Transpose table.
-          - ``zB``: Strip leading/trailing whitespace in current string column.
-                    - ``z.``: Filter rows with null values in current column.
-          - ``z^``: Toggle internal row index (RID) column.
-          - ``z~``: Toggle 1-based column index prefixes in visible headers.
-
-        Row loading triggers:
-          - ``↑``: Load rows above current visible range.
-          - ``↓``: Load rows below current visible range.
-
-        All other key actions are handled via BINDINGS and their ``action_*`` methods.
+        Special cases:
+          - Arrow up/down also triggers row loading for lazy-loaded dataframes.
 
         Args:
             event: The key event object.
         """
-        # Handle leader key sequences for `g`
-        if self.leader_key == "g":
-            if event.key == "v":  # `gv`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_show_hidden_columns()
-                return
-            elif event.key == "T":  # `gT`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.app.select_theme()
-                return
-            elif event.key == "U":  # `gU`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_uniq_rows()
-                return
-            # Set current row as header
-            elif event.key == "circumflex_accent":  # `g^`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_set_cursor_row_as_header()
-                return
-            # Go to leftmost column
-            elif event.key == "h":  # `gh`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.action_scroll_home()
-                self.leader_key = ""
-                self.notify("Scrolled to [$success]home[/]", title="Scroll")
-                return
-            # Go to last row
-            elif event.key == "j":  # `gj`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.action_scroll_bottom()
-                self.leader_key = ""
-                self.notify("Scrolled to [$success]bottom[/]", title="Scroll")
-                return
-            # Go to top row
-            elif event.key == "k":  # `gk`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.action_scroll_top()
-                self.leader_key = ""
-                self.notify("Scrolled to [$success]top[/]", title="Scroll")
-                return
-            # Go to last column
-            elif event.key == "l":  # `gl`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.action_scroll_end()
-                self.leader_key = ""
-                self.notify("Scrolled to [$success]end[/]", title="Scroll")
-                return
-            elif event.key == "colon":  # `g:`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_glue_list_column()
-                return
+        leader = self.leader_key
+        registry = self.app.key_registry
 
-        # Handle leader key sequences for `z`
-        elif self.leader_key == "z":
-            # Toggle internal row index column (RID)
-            if event.key == "circumflex_accent":  # `z^`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_toggle_rid()
-                return
-            elif event.key == "comma":  # `z,`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.action_toggle_thousand_separator()
-                return
-            elif event.key == "tilde":  # `z~`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_toggle_column_index()
-                return
-            elif event.key == "T":  # `zT`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_transpose()
-                return
-            elif event.key == "C":  # `zC`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_cycle_cursor_type()
-                return
-            elif event.key == "B":  # `zB`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_strip_whitespace_column()
-                return
-            elif event.key == "colon":  # `z:`:
-                event.stop()
-                event.prevent_default()
-                self.stop_timer()
-                self.do_join_columns()
-                return
+        # Try to dispatch via the registry (MainTable scope)
+        if registry.dispatch(event.key, leader, Scope.MAIN_TABLE, self):
+            event.stop()
+            event.prevent_default()
+            self.stop_timer()
+            self.leader_key = ""
+        # Try App-scope dispatch (for commands like gT=select_theme, etc.)
+        elif registry.dispatch(event.key, leader, Scope.APP, self.app):
+            event.stop()
+            event.prevent_default()
+            self.stop_timer()
+            self.leader_key = ""
+        # If we had a leader key but no binding matched, reset leader
+        elif leader:
+            event.stop()
+            event.prevent_default()
+            self.stop_timer()
+            self.leader_key = ""
+            self.notify(
+                f"Command not found for [$warning]{leader}[/][$accent]{event.key}[/] key binding",
+                title="Key Binding",
+                severity="warning",
+            )
 
+        # Arrow keys always trigger row loading for lazy-loaded dataframes
         if event.key == "up":
             self.load_rows_up()
         elif event.key == "down":
@@ -1100,9 +757,9 @@ class DataFrameTable(DataTable):
 
             # header row
             if row_idx == -1:
-                self.do_rename_column(col_idx)
+                self.cmd_rename_column(col_idx)
             else:
-                self.do_edit_cell()
+                self.cmd_edit_cell()
 
     def on_mouse_scroll_up(self, event) -> None:
         """Load more rows when scrolling up with mouse."""
@@ -1112,332 +769,189 @@ class DataFrameTable(DataTable):
         """Load more rows when scrolling down with mouse."""
         self.load_rows_down()
 
-    @with_leader_key
-    def action_go_top(self) -> None:
-        """Go to the top of the table."""
-        self.do_go_top()
+    # ─── cmd_* methods that bridge to existing logic ──────────────────────────
+    # These wrap methods that previously lived in action_* with inline logic.
+    # The bulk of cmd_* methods (navigation, editing, etc.) are defined further below.
 
-    @with_full_df
-    def action_go_bottom(self) -> None:
-        """Go to the bottom of the table."""
-        self.do_go_bottom()
+    def cmd_cursor_left(self) -> None:
+        """Move cursor left."""
+        self.action_cursor_left()
 
-    def action_go_to_row(self) -> None:
-        """Go to a specific row number."""
-        self.do_go_to_row()
+    def cmd_cursor_right(self) -> None:
+        """Move cursor right."""
+        self.action_cursor_right()
 
-    def action_page_up(self) -> None:
-        """Move the cursor one page up."""
-        self.do_page_up()
+    def cmd_cursor_up(self) -> None:
+        """Move cursor up."""
+        self.action_cursor_up()
+
+    def cmd_cursor_down(self) -> None:
+        """Move cursor down."""
+        self.action_cursor_down()
+
+    def cmd_page_up(self) -> None:
+        """Page up."""
         super().action_page_up()
 
-    def action_page_down(self) -> None:
-        """Move the cursor one page down."""
-        self.do_page_down()
+    def cmd_page_down(self) -> None:
+        """Page down."""
         super().action_page_down()
 
-    def action_view_row_detail(self) -> None:
-        """View details of the current row."""
-        self.do_view_row_detail()
+    def cmd_scroll_home(self) -> None:
+        """Scroll to leftmost column."""
+        self.action_scroll_home()
+        self.notify("Scrolled to [$success]home[/]", title="Scroll")
 
-    def action_view_cell_detail(self) -> None:
-        """View details of the current cell."""
-        self.do_view_cell_detail()
+    def cmd_scroll_end(self) -> None:
+        """Scroll to rightmost column."""
+        self.action_scroll_end()
+        self.notify("Scrolled to [$success]end[/]", title="Scroll")
 
-    @with_full_df
-    @with_leader_key
-    def action_delete_column(self) -> None:
-        """Delete selected columns or the current column."""
-        if self.leader_key == "g":
-            self.do_delete_column(more="before")
-        elif self.leader_key == "z":
-            self.do_delete_column(more="after")
-        else:
-            self.do_delete_column()
+    def cmd_scroll_top(self) -> None:
+        """Scroll to first row."""
+        self.action_scroll_top()
+        self.notify("Scrolled to [$success]top[/]", title="Scroll")
 
-    @with_leader_key
-    def action_hide_column(self) -> None:
-        """Hide selected columns or the current column."""
-        if self.leader_key == "g":
-            self.do_hide_column(more="before")
-        elif self.leader_key == "z":
-            self.do_hide_column(more="after")
-        else:
-            self.do_hide_column()
+    def cmd_scroll_bottom(self) -> None:
+        """Scroll to last row."""
+        self.action_scroll_bottom()
+        self.notify("Scrolled to [$success]bottom[/]", title="Scroll")
 
-    def action_show_hidden_columns(self) -> None:
-        """Show all hidden columns."""
-        self.do_show_hidden_columns()
-
-    @with_leader_key
-    def action_expand_column(self) -> None:
-        """Expand the current column to its full width."""
-        self.do_expand_column()
-
-    @with_full_df
-    def action_sort_ascending(self) -> None:
+    def cmd_sort_ascending(self) -> None:
         """Sort by current column in ascending order."""
-        self.do_sort_by_column(descending=False)
+        self.cmd_sort_by_column(descending=False)
 
-    @with_full_df
-    def action_sort_descending(self) -> None:
+    def cmd_sort_descending(self) -> None:
         """Sort by current column in descending order."""
-        self.do_sort_by_column(descending=True)
+        self.cmd_sort_by_column(descending=True)
 
-    @with_full_df
-    def action_show_frequency(self) -> None:
-        """Show frequency distribution for the current column."""
-        self.do_show_frequency()
+    def cmd_hide_column_before(self) -> None:
+        """Hide current column and those before."""
+        self.cmd_hide_column(more="before")
 
-    @with_full_df
-    @with_leader_key
-    def action_show_histogram(self, default: int | None = None) -> None:
-        """Show histogram for the current column."""
-        if default is None:
-            default = 0 if self.leader_key == "g" else 1
-        self.do_show_histogram(default=default)
+    def cmd_hide_column_after(self) -> None:
+        """Hide current column and those after."""
+        self.cmd_hide_column(more="after")
 
-    @with_full_df
-    def action_show_bar(self) -> None:
-        """Show bar chart using first selected column as label and cursor column as value."""
-        self.do_show_bar()
+    def cmd_delete_column_before(self) -> None:
+        """Delete column and those before current column."""
+        self.cmd_delete_column(more="before")
 
-    @with_full_df
-    @with_leader_key
-    def action_show_statistics(self) -> None:
-        """Show statistics for the current column or entire dataframe."""
-        self.do_show_statistics()
+    def cmd_delete_column_after(self) -> None:
+        """Delete column and those after current column."""
+        self.cmd_delete_column(more="after")
 
-    def action_metadata_column(self) -> None:
-        """Show metadata for the current column."""
-        self.do_metadata_column()
+    def cmd_delete_row_above(self) -> None:
+        """Delete row and those above."""
+        self.cmd_delete_row(more="above")
 
-    @with_full_df
-    @with_leader_key
-    def action_filter_rows(self, result: dict | None = None) -> None:
-        """Filter rows by value or expression"""
-        self.do_filter_rows(result)
+    def cmd_delete_row_below(self) -> None:
+        """Delete row and those below."""
+        self.cmd_delete_row(more="below")
 
-    @with_full_df
-    def action_filter_rows_expr(self) -> None:
-        """Filter rows by value or expression."""
-        self.do_filter_rows_expr()
+    def cmd_show_histogram_custom(self) -> None:
+        """Show histogram with custom bins."""
+        self.cmd_show_histogram(default=0)
 
-    @with_full_df
-    @with_leader_key
-    def action_filter_rows_null(self) -> None:
-        """Filter rows with null or non-null values in the current column.
+    def cmd_show_statistics_all(self) -> None:
+        """Show statistics for entire dataframe."""
+        self.cmd_show_statistics(cidx=-1)
 
-        Press ``.`` for non-null rows and ``z.`` for null rows.
-        """
-        self.do_filter_rows_null(with_null=self.leader_key == "z")
+    def cmd_expand_all_columns(self) -> None:
+        """Toggle column full width for all string/list columns."""
+        self.cmd_expand_column(expand_all=True)
 
-    @with_full_df
-    def action_filter_rows_value(self) -> None:
-        """Filter rows by value for the current column."""
-        self.do_filter_rows_value()
+    def cmd_filter_rows_nonnull(self) -> None:
+        """Filter rows with non-null values in current column."""
+        self.cmd_filter_rows_null(with_null=False)
 
-    @with_full_df
-    def action_collect_rows_columns(self, cidx: int | None = None, term: Any = None) -> None:
-        """Collect rows to a new tab based on the current selection or value."""
-        self.do_collect_rows_columns(cidx=cidx, term=term)
+    def cmd_select_rows_all(self) -> None:
+        """Select rows matching cursor value in all columns."""
+        self.cmd_select_rows(scope="all")
 
-    def action_edit_cell(self) -> None:
-        """Edit the current cell."""
-        self.do_edit_cell()
+    def cmd_select_rows_expr_all(self) -> None:
+        """Select rows where expression matches in all columns."""
+        self.cmd_select_rows_expr(scope="all")
 
-    def action_edit_column(self) -> None:
-        """Edit the entire current column with an expression."""
-        self.do_edit_column()
+    def cmd_unselect_rows_expr_all(self) -> None:
+        """Unselect rows where expression matches in all columns."""
+        self.cmd_unselect_rows_expr(scope="all")
 
-    @with_leader_key
-    def action_add_column(self) -> None:
-        """Add an empty column after the current column."""
-        if self.leader_key == "z":
-            self.do_add_link_column()
-        else:
-            self.do_add_column()
+    def cmd_find_forward_all(self) -> None:
+        """Search forward in all columns with expression."""
+        self.cmd_find_forward(forward=True, scope="all")
 
-    def action_add_column_expr(self) -> None:
-        """Add a new column with optional expression after the current column."""
-        self.do_add_column_expr()
+    def cmd_find_forward_cursor(self) -> None:
+        """Search forward in current column with cursor value."""
+        self.cmd_find_cursor_direct(forward=True, scope="column")
 
-    @with_full_df
-    def action_add_index_column(self) -> None:
-        """Add an index column after the current column."""
-        self.do_add_index_column()
+    def cmd_find_backward_all(self) -> None:
+        """Search backward in all columns with expression."""
+        self.cmd_find_backward(forward=False, scope="all")
 
-    def action_split_column(self) -> None:
-        """Split the current string column into a new column by delimiter."""
-        self.do_split_column()
+    def cmd_find_backward_cursor(self) -> None:
+        """Search backward in current column with cursor value."""
+        self.cmd_find_cursor_direct(forward=False, scope="column")
 
-    @with_full_df
-    def action_expand_list_column(self) -> None:
-        """Expand the current list column into indexed columns."""
-        self.do_expand_list_column()
+    def cmd_replace_column(self) -> None:
+        """Replace in current column."""
+        self.cmd_replace(scope="column")
 
-    @with_full_df
-    def action_contract_list_column(self) -> None:
-        """Contract indexed sibling columns back into a single list column."""
-        self.do_contract_list_column()
+    def cmd_replace_all_columns(self) -> None:
+        """Replace across all columns."""
+        self.cmd_replace(scope="global")
 
-    def action_rename_column(self, col_idx: int | None = None) -> None:
-        """Rename the current column."""
-        self.do_rename_column(col_idx=col_idx)
+    def cmd_move_column_left(self) -> None:
+        """Move column left."""
+        self.cmd_move_column("left")
 
-    @with_full_df
-    def action_clear_cell(self) -> None:
-        """Clear the current cell (set to None)."""
-        self.do_clear_cell()
+    def cmd_move_column_right(self) -> None:
+        """Move column right."""
+        self.cmd_move_column("right")
 
-    @with_full_df
-    def action_clear_column(self) -> None:
-        """Clear cells in the current column that match the cursor value."""
-        self.do_clear_column()
+    def cmd_move_row_up(self) -> None:
+        """Move row up."""
+        self.cmd_move_row("up")
 
-    @with_leader_key
-    def action_select_rows(self) -> None:
-        """Select rows by cursor value in current column, or all columns in ``g`` leader mode."""
-        self.do_select_rows()
+    def cmd_move_row_down(self) -> None:
+        """Move row down."""
+        self.cmd_move_row("down")
 
-    @with_leader_key
-    def action_select_rows_expr(self) -> None:
-        """Select rows by expression in current column, or all columns in ``g`` leader mode."""
-        scope = "all" if self.leader_key == "g" else "column"
-        self.do_select_rows_expr(scope=scope)
+    def cmd_cast_integer(self) -> None:
+        """Cast column to integer."""
+        self.cmd_cast_column_dtype("pl.Int64")
 
-    @with_leader_key
-    def action_unselect_rows_expr(self) -> None:
-        """Unselect rows by expression in current column, or all columns in ``g`` leader mode."""
-        scope = "all" if self.leader_key == "g" else "column"
-        self.do_unselect_rows_expr(scope=scope)
+    def cmd_cast_float(self) -> None:
+        """Cast column to float."""
+        self.cmd_cast_column_dtype("pl.Float64")
 
-    @with_leader_key
-    def action_find_cursor_value(self) -> None:
-        """Search forward by expression in current column or globally."""
-        if self.leader_key == "z":
-            self.do_find_cursor_value_direct(forward=True, scope="column")
-        else:
-            self.do_find_cursor_value(forward=True)
+    def cmd_cast_boolean(self) -> None:
+        """Cast column to boolean."""
+        self.cmd_cast_column_dtype("pl.Boolean")
 
-    @with_leader_key
-    def action_find_expr(self) -> None:
-        """Search backward by expression in current column or globally."""
-        if self.leader_key == "z":
-            self.do_find_cursor_value_direct(forward=False, scope="column")
-        else:
-            self.do_find_expr(forward=False)
+    def cmd_cast_string(self) -> None:
+        """Cast column to string."""
+        self.cmd_cast_column_dtype("pl.String")
 
-    @with_leader_key
-    def action_replace(self) -> None:
-        """Replace values in current column or globally across all columns."""
-        scope = "global" if self.leader_key == "g" else "column"
-        self.do_replace(scope=scope)
+    def cmd_cast_date(self) -> None:
+        """Cast column to date."""
+        self.cmd_cast_column_dtype("pl.Date")
 
-    def action_toggle_selection_current_row(self) -> None:
-        """Toggle selection for the current row."""
-        self.do_toggle_selection_current_row()
+    def cmd_upper_case_column(self) -> None:
+        """Convert column(s) to uppercase."""
+        self.cmd_case_column("upper")
 
-    def action_toggle_selection_current_column(self) -> None:
-        """Toggle selection for the current column."""
-        self.do_toggle_selection_current_column()
+    def cmd_lower_case_column(self) -> None:
+        """Convert column(s) to lowercase."""
+        self.cmd_case_column("lower")
 
-    @with_full_df
-    def action_toggle_selections(self) -> None:
-        """Toggle all row selections."""
-        self.do_toggle_selections()
-
-    @with_full_df
-    @with_leader_key
-    def action_delete_row(self) -> None:
-        """Delete the current row."""
-        if self.leader_key == "g":
-            self.do_delete_row(more="above")
-        elif self.leader_key == "z":
-            self.do_delete_row(more="below")
-        else:
-            self.do_delete_row()
-
-    @with_full_df
-    def action_explode_column(self) -> None:
-        """Explode the current list column into multiple rows."""
-        self.do_explode_column()
-
-    def action_explode_column_delim(self) -> None:
-        """Explode the current column by a delimiter into multiple rows."""
-        self.do_explode_column_delim()
-
-    @with_full_df
-    @with_leader_key
-    def action_duplicate_row_column(self) -> None:
-        """Duplicate the current row or column."""
-        self.do_duplicate_row_column()
-
-    @with_full_df
-    @with_leader_key
-    def action_undo(self) -> None:
-        """Undo the last action."""
-        if self.leader_key == "g":
-            self.do_reset()
-        else:
-            self.do_undo()
-
-    @with_full_df
-    def action_redo(self) -> None:
-        """Redo the last undone action."""
-        self.do_redo()
-
-    @with_full_df
-    def action_move_column_left(self, col_idx: int | None = None) -> None:
-        """Move the current column to the left."""
-        self.do_move_column("left", col_idx=col_idx)
-
-    @with_full_df
-    def action_move_column_right(self, col_idx: int | None = None) -> None:
-        """Move the current column to the right."""
-        self.do_move_column("right", col_idx=col_idx)
-
-    @with_full_df
-    def action_move_row_up(self) -> None:
-        """Move the current row up."""
-        self.do_move_row("up")
-
-    @with_full_df
-    def action_move_row_down(self) -> None:
-        """Move the current row down."""
-        self.do_move_row("down")
-
-    def action_clear_selections_and_matches(self) -> None:
-        """Clear all row/column selections and cell matches."""
-        self.do_clear_selections_and_matches()
-
-    def action_toggle_freeze_row_column(self) -> None:
-        """Toggle the freeze."""
-        self.do_toggle_freeze_row_column()
-
-    @with_full_df
-    def action_cast_column_dtype(self, dtype: str | pl.DataType) -> None:
-        """Cast the current column to a different data type."""
-        self.do_cast_column_dtype(dtype)
-
-    @with_full_df
-    def action_upper_case_column(self) -> None:
-        """Convert the current or selected string column(s) to uppercase."""
-        self.do_case_column("upper")
-
-    @with_full_df
-    def action_lower_case_column(self) -> None:
-        """Convert the current or selected string column(s) to lowercase."""
-        self.do_case_column("lower")
-
-    def action_copy_cell(self) -> None:
+    def cmd_copy_cell(self) -> None:
         """Copy the current cell to clipboard."""
         ridx = self.cursor_ridx
         cidx = self.cursor_cidx
-
         try:
             cell_str = str(self.df.item(ridx, cidx))
-            self.do_copy_to_clipboard(cell_str, f"Copied: [$success]{cell_str[:50]}[/]")
+            self.cmd_copy_to_clipboard(cell_str, f"Copied: [$success]{cell_str[:50]}[/]")
         except IndexError:
             self.notify(
                 f"Failed to copy cell ([$error]{ridx}[/], [$accent]{cidx}[/]) to clipboard",
@@ -1446,16 +960,13 @@ class DataFrameTable(DataTable):
             )
 
     @with_full_df
-    def action_copy_column(self) -> None:
+    def cmd_copy_column(self) -> None:
         """Copy the current column to clipboard (one value per line)."""
         col_name = self.cursor_col_name
-
         try:
-            # Get all values in the column and join with newlines
             col_values = [str(val) for val in self.df[col_name].to_list()]
             col_str = "\n".join(col_values)
-
-            self.do_copy_to_clipboard(
+            self.cmd_copy_to_clipboard(
                 col_str,
                 f"Copied [$success]{len(col_values)}[/] values from column [$accent]{col_name}[/]",
             )
@@ -1464,24 +975,20 @@ class DataFrameTable(DataTable):
                 f"Failed to copy column [$error]{col_name}[/] to clipboard", title="Copy Column", severity="error"
             )
 
-    def action_copy_row(self) -> None:
+    def cmd_copy_row(self) -> None:
         """Copy the current row to clipboard (values separated by tabs)."""
         ridx = self.cursor_ridx
-
         try:
-            # Get all values in the row and join with tabs
             row_values = [str(val) for val in self.df.row(ridx)]
             row_str = "\t".join(row_values)
-
-            self.do_copy_to_clipboard(
+            self.cmd_copy_to_clipboard(
                 row_str,
                 f"Copied row [$success]{ridx + 1}[/] with [$accent]{len(row_values)}[/] values",
             )
         except (FileNotFoundError, IndexError):
             self.notify(f"Failed to copy row [$error]{ridx}[/] to clipboard", title="Copy Row", severity="error")
 
-    @with_leader_key
-    def action_toggle_thousand_separator(self) -> None:
+    def cmd_toggle_thousand_separator(self) -> None:
         """Toggle thousand separator for the current cursor column."""
         col_name = self.cursor_col_name
         if col_name in self.thousand_separator_columns:
@@ -1500,13 +1007,21 @@ class DataFrameTable(DataTable):
                     severity="warning",
                 )
                 return
-
         self.setup_table()
-        message = f"Thousand separator is [$success]{status}[/] for column [$accent]{col_name}[/]"
+        self.notify(
+            f"Thousand separator is [$success]{status}[/] for column [$accent]{col_name}[/]",
+            title="Toggle Thousand Separator",
+        )
 
-        self.notify(message, title="Toggle Thousand Separator")
+    def cmd_decrease_float_precision(self) -> None:
+        """Decrease float precision for the current column."""
+        self._adjust_float_precision(-1)
 
-    def action_adjust_float_precision(self, delta: int) -> None:
+    def cmd_increase_float_precision(self) -> None:
+        """Increase float precision for the current column."""
+        self._adjust_float_precision(1)
+
+    def _adjust_float_precision(self, delta: int) -> None:
         """Adjust float precision for the current cursor column."""
         col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
@@ -1518,48 +1033,20 @@ class DataFrameTable(DataTable):
                 severity="warning",
             )
             return
-
         current = self.float_precision_columns.get(col_name, 0)
         new_precision = max(0, current + delta)
-
         if new_precision == 0:
             self.float_precision_columns.pop(col_name, None)
         else:
             self.float_precision_columns[col_name] = new_precision
-
         if new_precision != current:
             self.setup_table()
-
         message = (
             f"Float precision turned [$success]off[/] for column [$accent]{col_name}[/]"
             if new_precision == 0
             else f"Float precision for column [$success]{col_name}[/] set to [$accent]{new_precision}[/] decimal place(s)"
         )
         self.notify(message, title="Set Float Precision")
-
-    def action_next_match(self) -> None:
-        """Go to the next matched cell."""
-        self.do_next_match()
-
-    def action_previous_match(self) -> None:
-        """Go to the previous matched cell."""
-        self.do_previous_match()
-
-    def action_next_selected_row(self) -> None:
-        """Go to the next selected row."""
-        self.do_next_selected_row()
-
-    def action_previous_selected_row(self) -> None:
-        """Go to the previous selected row."""
-        self.do_previous_selected_row()
-
-    @with_leader_key
-    def action_sql_query(self) -> None:
-        """Open the SQL interface screen."""
-        if self.leader_key == "z":
-            self.do_simple_sql()
-        else:
-            self.do_advanced_sql()
 
     def setup_table(self) -> None:
         """Setup the table for display.
@@ -2082,13 +1569,14 @@ class DataFrameTable(DataTable):
         return row_key
 
     # Navigation
-    def do_go_top(self) -> None:
+    def cmd_go_top(self) -> None:
         """Go to the top of the table."""
         self.move_cursor(row=0)
 
         self.notify("Moved to top of table", title="Go to Top")
 
-    def do_go_bottom(self) -> None:
+    @with_full_df
+    def cmd_go_bottom(self) -> None:
         """Go to the bottom of the table."""
         stop = len(self.df)
         start = max(0, stop - self.BATCH_SIZE)
@@ -2104,7 +1592,7 @@ class DataFrameTable(DataTable):
 
         self.notify("Moved to bottom of table", title="Go to Bottom")
 
-    def do_go_to_row(self) -> None:
+    def cmd_go_to_row(self) -> None:
         """Open a modal screen to Go to a specific row."""
         self.app.push_screen(GoToRowScreen(self), callback=self.go_to_row)
 
@@ -2123,7 +1611,7 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Moved to row {result}", title="Go to Row")
 
-    def do_page_up(self) -> None:
+    def cmd_page_backward(self) -> None:
         """Move the cursor one page up."""
         self._set_hover_cursor(False)
         if self.show_cursor and self.cursor_type in ("cell", "row"):
@@ -2137,7 +1625,7 @@ class DataFrameTable(DataTable):
 
             self.move_cursor(row=self.get_row_idx(str(next_ridx)), column=col_idx)
 
-    def do_page_down(self) -> None:
+    def cmd_page_forward(self) -> None:
         """Move the cursor one page down."""
         self.load_rows_down()
 
@@ -2210,7 +1698,7 @@ class DataFrameTable(DataTable):
         if dirty:
             self.dirty = True
 
-    def do_undo(self) -> None:
+    def cmd_undo(self) -> None:
         """Undo the last action."""
         if not self.histories_undo:
             self.notify("No actions to undo", title="Undo", severity="warning")
@@ -2225,7 +1713,7 @@ class DataFrameTable(DataTable):
 
         self.notify(history.description, title="Undo")
 
-    def do_redo(self) -> None:
+    def cmd_redo(self) -> None:
         """Redo the last undone action."""
         if not self.histories_redo:
             self.notify("No actions to redo", title="Redo", severity="warning")
@@ -2285,28 +1773,27 @@ class DataFrameTable(DataTable):
         self.show_column_index = False
         self.setup_table()
 
-    def do_reset(self) -> None:
+    def cmd_reset(self) -> None:
         """Reset the table to the initial state."""
         self.apply_frame(self.dataframe, dirty=False)
         self.notify("Restored to initial state", title="Reset")
 
     # Display
-    @with_leader_key
-    def do_cycle_cursor_type(self) -> None:
+    def cmd_cycle_cursor_type(self) -> None:
         """Cycle through cursor types: cell -> row -> column -> cell."""
         next_type = get_next_item(CURSOR_TYPES, self.cursor_type)
         self.cursor_type = next_type
 
         self.notify(f"Cursor type is now [$success]{next_type}[/]", title="Cycle Cursor Type")
 
-    def do_view_row_detail(self) -> None:
+    def cmd_view_row_detail(self) -> None:
         """Open a modal screen to view the selected row's details."""
         ridx = self.cursor_ridx
 
         # Push the modal screen
         self.app.push_screen(RowDetailScreen(self, ridx))
 
-    def do_view_cell_detail(self) -> None:
+    def cmd_view_cell_detail(self) -> None:
         """Open a modal screen to view the selected cell's details."""
         cidx = self.cursor_cidx
         col_name = self.df.columns[cidx]
@@ -2332,7 +1819,8 @@ class DataFrameTable(DataTable):
         elif dtype == pl.Struct and cell_value:
             self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
 
-    def do_show_frequency(self, cidx: int | list[int] | None = None) -> None:
+    @with_full_df
+    def cmd_show_frequency(self, cidx: int | list[int] | None = None) -> None:
         """Show frequency distribution for one or more columns.
 
         Args:
@@ -2353,7 +1841,8 @@ class DataFrameTable(DataTable):
         # Push the frequency modal screen
         self.app.push_screen(FrequencyScreen(self, cidx))
 
-    def do_show_histogram(self, default: int = 1) -> None:
+    @with_full_df
+    def cmd_show_histogram(self, default: int = 1) -> None:
         """Show histogram for a given columnn."""
         dtype = self.cursor_col_dtype
         dc = DtypeConfig(dtype)
@@ -2385,7 +1874,8 @@ class DataFrameTable(DataTable):
         bin_count, bins = result
         self.app.push_screen(HistogramScreen(self, bins=bins, bin_count=bin_count))
 
-    def do_show_bar(self) -> None:
+    @with_full_df
+    def cmd_show_bar(self) -> None:
         """Show bar chart using first selected column as label and cursor column as value."""
         if not self.selected_columns:
             self.notify(
@@ -2413,20 +1903,23 @@ class DataFrameTable(DataTable):
         cidx_label = self.df.columns.index(col_label_name)
         self.app.push_screen(BarScreen(self, cidx, cidx_label))
 
-    def do_show_statistics(self, cidx: int | None = None) -> None:
-        """Show statistics for the current column or entire dataframe."""
-        # Show statistics for entire dataframe
-        if self.leader_key == "g":
+    @with_full_df
+    def cmd_show_statistics(self, cidx: int | None = None) -> None:
+        """Show statistics for the current column or entire dataframe.
+
+        Args:
+            cidx: Column index. Pass -1 for entire dataframe, None for current column.
+        """
+        if cidx == -1:
             self.app.push_screen(StatisticsScreen(self, cidx=None))
-        # Show statistics for current column
         else:
             self.app.push_screen(StatisticsScreen(self, cidx=self.cursor_cidx if cidx is None else cidx))
 
-    def do_metadata_column(self) -> None:
+    def cmd_metadata_column(self) -> None:
         """Show metadata for all columns in the dataframe."""
         self.app.push_screen(MetaColumnScreen(self))
 
-    def do_toggle_freeze_row_column(self) -> None:
+    def cmd_toggle_freeze(self) -> None:
         """Toggle the freeze."""
         if self.fixed_rows or self.fixed_columns:
             self.fixed_rows = self.fixed_columns = 0
@@ -2464,7 +1957,7 @@ class DataFrameTable(DataTable):
 
         self.notify(descr, title="Freeze Row/Column")
 
-    def do_hide_column(self, more: str | None = None) -> None:
+    def cmd_hide_column(self, more: str | None = None) -> None:
         """Hide columns from the table display.
 
         Args:
@@ -2552,20 +2045,20 @@ class DataFrameTable(DataTable):
             self.log(f"Error expanding column `{col_name}`: {e}")
             return None
 
-    def do_expand_column(self) -> None:
+    def cmd_expand_column(self, expand_all: bool = False) -> None:
         """Expand/unexpand string/list columns.
 
-        In leader mode: expand or unexpand all string/list columns.
-        Otherwise: expand or unexpand the current column only.
+        Args:
+            expand_all: If True, expand or unexpand all string/list columns.
+                        Otherwise: expand or unexpand the current column only.
         """
-        if self.leader_key == "g":
+        if expand_all:
             # Collect all string/list column names
             target_cols = [
                 col for col, dtype in self.visible_columns.items() if DtypeConfig(dtype).gtype in ("string", "list")
             ]
 
             if not target_cols:
-                # self.notify("No string/list columns to expand", title="Expand Columns")
                 return
 
             results = []
@@ -2601,8 +2094,7 @@ class DataFrameTable(DataTable):
 
             self.notify(f"Column {result}", title="Expand Column")
 
-    @with_leader_key
-    def do_toggle_rid(self) -> None:
+    def cmd_toggle_rid(self) -> None:
         """Toggle display of the internal RID column."""
         self.add_history("Toggle RID column display")
         self.show_rid = not self.show_rid
@@ -2615,8 +2107,7 @@ class DataFrameTable(DataTable):
             title="Toggle RID",
         )
 
-    @with_leader_key
-    def do_toggle_column_index(self) -> None:
+    def cmd_toggle_column_index(self) -> None:
         """Toggle display of column index prefixes in headers."""
         self.add_history("Toggle column index display")
 
@@ -2626,8 +2117,7 @@ class DataFrameTable(DataTable):
         self.notify(f"Column index prefix is [$success]{status}[/]", title="Toggle Column Index")
 
     @with_full_df
-    @with_leader_key
-    def do_set_cursor_row_as_header(self) -> None:
+    def cmd_set_row_as_header(self) -> None:
         """Set cursor row as the new header row."""
         ridx = self.cursor_ridx
 
@@ -2684,7 +2174,7 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Set row [$success]{ridx + 1}[/] as header", title="Set Row as Header")
 
-    def do_show_hidden_columns(self) -> None:
+    def cmd_show_hidden_columns(self) -> None:
         """Show all hidden columns by recreating the table."""
         if not self.hidden_columns:
             self.notify("No hidden columns to show", title="Show Hidden Column(s)", severity="warning")
@@ -2702,7 +2192,8 @@ class DataFrameTable(DataTable):
         self.notify("Displayed hidden column(s)", title="Show Hidden Column(s)")
 
     # Sort
-    def do_sort_by_column(self, descending: bool = False) -> None:
+    @with_full_df
+    def cmd_sort_by_column(self, descending: bool = False) -> None:
         """Sort by the currently selected column.
 
         Supports multi-column sorting:
@@ -2772,7 +2263,7 @@ class DataFrameTable(DataTable):
             )
 
     # Edit
-    def do_edit_cell(self, ridx: int | None = None, cidx: int | None = None) -> None:
+    def cmd_edit_cell(self, ridx: int | None = None, cidx: int | None = None) -> None:
         """Open modal to edit the selected cell."""
         ridx = self.cursor_ridx if ridx is None else ridx
         cidx = self.cursor_cidx if cidx is None else cidx
@@ -2854,7 +2345,7 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error updating cell ({ridx}, {col_name}): {e}")
 
-    def do_edit_column(self) -> None:
+    def cmd_edit_column(self) -> None:
         """Open modal to edit the entire column with an expression."""
         cidx = self.cursor_cidx
 
@@ -2928,7 +2419,7 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Updated column [$success]{col_name}[/] with [$accent]{expr}[/]", title="Edit Column")
 
-    def do_rename_column(self, col_idx: int | None = None) -> None:
+    def cmd_rename_column(self, col_idx: int | None = None) -> None:
         """Open modal to rename the selected column."""
         col_idx = self.cursor_column if col_idx is None else col_idx
         col_name = self.get_col_key(col_idx).value
@@ -2987,7 +2478,7 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Renamed column [$success]{col_name}[/] to [$accent]{new_name}[/]", title="Rename Column")
 
-    def do_clear_cell(self) -> None:
+    def cmd_clear_cell(self) -> None:
         """Clear the current cell by setting its value to None."""
         row_key, col_key = self.cursor_key
         ridx = self.cursor_ridx
@@ -3036,7 +2527,7 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error clearing cell ({ridx}, {col_name}): {e}")
 
-    def do_clear_column(self) -> None:
+    def cmd_clear_column(self) -> None:
         """Clear cells in the current column that match the cursor value by setting them to None."""
         col_idx = self.cursor_column
         col_name = self.cursor_col_name
@@ -3087,7 +2578,7 @@ class DataFrameTable(DataTable):
         return new_col_name
 
     @with_full_df
-    def do_add_column(self, col_name: str | None = None) -> None:
+    def cmd_add_column(self, col_name: str | None = None) -> None:
         """Add acolumn after the current column."""
         cidx = self.cursor_cidx
 
@@ -3128,7 +2619,7 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to add column [$error]{new_col_name}[/]", title="Add Column", severity="error")
             self.log(f"Error adding column `{new_col_name}`: {e}")
 
-    def do_add_column_expr(self) -> None:
+    def cmd_add_column_expr(self) -> None:
         """Open screen to add a new column with optional expression."""
         cidx = self.cursor_cidx
         self.app.push_screen(
@@ -3178,7 +2669,8 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to add column [$error]{new_col_name}[/]", title="Add Column", severity="error")
             self.log(f"Error adding column `{new_col_name}`: {e}")
 
-    def do_add_index_column(self, start: int = 1, step: int = 1) -> None:
+    @with_full_df
+    def cmd_add_index_column(self, start: int = 1, step: int = 1) -> None:
         """Add an index column after the current column.
 
         Args:
@@ -3230,7 +2722,7 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error adding index column `{new_col_name}`: {e}")
 
-    def do_split_column(self) -> None:
+    def cmd_split_column(self) -> None:
         """Open a confirmation screen to split the current string column into a new column."""
         col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
@@ -3307,8 +2799,7 @@ class DataFrameTable(DataTable):
             self.log(f"Error splitting column `{col_name}` with delimiter `{delimiter}`: {e}")
 
     @with_full_df
-    @with_leader_key
-    def do_join_columns(self) -> None:
+    def cmd_join_columns(self) -> None:
         """Prompt for a delimiter and join all selected columns into a new string column.
 
         The new column is inserted after the current cursor column.  At least two
@@ -3405,8 +2896,7 @@ class DataFrameTable(DataTable):
             self.log(f"Error joining columns into `{new_col_name}`: {e}")
 
     @with_full_df
-    @with_leader_key
-    def do_glue_list_column(self) -> None:
+    def cmd_glue_list_column(self) -> None:
         """Prompt for a delimiter and glue the items of the current list column into a string column.
 
         A new string column is inserted after the current cursor column, replacing
@@ -3481,7 +2971,8 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error gluing list column `{col_name}`: {e}")
 
-    def do_expand_list_column(self) -> None:
+    @with_full_df
+    def cmd_expand_list_column(self) -> None:
         """Expand the current list column into multiple indexed columns.
 
         Example: ``items`` -> ``items_1``, ``items_2``, ... based on the
@@ -3555,11 +3046,12 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error expanding list column `{col_name}`: {e}")
 
-    def do_contract_list_column(self) -> None:
+    @with_full_df
+    def cmd_contract_list_column(self) -> None:
         """Contract indexed sibling columns back into a single list column.
 
         Detects sibling columns by the ``base[N]`` naming pattern produced by
-        :meth:`do_expand_list_column`.  The cursor must be on one of those
+        :meth:`cmd_expand_list_column`.  The cursor must be on one of those
         indexed columns (e.g. ``items[2]``).  All siblings are collected in
         index order, combined into a Polars ``List`` column at the position of
         the first sibling, and the individual indexed columns are removed.
@@ -3649,7 +3141,7 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error contracting list column `{base_name}`: {e}")
 
-    def do_add_link_column(self) -> None:
+    def cmd_add_link_column(self) -> None:
         """Open AddLinkScreen to collect a link template and add a new link column."""
         self.app.push_screen(
             AddLinkScreen(self.cursor_cidx, self.df),
@@ -3723,7 +3215,8 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to add link column [$error]{new_col_name}[/]", title="Add Link", severity="error")
             self.log(f"Error adding link column: {e}")
 
-    def do_delete_column(self, more: str | None = None, col_idx: int | None = None) -> None:
+    @with_full_df
+    def cmd_delete_column(self, more: str | None = None, col_idx: int | None = None) -> None:
         """Remove selected columns when present, otherwise the current column."""
         # Get the column to remove
         if col_idx is None:
@@ -3806,7 +3299,8 @@ class DataFrameTable(DataTable):
 
         self.notify(message, title="Delete Column")
 
-    def do_explode_column(self) -> None:
+    @with_full_df
+    def cmd_explode_column(self) -> None:
         """Explode the current list column into multiple rows."""
         col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
@@ -3818,7 +3312,8 @@ class DataFrameTable(DataTable):
         self.task_done = False
         self.app.push_screen(BusyScreen(self, task=partial(self.explode_column, col_name)))
 
-    def do_explode_column_delim(self) -> None:
+    @with_full_df
+    def cmd_explode_column_delim(self) -> None:
         """Open screen to explode a string column based on delimiter."""
         col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
@@ -3896,7 +3391,8 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error exploding column `{col_name}` with delimiter `{delimiter}`: {e}")
 
-    def do_delete_row(self, more: str | None = None) -> None:
+    @with_full_df
+    def cmd_delete_row(self, more: str | None = None) -> None:
         """Delete rows from the table and dataframe.
 
         Supports deleting multiple selected rows. If no rows are selected, deletes the row at the cursor.
@@ -3965,14 +3461,19 @@ class DataFrameTable(DataTable):
         if deleted_count > 0:
             self.notify(f"Deleted [$success]{deleted_count}[/] row(s)", title="Delete Row(s)")
 
-    def do_duplicate_row_column(self) -> None:
-        """Duplicate the currently selected row or column."""
-        if self.leader_key == "z":
-            self.do_duplicate_column()
-        else:
-            self.do_duplicate_row()
+    def cmd_duplicate_row_column(self, target: str = "row") -> None:
+        """Duplicate the currently selected row or column.
 
-    def do_duplicate_row(self) -> None:
+        Args:
+            target: "row" or "column"
+        """
+        if target == "column":
+            self.cmd_duplicate_column()
+        else:
+            self.cmd_duplicate_row()
+
+    @with_full_df
+    def cmd_duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""
         ridx = self.cursor_ridx
         rid = self.df[RID][ridx]
@@ -4007,7 +3508,8 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Duplicated row [$success]{ridx + 1}[/]", title="Duplicate Row")
 
-    def do_duplicate_column(self) -> None:
+    @with_full_df
+    def cmd_duplicate_column(self) -> None:
         """Duplicate the currently selected column, inserting it right after the current column."""
         cidx = self.cursor_cidx
         col_name = self.cursor_col_name
@@ -4049,7 +3551,7 @@ class DataFrameTable(DataTable):
         )
 
     @with_full_df
-    def do_uniq_rows(self) -> None:
+    def cmd_remove_duplicates(self) -> None:
         """Remove duplicate rows from the current dataframe, keeping the first occurrence."""
         subset = list(self.visible_columns.keys())
         unique_df = self.df.unique(subset=subset, keep="first", maintain_order=True)
@@ -4079,7 +3581,8 @@ class DataFrameTable(DataTable):
             title="Unique Rows",
         )
 
-    def do_move_column(self, direction: str, col_idx: int | None = None) -> None:
+    @with_full_df
+    def cmd_move_column(self, direction: str, col_idx: int | None = None) -> None:
         """Move the current column left or right.
 
         Args:
@@ -4133,7 +3636,8 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move Column")
 
-    def do_move_row(self, direction: str) -> None:
+    @with_full_df
+    def cmd_move_row(self, direction: str) -> None:
         """Move the current row up or down.
 
         Args:
@@ -4222,7 +3726,7 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Moved row [$success]{curr_key.value}[/] {direction}", title="Move Row")
 
-    def do_transpose(self) -> None:
+    def cmd_transpose(self) -> None:
         """Transpose the dataframe, swapping rows and columns."""
         if not self.visible_columns:
             self.notify("No data columns available to transpose", title="Transpose", severity="warning")
@@ -4247,7 +3751,8 @@ class DataFrameTable(DataTable):
             self.log(f"Error transposing table: {e}")
 
     # Type casting
-    def do_cast_column_dtype(self, dtype: str) -> None:
+    @with_full_df
+    def cmd_cast_column_dtype(self, dtype: str) -> None:
         """Cast the current column to a different data type.
 
         Args:
@@ -4304,7 +3809,8 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error casting column `{col_name}`: {e}")
 
-    def do_case_column(self, case: str) -> None:
+    @with_full_df
+    def cmd_case_column(self, case: str) -> None:
         """Convert string column(s) to uppercase or lowercase.
 
         Applies the transformation to all selected string columns when a column
@@ -4350,8 +3856,7 @@ class DataFrameTable(DataTable):
         self.notify(descr, title=f"Convert to {label.capitalize()}")
 
     @with_full_df
-    @with_leader_key
-    def do_strip_whitespace_column(self) -> None:
+    def cmd_strip_whitespace(self) -> None:
         """Strip leading and trailing whitespace in the current string column."""
         col_name = self.cursor_col_name
         cidx = self.cursor_cidx
@@ -4464,14 +3969,16 @@ class DataFrameTable(DataTable):
 
         return matches
 
-    def do_find_cursor_value(self, forward: bool = True) -> None:
+    def cmd_find_forward(self, forward: bool = True, scope: str = "column") -> None:
         """Open expression search prefilled with cursor value.
 
-        Scope is determined by leader mode: current column by default, or global when in leader mode.
+        Args:
+            forward: Whether to navigate forward.
+            scope: "column" or "all" (global).
         """
-        self.do_find_expr(forward=forward)
+        self.cmd_find_backward(forward=forward, scope=scope)
 
-    def do_find_cursor_value_direct(self, forward: bool = True, scope: str = "column") -> None:
+    def cmd_find_cursor_direct(self, forward: bool = True, scope: str = "column") -> None:
         """Search immediately using the cursor value without opening SearchScreen.
 
         Args:
@@ -4494,18 +4001,18 @@ class DataFrameTable(DataTable):
             forward=forward,
         )
 
-    def do_find_expr(self, forward: bool = False) -> None:
+    def cmd_find_backward(self, forward: bool = False, scope: str = "column") -> None:
         """Open expression search screen.
-
-        Scope is determined by leader mode: current column by default, or global when in leader mode.
 
         Args:
             forward: Whether to navigate to the next match after applying results.
+            scope: "column" or "all" (global).
         """
         # Use current cell value as default search term
         term = NULL if self.cursor_value is None else str(self.cursor_value)
         cidx = self.cursor_cidx
-        scope = "global" if self.leader_key == "g" else "column"
+        if scope == "all":
+            scope = "global"
         title_scope = "Global" if scope == "global" else "Column"
         title_direction = "Forward" if forward else "Backward"
 
@@ -4575,11 +4082,11 @@ class DataFrameTable(DataTable):
 
         # Move to next/previous match relative to current cursor.
         if forward:
-            self.do_next_match()
+            self.cmd_next_match()
         else:
-            self.do_previous_match()
+            self.cmd_prev_match()
 
-    def do_next_match(self) -> None:
+    def cmd_next_match(self) -> None:
         """Move cursor to the next match."""
         if not self.matches:
             self.notify("No matches to navigate", title="Next Match", severity="warning")
@@ -4601,7 +4108,7 @@ class DataFrameTable(DataTable):
         first_ridx, first_cidx = ordered_matches[0]
         self.move_cursor_to(first_ridx, first_cidx)
 
-    def do_previous_match(self) -> None:
+    def cmd_prev_match(self) -> None:
         """Move cursor to the previous match."""
         if not self.matches:
             self.notify("No matches to navigate", title="Previous Match", severity="warning")
@@ -4623,7 +4130,7 @@ class DataFrameTable(DataTable):
         last_ridx, last_cidx = ordered_matches[-1]
         self.move_cursor_to(last_ridx, last_cidx)
 
-    def do_next_selected_row(self) -> None:
+    def cmd_next_selected_row(self) -> None:
         """Move cursor to the next selected row."""
         if not self.selected_rows:
             self.notify("No selected rows to navigate", title="Next Selected Row", severity="warning")
@@ -4645,7 +4152,7 @@ class DataFrameTable(DataTable):
         first_ridx = selected_row_indices[0]
         self.move_cursor_to(first_ridx, self.cursor_cidx)
 
-    def do_previous_selected_row(self) -> None:
+    def cmd_prev_selected_row(self) -> None:
         """Move cursor to the previous selected row."""
         if not self.selected_rows:
             self.notify("No selected rows to navigate", title="Previous Selected Row", severity="warning")
@@ -4667,7 +4174,7 @@ class DataFrameTable(DataTable):
         last_ridx = selected_row_indices[-1]
         self.move_cursor_to(last_ridx, self.cursor_cidx)
 
-    def do_replace(self, scope="column") -> None:
+    def cmd_replace(self, scope="column") -> None:
         """Open replace screen for current column or globally across all columns."""
         # Push the replace modal screen
         title = "Find and Replace" if scope == "column" else "Global Find and Replace"
@@ -4996,7 +4503,8 @@ class DataFrameTable(DataTable):
         self.show_next_replace_confirmation()
 
     # Filter & Collect
-    def do_filter_rows(self, result: dict | None = None) -> None:
+    @with_full_df
+    def cmd_filter_rows(self, result: dict | None = None) -> None:
         """Filter rows.
 
         If there are selected rows, view those, Otherwise, view based on the cursor value.
@@ -5033,7 +4541,8 @@ class DataFrameTable(DataTable):
                 }
             )
 
-    def do_filter_rows_null(self, with_null: bool = False) -> None:
+    @with_full_df
+    def cmd_filter_rows_null(self, with_null: bool = False) -> None:
         """Filter rows by nullness in the current column.
 
         Args:
@@ -5061,7 +4570,8 @@ class DataFrameTable(DataTable):
             }
         )
 
-    def do_filter_rows_expr(self) -> None:
+    @with_full_df
+    def cmd_filter_rows_expr(self) -> None:
         """Open the filter screen to enter an expression."""
         cidx = self.cursor_cidx
         dtype = self.cursor_col_dtype
@@ -5213,7 +4723,8 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Displayed [$success]{matched_count}[/] matching row(s)", title="View Rows")
 
-    def do_filter_rows_value(self) -> None:
+    @with_full_df
+    def cmd_filter_rows_value(self) -> None:
         """Filter current dataframe rows by a condition on the current numeric column.
 
         For integer/float columns, opens FilterNumericColumn to collect conditions.
@@ -5307,7 +4818,8 @@ class DataFrameTable(DataTable):
             title="Filter Rows",
         )
 
-    def do_collect_rows_columns(self, cidx: int | None = None, term: Any | list[Any] = None) -> None:
+    @with_full_df
+    def cmd_collect_rows(self, cidx: int | None = None, term: Any | list[Any] = None) -> None:
         """Collect rows/columns to a new tab.
 
         If there are selected rows/columns, use those.
@@ -5361,19 +4873,22 @@ class DataFrameTable(DataTable):
         )
 
     # Row selection
-    def do_select_rows(self) -> None:
+    @with_full_df
+    def cmd_select_rows(self, scope: str = "column") -> None:
         """Select rows.
 
         If there are existing cell matches, use those to select rows.
         Otherwise, use the current cell value as the search term and select rows matching that value.
-        In ``g`` leader mode, search all columns instead of only the current column.
+
+        Args:
+            scope: "column" for current column, "all" for all columns.
         """
         cidx = self.cursor_cidx
 
         # Use existing cell matches if present
         if self.matches:
             term = pl.col(RID).is_in(self.matches)
-        elif self.leader_key == "g":
+        elif scope == "all":
             search_term = NULL if self.cursor_value is None else str(self.cursor_value)
             matches = self.find_matches(
                 term=search_term,
@@ -5408,7 +4923,7 @@ class DataFrameTable(DataTable):
             }
         )
 
-    def do_select_rows_expr(self, scope: str = "column") -> None:
+    def cmd_select_rows_expr(self, scope: str = "column") -> None:
         """Open screen to select rows by expression in the requested scope.
 
         Args:
@@ -5432,7 +4947,7 @@ class DataFrameTable(DataTable):
             callback=partial(self.select_rows, scope=scope),
         )
 
-    def do_unselect_rows_expr(self, scope: str = "column") -> None:
+    def cmd_unselect_rows_expr(self, scope: str = "column") -> None:
         """Open screen to unselect rows by expression in the requested scope.
 
         Args:
@@ -5654,7 +5169,8 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-    def do_toggle_selections(self) -> None:
+    @with_full_df
+    def cmd_toggle_selections(self) -> None:
         """Toggle selected rows highlighting on/off."""
         # Add to history
         self.add_history("Toggle row selection")
@@ -5669,7 +5185,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-    def do_toggle_selection_current_row(self) -> None:
+    def cmd_toggle_selection_row(self) -> None:
         """Select/deselect current row."""
         # Add to history
         self.add_history("Toggle row selection")
@@ -5702,7 +5218,7 @@ class DataFrameTable(DataTable):
 
             self.update_cell(row_key, col_key, cell_text)
 
-    def do_toggle_selection_current_column(self) -> None:
+    def cmd_toggle_selection_col(self) -> None:
         """Select/deselect current column."""
         # Add to history
         self.add_history("Toggle column selection")
@@ -5718,7 +5234,7 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-    def do_clear_selections_and_matches(self) -> None:
+    def cmd_clear_selections(self) -> None:
         """Clear all selected rows/columns and matches without changing the dataframe."""
         # Check if any selected rows or matches
         if not self.selected_rows and not self.selected_columns and not self.matches:
@@ -5741,7 +5257,7 @@ class DataFrameTable(DataTable):
         self.notify(f"Cleared selections for [$success]{row_count}[/] rows", title="Clear Selections and Matches")
 
     # Copy
-    def do_copy_to_clipboard(self, content: str, message: str) -> None:
+    def cmd_copy_to_clipboard(self, content: str, message: str) -> None:
         """Copy content to clipboard using pbcopy (macOS) or xclip (Linux).
 
         Args:
@@ -5765,7 +5281,8 @@ class DataFrameTable(DataTable):
             self.notify("Failed to copy to clipboard", title="Copy to Clipboard", severity="error")
 
     # SQL Interface
-    def do_simple_sql(self) -> None:
+    @with_full_df
+    def cmd_sql_simple(self) -> None:
         """Open the SQL interface screen."""
         self.app.push_screen(
             SimpleSqlScreen(self),
@@ -5784,12 +5301,73 @@ class DataFrameTable(DataTable):
 
         self.run_sql(sql, new_tab)
 
-    def do_advanced_sql(self) -> None:
+    @with_full_df
+    def cmd_sql_advanced(self) -> None:
         """Open the advanced SQL interface screen."""
         self.app.push_screen(
             AdvancedSqlScreen(self),
             callback=self.advanced_sql,
         )
+
+    def cmd_run_command(self) -> None:
+        """Open a modal screen to run a cmd_* method by name.
+
+        Accepts command names like 'show-frequency' or 'show_frequency',
+        optionally followed by space-separated arguments.
+        """
+
+        self.app.push_screen(RunCommandScreen(), callback=self._dispatch_command_string)
+
+    def _dispatch_command_string(self, text: str | None) -> None:
+        """Parse and dispatch a command string like 'show-frequency arg1 arg2'.
+
+        Tries both the table (self) and the app as dispatch targets.
+
+        Args:
+            text: The command string entered by the user, or None if cancelled.
+        """
+        if not text:
+            return
+
+        from .commands import COMMANDS
+
+        parts = text.split()
+        cmd_name = parts[0]
+        args = parts[1:]
+
+        # Normalize: allow hyphens or underscores (canonical form uses hyphens)
+        cmd_name = cmd_name.replace("_", "-")
+
+        # Try lookup by command ID first
+        cmd_entry = COMMANDS.get(cmd_name)
+        if cmd_entry is None:
+            # Try as a direct method name (with or without cmd_ prefix)
+            method_name = cmd_name.replace("-", "_")
+            method_name = method_name if method_name.startswith("cmd_") else f"cmd_{method_name}"
+            method = getattr(self, method_name, None) or getattr(self.app, method_name, None)
+            if method is None:
+                self.notify(f"Unknown command: {cmd_name}", title="Run Command", severity="error")
+                return
+        else:
+            method_name = cmd_entry.method_name
+            method = getattr(self, method_name, None) or getattr(self.app, method_name, None)
+            if method is None:
+                self.notify(
+                    f"Command '{cmd_name}' not available on current target",
+                    title="Run Command",
+                    severity="error",
+                )
+                return
+
+        try:
+            if args:
+                method(*args)
+            else:
+                method()
+        except TypeError as e:
+            self.notify(f"Error calling {cmd_name}: {e}", title="Run Command", severity="error")
+        except Exception as e:
+            self.notify(f"{cmd_name} failed: {e}", title="Run Command", severity="error")
 
     def advanced_sql(self, result) -> None:
         """Handle SQL result result from AdvancedSqlScreen."""

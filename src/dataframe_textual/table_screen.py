@@ -356,11 +356,11 @@ class TableScreen(TableModalScreen):
 
         # Action collect
         if action == "collect":
-            self.dftable.action_collect_rows(cidx, values)
+            self.dftable.cmd_collect_rows(cidx=cidx, term=values)
 
         # Action filter
         else:
-            self.dftable.action_filter_rows(
+            self.dftable.cmd_filter_rows(
                 {
                     "term": expr,
                     "cidx": cidx,
@@ -977,9 +977,9 @@ class FrequencyScreen(TableScreen):
         cidx = self.cidxs[0]
 
         if action == "collect":
-            self.dftable.action_collect_rows_columns(cidx=cidx, term=expr)
+            self.dftable.cmd_collect_rows(cidx=cidx, term=expr)
         else:
-            self.dftable.action_filter_rows(
+            self.dftable.cmd_filter_rows(
                 {
                     "term": expr,
                     "cidx": cidx,
@@ -1147,10 +1147,10 @@ class MetaColumnScreen(TableScreen):
             row_idx, col_idx = self.table.cursor_coordinate
 
             if event.key in ("J", "shift+down"):
-                self.dftable.action_move_column_right(col_idx=row_idx)
+                self.dftable.cmd_move_column("right", col_idx=row_idx)
                 new_row_idx = min(row_idx + 1, len(self.dftable.df.columns) - 1)
             else:
-                self.dftable.action_move_column_left(col_idx=row_idx)
+                self.dftable.cmd_move_column("left", col_idx=row_idx)
                 new_row_idx = max(row_idx - 1, 0)
 
             # Refresh metadata to reflect the new column order and keep cursor on moved row.
@@ -1163,7 +1163,7 @@ class MetaColumnScreen(TableScreen):
 
             # Rename is asynchronous (opens a modal), so rebuild on resume.
             self._resume_row_idx = self.table.cursor_row
-            self.dftable.action_rename_column(col_idx=self._resume_row_idx)
+            self.dftable.cmd_rename_column(col_idx=self._resume_row_idx)
         # Delete column
         elif event.key == "d":
             event.stop()
