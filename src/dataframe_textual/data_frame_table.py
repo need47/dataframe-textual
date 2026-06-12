@@ -2802,38 +2802,48 @@ class DataFrameTable(DataTable):
 
         # Update the cell in the dataframe
         try:
-            self.df = self.df.with_columns(
-                pl.when(pl.arange(0, len(self.df)) == ridx)
-                .then(pl.lit(new_value))
-                .otherwise(pl.col(col_name))
-                .alias(col_name)
-            )
-
-            # Also update the view if applicable
-            if self.df_view is not None:
-                # Get the RID value for this row in df_view
-                ridx_view = self.df.item(ridx, self.df.columns.index(RID))
-                self.df_view = self.df_view.with_columns(
-                    pl.when(pl.col(RID) == ridx_view)
+            dtype = self.df.dtypes[cidx]
+            if isinstance(dtype, pl.List):
+                # pl.lit() cannot represent a list scalar inside when/then;
+                # rebuild the column as a Series with the updated value instead.
+                col_series = self.df[col_name].to_list()
+                col_series[ridx] = new_value
+                self.df = self.df.with_columns(pl.Series(col_name, col_series, dtype=dtype))
+            else:
+                self.df = self.df.with_columns(
+                    pl.when(pl.arange(0, len(self.df)) == ridx)
                     .then(pl.lit(new_value))
                     .otherwise(pl.col(col_name))
                     .alias(col_name)
                 )
 
+            # Also update the view if applicable
+            if self.df_view is not None:
+                # Sync the changed column from df into df_view via RID join
+                lf_updated = self.df.lazy().select(RID, pl.col(col_name))
+                self.df_view = self.df_view.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
+
             # Update the display
             cell_value = self.df.item(ridx, cidx)
-            if cell_value is None:
-                cell_value = NULL_DISPLAY
             dtype = self.df.dtypes[cidx]
             dc = DtypeConfig(dtype)
-            formatted_value = Text(str(cell_value), style=dc.style, justify=dc.justify)
+
+            if cell_value is None:
+                display_value = NULL_DISPLAY
+            elif isinstance(dtype, pl.List) and isinstance(cell_value, pl.Series):
+                # Polars returns list scalars as Series via item(); render compact list text for the table cell.
+                display_value = "[" + ", ".join(repr(v) for v in cell_value.to_list()) + "]"
+            else:
+                display_value = cell_value
+
+            formatted_value = Text(str(display_value), style=dc.style, justify=dc.justify)
 
             # string as keys
             row_key = str(ridx)
             col_key = col_name
             self.update_cell(row_key, col_key, formatted_value, update_width=True)
 
-            self.notify(f"Updated cell to [$success]{cell_value}[/]", title="Edit Cell")
+            self.notify(f"Updated cell to [$success]{display_value}[/]", title="Edit Cell")
         except Exception as e:
             self.notify(
                 f"Failed to update cell ([$error]{ridx}[/], [$accent]{col_name}[/])",

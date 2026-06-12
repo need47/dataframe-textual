@@ -404,7 +404,12 @@ class EditCellScreen(YesNoScreen):
 
         # Input
         df_value = df.item(ridx, cidx)
-        self.input_value = NULL if df_value is None else str(df_value)
+        if df_value is None:
+            self.input_value = NULL
+        elif isinstance(self.dtype, pl.List) and isinstance(df_value, pl.Series):
+            self.input_value = "[" + ", ".join(repr(v) for v in df_value) + "]"
+        else:
+            self.input_value = str(df_value)
 
         super().__init__(
             title="Edit Cell",
@@ -435,7 +440,18 @@ class EditCellScreen(YesNoScreen):
         else:
             # Parse and validate based on column dtype
             try:
-                new_value = DtypeConfig(self.dtype).convert(new_value_str)
+                if isinstance(self.dtype, pl.List):
+                    inner_dtype = self.dtype.inner
+                    inner_convert = DtypeConfig(inner_dtype).convert
+                    # Accept "1, 2, 3" or "[1, 2, 3]" or "['a', 'b']"
+                    stripped = new_value_str.strip()
+                    if stripped.startswith("[") and stripped.endswith("]"):
+                        items = eval(stripped)
+                        new_value = [inner_convert(v) for v in items]
+                    else:
+                        new_value = [inner_convert(v.strip()) for v in stripped.split(",") if v.strip()]
+                else:
+                    new_value = DtypeConfig(self.dtype).convert(new_value_str)
             except Exception as e:
                 self.notify(
                     f"Failed to convert [$error]{new_value_str}[/] to [$accent]{self.dtype}[/]: {e}",
