@@ -3516,7 +3516,7 @@ class DataFrameTable(DataTable):
         )
 
         try:
-            new_exprs = [pl.col(col_name).list.get(i).alias(new_col_names[i]) for i in range(max_len)]
+            new_exprs = [pl.col(col_name).list.get(i, null_on_oob=True).alias(new_col_names[i]) for i in range(max_len)]
 
             cols = self.df.columns
             select_cols = cols[:cidx] + new_col_names + cols[cidx + 1 :]
