@@ -277,10 +277,12 @@ class DataFrameTable(DataTable):
         - *(Supports case-insensitive & whole-word matching)*
 
         ## 🔎 Find & Replace
-        - **/** - 🔎 Find in current column with cursor value
-        - **g/** - 🌐 Find in all columns with cursor value
-        - **?** - 🔎 Find in current column with expression
-        - **g?** - 🌐 Find in all columns with expression
+        - **/** - 🔎 Search forward in current column with expression
+        - **g/** - 🌐 Search forward in all columns with expression
+        - **z/** - 🔎 Search forward in current column with cursor value
+        - **?** - 🔎 Search backward in current column with expression
+        - **g?** - 🌐 Search backward in all columns with expression
+        - **z?** - 🔎 Search backward in current column with cursor value
         - **n** - ⬇️ Go to next match
         - **N** - ⬆️ Go to previous match
         - **r** - 🔄 Replace in current column (interactive or all)
@@ -382,8 +384,8 @@ class DataFrameTable(DataTable):
         ("t", "toggle_selections", "Toggle row selections"),
         ("T", "clear_selections_and_matches", "Clear row/column selections and cell matches"),
         # Find & Replace
-        ("slash", "find_cursor_value", "Find with cursor value"),  # `/`
-        ("question_mark", "find_expr", "Find with expression"),  # `?`
+        ("slash", "find_cursor_value", "Search forward with expression"),  # `/`
+        ("question_mark", "find_expr", "Search backward with expression"),  # `?`
         ("n", "next_match", "Go to next match"),
         ("N", "previous_match", "Go to previous match"),
         ("r", "replace", "Replace with value"),
@@ -1310,13 +1312,19 @@ class DataFrameTable(DataTable):
 
     @with_leader_key
     def action_find_cursor_value(self) -> None:
-        """Find by cursor value in current column or globally across all columns."""
-        self.do_find_cursor_value()
+        """Search forward by expression in current column or globally."""
+        if self.leader_key == "z":
+            self.do_find_cursor_value_direct(forward=True, scope="column")
+        else:
+            self.do_find_cursor_value(forward=True)
 
     @with_leader_key
     def action_find_expr(self) -> None:
-        """Find by expression in current column or globally across all columns."""
-        self.do_find_expr()
+        """Search backward by expression in current column or globally."""
+        if self.leader_key == "z":
+            self.do_find_cursor_value_direct(forward=False, scope="column")
+        else:
+            self.do_find_expr(forward=False)
 
     @with_leader_key
     def action_replace(self) -> None:
@@ -4444,12 +4452,20 @@ class DataFrameTable(DataTable):
 
         return matches
 
-    def do_find_cursor_value(self) -> None:
-        """Find by cursor value.
+    def do_find_cursor_value(self, forward: bool = True) -> None:
+        """Open expression search prefilled with cursor value.
 
         Scope is determined by leader mode: current column by default, or global when in leader mode.
         """
-        # Get the value of the currently selected cell
+        self.do_find_expr(forward=forward)
+
+    def do_find_cursor_value_direct(self, forward: bool = True, scope: str = "column") -> None:
+        """Search immediately using the cursor value without opening SearchScreen.
+
+        Args:
+            forward: Whether to navigate to the next match (True) or previous match (False).
+            scope: "column" for current column, "global" for all columns.
+        """
         term = NULL if self.cursor_value is None else str(self.cursor_value)
         cidx = self.cursor_cidx
 
@@ -4462,32 +4478,39 @@ class DataFrameTable(DataTable):
                 "match_literal": True,
                 "match_reverse": False,
             },
-            scope="global" if self.leader_key == "g" else "column",
+            scope=scope,
+            forward=forward,
         )
 
-    def do_find_expr(self) -> None:
-        """Open screen to find by expression.
+    def do_find_expr(self, forward: bool = False) -> None:
+        """Open expression search screen.
 
         Scope is determined by leader mode: current column by default, or global when in leader mode.
+
+        Args:
+            forward: Whether to navigate to the next match after applying results.
         """
         # Use current cell value as default search term
         term = NULL if self.cursor_value is None else str(self.cursor_value)
         cidx = self.cursor_cidx
         scope = "global" if self.leader_key == "g" else "column"
+        title_scope = "Global" if scope == "global" else "Column"
+        title_direction = "Forward" if forward else "Backward"
 
         # Push the search modal screen
         self.app.push_screen(
-            SearchScreen("Find" if scope == "column" else "Global Find", self.df, cidx, term),
-            callback=partial(self.find, scope=scope),
+            SearchScreen(f"{title_scope} Find ({title_direction})", self.df, cidx, term),
+            callback=partial(self.find, scope=scope, forward=forward),
         )
 
     @with_full_df
-    def find(self, result: dict, scope="column") -> None:
+    def find(self, result: dict, scope: str = "column", forward: bool = True) -> None:
         """Find a term in current column or globally across all columns.
 
         Args:
             result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse".
             scope: "column" to find in current column, "global" to find across all columns. Defaults to "column".
+            forward: Whether to navigate to next match (True) or previous match (False) after highlighting.
         """
         if result is None:
             return
@@ -4537,6 +4560,12 @@ class DataFrameTable(DataTable):
 
         # Recreate table for display
         self.setup_table()
+
+        # Move to next/previous match relative to current cursor.
+        if forward:
+            self.do_next_match()
+        else:
+            self.do_previous_match()
 
     def do_next_match(self) -> None:
         """Move cursor to the next match."""

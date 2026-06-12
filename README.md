@@ -375,16 +375,18 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 #### Find & Replace
 
-| Key  | Action                                                           |
-| ---- | ---------------------------------------------------------------- |
-| `/`  | Find cursor value in current column and highlight matching cells |
-| `g/` | Find cursor value in all columns and highlight matching cells    |
-| `?`  | Find expression in current column and highlight matching cells   |
-| `g?` | Find expression in all columns and highlight matching cells      |
-| `n`  | Go to next matching cell                                         |
-| `N`  | Go to previous matching cell                                     |
-| `r`  | Find and replace in current column (interactive or replace all)  |
-| `gr` | Find and replace in all columns (interactive or replace all)     |
+| Key  | Action                                                          |
+| ---- | --------------------------------------------------------------- |
+| `/`  | Search forward in current column with expression                |
+| `g/` | Search forward in all columns with expression                   |
+| `z/` | Search forward in current column with cursor value              |
+| `?`  | Search backward in current column with expression               |
+| `g?` | Search backward in all columns with expression                  |
+| `z?` | Search backward in current column with cursor value             |
+| `n`  | Go to next matching cell                                        |
+| `N`  | Go to previous matching cell                                    |
+| `r`  | Find and replace in current column (interactive or replace all) |
+| `gr` | Find and replace in all columns (interactive or replace all)    |
 
 #### Filter & Collect
 
@@ -644,10 +646,12 @@ These options work with plain text searches. Use Polars regex patterns in expres
 
 Find by value/expression and highlight matching cells:
 
-- `/` - Find cursor value in current column
-- `g/` - Find cursor value in all columns (global search)
-- `?` - Open dialog to search in current column with expression
-- `g?` - Open dialog to search in all columns with expression (global search)
+- `/` - Search forward in current column with expression
+- `g/` - Search forward in all columns with expression
+- `z/` - Search forward in current column with cursor value
+- `?` - Search backward in current column with expression
+- `g?` - Search backward in all columns with expression
+- `z?` - Search backward in current column with cursor value
 - `n` - Go to next matching cell
 - `N` - Go to previous matching cell
 
