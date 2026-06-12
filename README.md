@@ -304,7 +304,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `I`               | Show statistics for current column                                             |
 | `gI`              | Show statistics for all columns                                                |
 | `m`               | Show histogram for current column                                              |
-| `M`               | Show histogram for current column with custom bins                             |
+| `gm`              | Show histogram for current column with custom bins                             |
 | `=`               | Show bar chart using first selected column as label and cursor column as value |
 | `-` (minus)       | Hide selected columns or current column                                        |
 | `g-` (minus)      | Hide current column and all columns before it                                  |

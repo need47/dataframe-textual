@@ -209,7 +209,7 @@ class DataFrameTable(DataTable):
         - **Tab** - 🔍 Show current cell details in modal; use `Tab` again there to drill deeper
         - **F** - 📊 Show frequency distribution for current or selected columns
         - **m** - 📊 Show histogram for current column
-        - **M** - 📊 Show histogram for current column with custom bins
+        - **gm** - 📊 Show histogram for current column with custom bins
         - **I** - 📈 Show statistics for current column
         - **gI** - 📊 Show statistics for entire dataframe
         - **zC** - 🎯 Cycle cursor type (cell → row → column)
@@ -361,7 +361,6 @@ class DataFrameTable(DataTable):
         ("tab", "view_cell_detail", "View cell details"),
         ("F", "show_frequency", "Show frequency for current column"),
         ("m", "show_histogram", "Show histogram for current column"),
-        ("M", "show_histogram(0)", "Show histogram for current column with custom bins"),
         ("I", "show_statistics", "Show statistics"),
         ("equals_sign", "show_bar", "Show bar chart using first selected column as label and cursor column as value"),  # `=`
         # Sort
@@ -1191,8 +1190,11 @@ class DataFrameTable(DataTable):
         self.do_show_frequency()
 
     @with_full_df
-    def action_show_histogram(self, default: int = 1) -> None:
+    @with_leader_key
+    def action_show_histogram(self, default: int | None = None) -> None:
         """Show histogram for the current column."""
+        if default is None:
+            default = 0 if self.leader_key == "g" else 1
         self.do_show_histogram(default=default)
 
     @with_full_df
