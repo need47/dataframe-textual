@@ -4604,18 +4604,12 @@ class DataFrameTable(DataTable):
         # Find the previous match before current position
         for ridx, cidx in reversed(ordered_matches):
             if (ridx, cidx) < current_pos:
-                row_key = str(ridx)
-                col_key = self.df.columns[cidx]
-                row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
-                self.move_cursor(row=row_idx, column=col_idx)
+                self.move_cursor_to(ridx, cidx)
                 return
 
         # If no previous match, wrap around to the last match
         last_ridx, last_cidx = ordered_matches[-1]
-        row_key = str(last_ridx)
-        col_key = self.df.columns[last_cidx]
-        row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
-        self.move_cursor(row=row_idx, column=col_idx)
+        self.move_cursor_to(last_ridx, last_cidx)
 
     def do_next_selected_row(self) -> None:
         """Move cursor to the next selected row."""
