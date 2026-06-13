@@ -371,7 +371,7 @@ class DataFrameViewer(App):
     def cmd_show_commands(self) -> None:
         """Show all commands and key bindings in a new tab."""
         from .commands import Category
-        from .keybindings import Command, KeyBinding
+        from .keybindings import Command, KeyBinding, format_key_display
 
         all_items = self.key_registry.get_all_with_commands()
 
@@ -387,17 +387,21 @@ class DataFrameViewer(App):
             for binding, cmd in items:
                 rows.append(
                     {
-                        "Key": binding.display_key,
-                        "Leader": binding.leader if binding.leader else "",
-                        "Command": cmd.cmd,
-                        "Description": f"{cmd.emoji} {cmd.description}" if cmd.emoji else cmd.description,
-                        "Scope": binding.scope.value,
-                        "Category": cmd.category.value,
+                        "leader": binding.leader if binding.leader else "",
+                        "key": format_key_display(binding.key),
+                        "command": cmd.cmd,
+                        "description": f"{cmd.emoji} {cmd.description}" if cmd.emoji else cmd.description,
+                        "scope": binding.scope.value,
+                        "category": cmd.category.value,
                     }
                 )
 
         df = pl.DataFrame(rows)
         self.add_tab(df, filename="commands.csv", tabname="commands", after=self.tabbed.active_pane)
+
+        # Mark the newly created commands tab for keybindings save behavior
+        if table := self.active_table:
+            table.for_keybindings = True
 
     def cmd_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.
@@ -438,10 +442,13 @@ class DataFrameViewer(App):
         """Open a save dialog for the active tab or active view.
 
         When currently in a derived view, this action saves that view.
+        For keybindings tabs, saves modified bindings as JSON to config dir.
         Otherwise, it saves the active tab dataframe.
         """
         if table := self.active_table:
-            if table.df_view is not None:
+            if table.for_keybindings:
+                self.save_keybindings()
+            elif table.df_view is not None:
                 self.do_save_view_to_file()
             else:
                 self.do_save_to_file(all_tabs=False)
@@ -589,8 +596,6 @@ class DataFrameViewer(App):
             scope: "App" or "MainTable".
             force: If True, replace existing binding silently.
         """
-        from .commands import Scope
-
         scope_enum = Scope(scope)
         try:
             old = self.key_registry.bind(key, command_id, leader=leader, scope=scope_enum, force=force)
@@ -1050,6 +1055,80 @@ class DataFrameViewer(App):
                 break
 
         self.notify(f"Renamed tab [$success]{old_name}[/] to [$accent]{new_name}[/]", title="Rename Tab")
+
+    def save_keybindings(self) -> None:
+        """Save modified keybindings to the user config directory as JSON."""
+        import json
+
+        from .commands import COMMANDS
+        from .keybindings import DEFAULT_BINDINGS, format_key_display, get_config_dir, parse_key_display
+
+        table = self.active_table
+        if not table or not table.for_keybindings:
+            return
+
+        df = table.df
+
+        # Table state + validation: (display_key, leader, scope) -> command.
+        table_by_slot: dict[tuple[str, str, str], str] = {}
+        for row in df.iter_rows(named=True):
+            slot = (row["key"], row["leader"], row["scope"])
+            command = row["command"]
+            if command not in COMMANDS:
+                self.notify(f"Unknown command: {command}", title="Keybindings", severity="error")
+                return
+
+            if slot in table_by_slot:
+                self.notify(
+                    f"Duplicate binding for {slot}: {table_by_slot[slot]} and {command}",
+                    title="Keybindings",
+                    severity="error",
+                )
+                return
+
+            # Valid key and command
+            table_by_slot[slot] = command
+
+        # Default state: (display_key, leader, scope) -> command
+        default_by_slot: dict[tuple[str, str, str], str] = {
+            (format_key_display(b.key), b.leader, b.scope.value): b.command_id for b in DEFAULT_BINDINGS.values()
+        }
+
+        # Live registry state: (display_key, leader, scope) -> (raw_key, command)
+        registry_by_slot: dict[tuple[str, str, str], tuple[str, str]] = {
+            (format_key_display(b.key), b.leader, b.scope.value): (b.key, b.command_id)
+            for b in self.key_registry.bindings
+        }
+
+        # Update live registry: add/update changed slots, remove deleted slots.
+        for slot, command in table_by_slot.items():
+            reg = registry_by_slot.get(slot)
+            if reg is None or reg[1] != command:
+                _, leader, scope_str = slot
+                self.key_registry.set_binding(
+                    parse_key_display(slot[0]), command, leader=leader, scope=Scope(scope_str)
+                )
+
+        for slot, (raw_key, _) in registry_by_slot.items():
+            if slot not in table_by_slot:
+                _, leader, scope_str = slot
+                self.key_registry.remove_binding(raw_key, leader=leader, scope=Scope(scope_str))
+
+        # Persist only the non-default entries to JSON.
+        json_rows = [
+            {"key": key, "leader": leader, "command": command, "scope": scope}
+            for (key, leader, scope), command in table_by_slot.items()
+            if default_by_slot.get((key, leader, scope)) != command
+        ]
+
+        config_dir = get_config_dir()
+        config_dir.mkdir(parents=True, exist_ok=True)
+        filepath = config_dir / "keybindings.json"
+        try:
+            filepath.write_text(json.dumps(json_rows, indent=2) + "\n", encoding="utf-8")
+            self.notify(f"Saved keybindings to [$success]{filepath}[/]", title="Keybindings")
+        except OSError as e:
+            self.notify(f"Failed to save keybindings: {e}", title="Keybindings", severity="error")
 
     def do_save_to_file(self, all_tabs: bool = True, task_after_save: str | None = None) -> None:
         """Open screen to save file."""

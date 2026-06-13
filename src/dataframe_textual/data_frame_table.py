@@ -8,7 +8,10 @@ from functools import partial
 from itertools import zip_longest
 from pathlib import Path
 from threading import Event
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from .keybindings import KeyBindingRegistry
 
 import polars as pl
 from rich.text import Text, TextType
@@ -256,6 +259,9 @@ class DataFrameTable(DataTable):
 
         # Whether to show 1-based index prefix in column labels (e.g., "1_colname")
         self.show_column_index = False
+
+        # Whether this tab holds a keybindings table (for special save behavior)
+        self.for_keybindings = False
 
     def init_table(self) -> None:
         """Initial load of the dataframe and setup of the table display.
@@ -708,7 +714,7 @@ class DataFrameTable(DataTable):
             event: The key event object.
         """
         leader = self.leader_key
-        registry = self.app.key_registry
+        registry: "KeyBindingRegistry" = self.app.key_registry
 
         # Try to dispatch via the registry (MainTable scope)
         if registry.dispatch(event.key, leader, Scope.MAIN_TABLE, self):
@@ -1695,7 +1701,8 @@ class DataFrameTable(DataTable):
             self.histories_redo.clear()
 
         # Mark table as dirty if this operation modifies data
-        if dirty:
+        # Ignore for the Commands tab that displays keybindings
+        if dirty and not self.for_keybindings:
             self.dirty = True
 
     def cmd_undo(self) -> None:

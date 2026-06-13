@@ -15,13 +15,35 @@ Dispatch flow:
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .commands import COMMANDS, Category, Command, Scope
 
 log = logging.getLogger(__name__)
+
+
+APP_NAME = "dataframe_textual"
+
+
+def get_config_dir() -> Path:
+    """Return the platform-appropriate config directory for the app.
+
+    Returns:
+        Path to the config directory (e.g. ~/.config/dataframe_textual on Linux).
+    """
+    if sys.platform == "win32":
+        config_base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    elif sys.platform == "darwin":
+        config_base = Path.home() / "Library" / "Application Support"
+    else:
+        config_base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return config_base / APP_NAME
 
 
 class KeyBindingConflict(Exception):
@@ -70,59 +92,64 @@ class KeyBinding:
         return COMMANDS.get(self.command_id)
 
 
+# Textual key name -> human-friendly display string
+_KEY_DISPLAY_MAP: dict[str, str] = {
+    "circumflex_accent": "^",
+    "grave_accent": "`",
+    "underscore": "_",
+    "minus": "-",
+    "full_stop": ".",
+    "comma": ",",
+    "colon": ":",
+    "slash": "/",
+    "question_mark": "?",
+    "left_square_bracket": "[",
+    "right_square_bracket": "]",
+    "left_curly_bracket": "{",
+    "right_curly_bracket": "}",
+    "left_parenthesis": "(",
+    "right_parenthesis": ")",
+    "less_than_sign": "<",
+    "greater_than_sign": ">",
+    "equals_sign": "=",
+    "plus": "+",
+    "number_sign": "#",
+    "percent_sign": "%",
+    "dollar_sign": "$",
+    "tilde": "~",
+    "at": "@",
+    "asterisk": "*",
+    "vertical_line": "|",
+    "backslash": "\\",
+    "apostrophe": "'",
+    "quotation_mark": '"',
+    "enter": "Enter",
+    "tab": "Tab",
+    "escape": "Escape",
+    "delete": "Delete",
+    "home": "Home",
+    "end": "End",
+    "pageup": "PgUp",
+    "pagedown": "PgDn",
+    "up": "Up",
+    "down": "Down",
+    "left": "Left",
+    "right": "Right",
+    "shift+up": "Shift+Up",
+    "shift+down": "Shift+Down",
+    "shift+left": "Shift+Left",
+    "shift+right": "Shift+Right",
+    "shift+delete": "Shift+Delete",
+    "backspace": "Backspace",
+    "space": "Space",
+    "f1": "F1",
+}
+
+
 def format_key_display(key: str) -> str:
     """Convert a Textual key name to a human-friendly display string."""
-    key_map = {
-        "circumflex_accent": "^",
-        "grave_accent": "`",
-        "underscore": "_",
-        "minus": "-",
-        "full_stop": ".",
-        "comma": ",",
-        "colon": ":",
-        "slash": "/",
-        "question_mark": "?",
-        "left_square_bracket": "[",
-        "right_square_bracket": "]",
-        "left_curly_bracket": "{",
-        "right_curly_bracket": "}",
-        "left_parenthesis": "(",
-        "right_parenthesis": ")",
-        "less_than_sign": "<",
-        "greater_than_sign": ">",
-        "equals_sign": "=",
-        "number_sign": "#",
-        "percent_sign": "%",
-        "dollar_sign": "$",
-        "tilde": "~",
-        "at": "@",
-        "asterisk": "*",
-        "vertical_line": "|",
-        "backslash": "\\",
-        "apostrophe": "'",
-        "quotation_mark": '"',
-        "enter": "Enter",
-        "tab": "Tab",
-        "escape": "Escape",
-        "delete": "Delete",
-        "home": "Home",
-        "end": "End",
-        "pageup": "PgUp",
-        "pagedown": "PgDn",
-        "up": "↑",
-        "down": "↓",
-        "left": "←",
-        "right": "→",
-        "shift+up": "Shift+↑",
-        "shift+down": "Shift+↓",
-        "shift+left": "Shift+←",
-        "shift+right": "Shift+→",
-        "shift+delete": "Shift+Delete",
-        "f1": "F1",
-    }
-
-    if key in key_map:
-        return key_map[key]
+    if key in _KEY_DISPLAY_MAP:
+        return _KEY_DISPLAY_MAP[key]
 
     if key.startswith("ctrl+"):
         return f"Ctrl+{key[5:].upper()}"
@@ -130,14 +157,36 @@ def format_key_display(key: str) -> str:
     return key
 
 
+# Reverse mapping: display string -> Textual key name
+_DISPLAY_TO_KEY: dict[str, str] = {v: k for k, v in _KEY_DISPLAY_MAP.items()}
+
+
+def parse_key_display(display: str) -> str:
+    """Convert a human-friendly display string back to a Textual key name.
+
+    Args:
+        display: The display string (e.g. "^", "Ctrl+T", "Enter").
+
+    Returns:
+        The Textual key name (e.g. "circumflex_accent", "ctrl+t", "enter").
+    """
+    if display in _DISPLAY_TO_KEY:
+        return _DISPLAY_TO_KEY[display]
+
+    if display.startswith("Ctrl+") and len(display) > 5:
+        return f"ctrl+{display[5:].lower()}"
+
+    return display
+
+
 # ─── Default key bindings ─────────────────────────────────────────────────────
 
-DEFAULT_BINDINGS: list[KeyBinding] = []
+DEFAULT_BINDINGS: dict[tuple[str, str, Scope], KeyBinding] = {}
 
 
 def _bind(key: str, command_id: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE) -> None:
     """Create and register a default key binding."""
-    DEFAULT_BINDINGS.append(KeyBinding(key=key, command_id=command_id, leader=leader, scope=scope))
+    DEFAULT_BINDINGS[(key, leader, scope)] = KeyBinding(key=key, command_id=command_id, leader=leader, scope=scope)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -360,22 +409,14 @@ class KeyBindingRegistry:
     appropriate cmd_* method, and supports runtime modification of bindings.
     """
 
-    def __init__(self, bindings: list[KeyBinding] | None = None) -> None:
+    def __init__(self, bindings: dict[tuple[str, str, Scope], KeyBinding] | None = None) -> None:
         """Initialize the registry with a set of bindings.
 
         Args:
-            bindings: Initial list of bindings. Uses DEFAULT_BINDINGS if None.
+            bindings: Initial dict of bindings keyed by (key, leader, scope).
+                Uses DEFAULT_BINDINGS if None.
         """
-        self._bindings: list[KeyBinding] = list(bindings or DEFAULT_BINDINGS)
-        self._index: dict[tuple[str, str, Scope], KeyBinding] = {}
-        self._rebuild_index()
-
-    def _rebuild_index(self) -> None:
-        """Rebuild the lookup index from the current binding list."""
-        self._index.clear()
-        for binding in self._bindings:
-            index_key = (binding.key, binding.leader, binding.scope)
-            self._index[index_key] = binding
+        self._bindings: dict[tuple[str, str, Scope], KeyBinding] = dict(bindings or DEFAULT_BINDINGS)
 
     def lookup(self, key: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE) -> KeyBinding | None:
         """Look up a binding by key, leader, and scope.
@@ -388,7 +429,7 @@ class KeyBindingRegistry:
         Returns:
             The matching KeyBinding, or None if not found.
         """
-        return self._index.get((key, leader, scope))
+        return self._bindings.get((key, leader, scope))
 
     def dispatch(self, key: str, leader: str, scope: Scope, target: Any) -> bool:
         """Look up a binding and invoke the cmd_* method on target.
@@ -431,11 +472,11 @@ class KeyBindingRegistry:
 
     def get_bindings_for_command(self, command_id: str) -> list[KeyBinding]:
         """Get all bindings that trigger a given command."""
-        return [b for b in self._bindings if b.command_id == command_id]
+        return [b for b in self._bindings.values() if b.command_id == command_id]
 
     def get_bindings_for_scope(self, scope: Scope) -> list[KeyBinding]:
         """Get all bindings active in a given scope."""
-        return [b for b in self._bindings if b.scope == scope]
+        return [b for b in self._bindings.values() if b.scope == scope]
 
     def set_binding(self, key: str, command_id: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE) -> None:
         """Add or replace a binding (no conflict check).
@@ -443,11 +484,8 @@ class KeyBindingRegistry:
         If a binding already exists for the same key+leader+scope, it is replaced.
         For conflict-aware binding, use ``bind()`` instead.
         """
-        new_binding = KeyBinding(key=key, command_id=command_id, leader=leader, scope=scope)
         lookup_key = (key, leader, scope)
-        self._bindings = [b for b in self._bindings if (b.key, b.leader, b.scope) != lookup_key]
-        self._bindings.append(new_binding)
-        self._index[lookup_key] = new_binding
+        self._bindings[lookup_key] = KeyBinding(key=key, command_id=command_id, leader=leader, scope=scope)
 
     def bind(
         self, key: str, command_id: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE, force: bool = False
@@ -474,36 +512,36 @@ class KeyBindingRegistry:
 
         new_binding = KeyBinding(key=key, command_id=command_id, leader=leader, scope=scope)
         lookup_key = (key, leader, scope)
-        existing = self._index.get(lookup_key)
+        existing = self._bindings.get(lookup_key)
 
         if existing is not None:
             if not force:
                 raise KeyBindingConflict(existing, new_binding)
-            # Force replace — remove old binding
-            self._bindings = [b for b in self._bindings if (b.key, b.leader, b.scope) != lookup_key]
 
-        self._bindings.append(new_binding)
-        self._index[lookup_key] = new_binding
+        self._bindings[lookup_key] = new_binding
         return existing
+
+    def reset_to_defaults(self) -> None:
+        """Reset all bindings to the defaults."""
+        self._bindings = dict(DEFAULT_BINDINGS)
 
     def remove_binding(self, key: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE) -> bool:
         """Remove a binding by key+leader+scope. Returns True if found."""
         lookup_key = (key, leader, scope)
-        if lookup_key in self._index:
-            del self._index[lookup_key]
-            self._bindings = [b for b in self._bindings if (b.key, b.leader, b.scope) != lookup_key]
+        if lookup_key in self._bindings:
+            del self._bindings[lookup_key]
             return True
         return False
 
     @property
     def bindings(self) -> list[KeyBinding]:
         """Get all registered bindings."""
-        return list(self._bindings)
+        return list(self._bindings.values())
 
     def get_all_with_commands(self) -> list[tuple[KeyBinding, Command]]:
         """Get all bindings paired with their associated commands."""
         result = []
-        for binding in self._bindings:
+        for binding in self._bindings.values():
             cmd = binding.command
             if cmd is not None:
                 result.append((binding, cmd))
@@ -541,4 +579,67 @@ class KeyBindingRegistry:
 
 
 # ─── Module-level registry instance ──────────────────────────────────────────
+
+
+def load_user_keybindings(registry: KeyBindingRegistry) -> None:
+    """Load user keybindings from the config directory and apply overrides.
+
+    Reads keybindings.json from the platform config dir. Each entry must have
+    key, leader, command, and scope fields. The key field uses human-readable
+    display format (e.g. "^", "Ctrl+T") which is converted back to Textual key names.
+
+    Args:
+        registry: The registry to apply overrides to.
+    """
+    filepath = get_config_dir() / "keybindings.json"
+    if not filepath.exists():
+        return
+
+    try:
+        data = json.loads(filepath.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        log.warning("Failed to load keybindings from %s: %s", filepath, e)
+        return
+
+    if not isinstance(data, list):
+        log.warning("keybindings.json: expected a JSON array, got %s", type(data).__name__)
+        return
+
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        key_display = entry.get("key", "")
+        leader = entry.get("leader", "")
+        command = entry.get("command", "")
+        scope_str = entry.get("scope", "MainTable")
+
+        if not command:
+            continue
+
+        if command not in COMMANDS:
+            log.warning("keybindings.json: unknown command %r, skipping", command)
+            continue
+
+        try:
+            scope = Scope(scope_str)
+        except ValueError:
+            log.warning("keybindings.json: unknown scope %r, skipping", scope_str)
+            continue
+
+        raw_key = parse_key_display(key_display)
+
+        # Remove the old default slot if this command is being rebound to a new key
+        for default_b in DEFAULT_BINDINGS.values():
+            if (
+                default_b.command_id == command
+                and default_b.leader == leader
+                and default_b.scope == scope
+                and default_b.key != raw_key
+            ):
+                registry.remove_binding(default_b.key, leader=default_b.leader, scope=default_b.scope)
+
+        registry.set_binding(raw_key, command, leader=leader, scope=scope)
+
+
 key_registry = KeyBindingRegistry()
+load_user_keybindings(key_registry)

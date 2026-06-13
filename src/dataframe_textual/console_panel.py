@@ -68,6 +68,7 @@ class ConsolePanel(Vertical):
         #console_input {
             height: 3;
             width: 1fr;
+            border: solid $primary;
         }
     """
 
