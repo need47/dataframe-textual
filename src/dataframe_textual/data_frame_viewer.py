@@ -307,8 +307,8 @@ class DataFrameViewer(App):
                 column_count = len(table.lf.collect_schema().names())
 
         filename = Path(table.filename).name if table else "No file"
-        main_or_view = "Main" if table is None or table.df_view is None else "View"
-        context = f"{filename} | {main_or_view} | {row_count:,} rows x {column_count:,} cols"
+        view_or_main = "View" if table.in_view else "Main"
+        context = f"{filename} | {view_or_main} | {row_count:,} rows x {column_count:,} cols"
 
         self.status_bar.set_context(context)
 
@@ -370,31 +370,24 @@ class DataFrameViewer(App):
 
     def cmd_show_commands(self) -> None:
         """Show all commands and key bindings in a new tab."""
-        from .commands import Category
-        from .keybindings import Command, KeyBinding, format_key_display
+        from .keybindings import format_key_display
 
-        all_items = self.key_registry.get_all_with_commands()
-
-        by_category: dict[Category, list[tuple[KeyBinding, Command]]] = {}
-        for binding, cmd in all_items:
-            by_category.setdefault(cmd.category, []).append((binding, cmd))
-
-        rows: list[dict[str, str]] = []
-        for category in Category:
-            items = by_category.get(category)
-            if not items:
-                continue
-            for binding, cmd in items:
-                rows.append(
-                    {
-                        "Leader": binding.leader if binding.leader else "",
-                        "Key": format_key_display(binding.key),
-                        "Command": cmd.cmd,
-                        "Description": f"{cmd.emoji} {cmd.description}" if cmd.emoji else cmd.description,
-                        "Scope": binding.scope.value,
-                        "Category": cmd.category.value,
-                    }
-                )
+        seen = set()
+        rows = []
+        for binding, cmd in sorted(
+            self.key_registry._bindings.items(), key=lambda kv: (kv[1].category.value, kv[0].scope.value, kv[1].cmd)
+        ):
+            seen.add(cmd)
+            rows.append(
+                {
+                    "Leader": binding.leader if binding.leader else "",
+                    "Key": format_key_display(binding.key),
+                    "Command": cmd.cmd,
+                    "Description": f"{cmd.emoji} {cmd.description}" if cmd.emoji else cmd.description,
+                    "Scope": binding.scope.value,
+                    "Category": cmd.category.value,
+                }
+            )
 
         df = pl.DataFrame(rows)
         self.add_tab(df, filename="commands.csv", tabname="commands", after=self.tabbed.active_pane)
@@ -448,7 +441,7 @@ class DataFrameViewer(App):
         if table := self.active_table:
             if table.for_keybindings:
                 self.save_keybindings()
-            elif table.df_view is not None:
+            elif table.in_view:
                 self.do_save_view_to_file()
             else:
                 self.do_save_to_file(all_tabs=False)
@@ -600,16 +593,16 @@ class DataFrameViewer(App):
         try:
             old = self.key_registry.bind(key, command_id, leader=leader, scope=scope_enum, force=force)
         except KeyBindingConflict as e:
-            self.notify(str(e), title="Key Conflict", severity="error", timeout=5)
+            self.notify(f"Key binding conflict: {e}", title="Bind Key", severity="error", timeout=5)
             return
         except ValueError as e:
-            self.notify(str(e), title="Bind Error", severity="error", timeout=5)
+            self.notify(f"Invalid key binding: {e}", title="Bind Key", severity="error", timeout=5)
             return
 
         if old:
-            self.notify(f"Replaced '{old.command_id}' with '{command_id}'", title="Key Rebound")
+            self.notify(f"Replaced [$success]{old.command_id}[/] with [$accent]{command_id}[/]", title="Bind Key")
         else:
-            self.notify(f"Bound {leader}{key} → {command_id}", title="Key Bound")
+            self.notify(f"Bound [$success]{leader}{key}[/] → [$accent]{command_id}[/]", title="Bind Key")
 
     def _get_console_context(self) -> dict[str, Any]:
         """Build the execution context for the Python console.
@@ -902,7 +895,7 @@ class DataFrameViewer(App):
                 return
 
             # In a view - return to main table
-            if table.df_view is not None:
+            if table.in_view:
                 # Remove from history
                 while table.histories_undo:
                     h = table.histories_undo[-1]
@@ -912,8 +905,8 @@ class DataFrameViewer(App):
                         break
 
                 table.add_history("Return to main table")
-                table.df = table.df_view
-                table.df_view = None
+                table.df = table.dfull
+                table.dfull = None
                 table.setup_table()
 
                 self.notify("Returned to main table", title="Quit View")
@@ -1067,7 +1060,8 @@ class DataFrameViewer(App):
         if not table or not table.for_keybindings:
             return
 
-        df = table.df
+        # Use the full dataframe with defaults for saving, so that unmodified bindings are preserved in the output.
+        df = table.dfull if table.in_view else table.df
 
         # Table: KeyBinding -> Command
         table_keybindings: dict[KeyBinding, Command] = {}
@@ -1081,8 +1075,8 @@ class DataFrameViewer(App):
 
             # Parse the keybinding from the table row
             binding = KeyBinding(
-                leader=row["Leader"],
                 key=parse_key_display(row["Key"]),
+                leader=row["Leader"],
                 scope=Scope(row["Scope"]),
                 command_id=command_id,
             )
@@ -1097,6 +1091,10 @@ class DataFrameViewer(App):
                 return
 
             table_keybindings[binding] = command
+
+        if not table_keybindings:
+            self.notify("No keybindings found to save", title="Save Keybindings", severity="warning")
+            return
 
         # Update the app's key registry with the new bindings
         self.key_registry._bindings = table_keybindings
@@ -1117,9 +1115,9 @@ class DataFrameViewer(App):
         filepath = config_dir / "keybindings.json"
         try:
             filepath.write_text(json.dumps(json_rows, indent=2) + "\n", encoding="utf-8")
-            self.notify(f"Saved keybindings to [$success]{filepath}[/]", title="Keybindings")
+            self.notify(f"Saved keybindings to [$success]{filepath}[/]", title="Save Keybindings")
         except OSError as e:
-            self.notify(f"Failed to save keybindings: {e}", title="Keybindings", severity="error")
+            self.notify(f"Failed to save keybindings: {e}", title="Save Keybindings", severity="error")
 
     def do_save_to_file(self, all_tabs: bool = True, task_after_save: str | None = None) -> None:
         """Open screen to save file."""
@@ -1153,7 +1151,7 @@ class DataFrameViewer(App):
         if not (table := self.active_table):
             return
 
-        if table.df_view is None:
+        if not table.in_view:
             self.notify("No active view to save", title="Save View", severity="warning")
             return
 
@@ -1236,7 +1234,7 @@ class DataFrameViewer(App):
         if use_df is not None:
             lf = use_df.lazy()
         else:
-            lf = (table.df if table.df_view is None else table.df if use_view else table.df_view).lazy()
+            lf = (table.df if use_view else (table.dfull if table.in_view else table.df)).lazy()
 
         df: pl.DataFrame = lf.select(pl.exclude(RID)).collect()
         compression = "gzip" if filename.endswith(".gz") else "uncompressed"
@@ -1306,9 +1304,7 @@ class DataFrameViewer(App):
             if table.df is None:
                 table.df = table.lf.collect()
 
-            df = (table.df if table.df_view is None else table.df if use_view else table.df_view).select(
-                pl.exclude(RID)
-            )
+            df = (table.df if use_view else (table.dfull if table.in_view else table.df)).select(pl.exclude(RID))
             df.write_excel(filename, worksheet=table.tabname)
         else:
             # Multiple tabs - use xlsxwriter to create multiple sheets
@@ -1321,7 +1317,7 @@ class DataFrameViewer(App):
                     if table.df is None:
                         table.df = table.lf.collect()
 
-                    df = (table.df if table.df_view is None else table.df if use_view else table.df_view).select(
+                    df = (table.df if use_view else (table.dfull if table.in_view else table.df)).select(
                         pl.exclude(RID)
                     )
                     df.write_excel(workbook=wb, worksheet=worksheet)

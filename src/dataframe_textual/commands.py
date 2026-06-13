@@ -140,8 +140,6 @@ _reg("cursor-right",    "Move cursor right",          Scope.MAIN_TABLE, Category
 _reg("go-top",          "Go to first row",            Scope.MAIN_TABLE, Category.NAVIGATION, "⬆️")
 _reg("go-bottom",       "Go to last row",             Scope.MAIN_TABLE, Category.NAVIGATION, "⬇️")
 _reg("go-to-row",       "Go to row",                  Scope.MAIN_TABLE, Category.NAVIGATION, "🎯")
-_reg("page-up",         "Page up",                    Scope.MAIN_TABLE, Category.NAVIGATION, "📜")
-_reg("page-down",       "Page down",                  Scope.MAIN_TABLE, Category.NAVIGATION, "📜")
 _reg("page-backward",   "Page backward",              Scope.MAIN_TABLE, Category.NAVIGATION, "📜")
 _reg("page-forward",    "Page forward",               Scope.MAIN_TABLE, Category.NAVIGATION, "📜")
 _reg("scroll-home",     "Scroll to leftmost column",  Scope.MAIN_TABLE, Category.NAVIGATION, "⬅️")

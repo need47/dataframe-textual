@@ -101,7 +101,7 @@ class History:
 
     description: str
     df: pl.DataFrame
-    df_view: pl.DataFrame | None
+    dfull: pl.DataFrame | None
     filename: str
     hidden_columns: set[str]
     selected_rows: set[int]
@@ -221,8 +221,8 @@ class DataFrameTable(DataTable):
         self.filename = filename or "untitled.csv"  # Current filename
         self.tabname = tabname or Path(filename).stem  # Tab name
 
-        # In view mode, this is the copy of self.df
-        self.df_view = None
+        # In view mode, this will hold the full dataframe for operations that require it (e.g. filtering, sorting)
+        self.dfull = None
 
         # Pagination & Loading
         self.BATCH_SIZE = max((self.app.size.height // 100 + 1) * 100, 100)
@@ -461,6 +461,11 @@ class DataFrameTable(DataTable):
             Any: The value of the cell at the cursor position.
         """
         return self.df.item(self.cursor_ridx, self.cursor_cidx)
+
+    @property
+    def in_view(self) -> bool:
+        """Whether the table is currently in view mode."""
+        return self.dfull is not None
 
     @property
     def visible_columns(self) -> dict[str, pl.DataType]:
@@ -794,14 +799,6 @@ class DataFrameTable(DataTable):
     def cmd_cursor_down(self) -> None:
         """Move cursor down."""
         self.action_cursor_down()
-
-    def cmd_page_up(self) -> None:
-        """Page up."""
-        super().action_page_up()
-
-    def cmd_page_down(self) -> None:
-        """Page down."""
-        super().action_page_down()
 
     def cmd_scroll_home(self) -> None:
         """Scroll to leftmost column."""
@@ -1641,7 +1638,7 @@ class DataFrameTable(DataTable):
         return History(
             description=description,
             df=self.df,
-            df_view=self.df_view,
+            dfull=self.dfull,
             filename=self.filename,
             hidden_columns=self.hidden_columns.copy(),
             selected_rows=self.selected_rows.copy(),
@@ -1666,7 +1663,7 @@ class DataFrameTable(DataTable):
 
         # Restore state
         self.df = history.df
-        self.df_view = history.df_view
+        self.dfull = history.dfull
         self.filename = history.filename
         self.hidden_columns = history.hidden_columns.copy()
         self.selected_rows = history.selected_rows.copy()
@@ -1759,7 +1756,7 @@ class DataFrameTable(DataTable):
         frame = add_rid_column(frame)
 
         self.df = frame
-        self.df_view = None
+        self.dfull = None
         self.loaded_rows = 0
         self.loaded_ranges.clear()
         self.hidden_columns.clear()
@@ -2246,9 +2243,9 @@ class DataFrameTable(DataTable):
         # Perform the sort
         df_sorted = lf.sort(**sort_by).collect()
 
-        # Also update df_view if applicable
-        if self.df_view is not None:
-            self.df_view = self.df_view.lazy().sort(**sort_by).collect()
+        # Also update the full dataframe if applicable
+        if self.in_view:
+            self.dfull = self.dfull.lazy().sort(**sort_by).collect()
 
         # Update the dataframe
         self.df = df_sorted
@@ -2317,11 +2314,11 @@ class DataFrameTable(DataTable):
                     .alias(col_name)
                 )
 
-            # Also update the view if applicable
-            if self.df_view is not None:
-                # Sync the changed column from df into df_view via RID join
+            # Also update the full datafram if applicable
+            if self.in_view:
+                # Sync the changed column from df into dfull via RID join
                 lf_updated = self.df.lazy().select(RID, pl.col(col_name))
-                self.df_view = self.df_view.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
+                self.dfull = self.dfull.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
 
             # Update the display
             cell_value = self.df.item(ridx, cidx)
@@ -2405,13 +2402,13 @@ class DataFrameTable(DataTable):
             # Apply the expression to the column
             self.df = self.df.lazy().with_columns(expr.alias(col_name)).collect()
 
-            # Also update the view if applicable
-            # Update the value of col_name in df_view using the value of col_name from df based on RID mapping between them
-            if self.df_view is not None:
+            # Also update the full datafram if applicable
+            # Update the value of col_name in dfull using the value of col_name from df based on RID mapping between them
+            if self.in_view:
                 # Get updated column from df
                 lf_updated = self.df.lazy().select(RID, pl.col(col_name))
-                # Update df_view by joining on RID
-                self.df_view = self.df_view.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
+                # Update dfull by joining on RID
+                self.dfull = self.dfull.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
         except Exception as e:
             self.notify(
                 f"Failed to apply expression [$error]{term}[/] to column [$accent]{col_name}[/]",
@@ -2457,9 +2454,9 @@ class DataFrameTable(DataTable):
         # Rename the column in the dataframe
         self.df = self.df.rename({col_name: new_name})
 
-        # Also update the view if applicable
-        if self.df_view is not None:
-            self.df_view = self.df_view.rename({col_name: new_name})
+        # Also update the full datafram if applicable
+        if self.in_view:
+            self.dfull = self.dfull.rename({col_name: new_name})
 
         # Update sorted_columns if this column was sorted and maintain order
         if col_name in self.sorted_columns:
@@ -2508,11 +2505,11 @@ class DataFrameTable(DataTable):
                 .collect()
             )
 
-            # Also update the view if applicable
-            if self.df_view is not None:
+            # Also update the full datafram if applicable
+            if self.in_view:
                 ridx_view = self.df.item(ridx, self.df.columns.index(RID))
-                self.df_view = (
-                    self.df_view.lazy()
+                self.dfull = (
+                    self.dfull.lazy()
                     .with_columns(
                         pl.when(pl.col(RID) == ridx_view).then(pl.lit(None)).otherwise(pl.col(col_name)).alias(col_name)
                     )
@@ -2553,10 +2550,10 @@ class DataFrameTable(DataTable):
                 .collect()
             )
 
-            # Also update the view if applicable
-            if self.df_view is not None:
+            # Also update the full datafram if applicable
+            if self.in_view:
                 lf_updated = self.df.lazy().select(RID, pl.col(col_name))
-                self.df_view = self.df_view.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
+                self.dfull = self.dfull.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -2611,9 +2608,9 @@ class DataFrameTable(DataTable):
             select_cols = cols_before + [new_col] + cols_after
             self.df = self.df.lazy().with_columns(new_col).select(select_cols).collect()
 
-            # Also update the view if applicable
-            if self.df_view is not None:
-                self.df_view = self.df_view.lazy().with_columns(new_col).select(select_cols).collect()
+            # Also update the full datafram if applicable
+            if self.in_view:
+                self.dfull = self.dfull.lazy().with_columns(new_col).select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -2658,12 +2655,12 @@ class DataFrameTable(DataTable):
             select_cols = cols_before + [new_col_name] + cols_after
             self.df = self.df.lazy().with_columns(new_col).select(select_cols).collect()
 
-            # Also update the view if applicable
-            if self.df_view is not None:
-                # Get updated column from df for rows that exist in df_view
+            # Also update the full datafram if applicable
+            if self.in_view:
+                # Get updated column from df for rows that exist in dfull
                 lf_updated = self.df.lazy().select(RID, pl.col(new_col_name))
                 # Join and use coalesce to prefer updated value or keep original
-                self.df_view = self.df_view.lazy().join(lf_updated, on=RID, how="left").select(select_cols).collect()
+                self.dfull = self.dfull.lazy().join(lf_updated, on=RID, how="left").select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -2708,10 +2705,10 @@ class DataFrameTable(DataTable):
             select_cols = cols_before + [new_col_name] + cols_after
             self.df = self.df.lazy().with_columns(index_values).select(select_cols).collect()
 
-            # Also update the view if applicable.
-            if self.df_view is not None:
-                view_index_values = pl.Series(new_col_name, range(start, start + (step * len(self.df_view)), step))
-                self.df_view = self.df_view.lazy().with_columns(view_index_values).select(select_cols).collect()
+            # Also update the full datafram if applicable.
+            if self.in_view:
+                view_index_values = pl.Series(new_col_name, range(start, start + (step * len(self.dfull)), step))
+                self.dfull = self.dfull.lazy().with_columns(view_index_values).select(select_cols).collect()
 
             # Recreate table for display.
             self.setup_table()
@@ -2785,8 +2782,8 @@ class DataFrameTable(DataTable):
 
             self.df = self.df.lazy().with_columns(new_col).select(select_cols).collect()
 
-            if self.df_view is not None:
-                self.df_view = self.df_view.lazy().with_columns(new_col).select(select_cols).collect()
+            if self.in_view:
+                self.dfull = self.dfull.lazy().with_columns(new_col).select(select_cols).collect()
 
             self.setup_table()
             self.move_cursor(column=self.cursor_column + 1)
@@ -2879,8 +2876,8 @@ class DataFrameTable(DataTable):
 
             self.df = self.df.lazy().with_columns(join_expr).select(select_cols).collect()
 
-            if self.df_view is not None:
-                self.df_view = self.df_view.lazy().with_columns(join_expr).select(select_cols).collect()
+            if self.in_view:
+                self.dfull = self.dfull.lazy().with_columns(join_expr).select(select_cols).collect()
 
             # Clear column selection
             self.selected_columns.clear()
@@ -2958,8 +2955,8 @@ class DataFrameTable(DataTable):
 
             self.df = self.df.lazy().with_columns(glue_expr).select(select_cols).collect()
 
-            if self.df_view is not None:
-                self.df_view = self.df_view.lazy().with_columns(glue_expr).select(select_cols).collect()
+            if self.in_view:
+                self.dfull = self.dfull.lazy().with_columns(glue_expr).select(select_cols).collect()
 
             self.setup_table()
             self.move_cursor(column=cidx + 1)
@@ -3033,8 +3030,8 @@ class DataFrameTable(DataTable):
 
             self.df = self.df.lazy().with_columns(new_exprs).select(select_cols).collect()
 
-            if self.df_view is not None:
-                self.df_view = self.df_view.lazy().with_columns(new_exprs).select(select_cols).collect()
+            if self.in_view:
+                self.dfull = self.dfull.lazy().with_columns(new_exprs).select(select_cols).collect()
 
             self.setup_table()
             self.move_cursor(column=cidx)
@@ -3128,8 +3125,8 @@ class DataFrameTable(DataTable):
 
             self.df = self.df.lazy().with_columns(list_expr).select(select_cols).collect()
 
-            if self.df_view is not None:
-                self.df_view = self.df_view.lazy().with_columns(list_expr).select(select_cols).collect()
+            if self.in_view:
+                self.dfull = self.dfull.lazy().with_columns(list_expr).select(select_cols).collect()
 
             self.setup_table()
             self.move_cursor(column=insert_cidx)
@@ -3203,12 +3200,12 @@ class DataFrameTable(DataTable):
             select_cols = cols_before + [new_col_name] + cols_after
             self.df = self.df.lazy().with_columns(new_col).select(select_cols).collect()
 
-            # Also update the view if applicable
-            if self.df_view is not None:
-                # Get updated column from df for rows that exist in df_view
+            # Also update the full datafram if applicable
+            if self.in_view:
+                # Get updated column from df for rows that exist in dfull
                 lf_updated = self.df.lazy().select(RID, pl.col(new_col_name))
                 # Join and use coalesce to prefer updated value or keep original
-                self.df_view = self.df_view.lazy().join(lf_updated, on=RID, how="left").select(select_cols).collect()
+                self.dfull = self.dfull.lazy().join(lf_updated, on=RID, how="left").select(select_cols).collect()
 
             # Recreate table for display
             self.setup_table()
@@ -3292,9 +3289,9 @@ class DataFrameTable(DataTable):
         # Remove from dataframe
         self.df = self.df.lazy().drop(col_names_to_delete).collect()
 
-        # Also update the view if applicable
-        if self.df_view is not None:
-            self.df_view = self.df_view.lazy().drop(col_names_to_delete).collect()
+        # Also update the full datafram if applicable
+        if self.in_view:
+            self.dfull = self.dfull.lazy().drop(col_names_to_delete).collect()
 
         # Recreate table for display
         self.setup_table()
@@ -3352,16 +3349,16 @@ class DataFrameTable(DataTable):
         dtype = self.df.schema[col_name]
 
         try:
-            if self.df_view is not None:
+            if self.in_view:
                 old_rids = set(self.df[RID])
 
                 # If it's already a list column, just explode it
                 if dtype == pl.List:
-                    lf_view = add_rid_column(self.df_view.lazy().rename({RID: RID_OLD}).explode(col_name))
+                    lf_view = add_rid_column(self.dfull.lazy().rename({RID: RID_OLD}).explode(col_name))
                 # If a delimiter is provided, split the string column by the delimiter
                 elif dtype == pl.String and delimiter:
                     lf_view = add_rid_column(
-                        self.df_view.lazy()
+                        self.dfull.lazy()
                         .rename({RID: RID_OLD})
                         .with_columns(pl.col(col_name).str.split(delimiter))
                         .explode(col_name)
@@ -3370,7 +3367,7 @@ class DataFrameTable(DataTable):
                     return
 
                 self.df = lf_view.filter(pl.col(RID_OLD).is_in(old_rids)).drop(RID_OLD).collect()
-                self.df_view = lf_view.drop(RID_OLD).collect()
+                self.dfull = lf_view.drop(RID_OLD).collect()
             else:
                 if dtype == pl.List:
                     self.df = add_rid_column(self.df.lazy().drop(RID).explode(col_name)).collect()
@@ -3457,9 +3454,9 @@ class DataFrameTable(DataTable):
         if self.matches:
             self.matches = {rid: cols for rid, cols in self.matches.items() if rid in ok_rids}
 
-        # Also update the view if applicable
-        if self.df_view is not None:
-            self.df_view = self.df_view.lazy().filter(~pl.col(RID).is_in(rids_to_delete)).collect()
+        # Also update the full datafram if applicable
+        if self.in_view:
+            self.dfull = self.dfull.lazy().filter(~pl.col(RID).is_in(rids_to_delete)).collect()
 
         # Recreate table for display
         self.setup_table()
@@ -3500,12 +3497,12 @@ class DataFrameTable(DataTable):
         # Combine the parts
         self.df = pl.concat([lf_before, row_to_duplicate, lf_after]).collect()
 
-        # Also update the view if applicable
-        if self.df_view is not None:
-            lf_view = self.df_view.lazy()
+        # Also update the full datafram if applicable
+        if self.in_view:
+            lf_view = self.dfull.lazy()
             lf_view_before = lf_view.slice(0, rid + 1)
             lf_view_after = lf_view.slice(rid + 1).with_columns(pl.col(RID) + 1)
-            self.df_view = pl.concat([lf_view_before, row_to_duplicate, lf_view_after]).collect()
+            self.dfull = pl.concat([lf_view_before, row_to_duplicate, lf_view_after]).collect()
 
         # Recreate table for display
         self.setup_table()
@@ -3541,11 +3538,9 @@ class DataFrameTable(DataTable):
         # Add the new column and reorder columns for insertion after current column
         self.df = self.df.lazy().with_columns(pl.col(col_name).alias(new_col_name)).select(cols_new).collect()
 
-        # Also update the view if applicable
-        if self.df_view is not None:
-            self.df_view = (
-                self.df_view.lazy().with_columns(pl.col(col_name).alias(new_col_name)).select(cols_new).collect()
-            )
+        # Also update the full datafram if applicable
+        if self.in_view:
+            self.dfull = self.dfull.lazy().with_columns(pl.col(col_name).alias(new_col_name)).select(cols_new).collect()
 
         # Recreate table for display
         self.setup_table()
@@ -3578,8 +3573,8 @@ class DataFrameTable(DataTable):
         if self.matches:
             self.matches = {rid: cols for rid, cols in self.matches.items() if rid in ok_rids}
 
-        if self.df_view is not None:
-            self.df_view = self.df_view.lazy().filter(pl.col(RID).is_in(ok_rids)).collect()
+        if self.in_view:
+            self.dfull = self.dfull.lazy().filter(pl.col(RID).is_in(ok_rids)).collect()
 
         self.setup_table()
 
@@ -3631,9 +3626,9 @@ class DataFrameTable(DataTable):
         cols[cidx], cols[swap_cidx] = cols[swap_cidx], cols[cidx]
         self.df = self.df.lazy().select(cols).collect()
 
-        # Also update the view if applicable
-        if self.df_view is not None:
-            self.df_view = self.df_view.lazy().select(cols).collect()
+        # Also update the full datafram if applicable
+        if self.in_view:
+            self.dfull = self.dfull.lazy().select(cols).collect()
 
         # Recreate table for display
         self.setup_table()
@@ -3709,25 +3704,25 @@ class DataFrameTable(DataTable):
             ]
         ).collect()
 
-        # Also update the view if applicable
-        if self.df_view is not None:
+        # Also update the full datafram if applicable
+        if self.in_view:
             # Find RID values
             curr_rid = self.df[RID][curr_row_idx]
             swap_rid = self.df[RID][swap_row_idx]
 
             # Locate the rows by RID in the view
-            curr_ridx = self.df_view[RID].index_of(curr_rid)
-            swap_ridx = self.df_view[RID].index_of(swap_rid)
+            curr_ridx = self.dfull[RID].index_of(curr_rid)
+            swap_ridx = self.dfull[RID].index_of(swap_rid)
             first, second = sorted([curr_ridx, swap_ridx])
 
             # Swap the rows in the view
-            self.df_view = pl.concat(
+            self.dfull = pl.concat(
                 [
-                    self.df_view.slice(0, first).lazy(),
-                    self.df_view.slice(second, 1).lazy(),
-                    self.df_view.slice(first + 1, second - first - 1).lazy(),
-                    self.df_view.slice(first, 1).lazy(),
-                    self.df_view.slice(second + 1).lazy(),
+                    self.dfull.slice(0, first).lazy(),
+                    self.dfull.slice(second, 1).lazy(),
+                    self.dfull.slice(first + 1, second - first - 1).lazy(),
+                    self.dfull.slice(first, 1).lazy(),
+                    self.dfull.slice(second + 1).lazy(),
                 ]
             ).collect()
 
@@ -3800,9 +3795,9 @@ class DataFrameTable(DataTable):
             else:
                 self.df = self.df.with_columns(pl.col(col_name).cast(target_dtype))
 
-            # Also update the view if applicable
-            if self.df_view is not None:
-                self.df_view = self.df_view.with_columns(pl.col(col_name).cast(target_dtype))
+            # Also update the full datafram if applicable
+            if self.in_view:
+                self.dfull = self.dfull.with_columns(pl.col(col_name).cast(target_dtype))
 
             # Recreate table for display
             self.setup_table()
@@ -3856,8 +3851,8 @@ class DataFrameTable(DataTable):
         ]
         self.df = self.df.with_columns(transforms)
 
-        if self.df_view is not None:
-            self.df_view = self.df_view.with_columns(transforms)
+        if self.in_view:
+            self.dfull = self.dfull.with_columns(transforms)
 
         self.setup_table()
         self.notify(descr, title=f"Convert to {label.capitalize()}")
@@ -3883,8 +3878,8 @@ class DataFrameTable(DataTable):
             trimmed_expr = pl.col(col_name).str.strip_chars().alias(col_name)
             self.df = self.df.with_columns(trimmed_expr)
 
-            if self.df_view is not None:
-                self.df_view = self.df_view.with_columns(trimmed_expr)
+            if self.in_view:
+                self.dfull = self.dfull.with_columns(trimmed_expr)
 
             self.setup_table()
             self.move_cursor(column=cidx)
@@ -4351,10 +4346,10 @@ class DataFrameTable(DataTable):
                     pl.when(mask).then(pl.lit(value)).otherwise(pl.col(col_name)).alias(col_name)
                 )
 
-            # Also update the view if applicable
-            if self.df_view is not None:
+            # Also update the full datafram if applicable
+            if self.in_view:
                 lf_updated = self.df.lazy().filter(mask).select(pl.col(RID), pl.col(col_name))
-                self.df_view = self.df_view.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
+                self.dfull = self.dfull.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
 
             state.replaced_occurrence += len(ridxs)
 
@@ -4444,9 +4439,9 @@ class DataFrameTable(DataTable):
                     .alias(col_name)
                 )
 
-                # Also update the view if applicable
-                if self.df_view is not None:
-                    self.df_view = self.df_view.with_columns(
+                # Also update the full datafram if applicable
+                if self.in_view:
+                    self.dfull = self.dfull.with_columns(
                         pl.when(pl.col(RID) == rid)
                         .then(pl.col(col_name).str.replace_all(term_find, state.term_replace))
                         .otherwise(pl.col(col_name))
@@ -4469,9 +4464,9 @@ class DataFrameTable(DataTable):
                     .alias(col_name)
                 )
 
-                # Also update the view if applicable
-                if self.df_view is not None:
-                    self.df_view = self.df_view.with_columns(
+                # Also update the full datafram if applicable
+                if self.in_view:
+                    self.dfull = self.dfull.with_columns(
                         pl.when(pl.col(RID) == rid).then(pl.lit(value)).otherwise(pl.col(col_name)).alias(col_name)
                     )
 
@@ -4711,8 +4706,8 @@ class DataFrameTable(DataTable):
         ok_rids = set(df_filtered[RID])
 
         # Create a view of self.df as a copy
-        if self.df_view is None:
-            self.df_view = self.df
+        if self.dfull is None:
+            self.dfull = self.df
 
         # Update dataframe
         self.df = df_filtered
@@ -4735,7 +4730,7 @@ class DataFrameTable(DataTable):
         """Filter current dataframe rows by a condition on the current numeric column.
 
         For integer/float columns, opens FilterNumericColumn to collect conditions.
-        The filtered result replaces self.df; the original is saved in self.df_view.
+        The filtered result replaces self.df; the original is saved in self.dfull.
         For other dtypes, a warning is shown.
         """
         cidx = self.cursor_cidx
@@ -4804,9 +4799,9 @@ class DataFrameTable(DataTable):
         col_name = self.cursor_col_name
         self.add_history(f"Filter rows on column [$success]{col_name}[/] by expression")
 
-        # Store original dataframe in df_view if not already in a view
-        if self.df_view is None:
-            self.df_view = self.df
+        # Store original dataframe in dfull if not already in a view
+        if not self.in_view:
+            self.dfull = self.df
 
         ok_rids = set(df_filtered[RID])
         self.df = df_filtered
@@ -5419,9 +5414,9 @@ class DataFrameTable(DataTable):
         # Add to history
         self.add_history(f"Run SQL Query: [$success]{sql}[/]")
 
-        # Create a view of self.df as a copy
-        if self.df_view is None:
-            self.df_view = self.df
+        # Store original dataframe in dfull if not already in a view
+        if not self.in_view:
+            self.dfull = self.df
 
         # Update dataframe
         self.df = df_filtered
