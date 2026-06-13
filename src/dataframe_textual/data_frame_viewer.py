@@ -387,12 +387,12 @@ class DataFrameViewer(App):
             for binding, cmd in items:
                 rows.append(
                     {
-                        "leader": binding.leader if binding.leader else "",
-                        "key": format_key_display(binding.key),
-                        "command": cmd.cmd,
-                        "description": f"{cmd.emoji} {cmd.description}" if cmd.emoji else cmd.description,
-                        "scope": binding.scope.value,
-                        "category": cmd.category.value,
+                        "Leader": binding.leader if binding.leader else "",
+                        "Key": format_key_display(binding.key),
+                        "Command": cmd.cmd,
+                        "Description": f"{cmd.emoji} {cmd.description}" if cmd.emoji else cmd.description,
+                        "Scope": binding.scope.value,
+                        "Category": cmd.category.value,
                     }
                 )
 
@@ -1060,8 +1060,8 @@ class DataFrameViewer(App):
         """Save modified keybindings to the user config directory as JSON."""
         import json
 
-        from .commands import COMMANDS
-        from .keybindings import DEFAULT_BINDINGS, format_key_display, get_config_dir, parse_key_display
+        from .commands import COMMANDS, Command
+        from .keybindings import KeyBinding, format_key_display, get_config_dir, parse_key_display
 
         table = self.active_table
         if not table or not table.for_keybindings:
@@ -1069,56 +1069,47 @@ class DataFrameViewer(App):
 
         df = table.df
 
-        # Table state + validation: (display_key, leader, scope) -> command.
-        table_by_slot: dict[tuple[str, str, str], str] = {}
+        # Table: KeyBinding -> Command
+        table_keybindings: dict[KeyBinding, Command] = {}
+
         for row in df.iter_rows(named=True):
-            slot = (row["key"], row["leader"], row["scope"])
-            command = row["command"]
-            if command not in COMMANDS:
-                self.notify(f"Unknown command: {command}", title="Keybindings", severity="error")
+            command_id = row["Command"]
+            command = COMMANDS.get(command_id)
+            if command is None:
+                self.notify(f"Unknown command: {command_id}", title="Save Keybindings", severity="error")
                 return
 
-            if slot in table_by_slot:
+            # Parse the keybinding from the table row
+            binding = KeyBinding(
+                leader=row["Leader"],
+                key=parse_key_display(row["Key"]),
+                scope=Scope(row["Scope"]),
+                command_id=command_id,
+            )
+
+            # Check for duplicate bindings
+            if binding in table_keybindings:
                 self.notify(
-                    f"Duplicate binding for {slot}: {table_by_slot[slot]} and {command}",
+                    f"Duplicate binding for {binding.display_key} ({binding.scope.value})",
                     title="Keybindings",
                     severity="error",
                 )
                 return
 
-            # Valid key and command
-            table_by_slot[slot] = command
+            table_keybindings[binding] = command
 
-        # Default state: (display_key, leader, scope) -> command
-        default_by_slot: dict[tuple[str, str, str], str] = {
-            (format_key_display(b.key), b.leader, b.scope.value): b.command_id for b in DEFAULT_BINDINGS.values()
-        }
+        # Update the app's key registry with the new bindings
+        self.key_registry._bindings = table_keybindings
 
-        # Live registry state: (display_key, leader, scope) -> (raw_key, command)
-        registry_by_slot: dict[tuple[str, str, str], tuple[str, str]] = {
-            (format_key_display(b.key), b.leader, b.scope.value): (b.key, b.command_id)
-            for b in self.key_registry.bindings
-        }
-
-        # Update live registry: add/update changed slots, remove deleted slots.
-        for slot, command in table_by_slot.items():
-            reg = registry_by_slot.get(slot)
-            if reg is None or reg[1] != command:
-                _, leader, scope_str = slot
-                self.key_registry.set_binding(
-                    parse_key_display(slot[0]), command, leader=leader, scope=Scope(scope_str)
-                )
-
-        for slot, (raw_key, _) in registry_by_slot.items():
-            if slot not in table_by_slot:
-                _, leader, scope_str = slot
-                self.key_registry.remove_binding(raw_key, leader=leader, scope=Scope(scope_str))
-
-        # Persist only the non-default entries to JSON.
+        # Serialize the new keybindings to JSON format for saving. Only include bindings that differ from defaults.
         json_rows = [
-            {"key": key, "leader": leader, "command": command, "scope": scope}
-            for (key, leader, scope), command in table_by_slot.items()
-            if default_by_slot.get((key, leader, scope)) != command
+            {
+                "key": format_key_display(binding.key),
+                "leader": binding.leader,
+                "command": command.cmd,
+                "scope": binding.scope.value,
+            }
+            for binding, command in table_keybindings.items()
         ]
 
         config_dir = get_config_dir()

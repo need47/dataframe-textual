@@ -1,7 +1,7 @@
 """Key binding registry for mapping keys to commands.
 
 Keybindings map physical key presses (with optional leader-key prefixes) to command IDs.
-Bindings must be unique within a given scope (same key + leader + scope = conflict).
+Bindings must be unique within a given scope (same leader + key + scope = conflict).
 Bindings may share the same key across different scopes.
 
 The default bindings defined here mirror the existing hard-coded bindings.
@@ -55,28 +55,47 @@ class KeyBindingConflict(Exception):
     """
 
     def __init__(self, existing: "KeyBinding", attempted: "KeyBinding") -> None:
-        self.existing = existing
-        self.attempted = attempted
         super().__init__(
             f"Key '{attempted.display_key}' (scope={attempted.scope.value}) is already bound to '{existing.command_id}'"
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class KeyBinding:
     """A key binding that maps a key (with optional leader prefix) to a command.
 
     Attributes:
-        key: The Textual key name (e.g. "q", "ctrl+g", "slash").
-        command_id: The ID of the command this binding triggers.
         leader: Optional leader key prefix ("g" or "z"). Empty string means no leader.
+        key: The Textual key name (e.g. "q", "ctrl+g", "slash").
         scope: The scope where this binding is active.
+        command_id: The ID of the command this binding triggers.
     """
 
+    leader: str
     key: str
+    scope: Scope
     command_id: str
-    leader: str = ""
-    scope: Scope = Scope.MAIN_TABLE
+
+    def __eq__(self, other: object) -> bool:
+        """Compare bindings by leader, key, and scope.
+
+        Args:
+            other: The object to compare against.
+
+        Returns:
+            True when both bindings represent the same key slot.
+        """
+        if not isinstance(other, KeyBinding):
+            return NotImplemented
+        return (self.leader, self.key, self.scope) == (other.leader, other.key, other.scope)
+
+    def __hash__(self) -> int:
+        """Hash bindings by leader, key, and scope.
+
+        Returns:
+            A stable hash for dict/set usage keyed by binding slot.
+        """
+        return hash((self.leader, self.key, self.scope))
 
     @property
     def display_key(self) -> str:
@@ -94,38 +113,43 @@ class KeyBinding:
 
 # Textual key name -> human-friendly display string
 _KEY_DISPLAY_MAP: dict[str, str] = {
-    "circumflex_accent": "^",
+    "f1": "F1",
+    "tilde": "~",
     "grave_accent": "`",
-    "underscore": "_",
-    "minus": "-",
-    "full_stop": ".",
-    "comma": ",",
-    "colon": ":",
-    "slash": "/",
-    "question_mark": "?",
-    "left_square_bracket": "[",
-    "right_square_bracket": "]",
-    "left_curly_bracket": "{",
-    "right_curly_bracket": "}",
+    "exclamation_mark": "!",
+    "at": "@",
+    "number_sign": "#",
+    "dollar_sign": "$",
+    "percent_sign": "%",
+    "circumflex_accent": "^",
+    "ampersand": "&",
+    "asterisk": "*",
     "left_parenthesis": "(",
     "right_parenthesis": ")",
-    "less_than_sign": "<",
-    "greater_than_sign": ">",
-    "equals_sign": "=",
+    "underscore": "_",
+    "minus": "-",
     "plus": "+",
-    "number_sign": "#",
-    "percent_sign": "%",
-    "dollar_sign": "$",
-    "tilde": "~",
-    "at": "@",
-    "asterisk": "*",
+    "equals_sign": "=",
+    "backspace": "Backspace",
+    "left_curly_bracket": "{",
+    "left_square_bracket": "[",
+    "right_curly_bracket": "}",
+    "right_square_bracket": "]",
     "vertical_line": "|",
     "backslash": "\\",
-    "apostrophe": "'",
+    "colon": ":",
+    "semicolon": ";",
     "quotation_mark": '"',
+    "apostrophe": "'",
     "enter": "Enter",
-    "tab": "Tab",
+    "less_than_sign": "<",
+    "comma": ",",
+    "greater_than_sign": ">",
+    "full_stop": ".",
+    "question_mark": "?",
+    "slash": "/",
     "escape": "Escape",
+    "tab": "Tab",
     "delete": "Delete",
     "home": "Home",
     "end": "End",
@@ -140,9 +164,7 @@ _KEY_DISPLAY_MAP: dict[str, str] = {
     "shift+left": "Shift+Left",
     "shift+right": "Shift+Right",
     "shift+delete": "Shift+Delete",
-    "backspace": "Backspace",
     "space": "Space",
-    "f1": "F1",
 }
 
 
@@ -181,12 +203,13 @@ def parse_key_display(display: str) -> str:
 
 # ─── Default key bindings ─────────────────────────────────────────────────────
 
-DEFAULT_BINDINGS: dict[tuple[str, str, Scope], KeyBinding] = {}
+DEFAULT_BINDINGS: dict[KeyBinding, Command] = {}
 
 
 def _bind(key: str, command_id: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE) -> None:
     """Create and register a default key binding."""
-    DEFAULT_BINDINGS[(key, leader, scope)] = KeyBinding(key=key, command_id=command_id, leader=leader, scope=scope)
+    binding = KeyBinding(leader=leader, key=key, scope=scope, command_id=command_id)
+    DEFAULT_BINDINGS[binding] = COMMANDS[command_id]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -409,14 +432,14 @@ class KeyBindingRegistry:
     appropriate cmd_* method, and supports runtime modification of bindings.
     """
 
-    def __init__(self, bindings: dict[tuple[str, str, Scope], KeyBinding] | None = None) -> None:
+    def __init__(self) -> None:
         """Initialize the registry with a set of bindings.
 
         Args:
-            bindings: Initial dict of bindings keyed by (key, leader, scope).
+            bindings: Initial mapping from binding slot to command.
                 Uses DEFAULT_BINDINGS if None.
         """
-        self._bindings: dict[tuple[str, str, Scope], KeyBinding] = dict(bindings or DEFAULT_BINDINGS)
+        self._bindings: dict[KeyBinding, Command] = {}
 
     def lookup(self, key: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE) -> KeyBinding | None:
         """Look up a binding by key, leader, and scope.
@@ -429,7 +452,11 @@ class KeyBindingRegistry:
         Returns:
             The matching KeyBinding, or None if not found.
         """
-        return self._bindings.get((key, leader, scope))
+        probe = KeyBinding(leader=leader, key=key, scope=scope, command_id="")
+        command = self._bindings.get(probe)
+        if command is None:
+            return None
+        return KeyBinding(leader=leader, key=key, scope=scope, command_id=command.cmd)
 
     def dispatch(self, key: str, leader: str, scope: Scope, target: Any) -> bool:
         """Look up a binding and invoke the cmd_* method on target.
@@ -448,13 +475,9 @@ class KeyBindingRegistry:
         Returns:
             True if a binding was found and dispatched, False otherwise.
         """
-        binding = self.lookup(key, leader, scope)
-        if binding is None:
-            return False
-
-        cmd = binding.command
+        probe = KeyBinding(leader=leader, key=key, scope=scope, command_id="")
+        cmd = self._bindings.get(probe)
         if cmd is None:
-            log.warning("Binding %s references unknown command %r", binding.display_key, binding.command_id)
             return False
 
         method = getattr(target, cmd.method_name, None)
@@ -472,20 +495,19 @@ class KeyBindingRegistry:
 
     def get_bindings_for_command(self, command_id: str) -> list[KeyBinding]:
         """Get all bindings that trigger a given command."""
-        return [b for b in self._bindings.values() if b.command_id == command_id]
+        return [binding for binding, command in self._bindings.items() if command.cmd == command_id]
 
     def get_bindings_for_scope(self, scope: Scope) -> list[KeyBinding]:
         """Get all bindings active in a given scope."""
-        return [b for b in self._bindings.values() if b.scope == scope]
+        return [binding for binding in self._bindings if binding.scope == scope]
 
-    def set_binding(self, key: str, command_id: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE) -> None:
+    def set_binding(self, binding: KeyBinding) -> None:
         """Add or replace a binding (no conflict check).
 
         If a binding already exists for the same key+leader+scope, it is replaced.
         For conflict-aware binding, use ``bind()`` instead.
         """
-        lookup_key = (key, leader, scope)
-        self._bindings[lookup_key] = KeyBinding(key=key, command_id=command_id, leader=leader, scope=scope)
+        self._bindings[binding] = COMMANDS[binding.command_id]
 
     def bind(
         self, key: str, command_id: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE, force: bool = False
@@ -510,42 +532,40 @@ class KeyBindingRegistry:
         if command_id not in COMMANDS:
             raise ValueError(f"Unknown command ID: {command_id!r}")
 
-        new_binding = KeyBinding(key=key, command_id=command_id, leader=leader, scope=scope)
-        lookup_key = (key, leader, scope)
-        existing = self._bindings.get(lookup_key)
+        new_binding = KeyBinding(leader=leader, key=key, scope=scope, command_id=command_id)
+        existing_cmd = self._bindings.get(new_binding)
+        existing = (
+            None
+            if existing_cmd is None
+            else KeyBinding(leader=leader, key=key, scope=scope, command_id=existing_cmd.cmd)
+        )
 
-        if existing is not None:
+        if existing_cmd is not None:
             if not force:
                 raise KeyBindingConflict(existing, new_binding)
 
-        self._bindings[lookup_key] = new_binding
+        self._bindings[new_binding] = COMMANDS[command_id]
         return existing
 
     def reset_to_defaults(self) -> None:
         """Reset all bindings to the defaults."""
         self._bindings = dict(DEFAULT_BINDINGS)
 
-    def remove_binding(self, key: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE) -> bool:
-        """Remove a binding by key+leader+scope. Returns True if found."""
-        lookup_key = (key, leader, scope)
-        if lookup_key in self._bindings:
-            del self._bindings[lookup_key]
+    def remove_binding(self, binding: KeyBinding) -> bool:
+        """Remove a binding by slot. Returns True if found."""
+        if binding in self._bindings:
+            del self._bindings[binding]
             return True
         return False
 
     @property
     def bindings(self) -> list[KeyBinding]:
         """Get all registered bindings."""
-        return list(self._bindings.values())
+        return list(self._bindings.keys())
 
     def get_all_with_commands(self) -> list[tuple[KeyBinding, Command]]:
         """Get all bindings paired with their associated commands."""
-        result = []
-        for binding in self._bindings.values():
-            cmd = binding.command
-            if cmd is not None:
-                result.append((binding, cmd))
-        return result
+        return list(self._bindings.items())
 
     def generate_help_text(self, scope: Scope) -> str:
         """Generate Markdown help text for all bindings in a given scope.
@@ -577,69 +597,64 @@ class KeyBindingRegistry:
 
         return "\n".join(lines)
 
+    def load_keybindings(self) -> None:
+        """Load keybindings from the config directory and/or defaults.
 
-# ─── Module-level registry instance ──────────────────────────────────────────
+        This method first attempts to load keybindings from the user's config
+        directory. If the file doesn't exist or is invalid, it falls back to
+        the default keybindings.
 
+        After loading, the registry will contain a complete set of bindings, with
+        user-defined bindings taking precedence over defaults, and any missing bindings
+        filled in from the defaults.
+        """
 
-def load_user_keybindings(registry: KeyBindingRegistry) -> None:
-    """Load user keybindings from the config directory and apply overrides.
+        # Read bindings from config file first
+        filepath = get_config_dir() / "keybindings.json"
 
-    Reads keybindings.json from the platform config dir. Each entry must have
-    key, leader, command, and scope fields. The key field uses human-readable
-    display format (e.g. "^", "Ctrl+T") which is converted back to Textual key names.
-
-    Args:
-        registry: The registry to apply overrides to.
-    """
-    filepath = get_config_dir() / "keybindings.json"
-    if not filepath.exists():
-        return
-
-    try:
-        data = json.loads(filepath.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as e:
-        log.warning("Failed to load keybindings from %s: %s", filepath, e)
-        return
-
-    if not isinstance(data, list):
-        log.warning("keybindings.json: expected a JSON array, got %s", type(data).__name__)
-        return
-
-    for entry in data:
-        if not isinstance(entry, dict):
-            continue
-        key_display = entry.get("key", "")
-        leader = entry.get("leader", "")
-        command = entry.get("command", "")
-        scope_str = entry.get("scope", "MainTable")
-
-        if not command:
-            continue
-
-        if command not in COMMANDS:
-            log.warning("keybindings.json: unknown command %r, skipping", command)
-            continue
+        # If the file doesn't exist, keep defaults and return early
+        if not filepath.exists():
+            self._bindings = dict(DEFAULT_BINDINGS)
+            return
 
         try:
-            scope = Scope(scope_str)
-        except ValueError:
-            log.warning("keybindings.json: unknown scope %r, skipping", scope_str)
-            continue
+            data = json.loads(filepath.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            log.warning("Failed to load keybindings from %s: %s", filepath, e)
+            return
 
-        raw_key = parse_key_display(key_display)
+        if not isinstance(data, list):
+            log.warning("keybindings.json: expected a JSON array, got %s", type(data).__name__)
+            return
 
-        # Remove the old default slot if this command is being rebound to a new key
-        for default_b in DEFAULT_BINDINGS.values():
-            if (
-                default_b.command_id == command
-                and default_b.leader == leader
-                and default_b.scope == scope
-                and default_b.key != raw_key
-            ):
-                registry.remove_binding(default_b.key, leader=default_b.leader, scope=default_b.scope)
+        for entry in data:
+            if not isinstance(entry, dict):
+                continue
+            key_display = entry.get("key", "")
+            leader = entry.get("leader", "")
+            command = entry.get("command", "")
+            scope_str = entry.get("scope", "MainTable")
 
-        registry.set_binding(raw_key, command, leader=leader, scope=scope)
+            if not (cmd := COMMANDS.get(command)):
+                log.warning("keybindings.json: unknown command %r, skipping", command)
+                continue
+
+            try:
+                scope = Scope(scope_str)
+            except ValueError:
+                log.warning("keybindings.json: unknown scope %r, skipping", scope_str)
+                continue
+
+            raw_key = parse_key_display(key_display)
+            binding = KeyBinding(leader=leader, key=raw_key, scope=scope, command_id=command)
+            self._bindings[binding] = COMMANDS[command]
+
+        # Add any default bindings that weren't overridden by the user config
+        for binding, cmd in DEFAULT_BINDINGS.items():
+            if binding not in self._bindings:
+                self._bindings[binding] = cmd
 
 
+# ─── Module-level registry instance ──────────────────────────────────────────
 key_registry = KeyBindingRegistry()
-load_user_keybindings(key_registry)
+key_registry.load_keybindings()
