@@ -378,6 +378,7 @@ class DataFrameViewer(App):
 
     def cmd_show_commands(self) -> None:
         """Show all commands and key bindings in a new tab."""
+        from .commands import COMMANDS
         from .keybindings import format_key_display
 
         seen = set()
@@ -394,6 +395,22 @@ class DataFrameViewer(App):
                     "Command": cmd.cmd,
                     "Description": f"{cmd.emoji} {cmd.description}" if cmd.emoji else cmd.description,
                     "Scope": binding.scope.value,
+                    "Category": cmd.category.value,
+                }
+            )
+
+        # Include unbound commands that have no key bindings
+        for cmd in COMMANDS.values():
+            if cmd in seen:
+                continue
+
+            rows.append(
+                {
+                    "Leader": "",
+                    "Key": "",
+                    "Command": cmd.cmd,
+                    "Description": f"{cmd.emoji} {cmd.description}" if cmd.emoji else cmd.description,
+                    "Scope": "",
                     "Category": cmd.category.value,
                 }
             )
