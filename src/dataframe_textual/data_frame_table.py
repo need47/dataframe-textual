@@ -5049,6 +5049,31 @@ class DataFrameTable(DataTable):
             callback=partial(self.unselect_rows, scope=scope),
         )
 
+    def cmd_unselect_current_row(self) -> None:
+        """Unselect the current row."""
+        ridx = self.cursor_ridx
+        rid = self.df[RID][ridx]
+
+        if rid not in self.selected_rows:
+            self.notify("Current row is not selected.", title="Unselect Row", severity="warning")
+            return
+
+        self.add_history("Unselect current row")
+        self.selected_rows.remove(rid)
+        self.setup_table()
+        self.notify("Current row has been unselected.", title="Unselect Row")
+
+    def cmd_unselect_all_rows(self) -> None:
+        """Unselect all rows."""
+        if not self.selected_rows:
+            self.notify("No rows are currently selected.", title="Unselect All Rows", severity="warning")
+            return
+
+        self.add_history("Unselect all rows")
+        self.selected_rows.clear()
+        self.setup_table()
+        self.notify("All rows have been unselected.", title="Unselect All Rows")
+
     @with_full_df
     def unselect_rows(self, result: dict, scope: str = "column") -> None:
         """Unselect rows where a term/expression matches in the selected scope.

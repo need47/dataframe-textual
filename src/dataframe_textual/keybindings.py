@@ -342,6 +342,8 @@ _bind("t", "toggle-selections")
 _bind("T", "clear-selections")
 _bind("left_curly_bracket", "prev-selected-row")
 _bind("right_curly_bracket", "next-selected-row")
+_bind("u", "unselect-current-row")
+_bind("u", "unselect-all-rows", leader="g")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MainTable-scope bindings: Find & Replace

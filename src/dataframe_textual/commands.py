@@ -233,6 +233,8 @@ _reg("toggle-selections",      "Toggle row selection (invert all)",             
 _reg("clear-selections",       "Clear all row/column selections and cell matches",         Scope.MAIN_TABLE, Category.SELECTION, "🧹")
 _reg("prev-selected-row",      "Go to previous selected row",                              Scope.MAIN_TABLE, Category.SELECTION, "⬆️")
 _reg("next-selected-row",      "Go to next selected row",                                  Scope.MAIN_TABLE, Category.SELECTION, "⬇️")
+_reg("unselect-current-row",   "Unselect the current row",                                 Scope.MAIN_TABLE, Category.SELECTION, "➖")
+_reg("unselect-all-rows",      "Unselect all rows",                                        Scope.MAIN_TABLE, Category.SELECTION, "➖")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Find & Replace (MainTable scope)
