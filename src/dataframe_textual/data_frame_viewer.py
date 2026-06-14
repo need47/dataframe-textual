@@ -144,12 +144,12 @@ class DataFrameViewer(App):
         if self.leader_key:
             event.stop()
             event.prevent_default()
-            self.reset_leader_key()
             self.notify(
                 f"Command not found for [$warning]{self.leader_key}[/][$accent]{event.key}[/] key binding",
                 title="Key Binding",
                 severity="warning",
             )
+            self.reset_leader_key()
             return
 
         # Enter leader mode on `g` or `z` key

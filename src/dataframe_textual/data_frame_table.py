@@ -21,6 +21,7 @@ from textual.coordinate import Coordinate
 from textual.events import Click, Key
 from textual.reactive import reactive
 from textual.render import measure
+from textual.renderables.bar import Bar
 from textual.widgets import DataTable
 from textual.widgets.data_table import (
     CellDoesNotExist,
@@ -36,6 +37,7 @@ from textual.widgets.data_table import (
 
 from .commands import Scope
 from .common import (
+    BAR_COLUMN_WIDTH,
     COLUMN_WIDTH_CAP,
     CURSOR_TYPES,
     HIGHLIGHT_COLOR,
@@ -57,7 +59,6 @@ from .common import (
 from .loading_screen import BusyScreen, LoadingScreen
 from .run_command_screen import RunCommandScreen
 from .table_screen import (
-    BarScreen,
     CellDetailScreen,
     FrequencyScreen,
     HistogramScreen,
@@ -82,7 +83,6 @@ from .yes_no_screen import (
     FilterTemporalScreen,
     FindReplaceScreen,
     FreezeScreen,
-    GoToRowScreen,
     RenameColumnScreen,
     SearchScreen,
     SimpleSqlScreen,
@@ -114,6 +114,7 @@ class History:
     expanded_columns: set[str]
     thousand_separator_columns: set[str]
     float_precision_columns: dict[str, int]
+    bar_columns: set[str]
     show_rid: bool
     show_column_index: bool
     dirty: bool = False  # Whether this history state has unsaved changes
@@ -253,6 +254,9 @@ class DataFrameTable(DataTable):
 
         # Per-column float precision: col_name -> number of decimal places
         self.float_precision_columns: dict[str, int] = {}
+
+        # Columns displaying as inline bar charts
+        self.bar_columns: set[str] = set()
 
         # Whether to show internal row index column
         self.show_rid = False
@@ -1093,8 +1097,11 @@ class DataFrameTable(DataTable):
         has_string_or_list_col = any(dtype == pl.String or dtype == pl.List for dtype in self.df.dtypes)
 
         # No string columns, let Textual auto-size all columns
-        if not has_string_or_list_col:
+        if not has_string_or_list_col and not self.bar_columns:
             return col_widths
+
+        for col in self.bar_columns:
+            col_widths[col] = BAR_COLUMN_WIDTH
 
         # Get available width for the table (with some padding for borders/scrollbar)
         init_available_width = self.scrollable_content_region.width or self.app.size.width
@@ -1110,6 +1117,9 @@ class DataFrameTable(DataTable):
             label_text = self._build_column_label(col, col_idx)
             label_width = measure(self.app.console, label_text, 1) + 2
             col_label_widths[col] = label_width
+
+            if label_width > col_widths.get(col, 0):
+                col_widths[col] = label_width
 
             # Let Textual auto-size for non-string and non-list columns and already expanded columns
             if (dtype != pl.String and dtype != pl.List) or col in self.expanded_columns:
@@ -1319,6 +1329,53 @@ class DataFrameTable(DataTable):
 
         return insert_pos
 
+    def _apply_bar_widgets_to_row(
+        self, formatted_row: list, bar_col_indices: list[bool], vals: list, visible_col_list: list[str]
+    ) -> None:
+        """Replace formatted cells with Bar widgets for bar columns.
+
+        For each bar column, calculates the normalized value (0-1) based on the
+        column's min/max values and creates a Bar widget for display, replacing
+        the formatted cell with the widget.
+
+        Args:
+            formatted_row: List of formatted cell values (modified in place).
+            bar_col_indices: List of booleans indicating which columns should display as bars.
+            vals: List of original values corresponding to the columns.
+            visible_col_list: List of visible column names.
+        """
+        bar_width = BAR_COLUMN_WIDTH
+
+        for cell_idx, is_bar_col in enumerate(bar_col_indices):
+            if not is_bar_col:
+                continue
+
+            val = vals[cell_idx]
+            col_name = visible_col_list[cell_idx]
+
+            # Skip non-numeric or null values
+            if not isinstance(val, (int, float)) or val is None:
+                continue
+
+            try:
+                col_data = self.df[col_name].drop_nulls()
+                if len(col_data) == 0:
+                    continue
+
+                min_val = float(col_data.min())
+                max_val = float(col_data.max())
+                range_val = max_val - min_val if max_val > min_val else 1
+                num_val = float(val)
+                normalized = (num_val - min_val) / range_val if range_val > 0 else 0
+
+                formatted_row[cell_idx] = Bar(
+                    highlight_range=(0.0, normalized * bar_width),
+                    width=bar_width,
+                )
+            except (ValueError, TypeError):
+                # If conversion fails, keep the original formatted value
+                pass
+
     def load_rows_segment(self, segment_start: int, segment_stop: int) -> int:
         """Load a single contiguous segment of rows into the table.
 
@@ -1346,13 +1403,18 @@ class DataFrameTable(DataTable):
             is_selected = rid in self.selected_rows
             match_cols = self.matches.get(rid, set())
 
-            vals, dtypes, styles = [], [], []
+            vals, dtypes, styles, bar_col_indices = [], [], [], []
+            visible_col_list = list(visible_columns.keys())
+
             for val, col, dtype in zip(row, self.df.columns, self.df.dtypes, strict=True):
                 if col not in visible_columns:
                     continue
 
                 vals.append(val)
                 dtypes.append(dtype)
+
+                # Track which indices should be displayed as bars
+                bar_col_indices.append(col in self.bar_columns)
 
                 # Highlight entire row with selection or cells with matches
                 styles.append(
@@ -1366,6 +1428,9 @@ class DataFrameTable(DataTable):
                 thousand_separator=thousand_separator,
                 float_precision=float_precision,
             )
+
+            # Replace cells in bar columns with Bar widgets
+            self._apply_bar_widgets_to_row(formatted_row, bar_col_indices, vals, visible_col_list)
 
             # Find correct insertion position and insert
             insert_pos = self._find_insert_position_for_row(ridx)
@@ -1596,22 +1661,50 @@ class DataFrameTable(DataTable):
 
     def cmd_go_to_row(self) -> None:
         """Open a modal screen to Go to a specific row."""
-        self.app.push_screen(GoToRowScreen(self), callback=self.go_to_row)
+        self.app.push_screen(
+            ConfirmScreen(
+                "Go to Row",
+                label="Enter row number (1-based) to jump to",
+                input={"value": "", "type": "number"},
+                yes="Go",
+                no="Cancel",
+            ),
+            callback=self.go_to_row,
+        )
 
     @with_full_df
-    def go_to_row(self, result: int | None) -> None:
+    def go_to_row(self, result: str | None) -> None:
         """Go to a specific row.
 
         Args:
-            result: The 1-based row index to jump to.
+            result: The 1-based row index entered by the user.
         """
         if result is None:
             return  # User cancelled the prompt
 
-        ridx = result - 1  # Convert to 0-based index in the dataframe
+        row_str = result.strip()
+
+        try:
+            row_index = int(row_str)
+        except ValueError:
+            self.notify("Please enter a valid non-negative integer", title="Go to Row", severity="error", timeout=10)
+            self.cmd_go_to_row()
+            return
+
+        total = len(self.df)
+        if not 1 <= row_index <= total:
+            self.notify(
+                f"Please enter a number between [$error]1[/] and [$accent]{total}[/]",
+                title="Go to Row",
+                severity="error",
+            )
+            self.cmd_go_to_row()
+            return
+
+        ridx = row_index - 1  # Convert to 0-based index in the dataframe
         self.move_cursor_to(ridx, 0)
 
-        self.notify(f"Moved to row {result}", title="Go to Row")
+        self.notify(f"Moved to row {row_index}", title="Go to Row")
 
     def cmd_page_backward(self) -> None:
         """Move the cursor one page up."""
@@ -1650,6 +1743,7 @@ class DataFrameTable(DataTable):
             expanded_columns=self.expanded_columns.copy(),
             thousand_separator_columns=self.thousand_separator_columns.copy(),
             float_precision_columns=self.float_precision_columns.copy(),
+            bar_columns=self.bar_columns.copy(),
             show_rid=self.show_rid,
             show_column_index=self.show_column_index,
             dirty=self.dirty,
@@ -1675,6 +1769,7 @@ class DataFrameTable(DataTable):
         self.expanded_columns = history.expanded_columns.copy()
         self.thousand_separator_columns = history.thousand_separator_columns.copy()
         self.float_precision_columns = history.float_precision_columns.copy()
+        self.bar_columns = history.bar_columns.copy()
         self.show_rid = history.show_rid
         self.show_column_index = history.show_column_index
         self.dirty = history.dirty
@@ -1770,6 +1865,7 @@ class DataFrameTable(DataTable):
         self.expanded_columns.clear()
         self.thousand_separator_columns = set()
         self.float_precision_columns = {}
+        self.bar_columns.clear()
         self.df_done = True
         self.dirty = dirty
         self.show_rid = False
@@ -1877,34 +1973,32 @@ class DataFrameTable(DataTable):
         bin_count, bins = result
         self.app.push_screen(HistogramScreen(self, bins=bins, bin_count=bin_count))
 
-    @with_full_df
     def cmd_show_bar(self) -> None:
-        """Show bar chart using first selected column as label and cursor column as value."""
-        if not self.selected_columns:
-            self.notify(
-                "Select a column first to use as the label",
-                title="Show Bar Chart",
-                severity="warning",
-            )
-            return
-
-        col_label_name = next(col for col in self.df.columns if col in self.selected_columns)
-        col_value_name = self.cursor_col_name
-
-        cidx = self.df.columns.index(col_value_name)
-        dtype = self.df.dtypes[cidx]
+        """Toggle inline bar chart display for the current column."""
+        col_name = self.cursor_col_name
+        dtype = self.cursor_col_dtype
         dc = DtypeConfig(dtype)
 
         if dc.gtype not in ("integer", "float"):
             self.notify(
-                f"Cannot show bar chart for non-numeric column [$warning]{col_value_name}[/] of type [$accent]{dtype}[/]",
+                f"Cannot show bar chart for non-numeric column [$warning]{col_name}[/] of type [$accent]{dtype}[/]",
                 title="Show Bar Chart",
                 severity="warning",
             )
             return
 
-        cidx_label = self.df.columns.index(col_label_name)
-        self.app.push_screen(BarScreen(self, cidx, cidx_label))
+        # Toggle bar display
+        if col_name in self.bar_columns:
+            self.bar_columns.discard(col_name)
+            status = "off"
+        else:
+            self.bar_columns.add(col_name)
+            status = "on"
+
+        # Recreate table for display
+        self.setup_table()
+
+        self.notify(f"Bar chart is [$success]{status}[/] for column [$accent]{col_name}[/]", title="Show Bar Chart")
 
     @with_full_df
     def cmd_show_statistics(self, cidx: int | None = None) -> None:

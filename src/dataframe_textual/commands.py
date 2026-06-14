@@ -167,7 +167,7 @@ _reg("show-histogram-custom",     "Show histogram for current column with custom
 _reg("show-statistics",           "Show statistics for current column",                                Scope.MAIN_TABLE, Category.DISPLAY, "📈")
 _reg("show-statistics-all",       "Show statistics for entire dataframe",                              Scope.MAIN_TABLE, Category.DISPLAY, "📊")
 _reg("cycle-cursor-type",         "Cycle cursor type (cell → row → column)",                          Scope.MAIN_TABLE, Category.DISPLAY, "🎯")
-_reg("show-bar",                  "Show bar chart (first selected col as label, cursor col as value)", Scope.MAIN_TABLE, Category.DISPLAY, "📊")
+_reg("show-bar",                  "Toggle inline bar chart display for current column",               Scope.MAIN_TABLE, Category.DISPLAY, "📊")
 _reg("metadata-column",           "Show column metadata (ID, name, type)",                             Scope.MAIN_TABLE, Category.DISPLAY, "📋")
 _reg("hide-column",               "Hide selected columns or current column",                           Scope.MAIN_TABLE, Category.DISPLAY, "👁️")
 _reg("hide-column-before",        "Hide current column and those before",                              Scope.MAIN_TABLE, Category.DISPLAY, "👁️")

@@ -783,42 +783,6 @@ class RenameTabScreen(YesNoScreen):
         return self.content_tab, new_name
 
 
-class GoToRowScreen(YesNoScreen):
-    """Modal screen to jump to a specific row index."""
-
-    def __init__(self, dftable: "DataFrameTable"):
-        self.dftable = dftable
-        super().__init__(
-            title="Go to Row",
-            label="Enter row number (1-based) to jump to",
-            input={"value": "", "type": "number"},
-            yes="Go",
-            no="Cancel",
-            on_yes_callback=self._get_input,
-        )
-
-    def _get_input(self) -> int | None:
-        """Get and validate the row index input."""
-        row_str = self.input.value.strip()
-
-        try:
-            row_index = int(row_str)
-        except ValueError:
-            self.notify("Please enter a valid non-negative integer", title="Go to Row", severity="error", timeout=10)
-            return None
-
-        total = len(self.dftable.df)
-        if 1 <= row_index <= total:
-            return row_index  # Convert to 0-based index
-
-        self.notify(
-            f"Please enter a number between [$error]1[/] and [$accent]{total}[/]",
-            title="Go to Row",
-            severity="error",
-        )
-        return None
-
-
 class CustomBinScreen(YesNoScreen):
     """Modal screen to specify custom bins for histogram."""
 

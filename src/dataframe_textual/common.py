@@ -54,6 +54,9 @@ HIGHLIGHT_COLOR = "red"
 # Maximum width for columns before truncation
 COLUMN_WIDTH_CAP = 35
 
+# Minimu width for bar columns
+BAR_COLUMN_WIDTH = 10
+
 # Thousand separator for numeric values (must be ',' or '_' per Python's format mini-language)
 THOUSAND_SEPARATOR = ","
 

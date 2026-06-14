@@ -303,11 +303,11 @@ Useful examples from current bindings:
 
 #### Undo/Redo/Reset
 
-| Key     | Action                  |
-| ------- | ----------------------- |
-| `U`     | Undo last action        |
-| `R`     | Redo last undone action |
-| `gU`    | Reset to initial state  |
+| Key  | Action                  |
+| ---- | ----------------------- |
+| `U`  | Undo last action        |
+| `R`  | Redo last undone action |
+| `gU` | Reset to initial state  |
 
 #### Navigation
 
@@ -330,33 +330,33 @@ Useful examples from current bindings:
 
 #### Display
 
-| Key               | Action                                                                         |
-| ----------------- | ------------------------------------------------------------------------------ |
-| `Enter`           | Show details for the current row as two-column key–value pairs                 |
-| `Tab`             | Show current cell details; press `Tab` again there to drill deeper             |
-| `C`               | Show metadata for all columns (name and data type)                             |
-| `F`               | Show frequency distribution for current or selected columns                    |
-| `I`               | Show statistics for current column                                             |
-| `gI`              | Show statistics for all columns                                                |
-| `m`               | Show histogram for current column                                              |
-| `gm`              | Show histogram for current column with custom bins                             |
-| `=`               | Show bar chart using first selected column as label and cursor column as value |
-| `-` (minus)       | Hide selected columns or current column                                        |
-| `g-` (minus)      | Hide current column and all columns before it                                  |
-| `z-` (minus)      | Hide current column and all columns after it                                   |
-| `gv`              | Show all hidden columns                                                        |
-| `z~`              | Toggle 1-based column index prefixes                                           |
-| `z^`              | Toggle internal row index (RID) column display                                 |
-| `_` (underscore)  | Toggle column full width for current column                                    |
-| `g_` (underscore) | Toggle column full width for all string/list columns                           |
-| `+`               | Toggle freeze rows and/or columns                                              |
-| `z,`              | Toggle thousand separator for current column                                   |
-| `(`               | Expand current list column into indexed columns (e.g. ``col[1]``, ``col[2]``)  |
-| `)`               | Contract indexed sibling columns (``col[N]``) back into a list column          |
-| `<`               | Decrease float precision for current column                                    |
-| `>`               | Increase float precision for current column                                    |
-| `g^`              | Set current row as the new header row                                          |
-| `zC`              | Cycle cursor type (cell -> row -> column)                                      |
+| Key               | Action                                                                        |
+| ----------------- | ----------------------------------------------------------------------------- |
+| `Enter`           | Show details for the current row as two-column key–value pairs                |
+| `Tab`             | Show current cell details                                                     |
+| `C`               | Show metadata for all columns (name and data type)                            |
+| `F`               | Show frequency distribution for current or selected columns                   |
+| `I`               | Show statistics for current column                                            |
+| `gI`              | Show statistics for all columns                                               |
+| `m`               | Show histogram for current column                                             |
+| `gm`              | Show histogram for current column with custom bins                            |
+| `zm`              | Toggle inline bar chart display for current numeric column                    |
+| `-` (minus)       | Hide selected columns or current column                                       |
+| `g-` (minus)      | Hide current column and all columns before it                                 |
+| `z-` (minus)      | Hide current column and all columns after it                                  |
+| `gv`              | Show all hidden columns                                                       |
+| `z~`              | Toggle 1-based column index prefixes                                          |
+| `z^`              | Toggle internal row index (RID) column display                                |
+| `_` (underscore)  | Toggle column full width for current column                                   |
+| `g_` (underscore) | Toggle column full width for all string/list columns                          |
+| `+`               | Toggle freeze rows and/or columns                                             |
+| `z,`              | Toggle thousand separator for current column                                  |
+| `(`               | Expand current list column into indexed columns (e.g. ``col[1]``, ``col[2]``) |
+| `)`               | Contract indexed sibling columns (``col[N]``) back into a list column         |
+| `<`               | Decrease float precision for current column                                   |
+| `>`               | Increase float precision for current column                                   |
+| `g^`              | Set current row as the new header row                                         |
+| `zC`              | Cycle cursor type (cell -> row -> column)                                     |
 
 #### Editing
 
@@ -509,21 +509,21 @@ These controls change how the table is shown without changing the underlying dat
 - `(`: Expand the current list column into indexed columns named like `colname[1]`, `colname[2]`, etc.
 - `)`: Contract those indexed sibling columns back into a single list column. Position the cursor on any sibling (e.g. `colname[2]`) and press `)` to merge all `colname[N]` columns back into `colname`.
 - `<` / `>`: Decrease or increase float precision for the current float column. Each column keeps its own precision setting, and `0` means the default full display.
+- `zm`: Toggle inline bar chart display for the current numeric column. When active, each cell is rendered as a Rich `Bar`, normalized to that column's min/max range. Press `zm` again to restore normal value display.
 
 ### 3. Modal Screen
 
 Several features open a **modal screen** (an overlay table) for inspection or interaction. The following modals share a common set of keyboard shortcuts:
 
-| Modal Screen    | Opened With | Purpose                                                          |
-| --------------- | ----------- | ---------------------------------------------------------------- |
-| Sheets Overview | `S`         | Summary of all open tabs                                         |
-| Column Metadata | `C`         | Column names and data types                                      |
-| Row Detail      | `Enter`     | All column values for one row                                    |
-| Cell Detail     | `Tab`       | Drill into a single cell value                                   |
-| Frequency       | `F`         | Value distribution for a column                                  |
-| Statistics      | `I` / `gI`  | Summary statistics for column or dataframe                       |
-| Histogram       | `m` / `gm`  | Numeric distribution as histogram                                |
-| Bar Chart       | `=`         | Bar chart using selected column as label, cursor column as value |
+| Modal Screen    | Opened With | Purpose                                    |
+| --------------- | ----------- | ------------------------------------------ |
+| Sheets Overview | `S`         | Summary of all open tabs                   |
+| Column Metadata | `C`         | Column names and data types                |
+| Row Detail      | `Enter`     | All column values for one row              |
+| Cell Detail     | `Tab`       | Drill into a single cell value             |
+| Frequency       | `F`         | Value distribution for a column            |
+| Statistics      | `I` / `gI`  | Summary statistics for column or dataframe |
+| Histogram       | `m` / `gm`  | Numeric distribution as histogram          |
 
 **Common keys available in all modal screens:**
 
