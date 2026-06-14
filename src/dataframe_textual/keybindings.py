@@ -206,236 +206,32 @@ def parse_key_display(display: str) -> str:
 DEFAULT_BINDINGS: dict[KeyBinding, Command] = {}
 
 
-def _bind(key: str, command_id: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE) -> None:
-    """Create and register a default key binding."""
-    binding = KeyBinding(leader=leader, key=key, scope=scope, command_id=command_id)
-    if binding in DEFAULT_BINDINGS:
-        existing_cmd = DEFAULT_BINDINGS[binding]
-        log.warning(
-            f"Default binding conflict: {binding.display_key!r} already bound to {existing_cmd.cmd!r}, "
-            f"cannot bind to {command_id!r}"
-        )
-        return
+def _build_default_bindings() -> None:
+    """Build DEFAULT_BINDINGS from COMMANDS.bindings (auto-generated from commands.py).
 
-    DEFAULT_BINDINGS[binding] = COMMANDS[command_id]
+    This function is called after all commands are registered and their bindings are set.
+    Each command specifies its key bindings, which are then converted to KeyBinding objects.
+    """
+    for cmd in COMMANDS.values():
+        for key, leader in cmd.bindings:
+            binding = KeyBinding(leader=leader or "", key=key, scope=cmd.scope, command_id=cmd.cmd)
+            if binding in DEFAULT_BINDINGS:
+                existing_cmd = DEFAULT_BINDINGS[binding]
+                log.warning(
+                    f"Default binding conflict: {binding.display_key!r} already bound to "
+                    f"'{existing_cmd.cmd}', cannot bind to '{cmd.cmd}'"
+                )
+                continue
+            DEFAULT_BINDINGS[binding] = cmd
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# App-scope bindings
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("q", "close", scope=Scope.APP)
-_bind("q", "close-all", leader="g", scope=Scope.APP)
-_bind("ctrl+q", "force-quit", scope=Scope.APP)
-_bind("B", "toggle-tab-bar", leader="g", scope=Scope.APP)
-_bind("B", "prev-tab", scope=Scope.APP)
-_bind("b", "next-tab", scope=Scope.APP)
-_bind("b", "move-tab-left", leader="g", scope=Scope.APP)
-_bind("b", "move-tab-right", leader="z", scope=Scope.APP)
-_bind("ctrl+t", "save-current-tab", scope=Scope.APP)
-_bind("ctrl+s", "save-all-tabs", scope=Scope.APP)
-_bind("w", "save-tab-overwrite", scope=Scope.APP)
-_bind("w", "save-all-overwrite", leader="g", scope=Scope.APP)
-_bind("ctrl+d", "duplicate-tab", scope=Scope.APP)
-_bind("ctrl+o", "open-file", scope=Scope.APP)
-_bind("ctrl+n", "new-tab", scope=Scope.APP)
-_bind("f1", "toggle-help-panel", scope=Scope.APP)
-_bind("grave_accent", "toggle-python-console", scope=Scope.APP)
-_bind("S", "show-sheets", scope=Scope.APP)
-_bind("backspace", "show-commands", leader="z", scope=Scope.APP)
-_bind("ctrl+h", "show-commands", leader="z", scope=Scope.APP)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: Navigation
+# Build default bindings from commands.py definitions
 # ═══════════════════════════════════════════════════════════════════════════════
+# All key bindings are now defined in commands.py via .bind() chains on command registration.
+# This function populates DEFAULT_BINDINGS from those definitions.
 
-_bind("h", "cursor-left")
-_bind("j", "cursor-down")
-_bind("k", "cursor-up")
-_bind("l", "cursor-right")
-_bind("g", "go-top", leader="g")  # 'gg' sequence (g is leader, then g as second key)
-_bind("G", "go-bottom")
-_bind("ctrl+g", "go-to-row")
-_bind("ctrl+b", "page-backward")
-_bind("ctrl+f", "page-forward")
-_bind("h", "scroll-home", leader="g")
-_bind("j", "scroll-bottom", leader="g")
-_bind("k", "scroll-top", leader="g")
-_bind("l", "scroll-end", leader="g")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: Undo/Redo/Reset
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("U", "undo")
-_bind("R", "redo")
-_bind("U", "reset", leader="g")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: Display
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("enter", "view-row-detail")
-_bind("tab", "view-cell-detail")
-_bind("F", "show-frequency")
-_bind("m", "show-histogram")
-_bind("m", "show-histogram-custom", leader="g")
-_bind("I", "show-statistics")
-_bind("I", "show-statistics-all", leader="g")
-_bind("C", "cycle-cursor-type", leader="z")
-_bind("m", "show-bar", leader="z")
-_bind("C", "metadata-column")
-_bind("minus", "hide-column")
-_bind("minus", "hide-column-before", leader="g")
-_bind("minus", "hide-column-after", leader="z")
-_bind("v", "show-hidden-columns", leader="g")
-_bind("underscore", "expand-column")
-_bind("underscore", "expand-all-columns", leader="g")
-_bind("plus", "toggle-freeze")
-_bind("tilde", "toggle-column-index", leader="z")
-_bind("circumflex_accent", "set-row-as-header", leader="g")
-_bind("T", "select-theme", leader="g", scope=Scope.APP)
-_bind("comma", "toggle-thousand-separator", leader="z")
-_bind("less_than_sign", "decrease-float-precision")
-_bind("greater_than_sign", "increase-float-precision")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: Editing
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("e", "edit-cell")
-_bind("E", "edit-column")
-_bind("a", "add-column")
-_bind("A", "add-column-expr")
-_bind("i", "add-index-column")
-_bind("a", "add-link-column", leader="z")
-_bind("circumflex_accent", "rename-column")
-_bind("d", "delete-row")
-_bind("d", "delete-row-above", leader="g")
-_bind("d", "delete-row-below", leader="z")
-_bind("delete", "clear-cell")
-_bind("shift+delete", "clear-column")
-_bind("asterisk", "delete-column")
-_bind("asterisk", "delete-column-before", leader="g")
-_bind("asterisk", "delete-column-after", leader="z")
-_bind("D", "duplicate-row")
-_bind("D", "duplicate-column", leader="z")
-_bind("U", "remove-duplicates", leader="z")
-_bind("T", "transpose", leader="z")
-_bind("left_parenthesis", "expand-list-column")
-_bind("right_parenthesis", "contract-list-column")
-_bind("o", "explode-column")
-_bind("O", "explode-column-delim")
-_bind("colon", "split-column")
-_bind("colon", "join-columns", leader="z")
-_bind("colon", "glue-list-column", leader="g")
-_bind("ctrl+u", "upper-case-column")
-_bind("ctrl+l", "lower-case-column")
-_bind("B", "strip-whitespace", leader="z")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: Row/Column Selection
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("comma", "select-rows")
-_bind("comma", "select-rows-all", leader="g")
-_bind("vertical_line", "select-rows-expr")
-_bind("vertical_line", "select-rows-expr-all", leader="g")
-_bind("backslash", "unselect-rows-expr")
-_bind("backslash", "unselect-rows-expr-all", leader="g")
-_bind("s", "toggle-selection-row")
-_bind("apostrophe", "toggle-selection-col")
-_bind("t", "toggle-selections")
-_bind("T", "clear-selections")
-_bind("left_curly_bracket", "prev-selected-row")
-_bind("right_curly_bracket", "next-selected-row")
-_bind("u", "unselect-current-row")
-_bind("u", "unselect-all-rows", leader="g")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: Find & Replace
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("slash", "find-forward")
-_bind("slash", "find-forward-all", leader="g")
-_bind("slash", "find-forward-cursor", leader="z")
-_bind("question_mark", "find-backward")
-_bind("question_mark", "find-backward-all", leader="g")
-_bind("question_mark", "find-backward-cursor", leader="z")
-_bind("n", "next-match")
-_bind("N", "prev-match")
-_bind("r", "replace-column")
-_bind("r", "replace-all-columns", leader="g")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: Filter & Collect
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("v", "filter-rows")
-_bind("V", "filter-rows-expr")
-_bind("full_stop", "filter-rows-nonnull")
-_bind("full_stop", "filter-rows-null", leader="z")
-_bind("f", "filter-rows-value")
-_bind("quotation_mark", "collect-rows")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: Sorting
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("left_square_bracket", "sort-ascending")
-_bind("right_square_bracket", "sort-descending")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: Reorder
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("shift+left", "move-column-left")
-_bind("H", "move-column-left")
-_bind("shift+right", "move-column-right")
-_bind("L", "move-column-right")
-_bind("shift+left", "move-column-start", leader="g")
-_bind("H", "move-column-start", leader="g")
-_bind("shift+right", "move-column-end", leader="g")
-_bind("L", "move-column-end", leader="g")
-_bind("shift+up", "move-row-up")
-_bind("K", "move-row-up")
-_bind("shift+down", "move-row-down")
-_bind("J", "move-row-down")
-_bind("shift+up", "move-row-top", leader="g")
-_bind("K", "move-row-top", leader="g")
-_bind("shift+down", "move-row-bottom", leader="g")
-_bind("J", "move-row-bottom", leader="g")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: Type Casting
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("number_sign", "cast-integer")
-_bind("percent_sign", "cast-float")
-_bind("dollar_sign", "cast-boolean")
-_bind("tilde", "cast-string")
-_bind("at", "cast-date")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: Copy
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("c", "copy-cell")
-_bind("ctrl+c", "copy-column")
-_bind("ctrl+r", "copy-row")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: SQL
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("Q", "sql-advanced")
-_bind("Q", "sql-simple", leader="z")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MainTable-scope bindings: Command Palette
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_bind("space", "run-command")
+_build_default_bindings()
 
 
 # ─── Registry class ──────────────────────────────────────────────────────────

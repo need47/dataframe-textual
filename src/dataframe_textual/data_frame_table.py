@@ -57,7 +57,7 @@ from .common import (
     validate_expr,
 )
 from .loading_screen import BusyScreen, LoadingScreen
-from .run_command_screen import RunCommandScreen
+from .run_command_screen import InputScreen, RunCommandScreen
 from .table_screen import (
     CellDetailScreen,
     FrequencyScreen,
@@ -5624,3 +5624,13 @@ class DataFrameTable(DataTable):
             f"Query executed successfully. Now showing [$accent]{len(self.df)}[/] rows and [$accent]{len(self.df.columns)}[/] columns.",
             title="SQL Query",
         )
+
+    # Misc
+    def cmd_get_input(self):
+        """Open a modal screen to get user input and show it in a notification."""
+        self.app.push_screen(InputScreen(), callback=self._handle_input)
+
+    def _handle_input(self, text: str | None) -> None:
+        """Handle input result from InputScreen."""
+        if text is not None:
+            self.notify(f"You entered: {text}", title="Input Received")

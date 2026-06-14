@@ -345,8 +345,8 @@ Useful examples from current bindings:
 | `g-` (minus)      | Hide current column and all columns before it                                 |
 | `z-` (minus)      | Hide current column and all columns after it                                  |
 | `gv`              | Show all hidden columns                                                       |
-| `z~`              | Toggle 1-based column index prefixes                                          |
-| `z^`              | Toggle internal row index (RID) column display                                |
+| `g~`              | Toggle 1-based column index prefixes                                          |
+| `z~`              | Toggle freeze rows and/or columns                                             |
 | `_` (underscore)  | Toggle column full width for current column                                   |
 | `g_` (underscore) | Toggle column full width for all string/list columns                          |
 | `+`               | Toggle freeze rows and/or columns                                             |
@@ -504,7 +504,8 @@ These controls change how the table is shown without changing the underlying dat
 - `z-`: Hide the current column and all columns after it.
 - `gv`: Show all hidden columns.
 - `+`: Freeze rows and/or columns to keep important areas visible while scrolling.
-- `z~`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
+- `z~`: Freeze rows and/or columns (alternative to `+`).
+- `g~`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
 - `z,`: Toggle the thousand separator for the current numeric column.
 - `(`: Expand the current list column into indexed columns named like `colname[1]`, `colname[2]`, etc.
 - `)`: Contract those indexed sibling columns back into a single list column. Position the cursor on any sibling (e.g. `colname[2]`) and press `)` to merge all `colname[N]` columns back into `colname`.

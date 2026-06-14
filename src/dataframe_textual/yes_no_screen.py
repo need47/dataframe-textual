@@ -374,7 +374,7 @@ class ConfirmScreen(YesNoScreen):
         }
     """
 
-    def __init__(self, title: str, label=None, input=None, yes="Yes", maybe: str | None = None, no="No"):
+    def __init__(self, title: str = None, label=None, input=None, yes="Yes", maybe: str | None = None, no="No"):
         super().__init__(
             title=title,
             label=label,
