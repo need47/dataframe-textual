@@ -209,6 +209,14 @@ DEFAULT_BINDINGS: dict[KeyBinding, Command] = {}
 def _bind(key: str, command_id: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE) -> None:
     """Create and register a default key binding."""
     binding = KeyBinding(leader=leader, key=key, scope=scope, command_id=command_id)
+    if binding in DEFAULT_BINDINGS:
+        existing_cmd = DEFAULT_BINDINGS[binding]
+        log.warning(
+            f"Default binding conflict: {binding.display_key!r} already bound to {existing_cmd.cmd!r}, "
+            f"cannot bind to {command_id!r}"
+        )
+        return
+
     DEFAULT_BINDINGS[binding] = COMMANDS[command_id]
 
 
@@ -492,10 +500,8 @@ class KeyBindingRegistry:
         method = getattr(target, cmd.method_name, None)
         if method is None:
             log.warning(
-                "Command %r wants method %r but target %r has no such method",
-                cmd.cmd,
-                cmd.method_name,
-                type(target).__name__,
+                f"Command {cmd.cmd!r} wants method {cmd.method_name!r} but "
+                f"target {type(target).__name__!r} has no such method"
             )
             return False
 
@@ -629,11 +635,11 @@ class KeyBindingRegistry:
         try:
             data = json.loads(filepath.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
-            log.warning("Failed to load keybindings from %s: %s", filepath, e)
+            log.warning(f"Failed to load keybindings from {filepath}: {e}")
             return
 
         if not isinstance(data, list):
-            log.warning("keybindings.json: expected a JSON array, got %s", type(data).__name__)
+            log.warning(f"keybindings.json: expected a JSON array, got {type(data).__name__}")
             return
 
         for entry in data:
@@ -645,13 +651,13 @@ class KeyBindingRegistry:
             scope_str = entry.get("scope", "MainTable")
 
             if not (cmd := COMMANDS.get(command)):
-                log.warning("keybindings.json: unknown command %r, skipping", command)
+                log.warning(f"keybindings.json: unknown command {command!r}, skipping")
                 continue
 
             try:
                 scope = Scope(scope_str)
             except ValueError:
-                log.warning("keybindings.json: unknown scope %r, skipping", scope_str)
+                log.warning(f"keybindings.json: unknown scope {scope_str!r}, skipping")
                 continue
 
             raw_key = parse_key_display(key_display)
