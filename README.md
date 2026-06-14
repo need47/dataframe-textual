@@ -46,11 +46,14 @@ This installs an executable `dv`.
 ### Using [uv](https://docs.astral.sh/uv/)
 
 ```bash
-# Install as a tool
+# Install from PyPI
 uv tool install dataframe-textual
 
-# Quick run using uvx without installation
-uvx https://github.com/need47/dataframe-textual.git <csvfile>
+# Install from GitHub
+uv tool install https://github.com/need47/dataframe-textual.git
+
+# Run once with uvx without installing locally
+uvx dataframe-textual <csvfile>
 ```
 
 ### Development installation
@@ -225,6 +228,38 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 - Press the next key within the timeout to execute the combined command
 - If no second key is pressed within 3 seconds or `Esc` is pressed, leader mode is cancelled.
 
+**Important:** press `z` then `Ctrl+H` to open a **Commands** tab, where all commands and keybindings can be viewed and modified.
+
+### Memorize `g` vs `z` Quickly
+
+Use this as a practical memory aid (not a strict rule):
+
+- `g` often means broader scope, global-style behavior, or toward left/up.
+- `z` is often the opposite: narrower/specific variants, toward right/down, or transform-style/less common actions.
+
+Why this helps:
+
+- In alphabet order, `g` comes before `z`, so it is easier to remember `g` as global/earlier/wider and `z` as later/narrower.
+- This pattern appears repeatedly in the command registry and default keybinding registry.
+
+Useful examples from current bindings:
+
+- Scope widening:
+  - `,` selects matching rows in current column, while `g,` selects in all columns.
+  - `/` searches current column, while `g/` searches all columns.
+  - `?` searches backward in current column, while `g?` searches backward in all columns.
+- Left/up vs right/down:
+  - `g*` delete current column and those before (left), while `z*` deletes current column and those after (right).
+  - `gd` delete current row and those above, while `zd` deletes current row and those below.
+  - `gb` move tab left, while `zb` moves tab right.
+- Specific/transform-style variants under `z`:
+  - `z/` and `z?` search with cursor value (specialized variant).
+  - `z:` joins selected columns.
+  - `zT` transposes rows/columns.
+  - `za` adds a link column from a URL template.
+
+**Tip**: Learn the base key first, then its `g` and `z` variants as a small family.
+
 ### App-Level Controls
 
 #### File & Tab Management
@@ -266,6 +301,14 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 ### Table-Level Controls
 
+#### Undo/Redo/Reset
+
+| Key     | Action                  |
+| ------- | ----------------------- |
+| `U`     | Undo last action        |
+| `R`     | Redo last undone action |
+| `gU`    | Reset to initial state  |
+
 #### Navigation
 
 | Key                      | Action                              |
@@ -284,14 +327,6 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `PageDown` / `PageUp`    | Scroll down/up one page             |
 | `Ctrl+F`                 | Page forward                        |
 | `Ctrl+B`                 | Page backforward                    |
-
-#### Undo/Redo/Reset
-
-| Key     | Action                  |
-| ------- | ----------------------- |
-| `u`/`U` | Undo last action        |
-| `R`     | Redo last undone action |
-| `gu`    | Reset to initial state  |
 
 #### Display
 
@@ -345,7 +380,7 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 | `zd`           | Delete current row and all those below                          |
 | `D`            | Duplicate current row                                           |
 | `zD`           | Duplicate current column                                        |
-| `gU`           | Remove duplicate rows (keep first occurrence)                   |
+| `zU`           | Remove duplicate rows (keep first occurrence)                   |
 | `:`            | Split current string column into a new column by delimiter      |
 | `z:`           | Join all selected columns into a new string column by delimiter |
 | `g:`           | Glue items of a list column into a string column by delimiter   |
@@ -442,7 +477,15 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 ## Features in Detail
 
-### 1. Display & UI
+### 1. Undo/Redo/Reset
+
+These actions are the fastest way to get out of trouble after a mistaken edit, delete, sort, filter, or other table change.
+
+- `U`: Undo the last action and restore the previous state.
+- `R`: Redo the last undone action.
+- `gU`: Reset the table to its original loaded state if you want to start over.
+
+### 2. Display & UI
 
 Columns are automatically styled based on their data types (auto-inferred):
 
@@ -467,14 +510,6 @@ These controls change how the table is shown without changing the underlying dat
 - `)`: Contract those indexed sibling columns back into a single list column. Position the cursor on any sibling (e.g. `colname[2]`) and press `)` to merge all `colname[N]` columns back into `colname`.
 - `<` / `>`: Decrease or increase float precision for the current float column. Each column keeps its own precision setting, and `0` means the default full display.
 
-### 2. Undo/Redo/Reset
-
-These actions are the fastest way to get out of trouble after a mistaken edit, delete, sort, filter, or other table change.
-
-- `u`/`U`: Undo the last action and restore the previous state.
-- `R`: Redo the last undone action.
-- `gu`: Reset the table to its original loaded state if you want to start over.
-
 ### 3. Modal Screen
 
 Several features open a **modal screen** (an overlay table) for inspection or interaction. The following modals share a common set of keyboard shortcuts:
@@ -487,7 +522,7 @@ Several features open a **modal screen** (an overlay table) for inspection or in
 | Cell Detail     | `Tab`       | Drill into a single cell value                                   |
 | Frequency       | `F`         | Value distribution for a column                                  |
 | Statistics      | `I` / `gI`  | Summary statistics for column or dataframe                       |
-| Histogram       | `m` / `M`   | Numeric distribution as histogram                                |
+| Histogram       | `m` / `gm`  | Numeric distribution as histogram                                |
 | Bar Chart       | `=`         | Bar chart using selected column as label, cursor column as value |
 
 **Common keys available in all modal screens:**
@@ -499,7 +534,7 @@ Several features open a **modal screen** (an overlay table) for inspection or in
 | `G`            | Scroll to bottom                             |
 | `[`            | Sort by current column ascending             |
 | `]`            | Sort by current column descending            |
-| `z,`           | Toggle thousand separator for numeric values |
+| `,`            | Toggle thousand separator for numeric values |
 | `C`            | Cycle cursor type (cell → row → column)      |
 | `Ctrl+S`       | Save the modal table to file                 |
 
@@ -748,7 +783,7 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 - `i`: Insert an index column after the current column.
 - `D`: Duplicate the current row.
 - `zD`: Duplicate the current column using a `_copy` suffix.
-- `gU`: Remove duplicate rows while keeping the first occurrence, based on visible-column values.
+- `zU`: Remove duplicate rows while keeping the first occurrence, based on visible-column values.
 - `:`: Split the current string column into a new list column using a delimiter.
 - `Ctrl+U`: Convert the current column, or all selected columns that are string type, to uppercase.
 - `Ctrl+L`: Convert the current column, or all selected columns that are string type, to lowercase.
