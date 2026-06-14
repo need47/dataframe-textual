@@ -110,31 +110,24 @@ class Command:
             This Command object for method chaining.
 
         Raises:
-            KeyError: If the binding conflicts with an existing binding.
+            KeyError: If the binding conflicts with an existing binding in the same scope.
         """
-        leader = leader or ""
-        binding_key = (self.cmd, self.scope, key, leader)
+        for command in COMMANDS.values():
+            if command is self or command.scope != self.scope:
+                continue
+            for bound_key, bound_leader in command.bindings:
+                if bound_key == key and bound_leader == leader:
+                    raise KeyError(
+                        f"Key '{leader or ''}{key}' (scope={self.scope.value}) is already bound to '{command.cmd}'"
+                    )
 
-        # Check for conflicts with existing bindings
-        if binding_key in _BINDING_REGISTRY:
-            existing_cmd = _BINDING_REGISTRY[binding_key]
-            raise KeyError(
-                f"Key '{leader}{key}' (scope={self.scope.value}) is already bound to '{existing_cmd.cmd}', "
-                f"cannot rebind to '{self.cmd}'"
-            )
-
-        _BINDING_REGISTRY[binding_key] = self
-        self.bindings.append((key, leader if leader else None))
+        self.bindings.append((key, leader))
         return self
 
 
 # fmt: off
-# ─── Global registries ────────────────────────────────────────────────────────
+# ─── Global registry ─────────────────────────────────────────────────────────
 
-# Tracks all bindings to detect conflicts: (cmd_id, scope, key, leader) -> Command
-_BINDING_REGISTRY: dict[tuple[str, Scope, str, str], Command] = {}
-
-# All registered commands: cmd_id -> Command
 COMMANDS: dict[str, Command] = {}
 
 
