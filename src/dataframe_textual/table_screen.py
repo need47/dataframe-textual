@@ -87,6 +87,9 @@ class TableModalScreen(ModalScreen):
         self.table = DataTable(zebra_stripes=True)
         yield self.table
 
+    def on_mount(self) -> None:
+        self.app.notify("Ready")
+
     def on_key(self, event: Key) -> None:
         """Handle key press events in the table screen.
 
@@ -416,6 +419,7 @@ class RowDetailScreen(TableScreen):
         Populates the table with column names and values from the selected row
         of the main DataFrame. Sets the table cursor type to "row".
         """
+        super().on_mount()
         self.build_table()
 
     def on_key(self, event: Key) -> None:
@@ -528,6 +532,7 @@ class StatisticsScreen(TableScreen):
 
     def on_mount(self) -> None:
         """Create the statistics table."""
+        super().on_mount()
         self.table.loading = True
         self.calculate_statistics()
 
@@ -757,6 +762,7 @@ class FrequencyScreen(TableScreen):
 
     def on_mount(self) -> None:
         """Start frequency calculation."""
+        super().on_mount()
         self.table.loading = True
         self._calculate_frequency()
 
@@ -1012,6 +1018,7 @@ class HistogramScreen(TableScreen):
 
     def on_mount(self) -> None:
         """Start histogram calculation."""
+        super().on_mount()
         self.table.loading = True
         self._calculate_histogram()
 
@@ -1232,6 +1239,7 @@ class CellDetailScreen(TableModalScreen):
 
     def on_mount(self) -> None:
         """Initialize the cell detail screen."""
+        super().on_mount()
         self.build_table()
 
     def on_key(self, event: Key) -> None:
@@ -1308,6 +1316,7 @@ class BarScreen(TableModalScreen):
 
     def on_mount(self) -> None:
         """Start bar calculation."""
+        super().on_mount()
         self.table.loading = True
         self._calculate_bar()
 

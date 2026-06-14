@@ -706,14 +706,13 @@ class DataFrameTable(DataTable):
             self.app.timeout_timer = None
 
     def on_key(self, event: Key) -> None:
-        """Handle all key press events via the key binding registry.
+        """Handle table-scoped key dispatch and row loading.
 
-        All command dispatch goes through ``app.key_registry.dispatch()``.
-        Leader-key sequences (g+key, z+key) are resolved by combining leader state
-        from ``self.leader_key`` with the incoming key event.
+        Only handles MAIN_TABLE scope dispatch. If a command is found in MAIN_TABLE scope,
+        the event is stopped and prevented. Otherwise, the event bubbles up to the app level
+        (DataFrameViewer.on_key()) to try APP scope dispatch.
 
-        Special cases:
-          - Arrow up/down also triggers row loading for lazy-loaded dataframes.
+        Arrow up/down always trigger row loading for lazy-loaded dataframes.
 
         Args:
             event: The key event object.
@@ -721,29 +720,13 @@ class DataFrameTable(DataTable):
         leader = self.leader_key
         registry: "KeyBindingRegistry" = self.app.key_registry
 
-        # Try to dispatch via the registry (MainTable scope)
+        # Try to dispatch via the registry (MAIN_TABLE scope only)
         if registry.dispatch(event.key, leader, Scope.MAIN_TABLE, self):
             event.stop()
             event.prevent_default()
             self.stop_timer()
             self.leader_key = ""
-        # Try App-scope dispatch (for commands like gT=select_theme, etc.)
-        elif registry.dispatch(event.key, leader, Scope.APP, self.app):
-            event.stop()
-            event.prevent_default()
-            self.stop_timer()
-            self.leader_key = ""
-        # If we had a leader key but no binding matched, reset leader
-        elif leader:
-            event.stop()
-            event.prevent_default()
-            self.stop_timer()
-            self.leader_key = ""
-            self.notify(
-                f"Command not found for [$warning]{leader}[/][$accent]{event.key}[/] key binding",
-                title="Key Binding",
-                severity="warning",
-            )
+            return
 
         # Arrow keys always trigger row loading for lazy-loaded dataframes
         if event.key == "up":
@@ -801,12 +784,12 @@ class DataFrameTable(DataTable):
         self.action_cursor_down()
 
     def cmd_scroll_home(self) -> None:
-        """Scroll to leftmost column."""
+        """Scroll to start column."""
         self.action_scroll_home()
         self.notify("Scrolled to [$success]home[/]", title="Scroll")
 
     def cmd_scroll_end(self) -> None:
-        """Scroll to rightmost column."""
+        """Scroll to end column."""
         self.action_scroll_end()
         self.notify("Scrolled to [$success]end[/]", title="Scroll")
 
@@ -912,6 +895,14 @@ class DataFrameTable(DataTable):
         """Move column right."""
         self.cmd_move_column("right")
 
+    def cmd_move_column_start(self) -> None:
+        """Move column to start."""
+        self.cmd_move_column("start")
+
+    def cmd_move_column_end(self) -> None:
+        """Move column to end."""
+        self.cmd_move_column("end")
+
     def cmd_move_row_up(self) -> None:
         """Move row up."""
         self.cmd_move_row("up")
@@ -919,6 +910,14 @@ class DataFrameTable(DataTable):
     def cmd_move_row_down(self) -> None:
         """Move row down."""
         self.cmd_move_row("down")
+
+    def cmd_move_row_top(self) -> None:
+        """Move row to top."""
+        self.cmd_move_row("top")
+
+    def cmd_move_row_bottom(self) -> None:
+        """Move row to bottom."""
+        self.cmd_move_row("bottom")
 
     def cmd_cast_integer(self) -> None:
         """Cast column to integer."""
@@ -3588,7 +3587,8 @@ class DataFrameTable(DataTable):
         """Move the current column left or right.
 
         Args:
-            direction: "left" to move left, "right" to move right.
+            direction: "left", "right", "start", or "end".
+            col_idx: Optional column index to move; defaults to the current cursor column.
         """
         row_idx = self.cursor_row
         if col_idx is None:
@@ -3598,32 +3598,52 @@ class DataFrameTable(DataTable):
         col_name = col_key.value
         cidx = self.df.columns.index(col_name)
 
-        # Validate move is possible
-        if direction == "left":
-            if col_idx <= 0:
-                self.notify("Cannot move column left", title="Move Column", severity="warning")
-                return
-            swap_idx = col_idx - 1
-        elif direction == "right":
-            if col_idx >= len(self.columns) - 1:
-                self.notify("Cannot move column right", title="Move Column", severity="warning")
-                return
-            swap_idx = col_idx + 1
+        if direction not in ("left", "right", "start", "end"):
+            return
 
-        # Get column to swap
-        _, swap_key = self.coordinate_to_cell_key(Coordinate(row_idx, swap_idx))
-        swap_name = swap_key.value
-        swap_cidx = self.df.columns.index(swap_name)
-
-        # Add to history
-        self.add_history(
-            f"Move column [$success]{col_name}[/] [$accent]{direction}[/] (swapped with [$success]{swap_name}[/])",
-            dirty=True,
-        )
-
-        # Update the dataframe column order
         cols = list(self.df.columns)
-        cols[cidx], cols[swap_cidx] = cols[swap_cidx], cols[cidx]
+
+        # Move to boundary.
+        if direction in ("start", "end"):
+            target_idx = 0 if direction == "start" else len(self.columns) - 1
+            if col_idx == target_idx:
+                self.notify(f"Cannot move column {direction}", title="Move Column", severity="warning")
+                return
+
+            cols.pop(cidx)
+            cols.insert(target_idx, col_name)
+
+            self.add_history(
+                f"Move column [$success]{col_name}[/] to {'first' if direction == 'start' else 'last'} position",
+                dirty=True,
+            )
+            destination_idx = target_idx
+        else:
+            # Validate adjacent move is possible.
+            if direction == "left":
+                if col_idx <= 0:
+                    self.notify("Cannot move column left", title="Move Column", severity="warning")
+                    return
+                swap_idx = col_idx - 1
+            else:
+                if col_idx >= len(self.columns) - 1:
+                    self.notify("Cannot move column right", title="Move Column", severity="warning")
+                    return
+                swap_idx = col_idx + 1
+
+            # Get column to swap.
+            _, swap_key = self.coordinate_to_cell_key(Coordinate(row_idx, swap_idx))
+            swap_name = swap_key.value
+            swap_cidx = self.df.columns.index(swap_name)
+
+            self.add_history(
+                f"Move column [$success]{col_name}[/] [$accent]{direction}[/] (swapped with [$success]{swap_name}[/])",
+                dirty=True,
+            )
+
+            cols[cidx], cols[swap_cidx] = cols[swap_cidx], cols[cidx]
+            destination_idx = swap_idx
+
         self.df = self.df.lazy().select(cols).collect()
 
         # Also update the full datafram if applicable
@@ -3634,18 +3654,75 @@ class DataFrameTable(DataTable):
         self.setup_table()
 
         # Restore cursor position on the moved column
-        self.move_cursor(row=row_idx, column=swap_idx)
+        self.move_cursor(row=row_idx, column=destination_idx)
 
         self.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move Column")
 
     @with_full_df
     def cmd_move_row(self, direction: str) -> None:
-        """Move the current row up or down.
+        """Move the current row.
 
         Args:
-            direction: "up" to move up, "down" to move down.
+            direction: "up", "down", "top", or "bottom".
         """
         curr_row_idx, col_idx = self.cursor_coordinate
+        curr_rid = self.df[RID][curr_row_idx]
+
+        if direction in ("top", "bottom"):
+            target_row_idx = 0 if direction == "top" else len(self.df) - 1
+            if curr_row_idx == target_row_idx:
+                self.notify(f"Cannot move row {direction}", title="Move Row", severity="warning")
+                return
+
+            self.add_history(
+                f"Move row [$success]{curr_row_idx}[/] to [$accent]{direction}[/]",
+                dirty=True,
+            )
+
+            # Reorder rows in the working dataframe.
+            if direction == "top":
+                self.df = pl.concat(
+                    [
+                        self.df.slice(curr_row_idx, 1).lazy(),
+                        self.df.slice(0, curr_row_idx).lazy(),
+                        self.df.slice(curr_row_idx + 1).lazy(),
+                    ]
+                ).collect()
+            else:
+                self.df = pl.concat(
+                    [
+                        self.df.slice(0, curr_row_idx).lazy(),
+                        self.df.slice(curr_row_idx + 1).lazy(),
+                        self.df.slice(curr_row_idx, 1).lazy(),
+                    ]
+                ).collect()
+
+            # Also update the full dataframe if applicable.
+            if self.in_view:
+                view_idx = self.dfull[RID].index_of(curr_rid)
+                view_target_idx = 0 if direction == "top" else len(self.dfull) - 1
+                if view_idx is not None and view_idx != view_target_idx:
+                    if direction == "top":
+                        self.dfull = pl.concat(
+                            [
+                                self.dfull.slice(view_idx, 1).lazy(),
+                                self.dfull.slice(0, view_idx).lazy(),
+                                self.dfull.slice(view_idx + 1).lazy(),
+                            ]
+                        ).collect()
+                    else:
+                        self.dfull = pl.concat(
+                            [
+                                self.dfull.slice(0, view_idx).lazy(),
+                                self.dfull.slice(view_idx + 1).lazy(),
+                                self.dfull.slice(view_idx, 1).lazy(),
+                            ]
+                        ).collect()
+
+            self.setup_table()
+            self.move_cursor_to(ridx=target_row_idx)
+            self.notify(f"Moved row [$success]{curr_rid}[/] to {direction}", title="Move Row")
+            return
 
         # Validate move is possible
         if direction == "up":

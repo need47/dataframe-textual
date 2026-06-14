@@ -259,10 +259,9 @@ _bind("l", "scroll-end", leader="g")
 # MainTable-scope bindings: Undo/Redo/Reset
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_bind("u", "undo")
 _bind("U", "undo")
 _bind("R", "redo")
-_bind("u", "reset", leader="g")
+_bind("U", "reset", leader="g")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MainTable-scope bindings: Display
@@ -314,7 +313,7 @@ _bind("asterisk", "delete-column-before", leader="g")
 _bind("asterisk", "delete-column-after", leader="z")
 _bind("D", "duplicate-row")
 _bind("D", "duplicate-column", leader="z")
-_bind("U", "remove-duplicates", leader="g")
+_bind("U", "remove-duplicates", leader="z")
 _bind("T", "transpose", leader="z")
 _bind("left_parenthesis", "expand-list-column")
 _bind("right_parenthesis", "contract-list-column")
@@ -385,10 +384,18 @@ _bind("shift+left", "move-column-left")
 _bind("H", "move-column-left")
 _bind("shift+right", "move-column-right")
 _bind("L", "move-column-right")
+_bind("shift+left", "move-column-start", leader="g")
+_bind("H", "move-column-start", leader="g")
+_bind("shift+right", "move-column-end", leader="g")
+_bind("L", "move-column-end", leader="g")
 _bind("shift+up", "move-row-up")
 _bind("K", "move-row-up")
 _bind("shift+down", "move-row-down")
 _bind("J", "move-row-down")
+_bind("shift+up", "move-row-top", leader="g")
+_bind("K", "move-row-top", leader="g")
+_bind("shift+down", "move-row-bottom", leader="g")
+_bind("J", "move-row-bottom", leader="g")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MainTable-scope bindings: Type Casting

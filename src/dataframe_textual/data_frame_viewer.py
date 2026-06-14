@@ -18,6 +18,7 @@ from .commands import Scope
 from .common import (
     RID,
     SUPPORTED_FORMATS,
+    THOUSAND_SEPARATOR,
     Source,
     get_next_item,
     guess_file_format,
@@ -25,9 +26,9 @@ from .common import (
     validate_expr,
 )
 from .console_panel import ConsolePanel
-from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable
 from .file_picker_screen import OpenFileScreen, SaveFileScreen
+from .help_panel import DataFrameHelpPanel
 from .keybindings import KeyBindingConflict, key_registry
 from .status_bar import StatusBar
 from .table_screen import SheetScreen
@@ -118,34 +119,41 @@ class DataFrameViewer(App):
         two-key sequences (e.g., ``gq``, ``gw``, ``z^``) to be dispatched.
 
         After leader logic, attempts to dispatch app-scope bindings via the registry.
+        If a leader key was pressed but no binding matched, shows an error message.
 
         Args:
             event: The key event object.
         """
+        # User can cancel with Escape key
+        if event.key == "escape":
+            event.stop()
+            event.prevent_default()
+            self.notify("Leader mode cancelled", title="Leader Mode")
+            return
+
+        # Try dispatching as an app-scope command
+        elif key_registry.dispatch(event.key, leader=self.leader_key, scope=Scope.APP, target=self):
+            event.stop()
+            event.prevent_default()
+            self.reset_leader_key()
+            return
+
+        # If we're here, the key wasn't dispatched.
+
         # Already in leader mode
         if self.leader_key:
-            if event.key == "escape":
-                event.stop()
-                self.cancel_leader_key()
-                return
-            elif self.timeout_timer:
-                self.timeout_timer.stop()
-                self.timeout_timer = None
-                self.notify(f"[$success]{self.leader_key}[/]+[$accent]{event.key}[/] were pressed", title="Leader Mode")
-
-            # Try dispatching as an app-scope command
-            leader = self.leader_key
-            self.leader_key = ""
-            if key_registry.dispatch(event.key, leader=leader, scope=Scope.APP, target=self):
-                event.stop()
-                event.prevent_default()
-                return
-            # Not an app command — restore leader for widget dispatch
-            self.leader_key = leader
+            event.stop()
+            event.prevent_default()
+            self.reset_leader_key()
+            self.notify(
+                f"Command not found for [$warning]{self.leader_key}[/][$accent]{event.key}[/] key binding",
+                title="Key Binding",
+                severity="warning",
+            )
             return
 
         # Enter leader mode on `g` or `z` key
-        if event.key in ("g", "z"):
+        elif event.key in ("g", "z"):
             event.stop()
             event.prevent_default()
 
@@ -154,22 +162,22 @@ class DataFrameViewer(App):
                 f"Leader mode activated with [$success]{event.key}[/], waiting for next key in 3 seconds",
                 title="Leader Mode",
             )
-            self.timeout_timer = self.set_timer(3, callback=self.cancel_leader_key)
+            self.timeout_timer = self.set_timer(3, callback=lambda: self.reset_leader_key("Leader mode timed out"))
             return
 
-        # Non-leader single keys: try app-scope dispatch
-        if key_registry.dispatch(event.key, leader="", scope=Scope.APP, target=self):
-            event.stop()
-            event.prevent_default()
+        # No relevant key binding, allow event to propagate normally
+        else:
+            return
 
-    def cancel_leader_key(self) -> None:
+    def reset_leader_key(self, message: str = "") -> None:
         """Cancel leader mode and reset the timeout timer."""
+        self.leader_key = ""
+        if message:
+            self.notify(message, title="Leader Mode")
+
         if self.timeout_timer:
             self.timeout_timer.stop()
             self.timeout_timer = None
-            self.notify("Leader mode cancelled", title="Leader Mode")
-
-        self.leader_key = ""
 
     @property
     def active_table(self) -> DataFrameTable | None:
@@ -375,7 +383,8 @@ class DataFrameViewer(App):
         seen = set()
         rows = []
         for binding, cmd in sorted(
-            self.key_registry._bindings.items(), key=lambda kv: (kv[1].category.value, kv[0].scope.value, kv[1].cmd)
+            self.key_registry._bindings.items(),
+            key=lambda kv: (kv[1].category.value, kv[0].scope.value, kv[1].cmd, kv[0].leader, kv[0].key),
         ):
             seen.add(cmd)
             rows.append(
@@ -395,6 +404,8 @@ class DataFrameViewer(App):
         # Mark the newly created commands tab for keybindings save behavior
         if table := self.active_table:
             table.for_keybindings = True
+
+        self.notify(f"Showing [$accent]{len(rows):{THOUSAND_SEPARATOR}}[/] commands", title="Commands List")
 
     def cmd_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.

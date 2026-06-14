@@ -2,6 +2,7 @@
 
 from textual.app import ComposeResult
 from textual.containers import Container
+from textual.events import Key
 from textual.screen import ModalScreen
 from textual.theme import BUILTIN_THEMES
 from textual.widgets import OptionList
@@ -51,6 +52,12 @@ class ThemeScreen(ModalScreen):
             options.highlighted = self.themes.index(self.original_theme)
         options.focus()
 
+    def on_key(self, event: Key) -> None:
+        if event.key in ("q", "escape"):
+            event.stop()
+            event.prevent_default()
+            self.cmd_restore_theme()
+
     def _set_theme(self, theme: str) -> None:
         """Apply the given theme to the app if it is a known built-in."""
         if theme in self.themes:
@@ -66,7 +73,7 @@ class ThemeScreen(ModalScreen):
         self._set_theme(str(event.option.prompt))
         self.app.pop_screen()
 
-    def action_cancel(self) -> None:
+    def cmd_restore_theme(self) -> None:
         """Restore the original theme and close the screen."""
         self.app.theme = self.original_theme
         self.app.notify(f"Switched back to theme [$success]{self.original_theme}[/]", title="Switch Theme")

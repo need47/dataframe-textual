@@ -4,9 +4,9 @@ from importlib.metadata import version
 
 __version__ = version("dataframe-textual")
 
-from .data_frame_help_panel import DataFrameHelpPanel
 from .data_frame_table import DataFrameTable, History
 from .data_frame_viewer import DataFrameViewer
+from .help_panel import DataFrameHelpPanel
 from .table_screen import (
     FrequencyScreen,
     MetaColumnScreen,
