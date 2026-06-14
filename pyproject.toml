@@ -36,7 +36,6 @@ dependencies = [
     "fastexcel>=0.16.0",
     "xlsxwriter>=3.2.9",
     "textual[syntax]>=8.0.2",
-    "vortex-data>=0.71.0",
     "polars>=1.41.0",
 ]
 
@@ -49,6 +48,9 @@ Documentation = "https://github.com/need47/dataframe-textual#readme"
 [project.optional-dependencies]
 dev = [
     "textual-dev>=1.8.0",
+]
+vortex = [
+    "vortex-data>=0.75.0",
 ]
 
 [tool.hatch.build.targets.wheel]
