@@ -214,7 +214,8 @@ def _build_default_bindings() -> None:
     """
     for cmd in COMMANDS.values():
         for key, leader in cmd.bindings:
-            binding = KeyBinding(leader=leader or "", key=key, scope=cmd.scope, command_id=cmd.cmd)
+            raw_key = parse_key_display(key)
+            binding = KeyBinding(leader=leader or "", key=raw_key, scope=cmd.scope, command_id=cmd.cmd)
             if binding in DEFAULT_BINDINGS:
                 existing_cmd = DEFAULT_BINDINGS[binding]
                 log.warning(

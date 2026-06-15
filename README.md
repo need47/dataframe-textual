@@ -443,12 +443,13 @@ Useful examples from current bindings:
 
 #### Reordering
 
-| Key             | Action                    |
-| --------------- | ------------------------- |
-| `H` / `Shift+←` | Move current column left  |
-| `J` / `Shift+↓` | Move current row down     |
-| `K` / `Shift+↑` | Move current row up       |
-| `L` / `Shift+→` | Move current column right |
+| Key             | Action                         |
+| --------------- | ------------------------------ |
+| `H` / `Shift+←` | Move current column left       |
+| `J` / `Shift+↓` | Move current row down          |
+| `K` / `Shift+↑` | Move current row up            |
+| `L` / `Shift+→` | Move current column right      |
+| `!`             | Pin column to start and freeze |
 
 #### Type Casting
 
@@ -537,6 +538,7 @@ Several features open a **modal screen** (an overlay table) for inspection or in
 | `]`            | Sort by current column descending            |
 | `,`            | Toggle thousand separator for numeric values |
 | `C`            | Cycle cursor type (cell → row → column)      |
+| `T`            | Open modal data as a new tab                 |
 | `Ctrl+S`       | Save the modal table to file                 |
 
 Individual modals may add extra keys on top of these (documented in each subsection below).
@@ -803,6 +805,11 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 - Swaps adjacent rows
 - `J` and `K` provide the same down/up movement
 - Reorder is preserved when saving
+
+**Pin Column**: `!`
+
+- Moves the current column to the leftmost unfrozen position and freezes it
+- If columns are already frozen, appends to the frozen set (increments `fixed_columns`)
 
 ### 16. Save File
 

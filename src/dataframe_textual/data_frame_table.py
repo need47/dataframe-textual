@@ -57,7 +57,7 @@ from .common import (
     validate_expr,
 )
 from .loading_screen import BusyScreen, LoadingScreen
-from .run_command_screen import InputScreen, RunCommandScreen
+from .run_command_screen import RunCommandScreen
 from .table_screen import (
     CellDetailScreen,
     FrequencyScreen,
@@ -907,6 +907,28 @@ class DataFrameTable(DataTable):
         """Move column to end."""
         self.cmd_move_column("end")
 
+    def cmd_pin_column(self) -> None:
+        """Pin the current column to the left and freeze it."""
+        col_name = self.cursor_col_name
+        col_idx = self.cursor_column
+        target = self.fixed_columns  # Insert after already-frozen columns
+
+        if col_idx != target:
+            # Move column to target position (after existing frozen columns)
+            cidx = self.df.columns.index(col_name)
+            cols = list(self.df.columns)
+            cols.pop(cidx)
+            cols.insert(target, col_name)
+            self.df = self.df.lazy().select(cols).collect()
+            if self.in_view:
+                self.dfull = self.dfull.lazy().select(cols).collect()
+
+        self.fixed_columns = target + 1
+        self.add_history(f"Pin column [$success]{col_name}[/] to start and freeze", dirty=True)
+        self.setup_table()
+        self.move_cursor(column=target)
+        self.notify(f"Pinned [$success]{col_name}[/] (frozen: {self.fixed_columns})", title="Pin Column")
+
     def cmd_move_row_up(self) -> None:
         """Move row up."""
         self.cmd_move_row("up")
@@ -1093,13 +1115,6 @@ class DataFrameTable(DataTable):
         """
         col_widths, col_label_widths = {}, {}
 
-        # Check if there are any string or list columns to determine if we need to calculate widths
-        has_string_or_list_col = any(dtype == pl.String or dtype == pl.List for dtype in self.df.dtypes)
-
-        # No string columns, let Textual auto-size all columns
-        if not has_string_or_list_col and not self.bar_columns:
-            return col_widths
-
         for col in self.bar_columns:
             col_widths[col] = BAR_COLUMN_WIDTH
 
@@ -1120,11 +1135,6 @@ class DataFrameTable(DataTable):
 
             if label_width > col_widths.get(col, 0):
                 col_widths[col] = label_width
-
-            # Let Textual auto-size for non-string and non-list columns and already expanded columns
-            if (dtype != pl.String and dtype != pl.List) or col in self.expanded_columns:
-                available_width -= label_width
-                continue
 
             try:
                 # Get sample values from the column
@@ -2432,6 +2442,12 @@ class DataFrameTable(DataTable):
             row_key = str(ridx)
             col_key = col_name
             self.update_cell(row_key, col_key, formatted_value, update_width=True)
+
+            # Expand column width if new content is wider than the explicit width set during setup
+            col = self.columns[col_key]
+            new_content_width = measure(self.app.console, str(display_value), 1) + 2
+            if col.width is not None and new_content_width > col.width:
+                col.width = new_content_width
 
             self.notify(f"Updated cell to [$success]{display_value}[/]", title="Edit Cell")
         except Exception as e:
@@ -5624,13 +5640,3 @@ class DataFrameTable(DataTable):
             f"Query executed successfully. Now showing [$accent]{len(self.df)}[/] rows and [$accent]{len(self.df.columns)}[/] columns.",
             title="SQL Query",
         )
-
-    # Misc
-    def cmd_get_input(self):
-        """Open a modal screen to get user input and show it in a notification."""
-        self.app.push_screen(InputScreen(), callback=self._handle_input)
-
-    def _handle_input(self, text: str | None) -> None:
-        """Handle input result from InputScreen."""
-        if text is not None:
-            self.notify(f"You entered: {text}", title="Input Received")

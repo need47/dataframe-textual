@@ -123,9 +123,25 @@ class TableModalScreen(ModalScreen):
             event.stop()
             next_type = get_next_item(CURSOR_TYPES, self.table.cursor_type)
             self.table.cursor_type = next_type
+        elif event.key == "T":
+            event.stop()
+            self.open_as_tab()
         elif event.key == "ctrl+s":
             event.stop()
             self.save_table()
+
+    def open_as_tab(self) -> None:
+        """Open the current modal DataFrame as a new tab."""
+        if self.df is None or self.df.is_empty():
+            self.notify("No data to open as tab", severity="warning")
+            return
+
+        tabname, filename = "modal", "modal.csv"
+        cols = [c for c in self.df.columns if c != RID]
+        df_out = self.df.select(cols).filter((pl.nth(0) != pl.lit(RID)) | pl.nth(0).is_null())
+        self.app.add_tab(df_out, filename=filename, tabname=tabname)
+        self.app.pop_screen()
+        self.notify(f"Opened as new tab: [$success]{tabname}[/]", title="New Tab")
 
     def build_table(self) -> None:
         """Build the table content.
@@ -774,13 +790,16 @@ class FrequencyScreen(TableScreen):
             self.df = (
                 self.dftable.df.lazy()
                 .group_by(self.col_names, maintain_order=True)
-                .len(name="Count")
-                .sort("Count", descending=True, nulls_last=True)
+                .len(name="count")
+                .sort("count", descending=True, nulls_last=True)
                 .collect()
             )
         else:
             col_name = self.col_names[0]
             self.df = self.dftable.df.lazy().select(pl.col(col_name).value_counts(sort=True)).unnest(col_name).collect()
+
+        # Add percentage column
+        self.df = self.df.with_columns((pl.col("count") / self.total_count * 100).round(3).alias("%"))
 
         self.app.call_from_thread(self._on_calc_ready)
 
@@ -826,9 +845,9 @@ class FrequencyScreen(TableScreen):
         # Add rows to the frequency table
         for ridx, row in enumerate(self.df.iter_rows()):
             values = row[: len(self.col_names)]
-            count = row[-1]
+            count = row[-2]
+            percentage = row[-1]
 
-            percentage = (count / self.total_count) * 100
             is_selected = ridx in self.selected_rows
             style = HIGHLIGHT_COLOR if is_selected else None
 

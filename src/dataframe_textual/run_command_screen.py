@@ -5,32 +5,34 @@ from textual.screen import ModalScreen
 from textual.widgets import Input
 
 
-class InputScreen(ModalScreen):
-    """Modal screen to get user input.
+class RunCommandScreen(ModalScreen):
+    """Modal screen to run a command by name with optional arguments.
+
+    Accepts command names like 'show-frequency' or 'show_frequency',
+    optionally followed by space-separated arguments.
     Enter to submit, Escape to cancel.
     """
 
     DEFAULT_CSS = """
-        InputScreen {
-            align: center middle;
+        RunCommandScreen {
+            align: center bottom;
         }
 
-        InputScreen #generic-input {
-            width: auto;
-            min-width: 48;
+        RunCommandScreen > #cmd-input {
+            width: 60%;
             border: solid $primary;
         }
     """
 
-    def __init__(self, placeholder: str = "Your input (Enter to submit, Esc to cancel)") -> None:
-        self.placeholder = placeholder
+    def __init__(self) -> None:
+        """Initialize the run command screen."""
         super().__init__()
 
     def compose(self) -> ComposeResult:
         """Compose the run command modal screen."""
         self.input = Input(
-            id="generic-input",
-            placeholder=self.placeholder,
+            id="cmd-input",
+            placeholder="command [arg1 arg2 ...] (Enter to run, Esc to cancel)",
         )
         yield self.input
 
@@ -49,29 +51,3 @@ class InputScreen(ModalScreen):
             event.stop()
             event.prevent_default()
             self.dismiss(None)
-
-
-class RunCommandScreen(InputScreen):
-    """Modal screen to run a command by name with optional arguments.
-
-    Accepts command names like 'show-frequency' or 'show_frequency',
-    optionally followed by space-separated arguments.
-    Enter to submit, Escape to cancel.
-    """
-
-    DEFAULT_CSS = """
-        RunCommandScreen {
-            align: center bottom;
-        }
-
-        RunCommandScreen > #generic-input {
-            width: 60%;
-            border: solid $primary;
-        }
-    """
-
-    def __init__(self) -> None:
-        """Initialize the run command screen."""
-        super().__init__(
-            placeholder="command [arg1 arg2 ...] (Enter to run, Esc to cancel)",
-        )

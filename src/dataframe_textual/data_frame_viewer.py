@@ -945,9 +945,9 @@ class DataFrameViewer(App):
                 if result:
                     # User wants to save - close after save dialog opens
                     self.do_save_to_file(all_tabs=False, task_after_save="close_tab")
-                elif result is None:
-                    # User cancelled - do nothing
-                    return
+                # elif result is None:
+                #     # User cancelled - do nothing
+                #     return
                 else:
                     # User wants to discard - close immediately
                     self.close_tab()
@@ -958,8 +958,7 @@ class DataFrameViewer(App):
                         "Close Tab",
                         label="This tab has unsaved changes. Save changes?",
                         yes="Save",
-                        maybe="Discard",
-                        no="Cancel",
+                        no="Discard",
                     ),
                     callback=_on_save_confirm,
                 )
@@ -1005,9 +1004,9 @@ class DataFrameViewer(App):
                 """Handle confirmation response for save-and-quit dialog."""
                 if result:
                     self.do_save_to_file(all_tabs=True, task_after_save="quit_app")
-                elif result is None:
-                    # User cancelled - do nothing
-                    return
+                # elif result is None:
+                #     # User cancelled - do nothing
+                #     return
                 else:
                     # User wants to discard - quit immediately
                     self.exit()
@@ -1025,8 +1024,7 @@ class DataFrameViewer(App):
                     f"Close {tab_count} Tabs" if tab_count > 1 else "Close Tab",
                     label=label,
                     yes="Save",
-                    maybe="Discard",
-                    no="Cancel",
+                    no="Discard",
                 ),
                 callback=_save_and_quit,
             )
