@@ -201,10 +201,10 @@ _reg("go-bottom",     "Go to last row",             Scope.MAIN_TABLE, Category.N
 _reg("go-to-row",     "Go to row",                  Scope.MAIN_TABLE, Category.NAVIGATION, "🎯").bind("ctrl+g")
 _reg("page-backward", "Page backward",              Scope.MAIN_TABLE, Category.NAVIGATION, "📜").bind("ctrl+b")
 _reg("page-forward",  "Page forward",               Scope.MAIN_TABLE, Category.NAVIGATION, "📜").bind("ctrl+f")
-_reg("scroll-home",   "Scroll to leftmost column",  Scope.MAIN_TABLE, Category.NAVIGATION, "⬅️").bind("h", leader="g")
-_reg("scroll-end",    "Scroll to rightmost column", Scope.MAIN_TABLE, Category.NAVIGATION, "➡️").bind("l", leader="g")
-_reg("scroll-top",    "Scroll to first row",        Scope.MAIN_TABLE, Category.NAVIGATION, "⬆️").bind("k", leader="g")
-_reg("scroll-bottom", "Scroll to last row",         Scope.MAIN_TABLE, Category.NAVIGATION, "⬇️").bind("j", leader="g")
+_reg("scroll-home",   "Scroll to leftmost column",  Scope.MAIN_TABLE, Category.NAVIGATION, "⬅️").bind("h", leader="g").bind("Left", leader="g")
+_reg("scroll-end",    "Scroll to rightmost column", Scope.MAIN_TABLE, Category.NAVIGATION, "➡️").bind("l", leader="g").bind("Right", leader="g")
+_reg("scroll-top",    "Scroll to first row",        Scope.MAIN_TABLE, Category.NAVIGATION, "⬆️").bind("k", leader="g").bind("Up", leader="g")
+_reg("scroll-bottom", "Scroll to last row",         Scope.MAIN_TABLE, Category.NAVIGATION, "⬇️").bind("j", leader="g").bind("Down", leader="g")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Undo/Redo/Reset (MainTable scope)
@@ -287,6 +287,8 @@ _reg("select-rows-expr-all",   "Select rows where expression matches in all colu
 _reg("unselect-rows-expr",     "Unselect rows where expression matches in current column", Scope.MAIN_TABLE, Category.SELECTION, "➖").bind("\\")
 _reg("unselect-rows-expr-all", "Unselect rows where expression matches in all columns",    Scope.MAIN_TABLE, Category.SELECTION, "➖").bind("\\", leader="g")
 _reg("toggle-selection-row",   "Select/deselect current row",                              Scope.MAIN_TABLE, Category.SELECTION, "✅").bind("s")
+_reg("select-row-above",       "Select current row and rows above",                        Scope.MAIN_TABLE, Category.SELECTION, "✅").bind("s", leader="g")
+_reg("select-row-below",       "Select current row and rows below",                        Scope.MAIN_TABLE, Category.SELECTION, "✅").bind("s", leader="z")
 _reg("toggle-selection-col",   "Select/deselect current column",                           Scope.MAIN_TABLE, Category.SELECTION, "✅").bind("'")
 _reg("toggle-selections",      "Toggle row selection (invert all)",                        Scope.MAIN_TABLE, Category.SELECTION, "💡").bind("t")
 _reg("clear-selections",       "Clear all row/column selections and cell matches",         Scope.MAIN_TABLE, Category.SELECTION, "🧹").bind("T")

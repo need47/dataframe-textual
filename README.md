@@ -404,6 +404,8 @@ Useful examples from current bindings:
 | `{`              | Go to previous selected row                                                    |
 | `}`              | Go to next selected row                                                        |
 | `s`              | Select/deselect current row                                                    |
+| `gs`             | Select current row and all rows above                                          |
+| `zs`             | Select current row and all rows below                                          |
 | `'` (apostrophe) | Select/deselect current column                                                 |
 | `t`              | Toggle row selections (invert)                                                 |
 | `T`              | Clear all row/column selections and cell matches                               |
@@ -429,9 +431,9 @@ Useful examples from current bindings:
 | ------------------ | ------------------------------------------------------ |
 | `v`                | Filter rows with cursor value in the current column    |
 | `V`                | Filter rows with specified value or expression         |
+| `f`                | Filter rows using values in the current column         |
 | `.`                | Filter rows with non-null values in the current column |
 | `z.`               | Filter rows with null values in the current column     |
-| `f`                | Filter rows using values in the current column         |
 | `"` (double quote) | Collect rows/columns to a new tab                      |
 
 #### Sorting (supporting multiple columns)
@@ -471,10 +473,10 @@ Useful examples from current bindings:
 
 #### SQL Interface
 
-| Key  | Action                                                        |
-| ---- | ------------------------------------------------------------- |
-| `Q`  | Advanced SQL interface (full SQL query with syntax highlight) |
-| `zQ` | Simple SQL interface (select columns & where clause)          |
+| Key  | Action                                                     |
+| ---- | ---------------------------------------------------------- |
+| `Q`  | SQL query interface (full SQL query with syntax highlight) |
+| `zQ` | SQL query interface (select columns & where clause)        |
 
 ## Features in Detail
 
@@ -584,7 +586,7 @@ Press `C` to open a modal displaying details for all columns:
 
 ### 6. Column Statistics
 
-Show summary statistics such as count, null count, mean, median, standard deviation, min, max, and etc.
+Show summary statistics such as count, unique count, null count, mean, median, standard deviation, min, max, sum, and etc.
 
 - `I` shows statistics for the current column
 - `gI` shows statistics for all columns in the dataframe
@@ -594,7 +596,7 @@ This is useful for:
 - Understanding data distributions and overall column behavior
 - Identifying outliers and anomalies
 - Checking data quality quickly
-- Reviewing summary statistics without leaving the TUI
+- Reviewing summary statistics
 - Comparing columns at a glance
 
 ### 7. Row Detail View
@@ -608,8 +610,8 @@ Useful for examining wide table where columns don't fit well on screen.
 
 - Press `v` to **filter** all rows containing the selected column value
 - Press `"` to **collect** all rows containing the selected column value to a new tab
-- Press `{` to move to the previous row
-- Press `}` to move to the next row
+- Press `{` to show the previous row
+- Press `}` to show the next row
 - Press `F` to show the frequency table for the selected column
 - Press `I` to show the statistics table for the selected column
 - Press `Tab` to open a cell-detail modal for the selected field
@@ -657,6 +659,8 @@ The application provides multiple ways to select rows (for filtering or collecti
 - `\` - Unselect currently selected rows where expression matches in the current column
 - `g\` - Unselect currently selected rows where expression matches in all columns
 - `s` - Select/deselect current row
+- `gs` - Select current row and all rows above
+- `zs` - Select current row and all rows below
 - `'` (apostrophe) - Select/deselect current column
 - `t` - Flip selections of all rows
 - `T` - Clear all row selections, column selections, and cell matches
@@ -665,7 +669,7 @@ The application provides multiple ways to select rows (for filtering or collecti
 
 **Advanced Options**:
 
-When searching or finding, you can use checkboxes in the dialog to enable:
+When searching, you can use checkboxes in the dialog to enable:
 
 - Match option `Nocase` for case-insensitive matching
 - Match option `Whole` to match full text
@@ -782,7 +786,7 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 - `g*`: Delete the current column and all columns to its left.
 - `z*`: Delete the current column and all columns to its right.
 - `a`: Add an empty column after the current column.
-- `A`: Add a column after the current column using a constant or a Polars expression such as `$age * 2`.
+- `A`: Add a column after the current column using a value or expression such as `$age * 2`.
 - `i`: Insert an index column after the current column.
 - `D`: Duplicate the current row.
 - `zD`: Duplicate the current column using a `_copy` suffix.

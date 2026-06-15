@@ -5432,6 +5432,24 @@ class DataFrameTable(DataTable):
 
             self.update_cell(row_key, col_key, cell_text)
 
+    def cmd_select_row_above(self) -> None:
+        """Select current row and all rows above it."""
+        ridx = self.cursor_ridx
+        rids = set(self.df[RID][: ridx + 1].to_list())
+        self.selected_rows |= rids
+        self.add_history(f"Select current row and [{ridx + 1}] rows above", dirty=False)
+        self.setup_table()
+        self.notify(f"Selected [$success]{len(rids)}[/] row(s) (current + above)", title="Select Rows")
+
+    def cmd_select_row_below(self) -> None:
+        """Select current row and all rows below it."""
+        ridx = self.cursor_ridx
+        rids = set(self.df[RID][ridx:].to_list())
+        self.selected_rows |= rids
+        self.add_history(f"Select current row and [{len(rids)}] rows below", dirty=False)
+        self.setup_table()
+        self.notify(f"Selected [$success]{len(rids)}[/] row(s) (current + below)", title="Select Rows")
+
     def cmd_toggle_selection_col(self) -> None:
         """Select/deselect current column."""
         # Add to history

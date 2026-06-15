@@ -5,7 +5,6 @@ import json
 import os
 import re
 import sys
-from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from io import StringIO
@@ -59,17 +58,6 @@ BAR_COLUMN_WIDTH = 10
 
 # Thousand separator for numeric values (must be ',' or '_' per Python's format mini-language)
 THOUSAND_SEPARATOR = ","
-
-
-def with_leader_key(func: Callable) -> Callable:
-    """Decorator that resets leader mode after the action completes."""
-
-    def wrapper(self, *args, **kwargs):
-        val = func(self, *args, **kwargs)
-        self.leader_key = ""
-        return val
-
-    return wrapper
 
 
 def format_float(value: float, thousand_separator: bool = False, precision: int = 2) -> str:
