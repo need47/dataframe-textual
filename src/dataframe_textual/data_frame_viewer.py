@@ -32,7 +32,7 @@ from .help_panel import DataFrameHelpPanel
 from .keybindings import KeyBindingConflict, key_registry
 from .status_bar import StatusBar
 from .table_screen import SheetScreen
-from .yes_no_screen import ConfirmScreen, NewTabScreen, RenameTabScreen
+from .yes_no_screen import ConfirmScreen, JoinTableScreen, NewTabScreen, RenameTabScreen
 
 
 class DataFrameViewer(App):
@@ -256,9 +256,47 @@ class DataFrameViewer(App):
                 table.focus()
 
     def on_ready(self) -> None:
-        """Called when the app is ready."""
-        # self.log(self.tree)
-        pass
+        """Initialize the active table when the app is ready, then load others in background."""
+        # Initialize the active table first to ensure quick startup and immediate interactivity
+        if actable := self.active_table:
+            if actable.loaded_rows == 0:
+                actable.init_table()
+            self._set_status()
+            actable.focus()
+
+        # Schedule background initialization of remaining tabs without blocking the UI
+        bg_tables = [t for t in self.tabs.values() if t is not actable and t.loaded_rows == 0]
+        if bg_tables:
+            self._init_background_tables(iter(bg_tables))
+
+    def _init_background_tables(self, tables_iter) -> None:
+        """Initialize one background table per event loop tick to avoid blocking.
+
+        Args:
+            tables_iter: Iterator over DataFrameTable instances to initialize.
+        """
+        table = next(tables_iter, None)
+        if table is None:
+            return
+
+        table.init_table()
+        self.call_later(self._init_background_tables, tables_iter)
+
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        """Handle tab activation events.
+
+        When a tab is activated, initializes the table if needed, updates status,
+        and focuses the table widget.
+
+        Args:
+            event: The tab activated event containing the activated tab pane.
+        """
+        if table := self.active_table:
+            if table.loaded_rows == 0:
+                table.init_table()
+
+            self._set_status()
+            table.focus()
 
     def on_click(self, event: Click) -> None:
         """Handle mouse click events on tabs.
@@ -279,23 +317,6 @@ class DataFrameViewer(App):
                     self.do_rename_tab(content_tab)
             except Exception as e:
                 self.log(f"Error handling tab rename click: {e}")
-
-    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
-        """Handle tab activation events.
-
-        When a tab is activated, focuses the table widget and loads its data if not already loaded.
-        Applies active styling to the clicked tab and removes it from others.
-
-        Args:
-            event: The tab activated event containing the activated tab pane.
-        """
-        # Focus the table in the newly activated tab
-        if table := self.active_table:
-            if table.loaded_rows == 0:
-                table.init_table()
-
-            self._set_status()
-            table.focus()
 
     def _set_status_context(self, table: DataFrameTable | None = None) -> None:
         """Update the fixed left-side status context.
@@ -538,6 +559,36 @@ class DataFrameViewer(App):
             return
 
         self.push_screen(NewTabScreen(), callback=partial(self.new_tab, dftable=table))
+
+    def cmd_join_table(self) -> None:
+        """Open the join table screen to join two tables.
+
+        Opens JoinTableScreen pre-selecting the active table as the left table.
+        The join result is added as a new tab.
+        """
+        if len(self.tabs) < 2:
+            self.notify("Need at least two open tabs to join.", severity="error")
+            return
+        self.push_screen(JoinTableScreen(), callback=self._join_table)
+
+    def _join_table(self, result: pl.DataFrame | None) -> None:
+        """Handle the result from JoinTableScreen.
+
+        Args:
+            result: The joined DataFrame, or None if the user cancelled or join failed.
+        """
+        if result is None:
+            return
+        self.add_tab(
+            result,
+            filename="join_results.csv",
+            tabname="join-results",
+            after=self.tabbed.active_pane,
+        )
+        self.notify(
+            f"Joined table: [$success]{len(result)}[/] rows, [$accent]{len(result.columns)}[/] columns",
+            title="Join Tables",
+        )
 
     def new_tab(self, result: str | None, dftable: "DataFrameTable") -> None:
         """Handle result from NewTabScreen.

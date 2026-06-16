@@ -8,10 +8,22 @@ if TYPE_CHECKING:
 
 
 import polars as pl
+from textual import on
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal
+from textual.containers import Container, Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Checkbox, Input, Label, RadioButton, RadioSet, SelectionList, TabPane, TextArea
+from textual.widgets import (
+    Button,
+    Checkbox,
+    Input,
+    Label,
+    RadioButton,
+    RadioSet,
+    Select,
+    SelectionList,
+    TabPane,
+    TextArea,
+)
 from textual.widgets.selection_list import Selection
 from textual.widgets.tabbed_content import ContentTab
 
@@ -1677,3 +1689,291 @@ class FilterBooleanScreen(YMNScreen):
             expr = pl.col(col) == selected_value
 
         return expr, self.cidx
+
+
+class JoinTableScreen(YMNScreen):
+    """A screen for joining two tables from the current app.
+
+    Provides two vertical panels (left and right) each containing an OptionList
+    to select a table and a SelectionList of columns that updates dynamically
+    based on the selected table. Also includes a join type selector.
+    """
+
+    JOIN_TYPES = {
+        "join-inner": "inner",
+        "join-left": "left",
+        "join-right": "right",
+        "join-full": "full",
+        "join-semi": "semi",
+        "join-anti": "anti",
+    }
+
+    # fmt: off
+    CSS = YMNScreen.DEFAULT_CSS.replace("YMNScreen", "JoinTableScreen") + """
+        JoinTableScreen > Container {
+            min-width: 64;
+            max-width: 80;
+            max-height: 80%;
+            padding: 1;
+        }
+
+        JoinTableScreen #join-panels {
+            height: auto;
+            max-height: 16;
+            margin-bottom: 1;
+        }
+
+        JoinTableScreen .join-panel {
+            width: 1fr;
+            height: auto;
+            padding: 0 1;
+        }
+
+        JoinTableScreen Select {
+            width: 100%;
+            margin: 0 0 1 0;
+        }
+
+        JoinTableScreen SelectionList {
+            height: auto;
+            max-height: 10;
+            margin: 0 0 1 0;
+        }
+
+        JoinTableScreen SelectionList:blur {
+            border: solid $secondary;
+        }
+
+        JoinTableScreen Label {
+            margin: 0;
+            width: 100%;
+        }
+
+        JoinTableScreen #join-type-set {
+            layout: horizontal;
+            height: auto;
+            margin: 0 0 1 0;
+        }
+
+        JoinTableScreen RadioButton {
+            margin: 0 1 0 0;
+        }
+
+        JoinTableScreen #button-container {
+            margin: 1 0 0 0;
+        }
+
+        JoinTableScreen Button {
+            height: 3;
+            margin: 0 2;
+        }
+    """
+    # fmt: on
+
+    def __init__(self, left: "DataFrameTable | None" = None, right: "DataFrameTable | None" = None) -> None:
+        """Initialize the join table screen.
+
+        Args:
+            left: Optional DataFrameTable to pre-select as the left table.
+                  Defaults to the active tab's DataFrameTable.
+            right: Optional DataFrameTable to pre-select as the right table.
+                   Defaults to the first table that is not the left table.
+        """
+        super().__init__(
+            yes="Join",
+            no="Cancel",
+            on_yes_callback=self._join_two_tables,
+        )
+
+        # Build table name -> DataFrameTable mapping from app tabs
+        self.dftables: dict[str, "DataFrameTable"] = {}
+        for dftable in self.app.tabs.values():
+            self.dftables[dftable.tabname] = dftable
+
+        # Store left/right DataFrameTable selections
+        self.left: "DataFrameTable" = left if left is not None else self.app.active_table
+
+        if right is not None:
+            self.right: "DataFrameTable" | None = right
+        else:
+            self.right = None
+            for dftable in self.app.tabs.values():
+                if dftable is not self.left:
+                    self.right = dftable
+                    break
+            else:
+                self.right = self.left
+
+    def compose(self) -> ComposeResult:
+        """Compose the join table screen widget structure.
+
+        Creates two vertical panels (left and right), each with an OptionList
+        for table selection and a SelectionList for column selection.
+        Also includes a RadioSet for join type.
+
+        Yields:
+            Widget: The components of the join table screen.
+        """
+        table_names = list(self.dftables.keys())
+        table_options = [(name, name) for name in table_names]
+        left_default = self.left.tabname if self.left else Select.BLANK
+        right_default = self.right.tabname if self.right else Select.BLANK
+
+        with Container(id="join-table-container") as container:
+            container.border_title = "Join Tables"
+
+            with Horizontal(id="join-panels"):
+                with Vertical(classes="join-panel"):
+                    yield Label("Left table:")
+                    yield Select(table_options, value=left_default, id="left-table-selection")
+                    yield Label("Left keys:")
+                    yield SelectionList(id="left-key-selection")
+
+                with Vertical(classes="join-panel"):
+                    yield Label("Right table:")
+                    yield Select(table_options, value=right_default, id="right-table-selection")
+                    yield Label("Right keys:")
+                    yield SelectionList(id="right-key-selection")
+
+            yield Label("Join type:")
+            with RadioSet(id="join-type-set"):
+                yield RadioButton("Inner", id="join-inner", value=True)
+                yield RadioButton("Left", id="join-left")
+                yield RadioButton("Right", id="join-right")
+                yield RadioButton("Full", id="join-full")
+                yield RadioButton("Semi", id="join-semi")
+                yield RadioButton("Anti", id="join-anti")
+
+            yield from super().compose()
+
+    def on_mount(self) -> None:
+        """Initialize column lists based on pre-selected left/right tables."""
+        left_select = self.query_one("#left-table-selection", Select)
+        right_select = self.query_one("#right-table-selection", Select)
+
+        if left_select.value != Select.BLANK:
+            self._update_columns("left", str(left_select.value))
+        if right_select.value != Select.BLANK:
+            self._update_columns("right", str(right_select.value))
+
+    def _update_columns(self, side: str, table_name: str) -> None:
+        """Update the SelectionList for the given side based on the selected table.
+
+        Args:
+            side: Either "left" or "right" to indicate which panel to update.
+            table_name: The name of the selected table.
+        """
+        selection_list = self.query_one(f"#{side}-key-selection", SelectionList)
+        dftable = self.dftables.get(table_name)
+        if dftable is None:
+            return
+
+        selection_list.clear_options()
+
+        for col in dftable.df.columns:
+            if col == RID:
+                continue
+            selection_list.add_option(Selection(col, col, initial_state=False))
+
+    @on(Select.Changed, "#left-table-selection")
+    def _on_left_table_changed(self, event: Select.Changed) -> None:
+        """Update left column list when a different table is selected.
+
+        Args:
+            event: The select changed event.
+        """
+        if event.value != Select.BLANK:
+            self._update_columns("left", str(event.value))
+
+    @on(Select.Changed, "#right-table-selection")
+    def _on_right_table_changed(self, event: Select.Changed) -> None:
+        """Update right column list when a different table is selected.
+
+        Args:
+            event: The select changed event.
+        """
+        if event.value != Select.BLANK:
+            self._update_columns("right", str(event.value))
+
+    def _get_selected_table(self, side: str) -> "DataFrameTable | None":
+        """Get the DataFrameTable for the currently selected table on the given side.
+
+        Args:
+            side: Either "left" or "right".
+
+        Returns:
+            The DataFrameTable for the selected table, or None if not found.
+        """
+        select = self.query_one(f"#{side}-table-selection", Select)
+        if select.value == Select.BLANK:
+            return None
+        return self.dftables.get(str(select.value))
+
+    def _get_selected_columns(self, side: str) -> list[str]:
+        """Get the selected column names from the SelectionList on the given side.
+
+        Args:
+            side: Either "left" or "right".
+
+        Returns:
+            A list of selected column names.
+        """
+        selection_list = self.query_one(f"#{side}-key-selection", SelectionList)
+        return list(selection_list.selected)
+
+    def _get_join_type(self) -> str:
+        """Get the selected join type from the RadioSet.
+
+        Returns:
+            The Polars join type string (e.g., "inner", "left", "full").
+        """
+        radio_set = self.query_one("#join-type-set", RadioSet)
+        pressed = radio_set.pressed_button
+        if pressed and pressed.id:
+            return self.JOIN_TYPES.get(pressed.id, "inner")
+        return "inner"
+
+    def _join_two_tables(self) -> pl.DataFrame | None:
+        """Perform the join operation on the two selected tables.
+
+        Returns:
+            The joined DataFrame, or None if validation fails.
+        """
+        left_table = self._get_selected_table("left")
+        right_table = self._get_selected_table("right")
+
+        if left_table is None or right_table is None:
+            self.notify("Please select both left and right tables.", severity="error")
+            return None
+
+        left_keys = self._get_selected_columns("left")
+        right_keys = self._get_selected_columns("right")
+
+        if not left_keys or not right_keys:
+            self.notify("Please select at least one key column on each side.", severity="error")
+            return None
+
+        if len(left_keys) != len(right_keys):
+            self.notify(
+                f"Key column count mismatch: left has {len(left_keys)}, right has {len(right_keys)}.",
+                severity="error",
+            )
+            return None
+
+        join_type = self._get_join_type()
+
+        left_df = left_table.df.select([c for c in left_table.df.columns if c != RID])
+        right_df = right_table.df.select([c for c in right_table.df.columns if c != RID])
+
+        try:
+            result = left_df.join(
+                right_df,
+                left_on=left_keys,
+                right_on=right_keys,
+                how=join_type,
+            )
+        except Exception as e:
+            self.notify(f"Join failed: {e}", severity="error")
+            return None
+
+        return result

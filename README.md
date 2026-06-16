@@ -27,6 +27,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 
 - 📂 **Multi-File Support** - Open multiple files in separate tabs
 - 🔄 **Tab Management** - Seamlessly switch between open files with keyboard shortcuts
+- 🔗 **Table Joins** - Join two tables into a new tab
 - 📑 **Duplicate Tab** - Create a copy of the current tab with the same data
 - 🐍 **Embedded Python Console** - Inspect and transform the active table directly in app
 - 📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
@@ -479,6 +480,12 @@ Useful examples from current bindings:
 | `Ctrl+C` | Copy column to clipboard              |
 | `Ctrl+R` | Copy row to clipboard (tab-separated) |
 
+#### Join Tables
+
+| Key | Action                         |
+| --- | ------------------------------ |
+| `&` | Join two tables into a new tab |
+
 #### SQL Interface
 
 | Key     | Action                                                     |
@@ -575,8 +582,10 @@ The modal displays a table with the following columns:
 | `Enter` | Close the modal and switch to the tab under the cursor      |
 | `e`     | Rename the tab under the cursor                             |
 | `d`     | Close the tab under the cursor (prompts if unsaved changes) |
+| `s`     | Select or deselect the tab under the cursor                 |
+| `&`     | Join exactly two selected tabs into a new tab               |
 
-This is useful for quickly navigating between tabs, reviewing file sizes at a glance, or closing tabs you no longer need without switching to them first.
+This is useful for quickly navigating between tabs, reviewing file sizes at a glance, closing tabs you no longer need without switching to them first, or selecting two tabs and pressing `&` to open the join-table modal.
 
 ### 5. Column Overview
 
@@ -957,7 +966,15 @@ The link template supports multiple placeholder types for maximum flexibility:
 - **Multiple Placeholders**: Mix and match placeholders in a single template
 - **URL Prefix**: Automatically prepends `https://` if URL doesn't start with `http://` or `https://`
 
-### 20. SQL Interface
+### 20. Join Tables
+
+Press `&` from the main table to open the join-table modal. The modal lets you choose the left and right tables, select matching key columns from each side, choose the join type, and create the joined result as a new tab.
+
+You can also start from the Sheets Overview: press `S`, select exactly two tabs with `s`, then press `&` to open the same join-table modal with those two tables pre-selected.
+
+Supported join types include inner, left, right, full, semi, and anti joins. Select the same number of key columns on both sides before pressing **Join**.
+
+### 21. SQL Interface
 
 The SQL interface provides two modes for querying your dataframe:
 
@@ -996,7 +1013,7 @@ FROM self
 WHERE `product id` = 7
 ```
 
-### 21. Python Console
+### 22. Python Console
 
 Use the built-in Python console for quick interactive transformations without leaving the TUI.
 

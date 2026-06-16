@@ -59,6 +59,7 @@ class Category(str, Enum):
     COPY = "Copy"
     SQL = "SQL Interface"
     VIEW_SETTINGS = "View & Settings"
+    JOIN_TABLE = "Join Tables"
     MISC = "Miscellaneous"
 
 
@@ -372,8 +373,9 @@ _reg("sql-simple",   "Open simple SQL interface (select columns & where clause)"
 _reg("run-command",  "Run a command by name with optional arguments",             Scope.MAIN_TABLE, Category.VIEW_SETTINGS, "▶️").bind("Space")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Misc (MainTable scope)
+# Join Tables (MainTable scope)
 # ═══════════════════════════════════════════════════════════════════════════════
+_reg("join-table",  "Join two tables", Scope.APP, Category.JOIN_TABLE, "🔗").bind("&")
 # fmt: on
 
 

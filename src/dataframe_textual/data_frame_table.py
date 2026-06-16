@@ -345,6 +345,10 @@ class DataFrameTable(DataTable):
                     if not decision["continue"]:
                         fully_loaded = False
                         break
+                    else:
+                        self.notify(f"{total_loaded:{THOUSAND_SEPARATOR}} loaded so far", title="Load DataFrame")
+                else:
+                    self.notify(f"{total_loaded:{THOUSAND_SEPARATOR}} loaded so far", title="Load DataFrame")
         except pl.exceptions.ComputeError as e:
             self.log(f"Error loading remaining batch: {e}")
             return self.app.exit(return_code=1, result=str(e))

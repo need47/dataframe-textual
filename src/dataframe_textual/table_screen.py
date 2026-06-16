@@ -33,6 +33,7 @@ from .common import (
 )
 from .file_picker_screen import SaveFileScreen
 from .text_screen import TextScreen
+from .yes_no_screen import JoinTableScreen
 
 
 class TableModalScreen(ModalScreen):
@@ -1351,6 +1352,33 @@ class SheetScreen(TableModalScreen):
         elif event.key == "e":
             event.stop()
             self._rename_cursor_tab()
+        elif event.key == "s":
+            event.stop()
+            self.toggele_row_selection()
+            self.build_table()
+        elif event.key == "ampersand":
+            event.stop()
+            self._join_selected_tabs()
+
+    def _get_selected_tables(self) -> list["DataFrameTable"]:
+        """Return selected tables in the visible sheet order."""
+        panes = list(self.tabs.keys())
+        tables = []
+        for row_idx in sorted(self.selected_rows):
+            if 0 <= row_idx < len(panes):
+                tables.append(self.tabs[panes[row_idx]])
+        return tables
+
+    def _join_selected_tabs(self) -> None:
+        """Open JoinTableScreen with the two selected sheet rows pre-selected."""
+        selected_tables = self._get_selected_tables()
+
+        if len(selected_tables) != 2:
+            self.notify("Select exactly 2 tables first with `[$warning]s[/]`", title="Join Tables", severity="warning")
+            return
+
+        left, right = selected_tables
+        self.app.push_screen(JoinTableScreen(left=left, right=right), callback=self.app._join_table)
 
     def _switch_to_cursor_tab(self) -> None:
         """Close the SheetScreen and switch to the tab under the cursor."""
