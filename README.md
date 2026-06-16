@@ -2,7 +2,7 @@
 
 A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet](https://parquet.apache.org/)/[Vortex](https://vortex.dev/)/JSON/[NDJSON](https://jsonlines.org/) built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring and analyzing tabular data directly in terminal with multi-tab support for multiple files!
 
-![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshot.png)
+![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/main-table.png)
 
 ## Features
 
@@ -604,7 +604,7 @@ This is useful for:
 Press `Enter` on any row to open a modal showing all column values for that row.
 Useful for examining wide table where columns don't fit well on screen.
 
-![Row detail](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/row-detail.png)
+![Row detail](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/row-detail.png)
 
 **Keys inside the modal**:
 
@@ -633,8 +633,7 @@ Inside the cell-detail modal, press `Tab` again on the selected row/column to ke
 
 Press `F` to see value distributions for the current column. If multiple columns are selected, it shows frequency of value combinations across those selected columns.
 
-- One value column per selected input column, plus Count, Percentage, Histogram
-- **Total row** at the bottom
+![Frequency distribution](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/frequency-distribution.png)
 
 **Keys inside the modal**:
 
