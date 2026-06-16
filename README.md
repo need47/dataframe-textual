@@ -340,9 +340,9 @@ Useful examples from current bindings:
 | `F`               | Show frequency distribution for current or selected columns                   |
 | `I`               | Show statistics for current column                                            |
 | `gI`              | Show statistics for all columns                                               |
-| `m`               | Show histogram for current column                                             |
-| `gm`              | Show histogram for current column with custom bins                            |
-| `zm`              | Toggle inline bar chart display for current numeric column                    |
+| `=`               | Show histogram for current column                                             |
+| `g=`              | Show histogram for current column with custom bins                            |
+| `z=`              | Toggle inline bar chart display for current numeric column                    |
 | `-` (minus)       | Hide selected columns or current column                                       |
 | `g-` (minus)      | Hide current column and all columns before it                                 |
 | `z-` (minus)      | Hide current column and all columns after it                                  |
