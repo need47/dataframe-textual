@@ -270,6 +270,7 @@ Useful examples from current bindings:
 | -------------- | ---------------------------------------------------------- |
 | `q`            | Quit current tab (prompts to save unsaved changes) or view |
 | `gq`           | Quit all tabs then app (prompts to save unsaved changes)   |
+| `Ctrl+Q`       | Force quit app (discards unsaved changes)                  |
 | `S`            | Show all open sheets/tabs                                  |
 | `gB`           | Toggle tab bar visibility                                  |
 | `B`            | Previous tab                                               |
@@ -292,12 +293,13 @@ Useful examples from current bindings:
 
 #### View & Settings
 
-| Key                      | Action                               |
-| ------------------------ | ------------------------------------ |
-| `F1`                     | Toggle help panel                    |
-| `` ` `` (backtick)       | Toggle Python console                |
-| `gT`                     | Select theme                         |
-| `Ctrl+P` -> `Screenshot` | Capture terminal view as a SVG image |
+| Key                         | Action                               |
+| --------------------------- | ------------------------------------ |
+| `F1`                        | Toggle help panel                    |
+| `` ` `` (backtick)          | Toggle Python console                |
+| `gT`                        | Select theme                         |
+| `z Ctrl+H` or `z Backspace` | Show all commands and key bindings   |
+| `Ctrl+P` -> `Screenshot`    | Capture terminal view as a SVG image |
 
 ---
 
@@ -328,7 +330,7 @@ Useful examples from current bindings:
 | `Ctrl+Home` / `Ctrl+End` | Go to page top/bottom               |
 | `PageDown` / `PageUp`    | Scroll down/up one page             |
 | `Ctrl+F`                 | Page forward                        |
-| `Ctrl+B`                 | Page backforward                    |
+| `Ctrl+B`                 | Page backward                       |
 
 #### Display
 
@@ -347,18 +349,17 @@ Useful examples from current bindings:
 | `g-` (minus)      | Hide current column and all columns before it                                 |
 | `z-` (minus)      | Hide current column and all columns after it                                  |
 | `gv`              | Show all hidden columns                                                       |
-| `g~`              | Toggle 1-based column index prefixes                                          |
-| `z~`              | Toggle freeze rows and/or columns                                             |
+| `$`               | Toggle 1-based column index prefixes                                          |
+| `z#`              | Toggle freeze rows and/or columns                                             |
 | `_` (underscore)  | Toggle column full width for current column                                   |
 | `g_` (underscore) | Toggle column full width for all string/list columns                          |
-| `+`               | Toggle freeze rows and/or columns                                             |
 | `z,`              | Toggle thousand separator for current column                                  |
 | `(`               | Expand current list column into indexed columns (e.g. ``col[1]``, ``col[2]``) |
 | `)`               | Contract indexed sibling columns (``col[N]``) back into a list column         |
 | `<`               | Decrease float precision for current column                                   |
 | `>`               | Increase float precision for current column                                   |
 | `g^`              | Set current row as the new header row                                         |
-| `zC`              | Cycle cursor type (cell -> row -> column)                                     |
+| `g#`              | Cycle cursor type (cell -> row -> column)                                     |
 
 #### Editing
 
@@ -408,6 +409,8 @@ Useful examples from current bindings:
 | `s`              | Select/deselect current row                                                    |
 | `gs`             | Select current row and all rows above                                          |
 | `zs`             | Select current row and all rows below                                          |
+| `u`              | Unselect the current row                                                       |
+| `gu`             | Unselect all rows                                                              |
 | `'` (apostrophe) | Select/deselect current column                                                 |
 | `t`              | Toggle row selections (invert)                                                 |
 | `T`              | Clear all row/column selections and cell matches                               |
@@ -447,13 +450,17 @@ Useful examples from current bindings:
 
 #### Reordering
 
-| Key             | Action                         |
-| --------------- | ------------------------------ |
-| `H` / `Shift+←` | Move current column left       |
-| `J` / `Shift+↓` | Move current row down          |
-| `K` / `Shift+↑` | Move current row up            |
-| `L` / `Shift+→` | Move current column right      |
-| `!`             | Pin column to start and freeze |
+| Key               | Action                         |
+| ----------------- | ------------------------------ |
+| `H` / `Shift+←`   | Move current column left       |
+| `J` / `Shift+↓`   | Move current row down          |
+| `K` / `Shift+↑`   | Move current row up            |
+| `L` / `Shift+→`   | Move current column right      |
+| `gH` / `gShift+←` | Move column to start           |
+| `gJ` / `gShift+↓` | Move row to bottom             |
+| `gK` / `gShift+↑` | Move row to top                |
+| `gL` / `gShift+→` | Move column to end             |
+| `!`               | Pin column to start and freeze |
 
 #### Type Casting
 
@@ -462,7 +469,6 @@ Useful examples from current bindings:
 | `~` | Cast current column to string  |
 | `@` | Cast current column to date    |
 | `#` | Cast current column to integer |
-| `$` | Cast current column to boolean |
 | `%` | Cast current column to float   |
 
 #### Copy
@@ -475,10 +481,11 @@ Useful examples from current bindings:
 
 #### SQL Interface
 
-| Key  | Action                                                     |
-| ---- | ---------------------------------------------------------- |
-| `Q`  | SQL query interface (full SQL query with syntax highlight) |
-| `zQ` | SQL query interface (select columns & where clause)        |
+| Key     | Action                                                     |
+| ------- | ---------------------------------------------------------- |
+| `Q`     | SQL query interface (full SQL query with syntax highlight) |
+| `zQ`    | SQL query interface (select columns & where clause)        |
+| `Space` | Run a command by name with optional arguments              |
 
 ## Features in Detail
 
@@ -508,14 +515,13 @@ These controls change how the table is shown without changing the underlying dat
 - `g-`: Hide the current column and all columns before it.
 - `z-`: Hide the current column and all columns after it.
 - `gv`: Show all hidden columns.
-- `+`: Freeze rows and/or columns to keep important areas visible while scrolling.
-- `z~`: Freeze rows and/or columns (alternative to `+`).
-- `g~`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
+- `z#`: Freeze rows and/or columns to keep important areas visible while scrolling.
+- `$`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
 - `z,`: Toggle the thousand separator for the current numeric column.
 - `(`: Expand the current list column into indexed columns named like `colname[1]`, `colname[2]`, etc.
 - `)`: Contract those indexed sibling columns back into a single list column. Position the cursor on any sibling (e.g. `colname[2]`) and press `)` to merge all `colname[N]` columns back into `colname`.
 - `<` / `>`: Decrease or increase float precision for the current float column. Each column keeps its own precision setting, and `0` means the default full display.
-- `zm`: Toggle inline bar chart display for the current numeric column. When active, each cell is rendered as a Rich `Bar`, normalized to that column's min/max range. Press `zm` again to restore normal value display.
+- `z=`: Toggle inline bar chart display for the current numeric column. When active, each cell is rendered as a Rich `Bar`, normalized to that column's min/max range. Press `z=` again to restore normal value display.
 
 ### 3. Modal Screen
 
@@ -529,7 +535,7 @@ Several features open a **modal screen** (an overlay table) for inspection or in
 | Cell Detail     | `Tab`       | Drill into a single cell value             |
 | Frequency       | `F`         | Value distribution for a column            |
 | Statistics      | `I` / `gI`  | Summary statistics for column or dataframe |
-| Histogram       | `m` / `gm`  | Numeric distribution as histogram          |
+| Histogram       | `=` / `g=`  | Numeric distribution as histogram          |
 
 **Common keys available in all modal screens:**
 
@@ -666,6 +672,8 @@ The application provides multiple ways to select rows (for filtering or collecti
 - `s` - Select/deselect current row
 - `gs` - Select current row and all rows above
 - `zs` - Select current row and all rows below
+- `u` - Unselect the current row
+- `gu` - Unselect all rows
 - `'` (apostrophe) - Select/deselect current column
 - `t` - Flip selections of all rows
 - `T` - Clear all row selections, column selections, and cell matches
@@ -813,12 +821,16 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 
 - Swaps adjacent columns
 - `H` and `L` provide the same left/right movement
+- `gH` / `gShift+←` moves column to start
+- `gL` / `gShift+→` moves column to end
 - Reorder is preserved when saving
 
 **Move Rows**: `Shift+↑` and `Shift+↓`
 
 - Swaps adjacent rows
 - `J` and `K` provide the same down/up movement
+- `gK` / `gShift+↑` moves row to top
+- `gJ` / `gShift+↓` moves row to bottom
 - Reorder is preserved when saving
 
 **Pin Column**: `!`
