@@ -10,7 +10,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 
 - 🚀 **Fast Loading** - Powered by Polars for efficient batch data handling
 - 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with auto-detected data types (e.g., integer, float, string)
-- ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls
+- ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls with fully customizable key bindings (mostly VisiData compatible)
 - 📊 **Flexible Input** - Read from files and/or stdin (pipes/redirects) in various formats
 - 🔄 **Smart Pagination** - Lazy load rows on demand for handling large datasets
 
@@ -28,7 +28,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 - 📂 **Multi-File Support** - Open multiple files in separate tabs
 - 🔄 **Tab Management** - Seamlessly switch between open files with keyboard shortcuts
 - 📑 **Duplicate Tab** - Create a copy of the current tab with the same data
-- 🐍 **Embedded Python Console** - Inspect and transform the active table with `df` and `pl` directly in-app
+- 🐍 **Embedded Python Console** - Inspect and transform the active table directly in app
 - 📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
 - 📸 **Take Screenshot** - Capture terminal view as a SVG image
 
