@@ -778,7 +778,7 @@ For **Basic Filter** (`v`) and **Collect** (`"`), rows are chosen in this order:
 - Multi-column sorting supported (press multiple times on different columns)
 - Press same key twice to remove the current column from sorting
 
-![Sorting](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/sort.png)
+![Sorting](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/sort-column.png)
 
 ### 14. Editing
 
