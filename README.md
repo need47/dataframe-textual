@@ -230,6 +230,8 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 **Important:** press `z` then `Ctrl+H` to open a **Commands** tab, where all commands and keybindings can be viewed and modified.
 
+![Commands](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/commands.png)
+
 ### Memorize `g` vs `z` Quickly
 
 Use this as a practical memory aid (not a strict rule):
@@ -549,6 +551,8 @@ Individual modals may add extra keys on top of these (documented in each subsect
 
 Press `S` to open a modal providing a summary view of all currently opened tabs.
 
+![Sheets](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/sheets.png)
+
 The modal displays a table with the following columns:
 
 | Column       | Description             |
@@ -590,6 +594,8 @@ Show summary statistics such as count, unique count, null count, mean, median, s
 
 - `I` shows statistics for the current column
 - `gI` shows statistics for all columns in the dataframe
+
+![Column statistics](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/column-statistics.png)
 
 This is useful for:
 
@@ -772,6 +778,8 @@ For **Basic Filter** (`v`) and **Collect** (`"`), rows are chosen in this order:
 - Multi-column sorting supported (press multiple times on different columns)
 - Press same key twice to remove the current column from sorting
 
+![Sorting](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/sort.png)
+
 ### 14. Editing
 
 Editing covers cell updates, structural table changes, and quick cleanup.
@@ -830,6 +838,8 @@ The application provides save actions for the current tab (or active view) and a
 - Useful after editing multiple datasets in the same session
 
 The output format is determined by the file extension, making it easy to convert between formats such as CSV, TSV, Parquet, or Excel.
+
+![Save File](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/save-file.png)
 
 ### 17. Clipboard Operations
 
@@ -944,6 +954,8 @@ Execute complete SQL queries for advanced data manipulation:
 - Always use `self` as the table name
 - Syntax highlighted
 
+![SQL Interface](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/sql-query.png)
+
 #### Simple SQL Interface (`zQ`)
 
 SELECT specific columns and apply WHERE conditions without writing full SQL:
@@ -951,6 +963,8 @@ SELECT specific columns and apply WHERE conditions without writing full SQL:
 - Choose which columns to include in results
 - Specify WHERE clause for filtering
 - Ideal for quick filtering and column selection
+
+![SQL Interface](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/sql-simple.png)
 
 **Examples:**
 
@@ -976,6 +990,8 @@ Use the built-in Python console for quick interactive transformations without le
 - In console: `Esc` closes the console panel
 - Available names: `df` (active DataFrame), `self` (active table), `app` (viewer app), `pl` (Polars)
 - Assign a DataFrame or Series back to `df` to refresh the current table immediately
+
+![Python Console](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/python-console.png)
 
 ## Handling Loading Errors
 
