@@ -750,6 +750,8 @@ Both actions work on a subset of the original dataframe, but they serve differen
 - Opens a dialog for value-based or expression-based filtering
 - Useful when you want to define the subset directly
 
+![Advanced Filter](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/advanced-filter.png)
+
 **Column Filter** (`f`):
 
 - Opens a type-aware filter dialog for the current column
@@ -758,6 +760,8 @@ Both actions work on a subset of the original dataframe, but they serve differen
 - Boolean columns support true, false, and null filtering
 - Temporal columns support the same comparison operators as numeric columns
 - List columns support exact-list matching and item membership checks such as "contains"
+
+![Column Filter](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/column-filter.png)
 
 **Collect** (`"`):
 
