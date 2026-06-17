@@ -1947,7 +1947,7 @@ class JoinTableScreen(YMNScreen):
         right_df = right_table.df.select([c for c in right_table.df.columns if c != RID])
 
         try:
-            result = left_df.join(
+            result: pl.DataFrame = left_df.join(
                 right_df,
                 left_on=left_keys,
                 right_on=right_keys,

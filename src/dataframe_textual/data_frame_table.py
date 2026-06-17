@@ -1517,7 +1517,7 @@ class DataFrameTable(DataTable):
             top_ridx = 0  # No top row key at index, default to 0
 
         # Load upward
-        start, stop = self._round_to_nearest_hundreds(top_ridx - BUFFER_SIZE * 2)
+        start, stop = self._round_to_nearest_hundreds(top_ridx - self.BATCH_SIZE - BUFFER_SIZE * 2)
         range_count = self.load_rows_range(start, stop)
 
         # Adjust scroll to maintain position if rows were loaded above
@@ -1541,7 +1541,7 @@ class DataFrameTable(DataTable):
             bottom_ridx = 0  # No bottom row key at index, default to 0
 
         # Load downward
-        start, stop = self._round_to_nearest_hundreds(bottom_ridx + BUFFER_SIZE * 2)
+        start, stop = self._round_to_nearest_hundreds(bottom_ridx + self.BATCH_SIZE + BUFFER_SIZE * 2)
         range_count = self.load_rows_range(start, stop)
 
         if range_count > 0:
@@ -1721,21 +1721,13 @@ class DataFrameTable(DataTable):
 
     def cmd_page_backward(self) -> None:
         """Move the cursor one page up."""
-        self._set_hover_cursor(False)
-        if self.show_cursor and self.cursor_type in ("cell", "row"):
-            height = self.scrollable_content_region.height - (self.header_height if self.show_header else 0)
-
-            col_idx = self.cursor_column
-            ridx = self.cursor_ridx
-            next_ridx = max(0, ridx - height - BUFFER_SIZE)
-            start, stop = self._round_to_nearest_hundreds(next_ridx)
-            self.load_rows_range(start, stop)
-
-            self.move_cursor(row=self.get_row_idx(str(next_ridx)), column=col_idx)
+        self.load_rows_up()
+        self.action_page_up()
 
     def cmd_page_forward(self) -> None:
         """Move the cursor one page down."""
         self.load_rows_down()
+        self.action_page_down()
 
     # History & Undo
     def create_history(self, description: str) -> "History":

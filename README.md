@@ -272,7 +272,7 @@ Useful examples from current bindings:
 | `q`            | Quit current tab (prompts to save unsaved changes) or view |
 | `gq`           | Quit all tabs then app (prompts to save unsaved changes)   |
 | `Ctrl+Q`       | Force quit app (discards unsaved changes)                  |
-| `S`            | Show all open sheets/tabs                                  |
+| `S`            | Show all open tabs                                         |
 | `gB`           | Toggle tab bar visibility                                  |
 | `B`            | Previous tab                                               |
 | `b`            | Next tab                                                   |
