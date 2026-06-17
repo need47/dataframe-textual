@@ -272,7 +272,6 @@ Useful examples from current bindings:
 | `q`            | Quit current tab (prompts to save unsaved changes) or view |
 | `gq`           | Quit all tabs then app (prompts to save unsaved changes)   |
 | `Ctrl+Q`       | Force quit app (discards unsaved changes)                  |
-| `S`            | Show all open tabs                                         |
 | `gB`           | Toggle tab bar visibility                                  |
 | `B`            | Previous tab                                               |
 | `b`            | Next tab                                                   |
@@ -294,13 +293,21 @@ Useful examples from current bindings:
 
 #### View & Settings
 
-| Key                         | Action                               |
-| --------------------------- | ------------------------------------ |
-| `F1`                        | Toggle help panel                    |
-| `` ` `` (backtick)          | Toggle Python console                |
-| `gT`                        | Select theme                         |
-| `z Ctrl+H` or `z Backspace` | Show all commands and key bindings   |
-| `Ctrl+P` -> `Screenshot`    | Capture terminal view as a SVG image |
+| Key                        | Action                                        |
+| -------------------------- | --------------------------------------------- |
+| `F1`                       | Toggle help panel                             |
+| `S`                        | Show information for all open tabs            |
+| `` ` `` (backtick)         | Toggle Python console                         |
+| `Space`                    | Run a command by name with optional arguments |
+| `z Ctrl+H` / `z Backspace` | Show all commands and key bindings            |
+| `Ctrl+P` -> `Screenshot`   | Capture terminal view as a SVG image          |
+| `gT`                       | Select theme                                  |
+
+#### Join Tables
+
+| Key | Action                         |
+| --- | ------------------------------ |
+| `&` | Join two tables into a new tab |
 
 ---
 
@@ -335,64 +342,65 @@ Useful examples from current bindings:
 
 #### Display
 
-| Key               | Action                                                                    |
-| ----------------- | ------------------------------------------------------------------------- |
-| `Enter`           | Show details for the current row as two-column key–value pairs            |
-| `Tab`             | Show current cell details                                                 |
-| `C`               | Show metadata for all columns (name and data type)                        |
-| `F`               | Show frequency distribution for current or selected columns               |
-| `I`               | Show statistics for current column                                        |
-| `gI`              | Show statistics for all columns                                           |
-| `=`               | Show histogram for current column                                         |
-| `g=`              | Show histogram for current column with custom bins                        |
-| `z=`              | Toggle inline bar chart display for current numeric column                |
-| `-` (minus)       | Hide selected columns or current column                                   |
-| `g-` (minus)      | Hide current column and all columns before it                             |
-| `z-` (minus)      | Hide current column and all columns after it                              |
-| `gv`              | Show all hidden columns                                                   |
-| `$`               | Toggle 1-based column index prefixes                                      |
-| `z#`              | Toggle freeze rows and/or columns                                         |
-| `_` (underscore)  | Toggle column full width for current column                               |
-| `g_` (underscore) | Toggle column full width for all string/list columns                      |
-| `z,`              | Toggle thousand separator for current column                              |
-| `(`               | Expand current list column into indexed columns (e.g. `col[1]`, `col[2]`) |
-| `)`               | Contract indexed sibling columns (`col[N]`) back into a list column       |
-| `<`               | Decrease float precision for current column                               |
-| `>`               | Increase float precision for current column                               |
-| `g^`              | Set current row as the new header row                                     |
-| `g#`              | Cycle cursor type (cell -> row -> column)                                 |
+| Key               | Action                                                         |
+| ----------------- | -------------------------------------------------------------- |
+| `Enter`           | Show details for the current row as two-column key–value pairs |
+| `Tab`             | Show current cell details                                      |
+| `C`               | Show metadata for all columns (name and data type)             |
+| `F`               | Show frequency distribution for current or selected columns    |
+| `I`               | Show statistics for current column                             |
+| `gI`              | Show statistics for all columns                                |
+| `=`               | Show histogram for current column                              |
+| `g=`              | Show histogram for current column with custom bins             |
+| `z=`              | Toggle inline bar chart display for current numeric column     |
+| `-` (minus)       | Hide selected columns or current column                        |
+| `g-` (minus)      | Hide current column and all columns before it                  |
+| `z-` (minus)      | Hide current column and all columns after it                   |
+| `gv`              | Show all hidden columns                                        |
+| `$`               | Toggle 1-based column index prefixes                           |
+| `z#`              | Toggle freeze rows and/or columns                              |
+| `_` (underscore)  | Toggle column full width for current column                    |
+| `g_` (underscore) | Toggle column full width for all string/list columns           |
+| `z,`              | Toggle thousand separator for current column                   |
+| `<`               | Decrease float precision for current column                    |
+| `>`               | Increase float precision for current column                    |
+| `g^`              | Set current row as the new header row                          |
+| `g#`              | Cycle cursor type (cell -> row -> column)                      |
 
 #### Editing
 
-| Key            | Action                                                          |
-| -------------- | --------------------------------------------------------------- |
-| `Double-click` | Edit cell or rename column header                               |
-| `Delete`       | Clear current cell (set to NULL)                                |
-| `Shift+Delete` | Clear current column (set matching cells to NULL)               |
-| `e`            | Edit current cell (respects data type)                          |
-| `E`            | Edit entire column with value/expression                        |
-| `a`            | Add empty column after current                                  |
-| `A`            | Add column with name and value/expression                       |
-| `i`            | Add index column after current                                  |
-| `za`           | Add a link column from URL template                             |
-| `^`            | Rename current column                                           |
-| `*`            | Delete selected columns or current column                       |
-| `g*`           | Delete current column and all columns before it                 |
-| `z*`           | Delete current column and all columns after it                  |
-| `d`            | Delete current row                                              |
-| `gd`           | Delete current row and all those above                          |
-| `zd`           | Delete current row and all those below                          |
-| `D`            | Duplicate current row                                           |
-| `zD`           | Duplicate current column                                        |
-| `zU`           | Remove duplicate rows (keep first occurrence)                   |
-| `:`            | Split current string column into a new column by delimiter      |
-| `z:`           | Join all selected columns into a new string column by delimiter |
-| `g:`           | Glue items of a list column into a string column by delimiter   |
-| `Ctrl+U`       | Convert current or selected string column(s) to uppercase       |
-| `Ctrl+L`       | Convert current or selected string column(s) to lowercase       |
-| `zB`           | Strip leading and trailing whitespaces in current string column |
-| `o`            | Explode current list column into multiple rows                  |
-| `zT`           | Transpose table (swap rows and columns)                         |
+| Key            | Action                                                                    |
+| -------------- | ------------------------------------------------------------------------- |
+| `Double-click` | Edit cell or rename column header                                         |
+| `Delete`       | Clear current cell (set to NULL)                                          |
+| `Shift+Delete` | Clear current column (set matching cells to NULL)                         |
+| `e`            | Edit current cell (respects data type)                                    |
+| `E`            | Edit entire column with value/expression                                  |
+| `a`            | Add empty column after current                                            |
+| `A`            | Add column with name and value/expression                                 |
+| `i`            | Add index column after current                                            |
+| `za`           | Add a link column from URL template                                       |
+| `^`            | Rename current column                                                     |
+| `*`            | Delete selected columns or current column                                 |
+| `g*`           | Delete current column and all columns before it                           |
+| `z*`           | Delete current column and all columns after it                            |
+| `d`            | Delete current row                                                        |
+| `gd`           | Delete current row and all those above                                    |
+| `zd`           | Delete current row and all those below                                    |
+| `D`            | Duplicate current row                                                     |
+| `zD`           | Duplicate current column                                                  |
+| `zU`           | Remove duplicate rows (keep first occurrence)                             |
+| `:`            | Split current string column into a new column by delimiter                |
+| `z:`           | Join all selected columns into a new string column by delimiter           |
+| `g:`           | Glue items of a list column into a string column by delimiter             |
+| `Ctrl+U`       | Convert current or selected string column(s) to uppercase                 |
+| `Ctrl+L`       | Convert current or selected string column(s) to lowercase                 |
+| `zB`           | Strip leading and trailing whitespaces in current string column           |
+| `(`            | Expand current list column into indexed columns (e.g. `col[1]`, `col[2]`) |
+| `)`            | Contract indexed sibling columns (`col[N]`) back into a list column       |
+| `z(`           | Explode current list column into multiple rows                            |
+| `z)`           | Implode current column into a list column                                 |
+| `zT`           | Transpose table (swap rows and columns)                                   |
 
 #### Row/Column Selection
 
@@ -412,6 +420,8 @@ Useful examples from current bindings:
 | `u`              | Unselect the current row                                                       |
 | `gu`             | Unselect all rows                                                              |
 | `'` (apostrophe) | Select/deselect current column                                                 |
+| `g'`             | Select current column and all columns to the left                              |
+| `z'`             | Select current column and all columns to the right                             |
 | `t`              | Toggle row selections (invert)                                                 |
 | `T`              | Clear all row/column selections and cell matches                               |
 
@@ -479,19 +489,12 @@ Useful examples from current bindings:
 | `Ctrl+C` | Copy column to clipboard              |
 | `Ctrl+R` | Copy row to clipboard (tab-separated) |
 
-#### Join Tables
-
-| Key | Action                         |
-| --- | ------------------------------ |
-| `&` | Join two tables into a new tab |
-
 #### SQL Interface
 
-| Key     | Action                                                     |
-| ------- | ---------------------------------------------------------- |
-| `Q`     | SQL query interface (full SQL query with syntax highlight) |
-| `zQ`    | SQL query interface (select columns & where clause)        |
-| `Space` | Run a command by name with optional arguments              |
+| Key  | Action                                                     |
+| ---- | ---------------------------------------------------------- |
+| `Q`  | SQL query interface (full SQL query with syntax highlight) |
+| `zQ` | SQL query interface (select columns & where clause)        |
 
 ## Features in Detail
 
@@ -524,8 +527,6 @@ These controls change how the table is shown without changing the underlying dat
 - `z#`: Freeze rows and/or columns to keep important areas visible while scrolling.
 - `$`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
 - `z,`: Toggle the thousand separator for the current numeric column.
-- `(`: Expand the current list column into indexed columns named like `colname[1]`, `colname[2]`, etc.
-- `)`: Contract those indexed sibling columns back into a single list column. Position the cursor on any sibling (e.g. `colname[2]`) and press `)` to merge all `colname[N]` columns back into `colname`.
 - `<` / `>`: Decrease or increase float precision for the current float column. Each column keeps its own precision setting, and `0` means the default full display.
 - `z=`: Toggle inline bar chart display for the current numeric column. When active, each cell is rendered as a Rich `Bar`, normalized to that column's min/max range. Press `z=` again to restore normal value display.
 
@@ -684,6 +685,8 @@ The application provides multiple ways to select rows (for filtering or collecti
 - `u` - Unselect the current row
 - `gu` - Unselect all rows
 - `'` (apostrophe) - Select/deselect current column
+- `g'` - Select current column and all columns to the left
+- `z'` - Select current column and all columns to the right
 - `t` - Flip selections of all rows
 - `T` - Clear all row selections, column selections, and cell matches
 - `{` - Go to previous selected row
@@ -820,6 +823,8 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 - `zD`: Duplicate the current column using a `_copy` suffix.
 - `zU`: Remove duplicate rows while keeping the first occurrence, based on visible-column values.
 - `:`: Split the current string column into a new list column using a delimiter.
+- `(`: Expand the current list column into indexed columns named like `colname[1]`, `colname[2]`, etc.
+- `)`: Contract those indexed sibling columns back into a single list column. Position the cursor on any sibling (e.g. `colname[2]`) and press `)` to merge all `colname[N]` columns back into `colname`.
 - `Ctrl+U`: Convert the current column, or all selected columns that are string type, to uppercase.
 - `Ctrl+L`: Convert the current column, or all selected columns that are string type, to lowercase.
 - `zB`: Strip leading and trailing whitespaces in the current string column.

@@ -3408,6 +3408,65 @@ class DataFrameTable(DataTable):
         self.notify(message, title="Delete Column")
 
     @with_full_df
+    def cmd_implode_column(self) -> None:
+        """Implode the current column into list values grouped by other columns."""
+        col_name = self.cursor_col_name
+        self.task_done = False
+        self.app.push_screen(BusyScreen(self, task=partial(self.implode_column, col_name)))
+
+    @work(thread=True)
+    def implode_column(self, col_name: str) -> None:
+        """Collapse rows by grouping columns and aggregating the current column as a list.
+
+        Selected columns, when present, define the grouping columns. Otherwise, all
+        columns except the current column and RID are used for grouping. The result
+        keeps only the grouping columns, the imploded current column, and a rebuilt RID.
+        """
+        columns = list(self.df.columns)
+        if self.selected_columns:
+            group_cols = [c for c in columns if c in self.selected_columns and c not in (col_name, RID)]
+        else:
+            group_cols = [c for c in columns if c not in (col_name, RID)]
+
+        descr = f"Implode column [$success]{col_name}[/] into a single list"
+        self.add_history(descr, dirty=True)
+
+        try:
+            select_cols = group_cols + [col_name]
+            lf = self.df.lazy().select(select_cols)
+
+            if group_cols:
+                lf = lf.group_by(group_cols, maintain_order=True).agg(pl.col(col_name))
+            else:
+                lf = lf.select(pl.col(col_name).implode())
+
+            self.df = add_rid_column(lf).collect()
+            self.dfull = None
+
+            remaining_cols = set(self.df.columns)
+            self.hidden_columns.intersection_update(remaining_cols)
+            self.selected_columns.intersection_update(remaining_cols)
+            self.selected_columns.discard(RID)
+            self.sorted_columns = {col: desc for col, desc in self.sorted_columns.items() if col in remaining_cols}
+            self.selected_rows.clear()
+            self.matches = defaultdict(set)
+
+            self.task_done = True
+            self.setup_table()
+
+            self.notify(descr, title="Implode Column")
+        except Exception as e:
+            if self.histories_undo:
+                self.histories_undo.pop()
+            self.notify(
+                f"Failed to implode column [$error]{col_name}[/]",
+                title="Implode Column",
+                severity="error",
+            )
+            self.log(f"Error imploding column `{col_name}`: {e}")
+            self.task_done = True
+
+    @with_full_df
     def cmd_explode_column(self) -> None:
         """Explode the current list column into multiple rows."""
         col_name = self.cursor_col_name
@@ -3426,6 +3485,7 @@ class DataFrameTable(DataTable):
         self.add_history(f"Explode column [$success]{col_name}[/]", dirty=True)
 
         dtype = self.df.schema[col_name]
+        cols = list(self.df.columns)
 
         try:
             if self.in_view:
@@ -3433,29 +3493,40 @@ class DataFrameTable(DataTable):
 
                 # If it's already a list column, just explode it
                 if dtype == pl.List:
-                    lf_view = add_rid_column(self.dfull.lazy().rename({RID: RID_OLD}).explode(col_name))
+                    lf_view = self.dfull.lazy().rename({RID: RID_OLD}).explode(col_name)
                 # If a delimiter is provided, split the string column by the delimiter
                 elif dtype == pl.String and delimiter:
-                    lf_view = add_rid_column(
+                    lf_view = (
                         self.dfull.lazy()
                         .rename({RID: RID_OLD})
                         .with_columns(pl.col(col_name).str.split(delimiter))
                         .explode(col_name)
                     )
+
                 else:
                     return
 
-                self.df = lf_view.filter(pl.col(RID_OLD).is_in(old_rids)).drop(RID_OLD).collect()
-                self.dfull = lf_view.drop(RID_OLD).collect()
+                lf = lf_view.filter(pl.col(RID_OLD).is_in(old_rids)).drop(RID_OLD)
+                lfull = lf_view.drop(RID_OLD)
+
+                if self.selected_columns:
+                    lf = lf.select([c for c in cols if c in self.selected_columns or c == col_name])
+                    lfull = lfull.select([c for c in cols if c in self.selected_columns or c == col_name])
+
+                self.df = add_rid_column(lf).collect()
+                self.dfull = add_rid_column(lfull).collect()
             else:
                 if dtype == pl.List:
-                    self.df = add_rid_column(self.df.lazy().drop(RID).explode(col_name)).collect()
+                    lf = self.df.lazy().drop(RID).explode(col_name)
                 elif dtype == pl.String and delimiter:
-                    self.df = add_rid_column(
-                        self.df.lazy().drop(RID).with_columns(pl.col(col_name).str.split(delimiter)).explode(col_name)
-                    ).collect()
+                    lf = self.df.lazy().drop(RID).with_columns(pl.col(col_name).str.split(delimiter)).explode(col_name)
                 else:
                     return
+
+                if self.selected_columns:
+                    lf = lf.select([c for c in cols if c in self.selected_columns or c == col_name])
+
+                self.df = add_rid_column(lf).collect()
 
             self.selected_rows.clear()
             self.matches = defaultdict(set)
@@ -3468,11 +3539,11 @@ class DataFrameTable(DataTable):
             if self.histories_undo:
                 self.histories_undo.pop()
             self.notify(
-                f"Failed to explode column [$error]{col_name}[/] with delimiter [$accent]{delimiter}[/]",
-                title="Explode Column with Delimiter",
+                f"Failed to explode column [$error]{col_name}[/]",
+                title="Explode Column",
                 severity="error",
             )
-            self.log(f"Error exploding column `{col_name}` with delimiter `{delimiter}`: {e}")
+            self.log(f"Error exploding column `{col_name}` `{delimiter}`: {e}")
 
     @with_full_df
     def cmd_delete_row(self, more: str | None = None) -> None:
@@ -5420,7 +5491,7 @@ class DataFrameTable(DataTable):
         self.setup_table()
         self.notify(f"Selected [$success]{len(rids)}[/] row(s) (current + below)", title="Select Rows")
 
-    def cmd_toggle_selection_col(self) -> None:
+    def cmd_toggle_selection_column(self) -> None:
         """Select/deselect current column."""
         # Add to history
         self.add_history("Toggle column selection")
@@ -5435,6 +5506,46 @@ class DataFrameTable(DataTable):
 
         # Recreate table for display
         self.setup_table()
+
+    def _select_visible_columns_to_current(self, side: str) -> None:
+        """Select visible columns from one edge through the current column."""
+        visible_columns = list(self.visible_columns)
+        col_name = self.cursor_col_name
+
+        try:
+            col_idx = visible_columns.index(col_name)
+        except ValueError:
+            self.notify(
+                f"Current column [$warning]{col_name}[/] is not visible",
+                title="Select Columns",
+                severity="warning",
+            )
+            return
+
+        if side == "left":
+            columns = visible_columns[: col_idx + 1]
+        else:
+            columns = visible_columns[col_idx:]
+
+        self.add_history(
+            f"Select column [$success]{col_name}[/] and [$accent]{len(columns) - 1}[/] other column(s) to the {side}",
+            dirty=False,
+        )
+
+        self.selected_columns.update(columns)
+        self.setup_table()
+        self.notify(
+            f"Selected column [$success]{col_name}[/] and [$accent]{len(columns) - 1}[/] other column(s) to the {side}",
+            title="Select Columns",
+        )
+
+    def cmd_select_column_left(self) -> None:
+        """Select current column and all visible columns to its left."""
+        self._select_visible_columns_to_current("left")
+
+    def cmd_select_column_right(self) -> None:
+        """Select current column and all visible columns to its right."""
+        self._select_visible_columns_to_current("right")
 
     def cmd_clear_selections(self) -> None:
         """Clear all selected rows/columns and matches without changing the dataframe."""

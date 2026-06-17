@@ -1092,8 +1092,8 @@ def add_rid_column(frame: pl.DataFrame | pl.LazyFrame, offset: int = 0) -> pl.Da
         The modified DataFrame or LazyFrame with the internal row index column added.
     """
     if isinstance(frame, pl.DataFrame) and RID not in frame.columns:
-        frame = frame.lazy().with_row_index(RID, offset=offset).select(pl.exclude(RID), RID).collect()
+        frame = frame.with_columns(pl.int_range(offset, pl.len() + offset).alias(RID))
     elif isinstance(frame, pl.LazyFrame) and RID not in frame.collect_schema():
-        frame = frame.with_row_index(RID, offset=offset).select(pl.exclude(RID), RID)
+        frame = frame.with_columns(pl.int_range(offset, pl.len() + offset).alias(RID))
 
     return frame
