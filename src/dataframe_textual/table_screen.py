@@ -1230,6 +1230,7 @@ class MetaColumnScreen(TableScreen):
             {
                 "Column": self.dftable.df.columns,
                 "Type": [str(dtype) for dtype in self.dftable.df.dtypes],
+                "Width": [col.width if (col := self.dftable.columns.get(c)) else 0 for c in self.dftable.df.columns],
             }
         )
 

@@ -694,6 +694,7 @@ class DataFrameViewer(App):
             "pl": pl,
             "app": self,
             "table": table,
+            "self": table,
             "df": None if table is None else table.df,
             "RID": RID,
         }

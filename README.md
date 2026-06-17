@@ -537,7 +537,7 @@ Several features open a **modal screen** (an overlay table) for inspection or in
 | Modal Screen    | Opened With | Purpose                                    |
 | --------------- | ----------- | ------------------------------------------ |
 | Sheets Overview | `S`         | Summary of all open tabs                   |
-| Column Metadata | `C`         | Column names and data types                |
+| Column Metadata | `C`         | Column name, data type, and width          |
 | Row Detail      | `Enter`     | All column values for one row              |
 | Cell Detail     | `Tab`       | Drill into a single cell value             |
 | Frequency       | `F`         | Value distribution for a column            |
@@ -593,6 +593,7 @@ Press `C` to open a modal displaying details for all columns:
 
 - **Column** - Column name
 - **Type** - Data type (e.g., Int64, String, Float64, Boolean)
+- **Width** - Column width
 
 **Keys inside the modal**
 

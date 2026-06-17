@@ -23,10 +23,6 @@ class ConsolePanel(Vertical):
     HISTORY_BEGINNING_PLACEHOLDER = "Already at beginning of history. Press Down to return."
     HISTORY_END_PLACEHOLDER = "Already at end of history. Press Up to return."
 
-    BINDINGS = [
-        ("escape", "close_console", "Close Console"),
-    ]
-
     DEFAULT_CSS = """
         ConsolePanel {
             dock: bottom;
@@ -130,6 +126,9 @@ class ConsolePanel(Vertical):
         elif event.key == "down":
             event.stop()
             self._navigate_history(1)
+        elif event.key == "escape":
+            event.stop()
+            self.close_console()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Reset history cursor if the user edits text after navigating history.
@@ -225,7 +224,7 @@ class ConsolePanel(Vertical):
         self._update_prompt()
         self.focus_input()
 
-    def action_close_console(self) -> None:
+    def close_console(self) -> None:
         """Hide the console panel when escape is pressed."""
         self.display = False
         if table := self.app.active_table:
