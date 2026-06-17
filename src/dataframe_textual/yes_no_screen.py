@@ -386,7 +386,7 @@ class ConfirmScreen(YesNoScreen):
         }
     """
 
-    def __init__(self, title: str = None, label=None, input=None, yes="Yes", maybe: str | None = None, no="No"):
+    def __init__(self, title: str | None = None, label=None, input=None, yes="Yes", maybe: str | None = None, no="No"):
         super().__init__(
             title=title,
             label=label,
@@ -436,6 +436,7 @@ class EditCellScreen(YesNoScreen):
     def _validate_input(self) -> tuple[int, int, str | None] | None:
         """Validate and save the edited value."""
         new_value_str = self.input.value  # Do not strip to preserve spaces
+        new_value: str | None = None
 
         # Handle empty input
         if not new_value_str:
