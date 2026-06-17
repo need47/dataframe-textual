@@ -361,6 +361,7 @@ Useful examples from current bindings:
 | `z#`              | Toggle freeze rows and/or columns                              |
 | `_` (underscore)  | Toggle column full width for current column                    |
 | `g_` (underscore) | Toggle column full width for all string/list columns           |
+| `z_` (underscore) | Set width for current column                                   |
 | `z,`              | Toggle thousand separator for current column                   |
 | `<`               | Decrease float precision for current column                    |
 | `>`               | Increase float precision for current column                    |
@@ -526,6 +527,9 @@ These controls change how the table is shown without changing the underlying dat
 - `gv`: Show all hidden columns.
 - `z#`: Freeze rows and/or columns to keep important areas visible while scrolling.
 - `$`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
+- `_`: Toggle full width for the current column.
+- `g_`: Toggle full width for all string/list columns.
+- `z_`: Set the current column width from a prompt. Values smaller than the column label are raised to the label width.
 - `z,`: Toggle the thousand separator for the current numeric column.
 - `<` / `>`: Decrease or increase float precision for the current float column. Each column keeps its own precision setting, and `0` means the default full display.
 - `z=`: Toggle inline bar chart display for the current numeric column. When active, each cell is rendered as a Rich `Bar`, normalized to that column's min/max range. Press `z=` again to restore normal value display.

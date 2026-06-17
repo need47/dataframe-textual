@@ -113,6 +113,7 @@ class History:
     expanded_columns: set[str]
     thousand_separator_columns: set[str]
     float_precision_columns: dict[str, int]
+    column_widths: dict[str, int]
     bar_columns: set[str]
     show_rid: bool
     show_column_index: bool
@@ -253,6 +254,9 @@ class DataFrameTable(DataTable):
 
         # Per-column float precision: col_name -> number of decimal places
         self.float_precision_columns: dict[str, int] = {}
+
+        # Per-column width overrides: col_name -> display width
+        self.column_widths: dict[str, int] = {}
 
         # Columns displaying as inline bar charts
         self.bar_columns: set[str] = set()
@@ -854,6 +858,31 @@ class DataFrameTable(DataTable):
         """Toggle column full width for all string/list columns."""
         self.cmd_expand_column(expand_all=True)
 
+    def cmd_set_column_width(self) -> None:
+        """Prompt for and set the current column width."""
+        col_name = self.cursor_col_name
+        col_key = ColumnKey(col_name)
+
+        if col_key not in self.columns:
+            self.notify(
+                f"Column [$warning]{col_name}[/] is not visible",
+                title="Set Column Width",
+                severity="warning",
+            )
+            return
+
+        current_width = self.columns[col_key].width or self._column_label_width(col_name)
+        self.app.push_screen(
+            ConfirmScreen(
+                "Set Column Width",
+                label=f"Enter width for column [$success]{col_name}[/]",
+                input={"value": str(current_width), "type": "number"},
+                yes="Set",
+                no="Cancel",
+            ),
+            callback=partial(self.set_column_width, col_name),
+        )
+
     def cmd_filter_rows_nonnull(self) -> None:
         """Filter rows with non-null values in current column."""
         self.cmd_filter_rows_null(with_null=False)
@@ -1079,6 +1108,66 @@ class DataFrameTable(DataTable):
         )
         self.notify(message, title="Set Float Precision")
 
+    def _column_label_width(self, col_name: str) -> int:
+        """Measure the display width needed for a column label."""
+        visible_col_idx = list(self.visible_columns).index(col_name) + 1
+        label = self._build_column_label(col_name, visible_col_idx)
+        return measure(self.app.console, label, 1) + 2
+
+    def set_column_width(self, col_name: str, result: str | None) -> None:
+        """Set the display width for a column from user input.
+
+        Args:
+            col_name: The name of the column being resized.
+            result: Width entered by the user, or None if cancelled.
+        """
+        if result is None:
+            return
+
+        width_text = result.strip()
+        try:
+            requested_width = int(width_text)
+        except ValueError:
+            self.notify("Please enter a valid integer width", title="Set Column Width", severity="error")
+            return
+
+        if requested_width <= 0:
+            self.notify("Column width must be greater than zero", title="Set Column Width", severity="error")
+            return
+
+        col_key = ColumnKey(col_name)
+        if col_key not in self.columns:
+            self.notify(
+                f"Column [$warning]{col_name}[/] is not visible",
+                title="Set Column Width",
+                severity="warning",
+            )
+            return
+
+        min_width = self._column_label_width(col_name)
+        new_width = max(min_width, requested_width)
+        column = self.columns[col_key]
+
+        if column.width == new_width and self.column_widths.get(col_name) == new_width:
+            self.notify(
+                f"Column [$success]{col_name}[/] is already width [$accent]{new_width}[/]",
+                title="Set Column Width",
+            )
+            return
+
+        self.add_history(f"Set width for column [$success]{col_name}[/] to [$accent]{new_width}[/]")
+        column.width = new_width
+        self.column_widths[col_name] = new_width
+        self.expanded_columns.discard(col_name)
+        self._update_count += 1
+        self._require_update_dimensions = True
+        self.refresh(layout=True)
+
+        message = f"Column [$success]{col_name}[/] width set to [$accent]{new_width}[/]"
+        if new_width != requested_width:
+            message += f" (minimum label width is [$accent]{min_width}[/])"
+        self.notify(message, title="Set Column Width")
+
     def setup_table(self) -> None:
         """Setup the table for display.
 
@@ -1165,18 +1254,29 @@ class DataFrameTable(DataTable):
             col_widths[col] = max_width
             available_width -= max_width
 
+        for col, width in self.column_widths.items():
+            if col in col_widths:
+                old_width = col_widths[col]
+                col_widths[col] = max(col_label_widths[col], width)
+                available_width -= col_widths[col] - old_width
+
         # If there's no more available width, auto-size remaining columns
         if available_width < 0:
             # Recalculate available width after capping wide columns
             available_width = init_available_width
             for col in col_widths:
+                if col in self.column_widths:
+                    available_width -= col_widths[col]
+                    continue
                 if col_widths[col] > COLUMN_WIDTH_CAP and col_label_widths[col] < COLUMN_WIDTH_CAP:
                     col_widths[col] = COLUMN_WIDTH_CAP  # Cap width to prevent extremely wide columns
                 available_width -= col_widths[col]
 
         # If there's still available width, distribute it proportionally to columns that are above the cap
         if available_width > BUFFER_SIZE:
-            flexible_cols = [col for col in col_widths if col_widths[col] >= COLUMN_WIDTH_CAP]
+            flexible_cols = [
+                col for col in col_widths if col not in self.column_widths and col_widths[col] >= COLUMN_WIDTH_CAP
+            ]
             # Only distribute if there's more than one flexible column to avoid giving all extra space to a single column
             if len(flexible_cols) > 1:
                 extra_width_per_col = (available_width - BUFFER_SIZE) // len(flexible_cols)
@@ -1748,6 +1848,7 @@ class DataFrameTable(DataTable):
             expanded_columns=self.expanded_columns.copy(),
             thousand_separator_columns=self.thousand_separator_columns.copy(),
             float_precision_columns=self.float_precision_columns.copy(),
+            column_widths=self.column_widths.copy(),
             bar_columns=self.bar_columns.copy(),
             show_rid=self.show_rid,
             show_column_index=self.show_column_index,
@@ -1774,6 +1875,7 @@ class DataFrameTable(DataTable):
         self.expanded_columns = history.expanded_columns.copy()
         self.thousand_separator_columns = history.thousand_separator_columns.copy()
         self.float_precision_columns = history.float_precision_columns.copy()
+        self.column_widths = history.column_widths.copy()
         self.bar_columns = history.bar_columns.copy()
         self.show_rid = history.show_rid
         self.show_column_index = history.show_column_index
@@ -1870,6 +1972,7 @@ class DataFrameTable(DataTable):
         self.expanded_columns.clear()
         self.thousand_separator_columns = set()
         self.float_precision_columns = {}
+        self.column_widths = {}
         self.bar_columns.clear()
         self.df_done = True
         self.dirty = dirty

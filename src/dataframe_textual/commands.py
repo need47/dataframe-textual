@@ -235,6 +235,7 @@ _reg("hide-column-after",         "Hide current column and those after",        
 _reg("show-hidden-columns",       "Show all hidden columns",                                  Scope.MAIN_TABLE, Category.DISPLAY, "👀").bind("v", leader="g")
 _reg("expand-column",             "Toggle column full width for current column",              Scope.MAIN_TABLE, Category.DISPLAY, "📏").bind("_")
 _reg("expand-all-columns",        "Toggle column full width for all string/list columns",     Scope.MAIN_TABLE, Category.DISPLAY, "📏").bind("_", leader="g")
+_reg("set-column-width",          "Set column width for current column",                      Scope.MAIN_TABLE, Category.DISPLAY, "📏").bind("_", leader="z")
 _reg("toggle-freeze",             "Freeze rows and/or columns",                               Scope.MAIN_TABLE, Category.DISPLAY, "📌").bind("#", leader="z")
 _reg("toggle-column-index",       "Toggle column index prefix",                               Scope.MAIN_TABLE, Category.DISPLAY, "🏷️").bind("$")
 _reg("set-row-as-header",         "Mark current row as header",                               Scope.MAIN_TABLE, Category.DISPLAY, "📌").bind("^", leader="g")
