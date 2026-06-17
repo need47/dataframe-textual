@@ -566,9 +566,6 @@ class DataFrameViewer(App):
         Opens JoinTableScreen pre-selecting the active table as the left table.
         The join result is added as a new tab.
         """
-        if len(self.tabs) < 2:
-            self.notify("Need at least two open tabs to join.", severity="error")
-            return
         self.push_screen(JoinTableScreen(), callback=self._join_table)
 
     def _join_table(self, result: pl.DataFrame | None) -> None:
