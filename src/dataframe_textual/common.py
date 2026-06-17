@@ -138,37 +138,74 @@ class DtypeClass:
         )
 
 
-# itype is used by Input widget for input validation
 # fmt: off
-STYLES = {
+# itype is used by Input widget for input validation
+DtypeClass_STR = DtypeClass(gtype="string", style="green", justify="left", itype="text", convert=str)
+DtypeClass_INT = DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int)
+DtypeClass_FLOAT = DtypeClass(gtype="float", style="yellow", justify="right", itype="number", convert=float)
+DtypeClass_BOOL = DtypeClass(gtype="boolean", style="blue", justify="center", itype="text", convert=lambda x: BOOLS.get(x.lower()))
+DtypeClass_TEMPORAL = DtypeClass(gtype="temporal", style="magenta", justify="center", itype="text", convert=str)
+# fmt: on
+
+DTYPE_TO_CLASS = {
     # str
-    pl.String: DtypeClass(gtype="string", style="green", justify="left", itype="text", convert=str),
+    pl.String: DtypeClass_STR,
     # int
-    pl.Int8: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.Int16: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.Int32: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.Int64: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.Int128: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.UInt8: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.UInt16: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.UInt32: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
-    pl.UInt64: DtypeClass(gtype="integer", style="cyan", justify="right", itype="integer", convert=int),
+    pl.Int8: DtypeClass_INT,
+    pl.Int16: DtypeClass_INT,
+    pl.Int32: DtypeClass_INT,
+    pl.Int64: DtypeClass_INT,
+    pl.Int128: DtypeClass_INT,
+    pl.UInt8: DtypeClass_INT,
+    pl.UInt16: DtypeClass_INT,
+    pl.UInt32: DtypeClass_INT,
+    pl.UInt64: DtypeClass_INT,
     # float
-    pl.Float32: DtypeClass(gtype="float", style="yellow", justify="right", itype="number", convert=float),
-    pl.Float64: DtypeClass(gtype="float", style="yellow", justify="right", itype="number", convert=float),
-    pl.Decimal: DtypeClass(gtype="float", style="yellow", justify="right", itype="number", convert=float),
+    pl.Float16: DtypeClass_FLOAT,
+    pl.Float32: DtypeClass_FLOAT,
+    pl.Float64: DtypeClass_FLOAT,
+    pl.Decimal: DtypeClass_FLOAT,
     # bool
-    pl.Boolean: DtypeClass(gtype="boolean", style="blue", justify="center", itype="text", convert=lambda x: BOOLS[x.lower()]),
+    pl.Boolean: DtypeClass_BOOL,
     # temporal
-    pl.Date: DtypeClass(gtype="temporal", style="magenta", justify="center", itype="text", convert=str),
-    pl.Datetime: DtypeClass(gtype="temporal", style="magenta", justify="center", itype="text", convert=str),
-    pl.Time: DtypeClass(gtype="temporal", style="magenta", justify="center", itype="text", convert=str),
+    pl.Date: DtypeClass_TEMPORAL,
+    pl.Datetime: DtypeClass_TEMPORAL,
+    pl.Time: DtypeClass_TEMPORAL,
+    # null
+    pl.Null: DtypeClass(gtype="null", style="", justify="", itype="text", convert=str),
     # object
     pl.Object: DtypeClass(gtype="object", style="", justify="", itype="text", convert=str),
     # unknown
     pl.Unknown: DtypeClass(gtype="unknown", style="", justify="", itype="text", convert=str),
 }
-# fmt: on
+
+FFINAME_TO_DTYPE = {
+    "str": pl.String,
+    "int": pl.Int64,
+    "i8": pl.Int8,
+    "i16": pl.Int16,
+    "i32": pl.Int32,
+    "i64": pl.Int64,
+    "i128": pl.Int128,
+    "u8": pl.UInt8,
+    "u16": pl.UInt16,
+    "u32": pl.UInt32,
+    "u64": pl.UInt64,
+    "u128": pl.UInt128,
+    "float": pl.Float64,
+    "f16": pl.Float16,
+    "f32": pl.Float32,
+    "f64": pl.Float64,
+    "decimal": pl.Decimal,
+    "bool": pl.Boolean,
+    "boolean": pl.Boolean,
+    "date": pl.Date,
+    "datetime": pl.Datetime,
+    "time": pl.Time,
+    "null": pl.Null,
+    "object": pl.Object,
+    "unknown": pl.Unknown,
+}
 
 # Subscript digits mapping for sort indicators
 SUBSCRIPT_DIGITS = {
@@ -219,16 +256,16 @@ def DtypeConfig(dtype: pl.DataType) -> DtypeClass:
     Returns:
         A DtypeClass containing style, justification, input type, and conversion function.
     """
-    if dc := STYLES.get(dtype):
+    if dc := DTYPE_TO_CLASS.get(dtype):
         return dc
     elif isinstance(dtype, pl.Datetime):
-        return STYLES[pl.Datetime]
+        return DTYPE_TO_CLASS[pl.Datetime]
     elif isinstance(dtype, pl.Date):
-        return STYLES[pl.Date]
+        return DTYPE_TO_CLASS[pl.Date]
     elif isinstance(dtype, pl.Time):
-        return STYLES[pl.Time]
+        return DTYPE_TO_CLASS[pl.Time]
     else:
-        return STYLES[pl.Unknown]
+        return DTYPE_TO_CLASS[pl.Unknown]
 
 
 def format_row(

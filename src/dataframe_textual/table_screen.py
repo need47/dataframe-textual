@@ -1141,7 +1141,7 @@ class MetaColumnScreen(TableScreen):
           - 'I': Show statistics for the selected column.
           - 'J' / 'Shift+Down': Move the selected column right (row moves down).
           - 'K' / 'Shift+Up': Move the selected column left (row moves up).
-          - 'e': Rename the selected column.
+          - 'e': Rename, resize, or cast the selected column.
           - 'g': Scroll to top.
           - 'G': Scroll to bottom.
           - 'q' / 'Escape': Close the modal.
@@ -1193,6 +1193,9 @@ class MetaColumnScreen(TableScreen):
             if col_idx == 0:  # column anme
                 self._resume_row_idx = self.table.cursor_row
                 self.dftable.cmd_rename_column(col_idx=self.table.cursor_row)
+            elif col_idx == 1:  # column dtype
+                col_name = self.dftable.df.columns[self.table.cursor_row]
+                self.dftable.cmd_cast_column_dtype(col_name=col_name)
             elif col_idx == 2:  # column width
                 self.dftable.cmd_resize_column(cidx=self.table.cursor_row)
         # Delete column

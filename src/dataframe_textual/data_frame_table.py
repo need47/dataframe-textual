@@ -2,11 +2,13 @@
 
 import io
 import sys
+from ast import In
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from functools import partial
 from itertools import zip_longest
 from pathlib import Path
+from re import I
 from threading import Event
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -991,23 +993,23 @@ class DataFrameTable(DataTable):
 
     def cmd_cast_integer(self) -> None:
         """Cast column to integer."""
-        self.cmd_cast_column_dtype("pl.Int64")
+        self.cmd_cast_column_dtype("i64")
 
     def cmd_cast_float(self) -> None:
         """Cast column to float."""
-        self.cmd_cast_column_dtype("pl.Float64")
+        self.cmd_cast_column_dtype("f64")
 
     def cmd_cast_boolean(self) -> None:
         """Cast column to boolean."""
-        self.cmd_cast_column_dtype("pl.Boolean")
+        self.cmd_cast_column_dtype("bool")
 
     def cmd_cast_string(self) -> None:
         """Cast column to string."""
-        self.cmd_cast_column_dtype("pl.String")
+        self.cmd_cast_column_dtype("str")
 
     def cmd_cast_date(self) -> None:
         """Cast column to date."""
-        self.cmd_cast_column_dtype("pl.Date")
+        self.cmd_cast_column_dtype("date")
 
     def cmd_upper_case_column(self) -> None:
         """Convert column(s) to uppercase."""
@@ -4097,19 +4099,42 @@ class DataFrameTable(DataTable):
 
     # Type casting
     @with_full_df
-    def cmd_cast_column_dtype(self, dtype: str) -> None:
+    def cmd_cast_column_dtype(self, ffiname: str = "", col_name: str = "") -> None:
         """Cast the current column to a different data type.
 
         Args:
-            dtype: Target data type (string representation, e.g., "pl.String", "pl.Int64")
+            ffiname: Target data type (e.g., "u16", "i32", "f64", "str"). If not provided, a confirmation screen will be shown.
+            col_name: Name of the column to cast. If not provided, the current column will be used.
         """
-        col_name = self.cursor_col_name
-        current_dtype = self.cursor_col_dtype
+        if not col_name:
+            col_name = self.cursor_col_name
 
-        try:
-            target_dtype = eval(dtype)
-        except Exception:
-            self.notify(f"Invalid target data type: [$error]{dtype}[/]", title="Cast Column", severity="error")
+        if ffiname:
+            self.cast_column_dtype(ffiname, col_name)
+        else:
+            self.app.push_screen(
+                ConfirmScreen(
+                    "Cast Column",
+                    label="Enter target data type (e.g., 'str', 'int', 'float', 'bool', 'f64', 'i32')",
+                    input="",
+                    yes="Cast",
+                    no="Cancel",
+                ),
+                callback=partial(self.cast_column_dtype, col_name=col_name),
+            )
+
+    def cast_column_dtype(self, ffiname: str, col_name: str) -> None:
+        """Cast a column to a specific data type."""
+        if not ffiname:
+            return
+
+        from .common import FFINAME_TO_DTYPE
+
+        current_dtype = self.df.schema[col_name]
+
+        target_dtype = FFINAME_TO_DTYPE.get(ffiname)
+        if target_dtype is None:
+            self.notify(f"Invalid target data type: [$error]{ffiname}[/]", title="Cast Column", severity="error")
             return
 
         if current_dtype == target_dtype:
