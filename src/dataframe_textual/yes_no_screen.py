@@ -681,26 +681,6 @@ class AddColumnScreen(YesNoScreen):
                 return self.cidx, col_name, pl.lit(term)
 
 
-class ExplodeColumnScreen(YesNoScreen):
-    """Modal screen to explode a column by a delimiter."""
-
-    def __init__(self, df: pl.DataFrame, col_name: str):
-        self.df = df
-        self.col_name = col_name
-
-        super().__init__(
-            title="Explode Column",
-            label=f"Enter the delimiter (e.g., `,` or `;`) to split the values in [$success]{col_name}[/]",
-            input="|",
-            on_yes_callback=self._get_input,
-        )
-
-    def _get_input(self) -> tuple[str, str]:
-        """Get input."""
-        delimiter = self.input.value  # Do not strip to preserve spaces
-        return self.col_name, delimiter
-
-
 class AddLinkScreen(AddColumnScreen):
     """Modal screen to add a new link column with user-provided expressions.
 

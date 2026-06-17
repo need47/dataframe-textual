@@ -269,7 +269,6 @@ _reg("transpose",            "Transpose table (swap rows/columns)",             
 _reg("expand-list-column",   "Expand current list column into indexed columns",          Scope.MAIN_TABLE, Category.EDITING, "🧩").bind("(")
 _reg("contract-list-column", "Contract indexed sibling columns back into a list column", Scope.MAIN_TABLE, Category.EDITING, "🧩").bind(")")
 _reg("explode-column",       "Explode current list column into rows",                    Scope.MAIN_TABLE, Category.EDITING, "💥").bind("o")
-_reg("explode-column-delim", "Explode current column by delimiter into rows",            Scope.MAIN_TABLE, Category.EDITING, "💥").bind("O")
 _reg("split-column",         "Split current column into a new column by delimiter",      Scope.MAIN_TABLE, Category.EDITING, "✂️").bind(":")
 _reg("join-columns",         "Join all selected columns into a new column",              Scope.MAIN_TABLE, Category.EDITING, "🔗").bind(":", leader="z")
 _reg("glue-list-column",     "Glue list column values with separator",                   Scope.MAIN_TABLE, Category.EDITING, "🔗").bind(":", leader="g")

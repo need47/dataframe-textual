@@ -335,32 +335,32 @@ Useful examples from current bindings:
 
 #### Display
 
-| Key               | Action                                                                        |
-| ----------------- | ----------------------------------------------------------------------------- |
-| `Enter`           | Show details for the current row as two-column key–value pairs                |
-| `Tab`             | Show current cell details                                                     |
-| `C`               | Show metadata for all columns (name and data type)                            |
-| `F`               | Show frequency distribution for current or selected columns                   |
-| `I`               | Show statistics for current column                                            |
-| `gI`              | Show statistics for all columns                                               |
-| `=`               | Show histogram for current column                                             |
-| `g=`              | Show histogram for current column with custom bins                            |
-| `z=`              | Toggle inline bar chart display for current numeric column                    |
-| `-` (minus)       | Hide selected columns or current column                                       |
-| `g-` (minus)      | Hide current column and all columns before it                                 |
-| `z-` (minus)      | Hide current column and all columns after it                                  |
-| `gv`              | Show all hidden columns                                                       |
-| `$`               | Toggle 1-based column index prefixes                                          |
-| `z#`              | Toggle freeze rows and/or columns                                             |
-| `_` (underscore)  | Toggle column full width for current column                                   |
-| `g_` (underscore) | Toggle column full width for all string/list columns                          |
-| `z,`              | Toggle thousand separator for current column                                  |
-| `(`               | Expand current list column into indexed columns (e.g. ``col[1]``, ``col[2]``) |
-| `)`               | Contract indexed sibling columns (``col[N]``) back into a list column         |
-| `<`               | Decrease float precision for current column                                   |
-| `>`               | Increase float precision for current column                                   |
-| `g^`              | Set current row as the new header row                                         |
-| `g#`              | Cycle cursor type (cell -> row -> column)                                     |
+| Key               | Action                                                                    |
+| ----------------- | ------------------------------------------------------------------------- |
+| `Enter`           | Show details for the current row as two-column key–value pairs            |
+| `Tab`             | Show current cell details                                                 |
+| `C`               | Show metadata for all columns (name and data type)                        |
+| `F`               | Show frequency distribution for current or selected columns               |
+| `I`               | Show statistics for current column                                        |
+| `gI`              | Show statistics for all columns                                           |
+| `=`               | Show histogram for current column                                         |
+| `g=`              | Show histogram for current column with custom bins                        |
+| `z=`              | Toggle inline bar chart display for current numeric column                |
+| `-` (minus)       | Hide selected columns or current column                                   |
+| `g-` (minus)      | Hide current column and all columns before it                             |
+| `z-` (minus)      | Hide current column and all columns after it                              |
+| `gv`              | Show all hidden columns                                                   |
+| `$`               | Toggle 1-based column index prefixes                                      |
+| `z#`              | Toggle freeze rows and/or columns                                         |
+| `_` (underscore)  | Toggle column full width for current column                               |
+| `g_` (underscore) | Toggle column full width for all string/list columns                      |
+| `z,`              | Toggle thousand separator for current column                              |
+| `(`               | Expand current list column into indexed columns (e.g. `col[1]`, `col[2]`) |
+| `)`               | Contract indexed sibling columns (`col[N]`) back into a list column       |
+| `<`               | Decrease float precision for current column                               |
+| `>`               | Increase float precision for current column                               |
+| `g^`              | Set current row as the new header row                                     |
+| `g#`              | Cycle cursor type (cell -> row -> column)                                 |
 
 #### Editing
 
@@ -392,7 +392,6 @@ Useful examples from current bindings:
 | `Ctrl+L`       | Convert current or selected string column(s) to lowercase       |
 | `zB`           | Strip leading and trailing whitespaces in current string column |
 | `o`            | Explode current list column into multiple rows                  |
-| `O`            | Explode current string column by delimiter into multiple rows   |
 | `zT`           | Transpose table (swap rows and columns)                         |
 
 #### Row/Column Selection
@@ -590,8 +589,9 @@ This is useful for quickly navigating between tabs, reviewing file sizes at a gl
 ### 5. Column Overview
 
 Press `C` to open a modal displaying details for all columns:
-  - **Column** - Column name
-  - **Type** - Data type (e.g., Int64, String, Float64, Boolean)
+
+- **Column** - Column name
+- **Type** - Data type (e.g., Int64, String, Float64, Boolean)
 
 **Keys inside the modal**
 
@@ -974,6 +974,8 @@ You can also start from the Sheets Overview: press `S`, select exactly two tabs 
 
 Supported join types include inner, left, right, full, semi, and anti joins. Select the same number of key columns on both sides before pressing **Join**.
 
+![Join Table](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/join-table.png)
+
 ### 21. SQL Interface
 
 The SQL interface provides two modes for querying your dataframe:
@@ -1090,7 +1092,7 @@ dv partially_broken.csv -E
 - **textual**: Terminal UI framework
 - **fastexcel**: Read Excel files
 - **xlsxwriter**: Write Excel files
-- **vortex-data**: Read/Write Vortex files
+- **vortex-data**: Read/Write Vortex files (optional)
 
 ## Requirements
 

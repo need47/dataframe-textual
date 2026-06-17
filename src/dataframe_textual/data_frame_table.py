@@ -75,7 +75,6 @@ from .yes_no_screen import (
     CustomBinScreen,
     EditCellScreen,
     EditColumnScreen,
-    ExplodeColumnScreen,
     FilterBooleanScreen,
     FilterListScreen,
     FilterNumericScreen,
@@ -3428,31 +3427,6 @@ class DataFrameTable(DataTable):
 
         self.task_done = False
         self.app.push_screen(BusyScreen(self, task=partial(self.explode_column, col_name)))
-
-    @with_full_df
-    def cmd_explode_column_delim(self) -> None:
-        """Open screen to explode a string column based on delimiter."""
-        col_name = self.cursor_col_name
-        dtype = self.cursor_col_dtype
-
-        # Only explode string columns
-        if not isinstance(dtype, pl.String):
-            return
-
-        self.app.push_screen(
-            ExplodeColumnScreen(self.df, col_name),
-            callback=self.explode_column_delim,
-        )
-
-    @with_full_df
-    def explode_column_delim(self, result) -> None:
-        """Handle result from ExplodeColumnScreen and launch the delimiter-based explode task."""
-        if result is None:
-            return
-        col_name, delimiter = result
-
-        self.task_done = False
-        self.app.push_screen(BusyScreen(self, task=partial(self.explode_column, col_name, delimiter)))
 
     @work(thread=True)
     def explode_column(self, col_name: str, delimiter: str | None = "|") -> None:
