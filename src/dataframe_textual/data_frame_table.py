@@ -179,7 +179,15 @@ def handle_term(
 
 
 class DataFrameTable(DataTable):
-    """Custom DataTable to highlight row/column labels based on cursor position."""
+    """Custom DataTable to highlight row/column labels based on cursor position.
+
+    - `ridx`: 0-based row index in the dataframe
+    - `cidx`: 0-based column index in the dataframe
+    - `row_idx`: 0-based row index in the table display
+    - `col_idx`: 0-based column index in the table display
+    - `row_key`: ridx as string
+    - `col_key`: column name as string
+    """
 
     @property
     def HELP(self) -> str:
@@ -884,7 +892,7 @@ class DataFrameTable(DataTable):
                 yes="Resize",
                 no="Cancel",
             ),
-            callback=partial(self.set_column_width, col_name),
+            callback=partial(self.resize_column, col_name),
         )
 
     def cmd_filter_rows_nonnull(self) -> None:
@@ -1118,7 +1126,7 @@ class DataFrameTable(DataTable):
         label = self._build_column_label(col_name, visible_col_idx)
         return measure(self.app.console, label, 1) + 2
 
-    def set_column_width(self, col_name: str, result: str | None) -> None:
+    def resize_column(self, col_name: str, result: str | None) -> None:
         """Set the display width for a column from user input.
 
         Args:
