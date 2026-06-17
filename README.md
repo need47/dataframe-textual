@@ -606,7 +606,7 @@ Press `C` to open a modal displaying details for all columns:
 - Press `I` to show the statistics table for the selected column
 - Press `J` or `Shift+↓` to move the selected column right (and move the metadata row down)
 - Press `K` or `Shift+↑` to move the selected column left (and move the metadata row up)
-- Press `e` to rename or resize the selected column
+- Press `e` to rename, resize, or cast the selected column
 - Press `d` to delete the selected column from the main table
 
 ### 6. Column Statistics
