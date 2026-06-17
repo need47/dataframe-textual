@@ -293,15 +293,15 @@ Useful examples from current bindings:
 
 #### View & Settings
 
-| Key                        | Action                                        |
-| -------------------------- | --------------------------------------------- |
-| `F1`                       | Toggle help panel                             |
-| `S`                        | Show information for all open tabs            |
-| `` ` `` (backtick)         | Toggle Python console                         |
-| `Space`                    | Run a command by name with optional arguments |
-| `z Ctrl+H` / `z Backspace` | Show all commands and key bindings            |
-| `Ctrl+P` -> `Screenshot`   | Capture terminal view as a SVG image          |
-| `gT`                       | Select theme                                  |
+| Key                       | Action                                        |
+| ------------------------- | --------------------------------------------- |
+| `F1`                      | Toggle help panel                             |
+| `S`                       | Show information for all open tabs            |
+| `` ` `` (backtick)        | Toggle Python console                         |
+| `Space`                   | Run a command by name with optional arguments |
+| `z Ctrl+H` / `zBackspace` | Show all commands and key bindings            |
+| `Ctrl+P` -> `Screenshot`  | Capture terminal view as a SVG image          |
+| `gT`                      | Select theme                                  |
 
 #### Join Tables
 
@@ -330,10 +330,10 @@ Useful examples from current bindings:
 | `Ctrl+G`                 | Go to specific row                  |
 | `←` / `↓` / `↑` / `→`    | Move left/down/up/right             |
 | `h` / `j` / `k` / `l`    | Move left/down/up/right (Vim-style) |
-| `gh`                     | Scroll to leftmost column           |
-| `gj`                     | Scroll to last row                  |
-| `gk`                     | Scroll to first row                 |
-| `gl`                     | Scroll to rightmost column          |
+| `gh` / `g←`              | Scroll to leftmost column           |
+| `gj` / `g↓`              | Scroll to last row                  |
+| `gk` / `g↑`              | Scroll to first row                 |
+| `gl` / `g→`              | Scroll to rightmost column          |
 | `Home` / `End`           | Go to first/last column             |
 | `Ctrl+Home` / `Ctrl+End` | Go to page top/bottom               |
 | `PageDown` / `PageUp`    | Scroll down/up one page             |
@@ -361,7 +361,7 @@ Useful examples from current bindings:
 | `z#`              | Toggle freeze rows and/or columns                              |
 | `_` (underscore)  | Toggle column full width for current column                    |
 | `g_` (underscore) | Toggle column full width for all string/list columns           |
-| `z_` (underscore) | Set width for current column                                   |
+| `z_` (underscore) | Resize current column                                          |
 | `z,`              | Toggle thousand separator for current column                   |
 | `<`               | Decrease float precision for current column                    |
 | `>`               | Increase float precision for current column                    |
@@ -529,7 +529,7 @@ These controls change how the table is shown without changing the underlying dat
 - `$`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
 - `_`: Toggle full width for the current column.
 - `g_`: Toggle full width for all string/list columns.
-- `z_`: Set the current column width from a prompt. Values smaller than the column label are raised to the label width.
+- `z_`: Resize the current column from a prompt.
 - `z,`: Toggle the thousand separator for the current numeric column.
 - `<` / `>`: Decrease or increase float precision for the current float column. Each column keeps its own precision setting, and `0` means the default full display.
 - `z=`: Toggle inline bar chart display for the current numeric column. When active, each cell is rendered as a Rich `Bar`, normalized to that column's min/max range. Press `z=` again to restore normal value display.
@@ -606,7 +606,7 @@ Press `C` to open a modal displaying details for all columns:
 - Press `I` to show the statistics table for the selected column
 - Press `J` or `Shift+↓` to move the selected column right (and move the metadata row down)
 - Press `K` or `Shift+↑` to move the selected column left (and move the metadata row up)
-- Press `e` to rename the selected column
+- Press `e` to rename or resize the selected column
 - Press `d` to delete the selected column from the main table
 
 ### 6. Column Statistics

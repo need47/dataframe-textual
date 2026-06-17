@@ -1189,9 +1189,12 @@ class MetaColumnScreen(TableScreen):
             event.stop()
             event.prevent_default()
 
-            # Rename is asynchronous (opens a modal), so rebuild on resume.
-            self._resume_row_idx = self.table.cursor_row
-            self.dftable.cmd_rename_column(col_idx=self._resume_row_idx)
+            col_idx = self.table.cursor_column
+            if col_idx == 0:  # column anme
+                self._resume_row_idx = self.table.cursor_row
+                self.dftable.cmd_rename_column(col_idx=self.table.cursor_row)
+            elif col_idx == 2:  # column width
+                self.dftable.cmd_resize_column(cidx=self.table.cursor_row)
         # Delete column
         elif event.key == "d":
             event.stop()
@@ -1240,8 +1243,6 @@ class MetaColumnScreen(TableScreen):
             col2style["Type"].append(DtypeConfig(dtype).style)
 
         self.df2table(col_style=col2style)
-
-        self.table.cursor_type = "row"
 
     def get_cidx(self) -> int:
         """Get the current column index."""
@@ -1327,7 +1328,7 @@ class CellDetailScreen(TableModalScreen):
 
 
 class SheetScreen(TableModalScreen):
-    """Modal screen displaying information about all currently opened tables."""
+    """Modal screen displaying information about all currently opened tabs."""
 
     def __init__(self, tabs: dict) -> None:
         """Initialize the SheetScreen.

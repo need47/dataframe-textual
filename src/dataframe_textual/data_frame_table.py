@@ -102,7 +102,6 @@ class History:
     df: pl.DataFrame
     dfull: pl.DataFrame | None
     filename: str
-    hidden_columns: set[str]
     selected_rows: set[int]
     selected_columns: set[str]
     sorted_columns: dict[str, bool]  # col_name -> descending
@@ -110,7 +109,6 @@ class History:
     fixed_rows: int
     fixed_columns: int
     cursor_coordinate: Coordinate
-    expanded_columns: set[str]
     thousand_separator_columns: set[str]
     float_precision_columns: dict[str, int]
     column_widths: dict[str, int]
@@ -231,7 +229,6 @@ class DataFrameTable(DataTable):
         self.loaded_ranges: list[tuple[int, int]] = []  # List of (start, end) row indices that are loaded
 
         # State tracking (all 0-based indexing)
-        self.hidden_columns: set[str] = set()  # Set of hidden column names
         self.selected_rows: set[int] = set()  # Track selected rows by RID
         self.selected_columns: set[str] = set()  # Track selected columns by name
         self.sorted_columns: dict[str, bool] = {}  # col_name -> descending
@@ -245,9 +242,6 @@ class DataFrameTable(DataTable):
         self.histories_undo: deque[History] = deque()
         # History stack for redo
         self.histories_redo: deque[History] = deque()
-
-        # Set of columns expanded to full width
-        self.expanded_columns: set[str] = set()
 
         # Set of columns with thousand separator enabled for numeric display
         self.thousand_separator_columns: set[str] = set()
@@ -490,6 +484,16 @@ class DataFrameTable(DataTable):
             for col, dtype in zip(self.df.columns, self.df.dtypes, strict=True)
             if col not in self.hidden_columns and (col != RID or self.show_rid)
         }
+
+    @property
+    def hidden_columns(self) -> set[str]:
+        """Get columns hidden through the column width state."""
+        return {col for col, width in self.column_widths.items() if width == 0}
+
+    @property
+    def expanded_columns(self) -> set[str]:
+        """Get columns expanded through the column width state."""
+        return {col for col, width in self.column_widths.items() if width == -1}
 
     @property
     def leader_key(self) -> bool:
@@ -858,15 +862,15 @@ class DataFrameTable(DataTable):
         """Toggle column full width for all string/list columns."""
         self.cmd_expand_column(expand_all=True)
 
-    def cmd_set_column_width(self) -> None:
-        """Prompt for and set the current column width."""
-        col_name = self.cursor_col_name
+    def cmd_resize_column(self, cidx: int | None = None) -> None:
+        """Prompt for and resize the current column."""
+        col_name = self.cursor_col_name if cidx is None else self.df.columns[cidx]
         col_key = ColumnKey(col_name)
 
         if col_key not in self.columns:
             self.notify(
                 f"Column [$warning]{col_name}[/] is not visible",
-                title="Set Column Width",
+                title="Resize Column",
                 severity="warning",
             )
             return
@@ -874,10 +878,10 @@ class DataFrameTable(DataTable):
         current_width = self.columns[col_key].width or self._column_label_width(col_name)
         self.app.push_screen(
             ConfirmScreen(
-                "Set Column Width",
+                "Resize Column",
                 label=f"Enter width for column [$success]{col_name}[/]",
                 input={"value": str(current_width), "type": "number"},
-                yes="Set",
+                yes="Resize",
                 no="Cancel",
             ),
             callback=partial(self.set_column_width, col_name),
@@ -1128,18 +1132,18 @@ class DataFrameTable(DataTable):
         try:
             requested_width = int(width_text)
         except ValueError:
-            self.notify("Please enter a valid integer width", title="Set Column Width", severity="error")
+            self.notify("Please enter a valid integer width", title="Resize Column", severity="error")
             return
 
         if requested_width <= 0:
-            self.notify("Column width must be greater than zero", title="Set Column Width", severity="error")
+            self.notify("Column width must be greater than zero", title="Resize Column", severity="error")
             return
 
         col_key = ColumnKey(col_name)
         if col_key not in self.columns:
             self.notify(
                 f"Column [$warning]{col_name}[/] is not visible",
-                title="Set Column Width",
+                title="Resize Column",
                 severity="warning",
             )
             return
@@ -1151,14 +1155,13 @@ class DataFrameTable(DataTable):
         if column.width == new_width and self.column_widths.get(col_name) == new_width:
             self.notify(
                 f"Column [$success]{col_name}[/] is already width [$accent]{new_width}[/]",
-                title="Set Column Width",
+                title="Resize Column",
             )
             return
 
-        self.add_history(f"Set width for column [$success]{col_name}[/] to [$accent]{new_width}[/]")
+        self.add_history(f"Resize column [$success]{col_name}[/] to width [$accent]{new_width}[/]")
         column.width = new_width
         self.column_widths[col_name] = new_width
-        self.expanded_columns.discard(col_name)
         self._update_count += 1
         self._require_update_dimensions = True
         self.refresh(layout=True)
@@ -1166,7 +1169,7 @@ class DataFrameTable(DataTable):
         message = f"Column [$success]{col_name}[/] width set to [$accent]{new_width}[/]"
         if new_width != requested_width:
             message += f" (minimum label width is [$accent]{min_width}[/])"
-        self.notify(message, title="Set Column Width")
+        self.notify(message, title="Resize Column")
 
     def setup_table(self) -> None:
         """Setup the table for display.
@@ -1255,7 +1258,7 @@ class DataFrameTable(DataTable):
             available_width -= max_width
 
         for col, width in self.column_widths.items():
-            if col in col_widths:
+            if width > 0 and col in col_widths:
                 old_width = col_widths[col]
                 col_widths[col] = max(col_label_widths[col], width)
                 available_width -= col_widths[col] - old_width
@@ -1265,7 +1268,7 @@ class DataFrameTable(DataTable):
             # Recalculate available width after capping wide columns
             available_width = init_available_width
             for col in col_widths:
-                if col in self.column_widths:
+                if col in self.column_widths and self.column_widths[col] != 0:
                     available_width -= col_widths[col]
                     continue
                 if col_widths[col] > COLUMN_WIDTH_CAP and col_label_widths[col] < COLUMN_WIDTH_CAP:
@@ -1837,7 +1840,6 @@ class DataFrameTable(DataTable):
             df=self.df,
             dfull=self.dfull,
             filename=self.filename,
-            hidden_columns=self.hidden_columns.copy(),
             selected_rows=self.selected_rows.copy(),
             selected_columns=self.selected_columns.copy(),
             sorted_columns=self.sorted_columns.copy(),
@@ -1845,7 +1847,6 @@ class DataFrameTable(DataTable):
             fixed_rows=self.fixed_rows,
             fixed_columns=self.fixed_columns,
             cursor_coordinate=self.cursor_coordinate,
-            expanded_columns=self.expanded_columns.copy(),
             thousand_separator_columns=self.thousand_separator_columns.copy(),
             float_precision_columns=self.float_precision_columns.copy(),
             column_widths=self.column_widths.copy(),
@@ -1864,7 +1865,6 @@ class DataFrameTable(DataTable):
         self.df = history.df
         self.dfull = history.dfull
         self.filename = history.filename
-        self.hidden_columns = history.hidden_columns.copy()
         self.selected_rows = history.selected_rows.copy()
         self.selected_columns = history.selected_columns.copy()
         self.sorted_columns = history.sorted_columns.copy()
@@ -1872,7 +1872,6 @@ class DataFrameTable(DataTable):
         self.fixed_rows = history.fixed_rows
         self.fixed_columns = history.fixed_columns
         self.cursor_coordinate = history.cursor_coordinate
-        self.expanded_columns = history.expanded_columns.copy()
         self.thousand_separator_columns = history.thousand_separator_columns.copy()
         self.float_precision_columns = history.float_precision_columns.copy()
         self.column_widths = history.column_widths.copy()
@@ -1960,7 +1959,6 @@ class DataFrameTable(DataTable):
         self.dfull = None
         self.loaded_rows = 0
         self.loaded_ranges.clear()
-        self.hidden_columns.clear()
         self.selected_rows.clear()
         self.selected_columns.clear()
         self.sorted_columns.clear()
@@ -1969,7 +1967,6 @@ class DataFrameTable(DataTable):
         self.fixed_columns = 0
         self.histories_undo.clear()
         self.histories_redo.clear()
-        self.expanded_columns.clear()
         self.thousand_separator_columns = set()
         self.float_precision_columns = {}
         self.column_widths = {}
@@ -2197,7 +2194,7 @@ class DataFrameTable(DataTable):
             if col_key not in self.columns:
                 continue
             self.remove_column(col_key)
-            self.hidden_columns.add(col_name)
+            self.column_widths[col_name] = 0
             self.selected_columns.discard(col_name)
 
         # Recompute labels for remaining visible columns when prefixes are shown.
@@ -2215,15 +2212,17 @@ class DataFrameTable(DataTable):
     def _expand_single_column(self, col_name: str) -> str | None:
         """Expand or unexpand a single column. Returns a status message fragment, or None on failure."""
         cidx = self.df.columns.index(col_name)
-        col_key = self.get_col_key(cidx)
+        col_key = ColumnKey(col_name)
+        if col_key not in self.columns:
+            return None
         col: Column = self.columns[col_key]
 
         label_width = len(self._build_column_label(col_name)) + 2
 
         # If already expanded, shrink back
-        if col_name in self.expanded_columns:
+        if self.column_widths.get(col_name) == -1:
             col.width = max(label_width, COLUMN_WIDTH_CAP)
-            self.expanded_columns.remove(col_name)
+            self.column_widths.pop(col_name, None)
             return f"[$success]{col_name}[/] shrunk to [$accent]{col.width}[/]"
 
         # Otherwise, expand to widest cell
@@ -2242,7 +2241,7 @@ class DataFrameTable(DataTable):
             if not need_expand:
                 return None
 
-            self.expanded_columns.add(col_name)
+            self.column_widths[col_name] = -1
             col.width = new_width
             return f"[$success]{col_name}[/] expanded to [$accent]{new_width}[/]"
 
@@ -2381,15 +2380,17 @@ class DataFrameTable(DataTable):
 
     def cmd_show_hidden_columns(self) -> None:
         """Show all hidden columns by recreating the table."""
-        if not self.hidden_columns:
+        hidden_columns = self.hidden_columns
+        if not hidden_columns:
             self.notify("No hidden columns to show", title="Show Hidden Column(s)", severity="warning")
             return
 
         # Add to history
         self.add_history("Show hidden column(s)")
 
-        # Clear hidden columns tracking
-        self.hidden_columns.clear()
+        # Clear hidden column width markers.
+        for col_name in hidden_columns:
+            self.column_widths.pop(col_name, None)
 
         # Recreate table for display
         self.setup_table()
@@ -2674,6 +2675,9 @@ class DataFrameTable(DataTable):
                 else:
                     sorted_columns[col] = order
             self.sorted_columns = sorted_columns
+
+        if col_name in self.column_widths:
+            self.column_widths[new_name] = self.column_widths.pop(col_name)
 
         # Update matches if this column had cell matches
         for cols in self.matches.values():
@@ -3481,9 +3485,9 @@ class DataFrameTable(DataTable):
             if col_name in self.sorted_columns:
                 del self.sorted_columns[col_name]
 
-        # Remove from hidden columns if present
+        # Remove from tracking if present
         for col_name in col_names_to_delete:
-            self.hidden_columns.discard(col_name)
+            self.column_widths.pop(col_name, None)
             self.selected_columns.discard(col_name)
 
         # Remove from matches
@@ -3547,7 +3551,7 @@ class DataFrameTable(DataTable):
             self.dfull = None
 
             remaining_cols = set(self.df.columns)
-            self.hidden_columns.intersection_update(remaining_cols)
+            self.column_widths = {col: width for col, width in self.column_widths.items() if col in remaining_cols}
             self.selected_columns.intersection_update(remaining_cols)
             self.selected_columns.discard(RID)
             self.sorted_columns = {col: desc for col, desc in self.sorted_columns.items() if col in remaining_cols}
