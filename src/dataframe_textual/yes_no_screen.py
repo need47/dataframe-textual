@@ -496,10 +496,6 @@ class KeyCaptureScreen(ModalScreen):
         event.stop()
         event.prevent_default()
 
-        # if event.key == "escape":
-        #     self.dismiss(None)
-        #     return
-
         key_display = format_key_display(event.key)
         if not self.validate_keybinding(key_display):
             return

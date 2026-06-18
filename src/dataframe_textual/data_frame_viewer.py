@@ -118,21 +118,15 @@ class DataFrameViewer(App):
         Intercepts ``g`` and ``z`` keystrokes to enter leader mode, which allows
         two-key sequences (e.g., ``gq``, ``gw``, ``z^``) to be dispatched.
 
-        After leader logic, attempts to dispatch app-scope bindings via the registry.
-        If a leader key was pressed but no binding matched, shows an error message.
+        Attempts to dispatch app-scope bindings via the registry. If leader mode
+        is active and no binding matches the second key, shows an error message
+        and resets leader mode. Leader mode also resets after a short timeout.
 
         Args:
             event: The key event object.
         """
-        # User can cancel with Escape key
-        if event.key == "escape":
-            event.stop()
-            event.prevent_default()
-            self.notify("Leader mode cancelled", title="Leader Mode")
-            return
-
         # Try dispatching as an app-scope command
-        elif key_registry.dispatch(event.key, leader=self.leader_key, scope=Scope.APP, target=self):
+        if key_registry.dispatch(event.key, leader=self.leader_key, scope=Scope.APP, target=self):
             event.stop()
             event.prevent_default()
             self.reset_leader_key()

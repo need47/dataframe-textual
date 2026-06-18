@@ -2601,7 +2601,10 @@ class DataFrameTable(DataTable):
             return
 
         self.edit_cell((ridx, cidx, result))
-        self.notify("Save the Commands tab to persist key binding changes", title="Key Binding")
+        self.notify(
+            "Save the Commands tab with [$success]Ctrl[/]+[$accent]T[/] to persist key binding changes",
+            title="Key Binding",
+        )
 
     def cmd_edit_column(self) -> None:
         """Open modal to edit the entire column with an expression."""

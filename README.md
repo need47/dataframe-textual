@@ -227,9 +227,9 @@ Shortcuts are a single key, a modifier combo (e.g., `Shift+G`), or a **leader se
 
 - Press the leader key `g` or `z` to activate the mode — a 3-second timeout begins
 - Press the next key within the timeout to execute the combined command
-- If no second key is pressed within 3 seconds or `Esc` is pressed, leader mode is cancelled.
+- If no second key is pressed within 3 seconds, leader mode is cancelled.
 
-**Important:** press `z` then `Ctrl+H` to open a **Commands** tab, where all commands and keybindings can be viewed and modified.
+**Important:** press `z` then `Ctrl+H` to open a **Commands** tab, where all commands and keybindings can be viewed and modified. In this tab, edit a `Leader` or `Key` cell with `e` or double-click to capture the next key press as the binding. Save the Commands tab to persist changes.
 
 ![Commands](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/commands.png)
 
