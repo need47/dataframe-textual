@@ -553,12 +553,12 @@ Several features open a **modal screen** (an overlay table) for inspection or in
 | Key            | Action                                       |
 | -------------- | -------------------------------------------- |
 | `q` / `Escape` | Close the modal                              |
-| `g`            | Scroll to top                                |
+| `gg`           | Scroll to top                                |
 | `G`            | Scroll to bottom                             |
 | `[`            | Sort by current column ascending             |
 | `]`            | Sort by current column descending            |
 | `,`            | Toggle thousand separator for numeric values |
-| `C`            | Cycle cursor type (cell → row → column)      |
+| `Shift+Tab`    | Cycle cursor type (cell → row → column)      |
 | `T`            | Open modal data as a new tab                 |
 | `Ctrl+S`       | Save the modal table to file                 |
 
@@ -666,6 +666,7 @@ Press `F` to see value distributions for the current column. If multiple columns
 
 - Press `v` to **filter** rows matching the selected value (or selected value combinations)
 - Press `"` to **collect** rows matching the selected value (or selected value combinations) to a new tab
+- Press `s` to select or deselect the current frequency row
 
 This is useful for:
 

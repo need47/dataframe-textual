@@ -110,7 +110,7 @@ class DataFrameViewer(App):
 
         # Global leader mode state
         self.leader_key = ""
-        self.timeout_timer: Timer | None = None
+        self.leader_timer: Timer | None = None
 
     def on_key(self, event: Key) -> None:
         """Handle leader-mode activation and app-scope command dispatch.
@@ -129,12 +129,10 @@ class DataFrameViewer(App):
         if key_registry.dispatch(event.key, leader=self.leader_key, scope=Scope.APP, target=self):
             event.stop()
             event.prevent_default()
-            self.reset_leader_key()
+            self.reset_leader()
             return
 
-        # If we're here, the key wasn't dispatched.
-
-        # Already in leader mode
+        # Already in leader mode, no matching command found
         if self.leader_key:
             event.stop()
             event.prevent_default()
@@ -143,35 +141,34 @@ class DataFrameViewer(App):
                 title="Key Binding",
                 severity="warning",
             )
-            self.reset_leader_key()
+            self.reset_leader()
             return
 
         # Enter leader mode on `g` or `z` key
         elif event.key in ("g", "z"):
             event.stop()
             event.prevent_default()
-
             self.leader_key = event.key
             self.notify(
                 f"Leader mode activated with [$success]{event.key}[/], waiting for next key in 3 seconds",
                 title="Leader Mode",
             )
-            self.timeout_timer = self.set_timer(3, callback=lambda: self.reset_leader_key("Leader mode timed out"))
+            self.leader_timer = self.set_timer(3, callback=lambda: self.reset_leader("Leader mode timed out"))
             return
 
         # No relevant key binding, allow event to propagate normally
         else:
             return
 
-    def reset_leader_key(self, message: str = "") -> None:
+    def reset_leader(self, message: str = "") -> None:
         """Cancel leader mode and reset the timeout timer."""
         self.leader_key = ""
         if message:
             self.notify(message, title="Leader Mode")
 
-        if self.timeout_timer:
-            self.timeout_timer.stop()
-            self.timeout_timer = None
+        if self.leader_timer:
+            self.leader_timer.stop()
+            self.leader_timer = None
 
     @property
     def active_table(self) -> DataFrameTable | None:
@@ -464,11 +461,11 @@ class DataFrameViewer(App):
         Checks for unsaved changes and prompts the user to save if needed.
         If this is the last tab, exits the app.
         """
-        self.do_close()
+        self.close_current()
 
     def cmd_close_all(self) -> None:
         """Close all tabs."""
-        self.do_close_all()
+        self.close_all()
 
     def cmd_force_quit(self) -> None:
         """Force quit the app, discarding unsaved changes."""
@@ -952,7 +949,7 @@ class DataFrameViewer(App):
         self.tabbed.active = tab.id
         table.focus()
 
-    def do_close(self, force=False) -> None:
+    def close_current(self, force=False) -> None:
         """Close current tab or view.
 
         When in a view, return to main table. Otherwise, close the active tab.
@@ -1030,7 +1027,7 @@ class DataFrameViewer(App):
         except Exception:
             pass
 
-    def do_close_all(self) -> None:
+    def close_all(self) -> None:
         """Close all tabs and quit the app.
 
         Checks if any tabs have unsaved changes. If yes, opens a confirmation dialog.

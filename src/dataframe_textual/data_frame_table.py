@@ -723,12 +723,6 @@ class DataFrameTable(DataTable):
         # self.setup_table()
         pass
 
-    def stop_timer(self) -> None:
-        """Stop the timeout timer in the app."""
-        if self.app.timeout_timer:
-            self.app.timeout_timer.stop()
-            self.app.timeout_timer = None
-
     def on_key(self, event: Key) -> None:
         """Handle table-scoped key dispatch and row loading.
 
@@ -748,8 +742,7 @@ class DataFrameTable(DataTable):
         if registry.dispatch(event.key, leader, Scope.MAIN_TABLE, self):
             event.stop()
             event.prevent_default()
-            self.stop_timer()
-            self.leader_key = ""
+            self.app.reset_leader()
             return
 
         # Arrow keys always trigger row loading for lazy-loaded dataframes

@@ -7,6 +7,7 @@ from textual.widgets.data_table import ColumnKey
 
 if TYPE_CHECKING:
     from .data_frame_table import DataFrameTable
+    from .keybindings import KeyBindingRegistry
 
 from functools import partial
 
@@ -19,6 +20,7 @@ from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
 
+from .commands import Scope
 from .common import (
     BAR_COLUMN_WIDTH,
     COLUMN_WIDTH_CAP,
@@ -77,6 +79,10 @@ class TableModalScreen(ModalScreen):
         self.col_justify = None
         self.filename: str | None = None
 
+        self.registry: "KeyBindingRegistry" = self.app.key_registry
+        self.leader = ""  # For command leader key sequences, if needed
+        self.leader_timer = None
+
     def compose(self) -> ComposeResult:
         """Compose the table screen widget structure.
 
@@ -95,41 +101,91 @@ class TableModalScreen(ModalScreen):
     def on_key(self, event: Key) -> None:
         """Handle key press events in the table screen.
 
-        Provides keyboard shortcuts for navigation and interaction, including q/Escape to close.
-        Prevents propagation of non-navigation keys to parent screens.
+        Dispatches common modal-table commands and manages modal leader mode.
 
         Args:
             event: The key event object.
         """
-        if event.key in ("q", "escape"):
+        # Try dispatching table-screen-scoped commands
+        if self.registry.dispatch(event.key, self.leader, Scope.TABLE_SCREEN, self):
             event.stop()
-            self.app.pop_screen()
-        elif event.key == "comma":
+            event.prevent_default()
+            self.reset_leader()
+            return
+
+        # Already in leader mode, no matching command found
+        if self.leader:
             event.stop()
-            self.thousand_separator = not self.thousand_separator
-            self.build_table()
-        elif event.key == "g":
+            event.prevent_default()
+            self.notify(
+                f"Command not found for [$warning]{self.leader}[/][$accent]{event.key}[/] key binding",
+                title="Key Binding",
+                severity="warning",
+            )
+            self.reset_leader()
+            return
+
+        # Enter leader mode on `g` or `z` key
+        if event.key in ("g", "z"):
             event.stop()
-            self.table.action_scroll_top()
-        elif event.key == "G":
-            event.stop()
-            self.table.action_scroll_bottom()
-        elif event.key == "left_square_bracket":  # '['
-            event.stop()
-            self.sort_by_column(descending=False)
-        elif event.key == "right_square_bracket":  # ']'
-            event.stop()
-            self.sort_by_column(descending=True)
-        elif event.key == "C":
-            event.stop()
-            next_type = get_next_item(CURSOR_TYPES, self.table.cursor_type)
-            self.table.cursor_type = next_type
-        elif event.key == "T":
-            event.stop()
-            self.open_as_tab()
-        elif event.key == "ctrl+s":
-            event.stop()
-            self.save_table()
+            event.prevent_default()
+            self.leader = event.key
+            self.notify(
+                f"Leader mode activated with [$success]{event.key}[/], waiting for next key in 3 seconds",
+                title="Leader Mode",
+            )
+            self.leader_timer = self.set_timer(3, callback=lambda: self.reset_leader("Leader mode timed out"))
+            return
+
+    def reset_leader(self, message: str = "") -> None:
+        """Cancel modal leader mode and reset the timeout timer."""
+        self.leader = ""
+        if message:
+            self.notify(message, title="Leader Mode")
+
+        if self.leader_timer:
+            self.leader_timer.stop()
+            self.leader_timer = None
+
+    def cmd_table_close(self) -> None:
+        """Close the modal table."""
+        self.app.pop_screen()
+
+    def cmd_table_toggle_thousand_separator(self) -> None:
+        """Toggle thousand separators in the modal table."""
+        self.thousand_separator = not self.thousand_separator
+        self.build_table()
+
+    def cmd_table_scroll_top(self) -> None:
+        """Scroll the modal table to the top."""
+        self.table.action_scroll_top()
+        self.notify("Scrolled to [$success]top[/]", title="Scroll")
+
+    def cmd_table_scroll_bottom(self) -> None:
+        """Scroll the modal table to the bottom."""
+        self.table.action_scroll_bottom()
+        self.notify("Scrolled to [$success]bottom[/]", title="Scroll")
+
+    def cmd_table_sort_ascending(self) -> None:
+        """Sort the modal table by the current column ascending."""
+        self.sort_by_column(descending=False)
+
+    def cmd_table_sort_descending(self) -> None:
+        """Sort the modal table by the current column descending."""
+        self.sort_by_column(descending=True)
+
+    def cmd_table_cycle_cursor_type(self) -> None:
+        """Cycle the modal table cursor type."""
+        next_type = get_next_item(CURSOR_TYPES, self.table.cursor_type)
+        self.table.cursor_type = next_type
+
+    def cmd_table_open_as_tab(self) -> None:
+        """Open the modal table as a new tab."""
+        self.open_as_tab()
+
+    def cmd_table_save(self) -> None:
+        """Save the modal table to a file."""
+        self.save_table()
 
     def open_as_tab(self) -> None:
         """Open the current modal DataFrame as a new tab."""
@@ -409,7 +465,7 @@ class TableScreen(TableModalScreen):
             return
 
         # Show frequency screen
-        self.dftable.do_show_frequency(cidx)
+        self.dftable.cmd_show_frequency(cidx)
 
     def show_statistics(self, cidx: int | None = None) -> None:
         """Show statistics for the selected column.
@@ -421,7 +477,7 @@ class TableScreen(TableModalScreen):
             return
 
         # Show statistics screen
-        self.dftable.do_show_statistics(cidx)
+        self.dftable.cmd_show_statistics(cidx)
 
 
 class RowDetailScreen(TableScreen):
@@ -443,77 +499,82 @@ class RowDetailScreen(TableScreen):
     def on_key(self, event: Key) -> None:
         """Handle key press events on the row detail screen.
 
-        Supported keys:
-          - 'v': Filter the main table by the selected value.
-          - '"': Collect the selected value in the main table to a new tab.
-          - '{': Move to the previous row.
-          - '}': Move to the next row.
-          - 'F': Show frequency for the selected value.
-          - 's': Show statistics for the selected value.
+        Dispatches row-detail commands through the key binding registry, then
+        falls back to the common modal table shortcuts.
 
         Args:
             event: The key event object.
         """
-        if event.key == "v":
+        if self.registry.dispatch(event.key, self.leader, Scope.ROW_DETAIL_SCREEN, self):
             event.stop()
-            cidx, name, value = self.get_cidx_name_value()
-            self.filter_or_collect_selected_value(cidx, name, value, action="filter")
-        elif event.key == "quotation_mark":  # '"'
-            event.stop()
-            cidx, name, value = self.get_cidx_name_value()
-            self.filter_or_collect_selected_value(cidx, name, value, action="collect")
-        # Move to the previous row
-        elif event.key == "left_curly_bracket":  # '{'
-            event.stop()
-            ridx = self.ridx - 1
-            if ridx >= 0:
-                self.ridx = ridx
-                self.dftable.move_cursor_to(self.ridx)
-                self.build_table()
-        # Move to the next row
-        elif event.key == "right_curly_bracket":  # '}'
-            event.stop()
-            ridx = self.ridx + 1
-            if ridx < len(self.dftable.df):
-                self.ridx = ridx
-                self.dftable.move_cursor_to(self.ridx)
-                self.build_table()
-        # Show frequency for the selected value
-        elif event.key == "F":
-            event.stop()
-            cidx, _, _ = self.get_cidx_name_value()
-            self.show_frequency(cidx)
-        # Show statistics for the selected value
-        elif event.key == "I":
-            event.stop()
-            cidx, _, _ = self.get_cidx_name_value()
-            self.show_statistics(cidx)
-        elif event.key == "tab":
-            event.stop()
-            ridx = self.ridx
-            cidx = self.table.cursor_row
-            col_name = self.dftable.df.columns[cidx]
-            dtype = self.dftable.df.dtypes[cidx]
-            cell_value = self.dftable.df.item(ridx, cidx)
+            event.prevent_default()
+            self.reset_leader()
+            return
 
-            if dtype == pl.String:
-                # String contains the delimiter '|' (indicating a potential list of values)
-                if "|" in cell_value:
-                    self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
-                # Show long string in a text screen for better readability
-                elif len(cell_value) > COLUMN_WIDTH_CAP:
-                    self.app.push_screen(TextScreen(cell_value))
+        super().on_key(event)
 
-            # Show cell detail screen if the value is a non-empty list
-            elif dtype == pl.List and not cell_value.is_empty():
-                if len(cell_value) == 1 and isinstance(cell_value[0], str) and len(cell_value[0]) > COLUMN_WIDTH_CAP:
-                    self.app.push_screen(TextScreen(cell_value[0]))
-                else:
-                    self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
+    def cmd_row_detail_filter_value(self) -> None:
+        """Filter the main table by the selected row-detail value."""
+        cidx, name, value = self.get_cidx_name_value()
+        self.filter_or_collect_selected_value(cidx, name, value, action="filter")
 
-            # or a non-empty dict (struct)
-            elif dtype == pl.Struct and cell_value:
+    def cmd_row_detail_collect_value(self) -> None:
+        """Collect the selected row-detail value in the main table to a new tab."""
+        cidx, name, value = self.get_cidx_name_value()
+        self.filter_or_collect_selected_value(cidx, name, value, action="collect")
+
+    def cmd_row_detail_previous_row(self) -> None:
+        """Show the previous dataframe row in the row-detail screen."""
+        ridx = self.ridx - 1
+        if ridx >= 0:
+            self.ridx = ridx
+            self.dftable.move_cursor_to(self.ridx)
+            self.build_table()
+
+    def cmd_row_detail_next_row(self) -> None:
+        """Show the next dataframe row in the row-detail screen."""
+        ridx = self.ridx + 1
+        if ridx < len(self.dftable.df):
+            self.ridx = ridx
+            self.dftable.move_cursor_to(self.ridx)
+            self.build_table()
+
+    def cmd_row_detail_show_frequency(self) -> None:
+        """Show frequency for the selected row-detail value."""
+        cidx, _, _ = self.get_cidx_name_value()
+        self.show_frequency(cidx)
+
+    def cmd_row_detail_show_statistics(self) -> None:
+        """Show statistics for the selected row-detail value."""
+        cidx, _, _ = self.get_cidx_name_value()
+        self.show_statistics(cidx)
+
+    def cmd_row_detail_drill_down(self) -> None:
+        """Show cell details for the selected row-detail value."""
+        ridx = self.ridx
+        cidx = self.table.cursor_row
+        col_name = self.dftable.df.columns[cidx]
+        dtype = self.dftable.df.dtypes[cidx]
+        cell_value = self.dftable.df.item(ridx, cidx)
+
+        if dtype == pl.String:
+            # String contains the delimiter '|' (indicating a potential list of values)
+            if "|" in cell_value:
                 self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
+            # Show long string in a text screen for better readability
+            elif len(cell_value) > COLUMN_WIDTH_CAP:
+                self.app.push_screen(TextScreen(cell_value))
+
+        # Show cell detail screen if the value is a non-empty list
+        elif dtype == pl.List and not cell_value.is_empty():
+            if len(cell_value) == 1 and isinstance(cell_value[0], str) and len(cell_value[0]) > COLUMN_WIDTH_CAP:
+                self.app.push_screen(TextScreen(cell_value[0]))
+            else:
+                self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
+
+        # or a non-empty dict (struct)
+        elif dtype == pl.Struct and cell_value:
+            self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
 
     def build_table(self) -> None:
         """Build the row detail table."""
@@ -804,17 +865,28 @@ class FrequencyScreen(TableScreen):
 
         self.app.call_from_thread(self._on_calc_ready)
 
-    def on_key(self, event: Key):
-        if event.key == "v":
+    def on_key(self, event: Key) -> None:
+        """Handle key press events on the frequency screen."""
+        if self.registry.dispatch(event.key, self.leader, Scope.FREQUENCY_SCREEN, self):
             event.stop()
-            self.filter_or_collect_selected_values(action="filter")
-        elif event.key == "quotation_mark":  # '"'
-            event.stop()
-            self.filter_or_collect_selected_values(action="collect")
-        elif event.key == "s":
-            event.stop()
-            self.toggele_row_selection()
-            self.build_table()
+            event.prevent_default()
+            self.reset_leader()
+            return
+
+        super().on_key(event)
+
+    def cmd_frequency_filter_value(self) -> None:
+        """Filter the main table by selected frequency value(s)."""
+        self.filter_or_collect_selected_values(action="filter")
+
+    def cmd_frequency_collect_value(self) -> None:
+        """Collect selected frequency value(s) to a new tab."""
+        self.filter_or_collect_selected_values(action="collect")
+
+    def cmd_frequency_toggle_selection(self) -> None:
+        """Select or deselect the current frequency row."""
+        self.toggele_row_selection()
+        self.build_table()
 
     def build_table(self) -> None:
         """Build the frequency table."""
@@ -1135,90 +1207,84 @@ class MetaColumnScreen(TableScreen):
     def on_key(self, event: Key) -> None:
         """Handle key press events on the column metadata screen.
 
-        Supports keys:
-          - 'Enter': Jump to the selected column in the main table and close the modal.
-          - 'F': Show frequency for the selected column.
-          - 'I': Show statistics for the selected column.
-          - 'J' / 'Shift+Down': Move the selected column right (row moves down).
-          - 'K' / 'Shift+Up': Move the selected column left (row moves up).
-          - 'e': Rename, resize, or cast the selected column.
-          - 'g': Scroll to top.
-          - 'G': Scroll to bottom.
-          - 'q' / 'Escape': Close the modal.
-          - 'd': Delete the selected column.
+        Dispatches metadata commands through the key binding registry, then
+        falls back to the common modal table shortcuts.
 
         Args:
             event: The key event object.
         """
-        # Enter key to jump to the column in the main table and close the metadata screen
-        if event.key == "enter":
+        if self.registry.dispatch(event.key, self.leader, Scope.META_COLUMN_SCREEN, self):
             event.stop()
             event.prevent_default()
-            cidx = self.get_cidx()
+            self.reset_leader()
+            return
+
+        super().on_key(event)
+
+    def cmd_meta_column_jump(self) -> None:
+        """Jump to the selected column in the main table and close metadata."""
+        cidx = self.get_cidx()
+        self.app.pop_screen()
+        self.dftable.move_cursor(column=cidx)
+
+    def cmd_meta_column_show_frequency(self) -> None:
+        """Show frequency for the selected column."""
+        self.show_frequency(self.get_cidx())
+
+    def cmd_meta_column_show_statistics(self) -> None:
+        """Show statistics for the selected column."""
+        self.show_statistics(self.get_cidx())
+
+    def cmd_meta_column_move_right(self) -> None:
+        """Move the selected column right."""
+        self.move_selected_column("right")
+
+    def cmd_meta_column_move_left(self) -> None:
+        """Move the selected column left."""
+        self.move_selected_column("left")
+
+    def move_selected_column(self, direction: str) -> None:
+        """Move the selected column and refresh metadata."""
+        row_idx, col_idx = self.table.cursor_coordinate
+
+        if direction == "right":
+            self.dftable.cmd_move_column("right", col_idx=row_idx)
+            new_row_idx = min(row_idx + 1, len(self.dftable.df.columns) - 1)
+        else:
+            self.dftable.cmd_move_column("left", col_idx=row_idx)
+            new_row_idx = max(row_idx - 1, 0)
+
+        self.build_table()
+        self.table.move_cursor(row=new_row_idx, column=col_idx)
+
+    def cmd_meta_column_edit(self) -> None:
+        """Rename, cast, or resize the selected column based on cursor column."""
+        row_idx = self.table.cursor_row
+        col_idx = self.table.cursor_column
+        self._resume_row_idx = row_idx
+        self._resume_col_idx = col_idx
+
+        if col_idx == 0:
+            self.dftable.cmd_rename_column(col_idx=row_idx)
+        elif col_idx == 1:
+            col_name = self.dftable.df.columns[row_idx]
+            self.dftable.cmd_cast_column_dtype(col_name=col_name)
+        elif col_idx == 2:
+            self.dftable.cmd_resize_column(cidx=row_idx)
+
+    def cmd_meta_column_delete(self) -> None:
+        """Delete the selected column and refresh metadata."""
+        row_idx = self.table.cursor_row
+
+        self.dftable.move_cursor(column=row_idx)
+        self.dftable.cmd_delete_column(col_idx=row_idx)
+
+        if not self.dftable.visible_columns:
             self.app.pop_screen()
-            self.dftable.move_cursor(column=cidx)
-        # Show frequency for the selected value
-        elif event.key == "F":
-            event.stop()
-            event.prevent_default()
-            self.show_frequency(self.get_cidx())
-        # Show statistics for the selected value
-        elif event.key == "I":
-            event.stop()
-            event.prevent_default()
-            self.show_statistics(self.get_cidx())
-        # Rearrange column
-        elif event.key in ("J", "K", "shift+down", "shift+up"):
-            event.stop()
-            event.prevent_default()
+            return
 
-            row_idx, col_idx = self.table.cursor_coordinate
-
-            if event.key in ("J", "shift+down"):
-                self.dftable.cmd_move_column("right", col_idx=row_idx)
-                new_row_idx = min(row_idx + 1, len(self.dftable.df.columns) - 1)
-            else:
-                self.dftable.cmd_move_column("left", col_idx=row_idx)
-                new_row_idx = max(row_idx - 1, 0)
-
-            # Refresh metadata to reflect the new column order and keep cursor on moved row.
-            self.build_table()
-            self.table.move_cursor(row=new_row_idx, column=col_idx)
-        # Rename column
-        elif event.key == "e":
-            event.stop()
-            event.prevent_default()
-
-            row_idx = self.table.cursor_row
-            col_idx = self.table.cursor_column
-            self._resume_row_idx = row_idx
-            self._resume_col_idx = col_idx
-
-            if col_idx == 0:  # column anme
-                self.dftable.cmd_rename_column(col_idx=row_idx)
-            elif col_idx == 1:  # column dtype
-                col_name = self.dftable.df.columns[row_idx]
-                self.dftable.cmd_cast_column_dtype(col_name=col_name)
-            elif col_idx == 2:  # column width
-                self.dftable.cmd_resize_column(cidx=row_idx)
-        # Delete column
-        elif event.key == "d":
-            event.stop()
-            event.prevent_default()
-
-            row_idx = self.table.cursor_row
-
-            # Align the main table cursor to the selected metadata row, then delete.
-            self.dftable.move_cursor(column=row_idx)
-            self.dftable.do_delete_column(col_idx=row_idx)
-
-            # Refresh metadata and keep cursor on a valid row after deletion.
-            if not self.dftable.visible_columns:
-                self.app.pop_screen()
-                return
-            else:
-                self.build_table()
-                self.table.move_cursor(row=row_idx)
+        self.build_table()
+        self.table.move_cursor(row=row_idx)
 
     def on_screen_resume(self) -> None:
         """Rebuild metadata after returning from stacked screens (e.g., rename dialog)."""
@@ -1275,38 +1341,43 @@ class CellDetailScreen(TableModalScreen):
     def on_key(self, event: Key) -> None:
         """Handle key press events on the column metadata screen.
 
-        Supports keys:
-          - 'tab': Show cell details for the selected value.
-
         Args:
             event: The key event object.
         """
-        if event.key == "tab":
+        if self.registry.dispatch(event.key, self.leader, Scope.CELL_DETAIL_SCREEN, self):
             event.stop()
-            cidx = self.table.cursor_column
-            ridx = self.table.cursor_row
-            col_name = self.df.columns[cidx]
-            dtype = self.df.dtypes[cidx]
-            cell_value = self.df.item(ridx, cidx)
+            event.prevent_default()
+            self.reset_leader()
+            return
 
-            if dtype == pl.String:
-                # String contains the delimiter '|' (indicating a potential list of values)
-                if "|" in cell_value:
-                    self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
-                # Show long string in a text screen for better readability
-                elif len(cell_value) > COLUMN_WIDTH_CAP:
-                    self.app.push_screen(TextScreen(cell_value))
+        super().on_key(event)
 
-            # Show cell detail screen if the value is a non-empty list
-            elif dtype == pl.List and not cell_value.is_empty():
-                if len(cell_value) == 1 and isinstance(cell_value[0], str) and len(cell_value[0]) > COLUMN_WIDTH_CAP:
-                    self.app.push_screen(TextScreen(cell_value[0]))
-                else:
-                    self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
+    def cmd_cell_detail_drill_down(self) -> None:
+        """Drill into the selected cell-detail value."""
+        cidx = self.table.cursor_column
+        ridx = self.table.cursor_row
+        col_name = self.df.columns[cidx]
+        dtype = self.df.dtypes[cidx]
+        cell_value = self.df.item(ridx, cidx)
 
-            # or a non-empty dict (struct)
-            elif dtype == pl.Struct and cell_value:
+        if dtype == pl.String:
+            # String contains the delimiter '|' (indicating a potential list of values)
+            if "|" in cell_value:
                 self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
+            # Show long string in a text screen for better readability
+            elif len(cell_value) > COLUMN_WIDTH_CAP:
+                self.app.push_screen(TextScreen(cell_value))
+
+        # Show cell detail screen if the value is a non-empty list
+        elif dtype == pl.List and not cell_value.is_empty():
+            if len(cell_value) == 1 and isinstance(cell_value[0], str) and len(cell_value[0]) > COLUMN_WIDTH_CAP:
+                self.app.push_screen(TextScreen(cell_value[0]))
+            else:
+                self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
+
+        # or a non-empty dict (struct)
+        elif dtype == pl.Struct and cell_value:
+            self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
 
     def build_table(self) -> None:
         """Build the list table."""
@@ -1352,22 +1423,34 @@ class SheetScreen(TableModalScreen):
 
     def on_key(self, event) -> None:
         """Handle key events."""
-        if event.key == "enter":
+        if self.registry.dispatch(event.key, self.leader, Scope.SHEET_SCREEN, self):
             event.stop()
-            self._switch_to_cursor_tab()
-        elif event.key == "d":
-            event.stop()
-            self._close_cursor_tab()
-        elif event.key == "e":
-            event.stop()
-            self._rename_cursor_tab()
-        elif event.key == "s":
-            event.stop()
-            self.toggele_row_selection()
-            self.build_table()
-        elif event.key == "ampersand":
-            event.stop()
-            self._join_selected_tabs()
+            event.prevent_default()
+            self.reset_leader()
+            return
+
+        super().on_key(event)
+
+    def cmd_sheet_switch_tab(self) -> None:
+        """Switch to the tab under the cursor."""
+        self._switch_to_cursor_tab()
+
+    def cmd_sheet_close_tab(self) -> None:
+        """Close the tab under the cursor."""
+        self._close_cursor_tab()
+
+    def cmd_sheet_rename_tab(self) -> None:
+        """Rename the tab under the cursor."""
+        self._rename_cursor_tab()
+
+    def cmd_sheet_toggle_selection(self) -> None:
+        """Select or deselect the current sheet row."""
+        self.toggele_row_selection()
+        self.build_table()
+
+    def cmd_sheet_join_selected_tabs(self) -> None:
+        """Join the selected tabs."""
+        self._join_selected_tabs()
 
     def _get_selected_tables(self) -> list["DataFrameTable"]:
         """Return selected tables in the visible sheet order."""
@@ -1405,7 +1488,7 @@ class SheetScreen(TableModalScreen):
         panes = list(self.tabs.keys())
         if 0 <= row_idx < len(panes):
             target_pane = panes[row_idx]
-            self.app.do_close(target_pane)
+            self.app.close_current(target_pane)
             self.build_table()
 
     def _rename_cursor_tab(self) -> None:

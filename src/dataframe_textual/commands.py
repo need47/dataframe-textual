@@ -357,7 +357,7 @@ _reg("cast-integer", "Cast column to integer", Scope.MAIN_TABLE, Category.TYPE_C
 _reg("cast-float",   "Cast column to float",   Scope.MAIN_TABLE, Category.TYPE_CASTING, "🔢").bind("%")
 _reg("cast-string",  "Cast column to string",  Scope.MAIN_TABLE, Category.TYPE_CASTING, "📝").bind("~")
 _reg("cast-date",    "Cast column to date",    Scope.MAIN_TABLE, Category.TYPE_CASTING, "📅").bind("@")
-_reg("cast-boolean", "Cast column to boolean", Scope.MAIN_TABLE, Category.TYPE_CASTING, "🔘")
+_reg("cast-boolean", "Cast column to boolean", Scope.MAIN_TABLE, Category.TYPE_CASTING, "🔘").bind("#", leader="z")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Copy (MainTable scope)
@@ -374,6 +374,68 @@ _reg("copy-row",    "Copy row to clipboard (tab-separated)", Scope.MAIN_TABLE, C
 _reg("sql-advanced", "Open advanced SQL interface (full SQL queries)",            Scope.MAIN_TABLE, Category.SQL,           "🔎").bind("Q")
 _reg("sql-simple",   "Open simple SQL interface (select columns & where clause)", Scope.MAIN_TABLE, Category.SQL,           "💬").bind("Q", leader="z")
 _reg("run-command",  "Run a command by name with optional arguments",             Scope.MAIN_TABLE, Category.VIEW_SETTINGS, "▶️").bind("Space")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Table Modal Screen
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("table-close",                     "Close modal table",             Scope.TABLE_SCREEN, Category.FILE_TAB,   "✖️").bind("q").bind("Escape")
+_reg("table-toggle-thousand-separator", "Toggle thousand separator",     Scope.TABLE_SCREEN, Category.DISPLAY,    "🔢").bind(",")
+_reg("table-scroll-top",                "Scroll modal table to top",     Scope.TABLE_SCREEN, Category.NAVIGATION, "⬆️").bind("g", leader="g")
+_reg("table-scroll-bottom",             "Scroll modal table to bottom",  Scope.TABLE_SCREEN, Category.NAVIGATION, "⬇️").bind("G")
+_reg("table-sort-ascending",            "Sort modal table ascending",    Scope.TABLE_SCREEN, Category.SORTING,    "🔼").bind("[")
+_reg("table-sort-descending",           "Sort modal table descending",   Scope.TABLE_SCREEN, Category.SORTING,    "🔽").bind("]")
+_reg("table-cycle-cursor-type",         "Cycle modal table cursor type", Scope.TABLE_SCREEN, Category.DISPLAY,    "🔀").bind("Shift+Tab")
+_reg("table-open-as-tab",               "Open modal table as a new tab", Scope.TABLE_SCREEN, Category.FILE_TAB,   "📋").bind("T")
+_reg("table-save",                      "Save modal table to file",      Scope.TABLE_SCREEN, Category.FILE_TAB,   "💾").bind("Ctrl+S")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Row Detail Screen
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("row-detail-filter-value",     "Filter main table by selected row-detail value",  Scope.ROW_DETAIL_SCREEN, Category.FILTER_COLLECT, "⏬").bind("v")
+_reg("row-detail-collect-value",    "Collect selected row-detail value to a new tab",  Scope.ROW_DETAIL_SCREEN, Category.FILTER_COLLECT, "📤").bind("\"")
+_reg("row-detail-previous-row",     "Show previous row in row detail",                 Scope.ROW_DETAIL_SCREEN, Category.NAVIGATION,     "⬆️").bind("{")
+_reg("row-detail-next-row",         "Show next row in row detail",                     Scope.ROW_DETAIL_SCREEN, Category.NAVIGATION,     "⬇️").bind("}")
+_reg("row-detail-show-frequency",   "Show frequency for selected row-detail value",    Scope.ROW_DETAIL_SCREEN, Category.DISPLAY,        "📊").bind("F")
+_reg("row-detail-show-statistics",  "Show statistics for selected row-detail value",   Scope.ROW_DETAIL_SCREEN, Category.DISPLAY,        "📈").bind("I")
+_reg("row-detail-drill-down",       "Drill into selected row-detail value",            Scope.ROW_DETAIL_SCREEN, Category.DISPLAY,        "🔍").bind("Tab")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Frequency Screen
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("frequency-filter-value",      "Filter main table by selected frequency value", Scope.FREQUENCY_SCREEN, Category.FILTER_COLLECT, "⏬").bind("v")
+_reg("frequency-collect-value",     "Collect selected frequency value to a new tab", Scope.FREQUENCY_SCREEN, Category.FILTER_COLLECT, "📤").bind("\"")
+_reg("frequency-toggle-selection",  "Select or deselect current frequency row",      Scope.FREQUENCY_SCREEN, Category.SELECTION,      "✅").bind("s")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Meta Column Screen
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("meta-column-jump",            "Jump to selected column in main table",   Scope.META_COLUMN_SCREEN, Category.NAVIGATION, "🎯").bind("Enter")
+_reg("meta-column-show-frequency",  "Show frequency for selected column",      Scope.META_COLUMN_SCREEN, Category.DISPLAY,    "📊").bind("F")
+_reg("meta-column-show-statistics", "Show statistics for selected column",     Scope.META_COLUMN_SCREEN, Category.DISPLAY,    "📈").bind("I")
+_reg("meta-column-move-right",      "Move selected column right",              Scope.META_COLUMN_SCREEN, Category.REORDER,    "➡️").bind("J").bind("Shift+Down")
+_reg("meta-column-move-left",       "Move selected column left",               Scope.META_COLUMN_SCREEN, Category.REORDER,    "⬅️").bind("K").bind("Shift+Up")
+_reg("meta-column-edit",            "Rename, resize, or cast selected column", Scope.META_COLUMN_SCREEN, Category.EDITING,    "✏️").bind("e")
+_reg("meta-column-delete",          "Delete selected column",                  Scope.META_COLUMN_SCREEN, Category.EDITING,    "🗑️").bind("d")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Cell Detail Screen
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("cell-detail-drill-down", "Drill into selected cell-detail value", Scope.CELL_DETAIL_SCREEN, Category.DISPLAY, "🔍").bind("Tab")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet Screen
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_reg("sheet-switch-tab",            "Switch to selected tab",                               Scope.SHEET_SCREEN, Category.NAVIGATION,         "🎯").bind("Enter")
+_reg("sheet-close-tab",             "Close selected tab",                                   Scope.SHEET_SCREEN, Category.FILE_TAB,           "✖️").bind("d")
+_reg("sheet-rename-tab",            "Rename selected tab",                                  Scope.SHEET_SCREEN, Category.FILE_TAB,           "✏️").bind("e")
+_reg("sheet-toggle-selection",      "Select or deselect current sheet row",                 Scope.SHEET_SCREEN, Category.SELECTION,          "✅").bind("s")
+_reg("sheet-join-selected-tabs",    "Join the two selected tabs",                           Scope.SHEET_SCREEN, Category.JOIN_TABLE,         "🔗").bind("&")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Join Tables (MainTable scope)

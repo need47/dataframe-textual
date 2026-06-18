@@ -114,6 +114,20 @@ class KeyBinding:
 # Textual key name -> human-friendly display string
 _KEY_DISPLAY_MAP: dict[str, str] = {
     "f1": "F1",
+    "enter": "Enter",
+    "backspace": "Backspace",
+    "escape": "Escape",
+    "tab": "Tab",
+    "delete": "Delete",
+    "home": "Home",
+    "end": "End",
+    "pageup": "PgUp",
+    "pagedown": "PgDn",
+    "up": "Up",
+    "down": "Down",
+    "left": "Left",
+    "right": "Right",
+    "space": "Space",
     "tilde": "~",
     "grave_accent": "`",
     "exclamation_mark": "!",
@@ -130,7 +144,6 @@ _KEY_DISPLAY_MAP: dict[str, str] = {
     "minus": "-",
     "plus": "+",
     "equals_sign": "=",
-    "backspace": "Backspace",
     "left_curly_bracket": "{",
     "left_square_bracket": "[",
     "right_curly_bracket": "}",
@@ -141,31 +154,12 @@ _KEY_DISPLAY_MAP: dict[str, str] = {
     "semicolon": ";",
     "quotation_mark": '"',
     "apostrophe": "'",
-    "enter": "Enter",
     "less_than_sign": "<",
     "comma": ",",
     "greater_than_sign": ">",
     "full_stop": ".",
     "question_mark": "?",
     "slash": "/",
-    "escape": "Escape",
-    "tab": "Tab",
-    "delete": "Delete",
-    "home": "Home",
-    "end": "End",
-    "pageup": "PgUp",
-    "pagedown": "PgDn",
-    "up": "Up",
-    "down": "Down",
-    "left": "Left",
-    "right": "Right",
-    "shift+up": "Shift+Up",
-    "shift+down": "Shift+Down",
-    "shift+left": "Shift+Left",
-    "shift+right": "Shift+Right",
-    "shift+delete": "Shift+Delete",
-    "shift+tab": "Shift+Tab",
-    "space": "Space",
 }
 
 
@@ -174,14 +168,34 @@ def format_key_display(key: str) -> str:
     if key in _KEY_DISPLAY_MAP:
         return _KEY_DISPLAY_MAP[key]
 
-    if key.startswith("ctrl+"):
-        return f"Ctrl+{key[5:].upper()}"
+    if "+" in key:
+        parts = key.split("+")
+        display_parts = []
+        for part in parts:
+            if part in _MODIFIER_DISPLAY_MAP:
+                display_parts.append(_MODIFIER_DISPLAY_MAP[part])
+            elif part in _KEY_DISPLAY_MAP:
+                display_parts.append(_KEY_DISPLAY_MAP[part])
+            elif len(part) == 1:
+                display_parts.append(part.upper())
+            else:
+                display_parts.append(part)
+        return "+".join(display_parts)
 
     return key
 
 
 # Reverse mapping: display string -> Textual key name
 _DISPLAY_TO_KEY: dict[str, str] = {v: k for k, v in _KEY_DISPLAY_MAP.items()}
+
+_MODIFIER_DISPLAY_MAP: dict[str, str] = {
+    "ctrl": "Ctrl",
+    "shift": "Shift",
+    "alt": "Alt",
+    "meta": "Meta",
+}
+
+_DISPLAY_TO_MODIFIER: dict[str, str] = {display: key for key, display in _MODIFIER_DISPLAY_MAP.items()}
 
 
 def parse_key_display(display: str) -> str:
@@ -196,8 +210,19 @@ def parse_key_display(display: str) -> str:
     if display in _DISPLAY_TO_KEY:
         return _DISPLAY_TO_KEY[display]
 
-    if display.startswith("Ctrl+") and len(display) > 5:
-        return f"ctrl+{display[5:].lower()}"
+    if "+" in display:
+        parts = display.split("+")
+        key_parts = []
+        for part in parts:
+            if part in _DISPLAY_TO_MODIFIER:
+                key_parts.append(_DISPLAY_TO_MODIFIER[part])
+            elif part in _DISPLAY_TO_KEY:
+                key_parts.append(_DISPLAY_TO_KEY[part])
+            elif len(part) == 1:
+                key_parts.append(part.lower())
+            else:
+                key_parts.append(part)
+        return "+".join(key_parts)
 
     return display
 
