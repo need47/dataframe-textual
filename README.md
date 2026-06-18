@@ -358,7 +358,7 @@ Useful examples from current bindings:
 | `z-` (minus)      | Hide current column and all columns after it                   |
 | `gv`              | Show all hidden columns                                        |
 | `$`               | Toggle 1-based column index prefixes                           |
-| `z#`              | Toggle freeze rows and/or columns                              |
+| `z!`              | Toggle freeze rows and/or columns                              |
 | `_` (underscore)  | Toggle column full width for current column                    |
 | `g_` (underscore) | Toggle column full width for all string/list columns           |
 | `z_` (underscore) | Resize current column                                          |
@@ -525,7 +525,7 @@ These controls change how the table is shown without changing the underlying dat
 - `g-`: Hide the current column and all columns before it.
 - `z-`: Hide the current column and all columns after it.
 - `gv`: Show all hidden columns.
-- `z#`: Freeze rows and/or columns to keep important areas visible while scrolling.
+- `z!`: Freeze rows and/or columns to keep important areas visible while scrolling.
 - `$`: Toggle a 1-based index prefix in visible column headers such as `1_colname`.
 - `_`: Toggle full width for the current column.
 - `g_`: Toggle full width for all string/list columns.

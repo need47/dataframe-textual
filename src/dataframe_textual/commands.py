@@ -236,7 +236,7 @@ _reg("show-hidden-columns",       "Show all hidden columns",                    
 _reg("expand-column",             "Toggle column full width for current column",              Scope.MAIN_TABLE, Category.DISPLAY, "📏").bind("_")
 _reg("expand-all-columns",        "Toggle column full width for all string/list columns",     Scope.MAIN_TABLE, Category.DISPLAY, "📏").bind("_", leader="g")
 _reg("resize-column",             "Resize current column",                                    Scope.MAIN_TABLE, Category.DISPLAY, "📏").bind("_", leader="z")
-_reg("toggle-freeze",             "Freeze rows and/or columns",                               Scope.MAIN_TABLE, Category.DISPLAY, "📌").bind("#", leader="z")
+_reg("toggle-freeze",             "Freeze rows and/or columns",                               Scope.MAIN_TABLE, Category.DISPLAY, "📌").bind("!", leader="z")
 _reg("toggle-column-index",       "Toggle column index prefix",                               Scope.MAIN_TABLE, Category.DISPLAY, "🏷️").bind("$")
 _reg("set-row-as-header",         "Mark current row as header",                               Scope.MAIN_TABLE, Category.DISPLAY, "📌").bind("^", leader="g")
 _reg("toggle-rid",                "Toggle internal row index (RID)",                          Scope.MAIN_TABLE, Category.DISPLAY, "🆔")

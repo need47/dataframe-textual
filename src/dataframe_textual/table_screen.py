@@ -1189,15 +1189,18 @@ class MetaColumnScreen(TableScreen):
             event.stop()
             event.prevent_default()
 
+            row_idx = self.table.cursor_row
             col_idx = self.table.cursor_column
+            self._resume_row_idx = row_idx
+            self._resume_col_idx = col_idx
+
             if col_idx == 0:  # column anme
-                self._resume_row_idx = self.table.cursor_row
-                self.dftable.cmd_rename_column(col_idx=self.table.cursor_row)
+                self.dftable.cmd_rename_column(col_idx=row_idx)
             elif col_idx == 1:  # column dtype
-                col_name = self.dftable.df.columns[self.table.cursor_row]
+                col_name = self.dftable.df.columns[row_idx]
                 self.dftable.cmd_cast_column_dtype(col_name=col_name)
             elif col_idx == 2:  # column width
-                self.dftable.cmd_resize_column(cidx=self.table.cursor_row)
+                self.dftable.cmd_resize_column(cidx=row_idx)
         # Delete column
         elif event.key == "d":
             event.stop()
@@ -1220,6 +1223,7 @@ class MetaColumnScreen(TableScreen):
     def on_screen_resume(self) -> None:
         """Rebuild metadata after returning from stacked screens (e.g., rename dialog)."""
         row_idx = getattr(self, "_resume_row_idx", self.table.cursor_row)
+        col_idx = getattr(self, "_resume_col_idx", self.table.cursor_column)
 
         # Remove old table and remount a fresh one to avoid stale cached column widths
         self.table.remove()
@@ -1228,7 +1232,7 @@ class MetaColumnScreen(TableScreen):
 
         self.build_table()
         self.table.focus()
-        self.table.move_cursor(row=row_idx)
+        self.table.move_cursor(row=row_idx, column=col_idx)
 
     def build_table(self) -> None:
         """Build the column metadata table."""
