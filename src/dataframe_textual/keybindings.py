@@ -415,16 +415,12 @@ class KeyBindingRegistry:
         This method first attempts to load keybindings from the user's config
         directory. If the file doesn't exist or is invalid, it falls back to
         the default keybindings.
-
-        After loading, the registry will contain a complete set of bindings, with
-        user-defined bindings taking precedence over defaults, and any missing bindings
-        filled in from the defaults.
         """
 
-        # Read bindings from config file first
+        # Read bindings from user config file first
         filepath = get_config_dir() / "keybindings.json"
 
-        # If the file doesn't exist, keep defaults and return early
+        # If the file doesn't exist, use defaults
         if not filepath.exists():
             self._bindings = dict(DEFAULT_BINDINGS)
             return
@@ -445,7 +441,7 @@ class KeyBindingRegistry:
             key_display = entry.get("key", "")
             leader = entry.get("leader", "")
             command = entry.get("command", "")
-            scope_str = entry.get("scope", "MainTable")
+            scope_str = entry.get("scope", "")
 
             if not (cmd := COMMANDS.get(command)):
                 log.warning(f"keybindings.json: unknown command {command!r}, skipping")
@@ -459,12 +455,7 @@ class KeyBindingRegistry:
 
             raw_key = parse_key_display(key_display)
             binding = KeyBinding(leader=leader, key=raw_key, scope=scope, command_id=command)
-            self._bindings[binding] = COMMANDS[command]
-
-        # Add any default bindings that weren't overridden by the user config
-        for binding, cmd in DEFAULT_BINDINGS.items():
-            if binding not in self._bindings:
-                self._bindings[binding] = cmd
+            self._bindings[binding] = cmd
 
 
 # ─── Module-level registry instance ──────────────────────────────────────────
