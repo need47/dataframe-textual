@@ -11,6 +11,7 @@ import polars as pl
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
+from textual.events import Key
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -27,7 +28,9 @@ from textual.widgets import (
 from textual.widgets.selection_list import Selection
 from textual.widgets.tabbed_content import ContentTab
 
+from .commands import Scope
 from .common import NULL, RID, DtypeClass, DtypeConfig, tentative_expr, validate_expr
+from .keybindings import KeyBinding, format_key_display, parse_key_display
 
 
 class YMNScreen(ModalScreen):
@@ -403,6 +406,144 @@ class ConfirmScreen(YesNoScreen):
         return self.input.value if self.input else True
 
 
+class KeyCaptureScreen(ModalScreen):
+    """Modal screen that captures a key for a Commands tab cell."""
+
+    DEFAULT_CSS = """
+        KeyCaptureScreen {
+            align: center middle;
+        }
+
+        KeyCaptureScreen > Container {
+            min-width: 56;
+            max-width: 72;
+            height: auto;
+            border: solid $primary;
+            border-title-color: $primary;
+            padding: 1 2;
+        }
+
+        KeyCaptureScreen Label {
+            width: 100%;
+            text-wrap: wrap;
+        }
+
+        KeyCaptureScreen #button-container {
+            margin: 1 0 0 0;
+            width: 100%;
+            height: auto;
+            align: center middle;
+        }
+
+        KeyCaptureScreen #status-label {
+            margin: 1 0 1 0;
+        }
+
+        KeyCaptureScreen Button {
+            height: 3;
+            margin: 0 2;
+        }
+    """
+
+    def __init__(
+        self,
+        command_id: str,
+        column_name: str,
+        current_value: str = "",
+        leader: str = "",
+        key: str = "",
+        scope: str = "",
+    ) -> None:
+        """Initialize the key capture modal.
+
+        Args:
+            command_id: The command whose key binding is being edited.
+            column_name: The keybinding column being edited.
+            current_value: The current display value for the selected cell.
+            leader: The row's current leader display value.
+            key: The row's current key display value.
+            scope: The row's command scope display value.
+        """
+        super().__init__()
+        self.command_id = command_id
+        self.column_name = column_name
+        self.current_value = current_value
+        self.leader = leader or ""
+        self.key = key or ""
+        self.scope = scope
+        self.status_label: Label | None = None
+
+    def compose(self) -> ComposeResult:
+        """Compose the key capture modal."""
+        with Container(id="modal-container") as container:
+            container.border_title = "Capture Key Binding"
+            yield Label(f"Command: [$success]{self.command_id}[/]")
+            yield Label(f"Cell: [$success]{self.column_name}[/]")
+            if self.current_value:
+                yield Label(f"Current: [$accent]{self.current_value}[/]")
+            self.status_label = Label("Press a key to use as this cell's value.", id="status-label")
+            yield self.status_label
+            with Horizontal(id="button-container"):
+                yield Button("Cancel", id="cancel", variant="error", compact=True)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Cancel capture when the Cancel button is pressed."""
+        if event.button.id == "cancel":
+            self.dismiss(None)
+
+    def on_key(self, event: Key) -> None:
+        """Capture the next key event as a binding."""
+        event.stop()
+        event.prevent_default()
+
+        # if event.key == "escape":
+        #     self.dismiss(None)
+        #     return
+
+        key_display = format_key_display(event.key)
+        if not self.validate_keybinding(key_display):
+            return
+
+        self.dismiss(key_display)
+
+    def validate_keybinding(self, key_display: str) -> bool:
+        """Check whether a captured key can be used for this keybinding cell."""
+        if self.column_name == "Leader" and key_display not in {"g", "z"}:
+            self.set_status("Leader must be [$success]g[/] or [$success]z[/]. Press another key.")
+            return False
+
+        leader = key_display if self.column_name == "Leader" else self.leader
+        key = key_display if self.column_name == "Key" else self.key
+        if not key:
+            return True
+
+        try:
+            binding = KeyBinding(
+                leader=leader,
+                key=parse_key_display(key),
+                scope=Scope(self.scope),
+                command_id=self.command_id,
+            )
+        except ValueError as e:
+            self.set_status(f"Invalid key binding scope: [$error]{e}[/].")
+            return False
+
+        existing_binding = self.app.key_registry.lookup(binding.key, binding.leader, binding.scope)
+        if existing_binding is not None and existing_binding.command_id != binding.command_id:
+            self.set_status(
+                f"[$warning]{binding.display_key}[/] is already bound to "
+                f"[$accent]{existing_binding.command_id}[/]. Press another key."
+            )
+            return False
+
+        return True
+
+    def set_status(self, message: str) -> None:
+        """Update the modal status text."""
+        if self.status_label is not None:
+            self.status_label.update(message)
+
+
 class EditCellScreen(YesNoScreen):
     """Modal screen to edit a single cell value."""
 
@@ -553,8 +694,7 @@ class FreezeScreen(YesNoScreen):
 class RenameColumnScreen(YesNoScreen):
     """Modal screen to rename a column."""
 
-    def __init__(self, col_idx: int, col_name: str, existing_columns: list[str]):
-        self.col_idx = col_idx
+    def __init__(self, col_name: str, existing_columns: list[str]):
         self.col_name = col_name
         self.existing_columns = [c for c in existing_columns if c != col_name]
 
@@ -568,7 +708,7 @@ class RenameColumnScreen(YesNoScreen):
             on_yes_callback=self._validate_input,
         )
 
-    def _validate_input(self) -> tuple[int, str, Any]:
+    def _validate_input(self) -> tuple[str, Any]:
         """Validate and save the new column name."""
         new_name = self.input.value.strip()
 
@@ -591,14 +731,14 @@ class RenameColumnScreen(YesNoScreen):
             new_name = None
 
         # Return new name
-        return self.col_idx, self.col_name, new_name
+        return self.col_name, new_name
 
 
 class EditColumnScreen(YesNoScreen):
     """Modal screen to edit an entire column with an expression."""
 
-    def __init__(self, cidx: int, df: pl.DataFrame):
-        self.cidx = cidx
+    def __init__(self, col_name: str, df: pl.DataFrame):
+        self.col_name = col_name
         self.df = df
         super().__init__(
             title="Edit Column",
@@ -607,10 +747,10 @@ class EditColumnScreen(YesNoScreen):
             on_yes_callback=self._get_input,
         )
 
-    def _get_input(self) -> tuple[str, int]:
+    def _get_input(self) -> tuple[str, str]:
         """Get input."""
         term = self.input.value  # Do not strip to preserve spaces
-        return term, self.cidx
+        return term, self.col_name
 
 
 class AddColumnScreen(YesNoScreen):
@@ -662,7 +802,7 @@ class AddColumnScreen(YesNoScreen):
             return self.cidx, col_name, term
         elif tentative_expr(term):
             try:
-                expr = validate_expr(term, self.df.columns, self.cidx, self.df)
+                expr = validate_expr(term, self.df.columns, self.df.columns[self.cidx], self.df)
                 return self.cidx, col_name, expr
             except Exception as e:
                 self.notify(f"Invalid expression [$error]{term}[/]: {e}", title="Add Column", severity="error")

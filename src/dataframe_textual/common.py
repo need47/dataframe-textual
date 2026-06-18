@@ -361,7 +361,7 @@ def tentative_expr(expr: str) -> bool:
 
 
 def validate_expr(
-    expr: str, columns: list[str], current_col_idx: int = 0, df: pl.DataFrame | None = None
+    expr: str, columns: list[str], current_col_name: str | None = None, df: pl.DataFrame | None = None
 ) -> pl.Expr | pl.DataFrame | pl.Series | None:
     """Validate and return the expression.
 
@@ -371,7 +371,7 @@ def validate_expr(
     Args:
         expr: The input expression as a string.
         columns: The list of column names in the DataFrame.
-        current_col_idx: The index of the currently selected column (0-based). Used for $_ reference.
+        current_col_name: The name of the currently selected column. Used for $_ reference.
         df: The current DataFrame used for evaluating expressions involving `self`.
 
     Returns:
@@ -384,7 +384,7 @@ def validate_expr(
 
     try:
         # Parse the expression
-        expr_str = parse_expr(expr, columns, current_col_idx)
+        expr_str = parse_expr(expr, columns, current_col_name)
 
         # Validate by evaluating it
         try:
@@ -402,7 +402,7 @@ def validate_expr(
         raise ValueError(f"Failed to parse expression `{expr}`: {ve}") from ve
 
 
-def parse_expr(expr: str, columns: list[str], current_cidx: int) -> str:
+def parse_expr(expr: str, columns: list[str], current_col_name: str | None = None) -> str:
     """Parse and convert an expression to Polars syntax.
 
     Replaces column references with Polars col() expressions:
@@ -423,7 +423,7 @@ def parse_expr(expr: str, columns: list[str], current_cidx: int) -> str:
     Args:
         expr: The input expression as a string.
         columns: The list of column names in the DataFrame.
-        current_cidx: The index of the currently selected column (0-based). Used for $_ reference.
+        current_col_name: The name of the currently selected column. Used for $_ reference.
 
     Returns:
         A Python expression string with $references replaced by pl.col() calls.
@@ -443,7 +443,7 @@ def parse_expr(expr: str, columns: list[str], current_cidx: int) -> str:
             # Return as a literal string
             return f"pl.lit({expr})"
 
-    parts = parse_placeholders(expr, columns, current_cidx)
+    parts = parse_placeholders(expr, columns, current_col_name)
 
     result = []
     for part in parts:
@@ -460,11 +460,11 @@ def parse_expr(expr: str, columns: list[str], current_cidx: int) -> str:
     return "".join(result)
 
 
-def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> list[str | pl.Expr]:
+def parse_placeholders(template: str, columns: list[str], current_col_name: str = "") -> list[str | pl.Expr]:
     """Parse template string into a list of strings or Polars expressions
 
     Supports multiple placeholder types:
-    - `$_` - Current column (based on current_cidx parameter)
+    - `$_` - Current column (based on current_col_name parameter)
     - `$#` - Row index (1-based)
     - `$1`, `$2`, etc. - Column index (1-based)
     - `$name` - Column name (e.g., `$product_id`)
@@ -473,7 +473,7 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
     Args:
         template: The template string containing placeholders and literal text
         columns: List of column names in the dataframe
-        current_cidx: 0-based index of the current column for `$_` references in the columns list
+        current_col_name: Current column name for `$_` references.
 
     Returns:
         A list of strings (literal text) and Polars expressions (for column references)
@@ -498,12 +498,6 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
     parts = []
     last_end = 0
 
-    # Get current column name for $_ references
-    try:
-        col_name = columns[current_cidx]
-    except IndexError:
-        raise ValueError(f"Current column index {current_cidx} is out of range for columns list")
-
     for match in placeholders:
         # Add literal text before this placeholder
         if match.start() > last_end:
@@ -513,7 +507,9 @@ def parse_placeholders(template: str, columns: list[str], current_cidx: int) -> 
 
         if placeholder == "_":
             # $_ refers to current column (where cursor was)
-            parts.append(pl.col(col_name))
+            if not current_col_name:
+                raise ValueError("Current column name is not provided for $_ reference")
+            parts.append(pl.col(current_col_name))
         elif placeholder == "#":
             # $# refers to row index (1-based)
             parts.append(pl.col(RID))

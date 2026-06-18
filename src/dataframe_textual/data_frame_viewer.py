@@ -599,7 +599,7 @@ class DataFrameViewer(App):
 
         try:
             # Validate and evaluate the expression
-            expr = validate_expr(result, dftable.df.columns, dftable.cursor_cidx, df=dftable.df)
+            expr = validate_expr(result, dftable.df.columns, dftable.cursor_col_name, df=dftable.df)
 
             if isinstance(expr, pl.Expr):
                 df = dftable.df.filter(expr)

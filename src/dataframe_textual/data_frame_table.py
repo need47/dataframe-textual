@@ -82,6 +82,7 @@ from .yes_no_screen import (
     FilterTemporalScreen,
     FindReplaceScreen,
     FreezeScreen,
+    KeyCaptureScreen,
     RenameColumnScreen,
     SearchScreen,
     SimpleSqlScreen,
@@ -2482,6 +2483,10 @@ class DataFrameTable(DataTable):
         ridx = self.cursor_ridx if ridx is None else ridx
         cidx = self.cursor_cidx if cidx is None else cidx
 
+        if self.for_keybindings:
+            self.capture_keybinding(ridx, cidx)
+            return
+
         # Push the edit modal screen
         self.app.push_screen(
             EditCellScreen(ridx, cidx, self.df),
@@ -2565,13 +2570,46 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error updating cell ({ridx}, {col_name}): {e}")
 
+    def capture_keybinding(self, ridx: int, cidx: int) -> None:
+        """Capture a new key binding for the current row in the Commands tab."""
+        required_columns = {"Leader", "Key", "Command", "Scope"}
+        if not required_columns.issubset(self.df.columns):
+            self.notify("This table cannot edit key bindings", title="Key Binding", severity="warning")
+            return
+
+        col_name = self.df.columns[cidx]
+        if col_name not in {"Leader", "Key"}:
+            self.notify("Move to the Leader or Key cell to capture a key", title="Key Binding", severity="warning")
+            return
+
+        row = self.df.row(ridx, named=True)
+        current_value = row.get(col_name) or ""
+        self.app.push_screen(
+            KeyCaptureScreen(row["Command"], col_name, current_value, row["Leader"], row["Key"], row["Scope"]),
+            callback=partial(self.update_keybinding, ridx, cidx),
+        )
+
+    def update_keybinding(self, ridx: int, cidx: int, result: str | None) -> None:
+        """Update a keybinding cell from the key capture modal.
+
+        Args:
+            ridx: The dataframe row index to update.
+            cidx: The dataframe column index to update.
+            result: Captured key display string, or None when cancelled.
+        """
+        if result is None:
+            return
+
+        self.edit_cell((ridx, cidx, result))
+        self.notify("Save the Commands tab to persist key binding changes", title="Key Binding")
+
     def cmd_edit_column(self) -> None:
         """Open modal to edit the entire column with an expression."""
-        cidx = self.cursor_cidx
+        col_name = self.cursor_col_name
 
         # Push the edit column modal screen
         self.app.push_screen(
-            EditColumnScreen(cidx, self.df),
+            EditColumnScreen(col_name, self.df),
             callback=self.edit_column,
         )
 
@@ -2580,9 +2618,7 @@ class DataFrameTable(DataTable):
         """Edit a column."""
         if result is None:
             return
-        term, cidx = result
-
-        col_name = self.df.columns[cidx]
+        term, col_name = result
 
         # Null case
         if term is None or term == NULL:
@@ -2591,7 +2627,7 @@ class DataFrameTable(DataTable):
         # Check if term is a valid expression
         elif tentative_expr(term):
             try:
-                expr = validate_expr(term, self.df.columns, cidx, self.df)
+                expr = validate_expr(term, self.df.columns, col_name, self.df)
             except Exception as e:
                 self.notify(f"Failed to validate expression [$error]{term}[/]", title="Edit Column", severity="error")
                 self.log(f"Error validating expression `{term}`: {e}")
@@ -2599,7 +2635,7 @@ class DataFrameTable(DataTable):
 
         # Otherwise, treat term as a literal value
         else:
-            dtype = self.df.dtypes[cidx]
+            dtype = self.df.schema[col_name]
             try:
                 value = DtypeConfig(dtype).convert(term)
                 expr = pl.lit(value)
@@ -2646,7 +2682,7 @@ class DataFrameTable(DataTable):
 
         # Push the rename column modal screen
         self.app.push_screen(
-            RenameColumnScreen(col_idx, col_name, self.df.columns),
+            RenameColumnScreen(col_name, self.df.columns),
             callback=self.rename_column,
         )
 
@@ -2656,10 +2692,10 @@ class DataFrameTable(DataTable):
         if result is None:
             return
 
-        col_idx, col_name, new_name = result
+        col_name, new_name = result
         if new_name is None:
             self.app.push_screen(
-                RenameColumnScreen(col_idx, col_name, self.df.columns),
+                RenameColumnScreen(col_name, self.df.columns),
                 callback=self.rename_column,
             )
             return
@@ -2697,6 +2733,7 @@ class DataFrameTable(DataTable):
         self.call_later(self.setup_table)
 
         # Move cursor to the renamed column
+        col_idx = self.df.columns.index(new_name)
         self.move_cursor(column=col_idx)
 
         self.notify(f"Renamed column [$success]{col_name}[/] to [$accent]{new_name}[/]", title="Rename Column")
@@ -3404,7 +3441,7 @@ class DataFrameTable(DataTable):
                 link_template = "https://" + link_template
 
             # Parse template placeholders into Polars expressions
-            parts = parse_placeholders(link_template, self.df.columns, cidx)
+            parts = parse_placeholders(link_template, self.df.columns, self.df.columns[cidx])
 
             # Build the concatenation expression
             exprs = [part if isinstance(part, pl.Expr) else pl.lit(part) for part in parts]
@@ -4312,7 +4349,7 @@ class DataFrameTable(DataTable):
                     expr = pl.col(col_name).is_null()
             elif tentative_expr(term):
                 try:
-                    expr = validate_expr(term, self.df.columns, col_idx, self.df)
+                    expr = validate_expr(term, self.df.columns, col_name, self.df)
                 except Exception as e:
                     self.notify(f"Failed to validate expression [$error]{term}[/]", title="Find", severity="error")
                     self.log(f"Error validating expression `{term}`: {e}")
@@ -4992,7 +5029,7 @@ class DataFrameTable(DataTable):
         # Support for polars expression in string form
         elif tentative_expr(term):
             try:
-                expr = validate_expr(term, self.df.columns, cidx, self.df)
+                expr = validate_expr(term, self.df.columns, col_name, self.df)
             except Exception as e:
                 self.notify(f"Failed to validate expression [$error]{term}[/]", title="View Rows", severity="error")
                 self.log(f"Error validating expression `{term}`: {e}")
@@ -5481,7 +5518,7 @@ class DataFrameTable(DataTable):
         # Expression in string form
         elif tentative_expr(term):
             try:
-                expr = validate_expr(term, self.df.columns, cidx, self.df)
+                expr = validate_expr(term, self.df.columns, col_name, self.df)
             except Exception as e:
                 self.notify(f"Failed to validate expression [$error]{term}[/]", title="Select Rows", severity="error")
                 self.log(f"Error validating expression `{term}`: {e}")
