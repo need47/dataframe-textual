@@ -4938,7 +4938,6 @@ class DataFrameTable(DataTable):
         self.show_next_replace_confirmation()
 
     # Filter & Collect
-    @with_full_df
     def cmd_filter_rows(self, result: dict | None = None) -> None:
         """Filter rows.
 
@@ -4975,7 +4974,6 @@ class DataFrameTable(DataTable):
                 }
             )
 
-    @with_full_df
     def cmd_filter_rows_null(self, with_null: bool = False) -> None:
         """Filter rows by nullness in the current column.
 
@@ -5003,7 +5001,6 @@ class DataFrameTable(DataTable):
             }
         )
 
-    @with_full_df
     def cmd_filter_rows_expr(self) -> None:
         """Open the filter screen to enter an expression."""
         col_name = self.cursor_col_name
@@ -5158,7 +5155,6 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Displayed [$success]{matched_count}[/] matching row(s)", title="View Rows")
 
-    @with_full_df
     def cmd_filter_rows_value(self) -> None:
         """Filter current dataframe rows by a condition on the current numeric column.
 
