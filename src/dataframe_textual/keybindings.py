@@ -164,6 +164,7 @@ _KEY_DISPLAY_MAP: dict[str, str] = {
     "shift+left": "Shift+Left",
     "shift+right": "Shift+Right",
     "shift+delete": "Shift+Delete",
+    "shift+tab": "Shift+Tab",
     "space": "Space",
 }
 

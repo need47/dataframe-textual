@@ -431,7 +431,7 @@ class DataFrameViewer(App):
                     "Key": "",
                     "Command": cmd.cmd,
                     "Description": f"{cmd.emoji} {cmd.description}" if cmd.emoji else cmd.description,
-                    "Scope": "",
+                    "Scope": cmd.scope.value,
                     "Category": cmd.category.value,
                 }
             )
@@ -1143,14 +1143,17 @@ class DataFrameViewer(App):
 
         for row in df.iter_rows(named=True):
             command_id = row["Command"]
-            command = COMMANDS.get(command_id)
-            if command is None:
+            if not (command := COMMANDS.get(command_id)):
                 self.notify(f"Unknown command: {command_id}", title="Save Keybindings", severity="error")
                 return
 
+            # Skip empty keybindings
+            if not (key := row["Key"]):
+                continue
+
             # Parse the keybinding from the table row
             binding = KeyBinding(
-                key=parse_key_display(row["Key"]),
+                key=parse_key_display(key),
                 leader=row["Leader"],
                 scope=Scope(row["Scope"]),
                 command_id=command_id,

@@ -366,7 +366,7 @@ Useful examples from current bindings:
 | `<`               | Decrease float precision for current column                    |
 | `>`               | Increase float precision for current column                    |
 | `g^`              | Set current row as the new header row                          |
-| `g#`              | Cycle cursor type (cell -> row -> column)                      |
+| `Shift+Tab`       | Cycle cursor type (cell -> row -> column)                      |
 
 #### Editing
 
@@ -392,8 +392,8 @@ Useful examples from current bindings:
 | `zD`           | Duplicate current column                                                  |
 | `zU`           | Remove duplicate rows (keep first occurrence)                             |
 | `:`            | Split current string column into a new column by delimiter                |
-| `z:`           | Join all selected columns into a new string column by delimiter           |
 | `g:`           | Glue items of a list column into a string column by delimiter             |
+| `z:`           | Join all selected columns into a new string column by delimiter           |
 | `Ctrl+U`       | Convert current or selected string column(s) to uppercase                 |
 | `Ctrl+L`       | Convert current or selected string column(s) to lowercase                 |
 | `zB`           | Strip leading and trailing whitespaces in current string column           |
