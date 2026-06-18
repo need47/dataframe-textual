@@ -336,9 +336,8 @@ Useful examples from current bindings:
 | `gl` / `g→`              | Scroll to rightmost column          |
 | `Home` / `End`           | Go to first/last column             |
 | `Ctrl+Home` / `Ctrl+End` | Go to page top/bottom               |
-| `PageDown` / `PageUp`    | Scroll down/up one page             |
-| `Ctrl+F`                 | Page forward                        |
-| `Ctrl+B`                 | Page backward                       |
+| `PageUp` / `Ctrl+B`      | Page backward                       |
+| `PageDown` / `Ctrl+F`    | Page forward                        |
 
 #### Display
 

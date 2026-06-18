@@ -5784,7 +5784,7 @@ class DataFrameTable(DataTable):
         elif row_count:
             message = f"Cleared selections for [$success]{row_count}[/] row(s)"
         else:
-            message = f"Cleared selections for [$accent]{col_count}[/] column(s)"
+            message = f"Cleared selections for [$success]{col_count}[/] column(s)"
 
         self.notify(message, title="Clear Selections/Matches")
 
