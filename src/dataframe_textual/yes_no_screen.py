@@ -543,13 +543,21 @@ class KeyCaptureScreen(ModalScreen):
 class EditCellScreen(YesNoScreen):
     """Modal screen to edit a single cell value."""
 
-    def __init__(self, ridx: int, cidx: int, df: pl.DataFrame):
+    def __init__(self, ridx: int, col_name: str, df: pl.DataFrame) -> None:
+        """Initialize the edit-cell modal for a dataframe cell.
+
+        Args:
+            ridx: The dataframe row index to edit.
+            col_name: The dataframe column name to edit.
+            df: The dataframe containing the editable cell.
+        """
         self.ridx = ridx
-        self.cidx = cidx
-        self.dtype = df.dtypes[cidx]
+        self.col_name = col_name
+        self.dtype = df.schema[col_name]
+        cidx = df.columns.index(col_name)
 
         # Label
-        content = f"[$success]{df.columns[cidx]}[/] ([$accent]{self.dtype}[/])"
+        content = f"[$success]{col_name}[/] ([$accent]{self.dtype}[/])"
 
         # Input
         df_value = df.item(ridx, cidx)
@@ -570,7 +578,7 @@ class EditCellScreen(YesNoScreen):
             on_yes_callback=self._validate_input,
         )
 
-    def _validate_input(self) -> tuple[int, int, str | None] | None:
+    def _validate_input(self) -> tuple[int, str, Any | None] | None:
         """Validate and save the edited value."""
         new_value_str = self.input.value  # Do not strip to preserve spaces
         new_value: str | None = None
@@ -611,7 +619,7 @@ class EditCellScreen(YesNoScreen):
                 return None
 
         # New value
-        return self.ridx, self.cidx, new_value
+        return self.ridx, self.col_name, new_value
 
 
 class SearchScreen(YesNoScreen):
@@ -619,8 +627,8 @@ class SearchScreen(YesNoScreen):
 
     CSS = YesNoScreen.DEFAULT_CSS.replace("YesNoScreen", "SearchScreen").replace("max-width: 60", "max-width: 70")
 
-    def __init__(self, title: str, df: pl.DataFrame, cidx: int, term: str):
-        self.cidx = cidx
+    def __init__(self, title: str, col_name: str, term: str):
+        self.col_name = col_name
 
         EXPR = f"{NULL}, Fire, $1 > 50, $name == 'text', $_ > 100, $a < $b"
         label = f"By value or Polars expression, e.g., {EXPR}"
@@ -647,7 +655,7 @@ class SearchScreen(YesNoScreen):
 
         return {
             "term": term,
-            "cidx": self.cidx,
+            "col_name": self.col_name,
             "match_nocase": match_nocase,
             "match_whole": match_whole,
             "match_literal": match_literal,
@@ -752,8 +760,8 @@ class EditColumnScreen(YesNoScreen):
 class AddColumnScreen(YesNoScreen):
     """Modal screen to add a new column with an expression."""
 
-    def __init__(self, cidx: int, df: pl.DataFrame, link: bool = False):
-        self.cidx = cidx
+    def __init__(self, col_name: str, df: pl.DataFrame, link: bool = False):
+        self.col_name = col_name
         self.df = df
         self.link = link
         self.existing_columns = set(df.columns)
@@ -773,49 +781,49 @@ class AddColumnScreen(YesNoScreen):
             on_yes_callback=self._get_input,
         )
 
-    def _get_input(self) -> tuple[int, str, Any] | None:
+    def _get_input(self) -> tuple[str, str, Any] | None:
         """Validate and return the new column configuration."""
-        col_name = self.input.value.strip()
+        new_col_name = self.input.value.strip()
         term = self.input2.value  # Do not strip to preserve spaces
 
         # Validate column name
-        if not col_name:
+        if not new_col_name:
             self.notify("Column name cannot be empty", title="Add Column", severity="error")
             return None
 
-        if col_name in self.existing_columns:
+        if new_col_name in self.existing_columns:
             self.notify(
-                f"Column [$error]{col_name}[/] already exists",
+                f"Column [$error]{new_col_name}[/] already exists",
                 title="Add Column",
                 severity="error",
             )
             return None
 
         if term == NULL:
-            return self.cidx, col_name, pl.lit(None)
+            return self.col_name, new_col_name, pl.lit(None)
         elif self.link:
             # Treat as link template
-            return self.cidx, col_name, term
+            return self.col_name, new_col_name, term
         elif tentative_expr(term):
             try:
-                expr = validate_expr(term, self.df.columns, self.df.columns[self.cidx], self.df)
-                return self.cidx, col_name, expr
+                expr = validate_expr(term, self.df.columns, self.col_name, self.df)
+                return self.col_name, new_col_name, expr
             except Exception as e:
                 self.notify(f"Invalid expression [$error]{term}[/]: {e}", title="Add Column", severity="error")
             return None
         else:
             # Treat as literal value
-            dtype = self.df.dtypes[self.cidx]
+            dtype = self.df.schema[self.col_name]
             try:
                 value = DtypeConfig(dtype).convert(term)
-                return self.cidx, col_name, pl.lit(value)
+                return self.col_name, new_col_name, pl.lit(value)
             except Exception as e:
                 self.notify(
                     f"Unable to convert [$warning]{term}[/] to [$accent]{dtype}[/]: {e}. Cast to string.",
                     title="Add Column",
                     severity="warning",
                 )
-                return self.cidx, col_name, pl.lit(term)
+                return self.col_name, new_col_name, pl.lit(term)
 
 
 class AddLinkScreen(AddColumnScreen):
@@ -826,8 +834,8 @@ class AddLinkScreen(AddColumnScreen):
     Inherits column name and expression validation from AddColumnScreen.
     """
 
-    def __init__(self, cidx: int, df: pl.DataFrame):
-        super().__init__(cidx, df, link=True)
+    def __init__(self, col_name: str, df: pl.DataFrame):
+        super().__init__(col_name, df, link=True)
 
 
 class FindReplaceScreen(YesNoScreen):
@@ -1158,7 +1166,7 @@ class FilterNumericScreen(YMNScreen):
         }
     """
 
-    def __init__(self, s: pl.Series, cidx: int, dc: DtypeClass, cursor_value: int | float | None) -> None:
+    def __init__(self, s: pl.Series, col_name: str, dc: DtypeClass, cursor_value: int | float | None) -> None:
         """Initialize the filter numeric column screen."""
         super().__init__(
             yes="Filter",
@@ -1166,7 +1174,7 @@ class FilterNumericScreen(YMNScreen):
             on_yes_callback=self._get_input,
         )
         self.s = s
-        self.cidx = cidx
+        self.col_name = col_name
         self.dc = dc
         self.placeholder = NULL if cursor_value is None else str(cursor_value)
 
@@ -1217,14 +1225,14 @@ class FilterNumericScreen(YMNScreen):
             )
             yield from super().compose()
 
-    def _get_input(self) -> tuple[pl.Expr | None, int]:
+    def _get_input(self) -> tuple[pl.Expr | None, str]:
         """Build and return a Polars filter expression from the numeric condition inputs.
 
         Returns:
-            A tuple of (filter_expression, cidx), where filter_expression is None
+            A tuple of (filter_expression, col_name), where filter_expression is None
             if no conditions were entered.
         """
-        col = self.s.name
+        col = self.col_name
         expr: pl.Expr | None = None
 
         eq = self.query_one("#condition-eq", Input).value.strip()
@@ -1256,7 +1264,7 @@ class FilterNumericScreen(YMNScreen):
                 e = pl.col(col) > self.dc.convert(gt)
                 expr = e if expr is None else expr & e
 
-        return expr, self.cidx
+        return expr, self.col_name
 
 
 class FilterTemporalScreen(YMNScreen):
@@ -1280,12 +1288,12 @@ class FilterTemporalScreen(YMNScreen):
         }
     """
 
-    def __init__(self, s: pl.Series, cidx: int, dc: DtypeClass, cursor_value: Any | None) -> None:
+    def __init__(self, s: pl.Series, col_name: str, dc: DtypeClass, cursor_value: Any | None) -> None:
         """Initialize the filter temporal column screen.
 
         Args:
             s: The source series for the selected temporal column.
-            cidx: The selected column index.
+            col_name: The selected column name.
             dc: Data type configuration for the temporal column.
             cursor_value: The current cell value used as the default placeholder.
         """
@@ -1295,7 +1303,7 @@ class FilterTemporalScreen(YMNScreen):
             on_yes_callback=self._get_input,
         )
         self.s = s
-        self.cidx = cidx
+        self.col_name = col_name
         self.dc = dc
         self.placeholder = NULL if cursor_value is None else str(cursor_value)
 
@@ -1365,14 +1373,14 @@ class FilterTemporalScreen(YMNScreen):
             self.notify(f"Unsupported temporal dtype: [$warning]{self.s.dtype}[/]", severity="warning")
             return None
 
-    def _get_input(self) -> tuple[pl.Expr | None, int]:
+    def _get_input(self) -> tuple[pl.Expr | None, str]:
         """Build and return a Polars filter expression from the temporal condition inputs.
 
         Returns:
-            A tuple of (filter_expression, cidx), where filter_expression is None
+            A tuple of (filter_expression, col_name), where filter_expression is None
             if no conditions were entered.
         """
-        col = self.s.name
+        col = self.col_name
         expr: pl.Expr | None = None
 
         eq = self.query_one("#condition-eq", Input).value.strip()
@@ -1404,7 +1412,7 @@ class FilterTemporalScreen(YMNScreen):
                 e = pl.col(col) > t
                 expr = e if expr is None else expr & e
 
-        return expr, self.cidx
+        return expr, self.col_name
 
 
 class FilterListScreen(YMNScreen):
@@ -1433,12 +1441,12 @@ class FilterListScreen(YMNScreen):
         }
     """
 
-    def __init__(self, s: pl.Series, cidx: int, cursor_value: Any | None) -> None:
+    def __init__(self, s: pl.Series, col_name: str, cursor_value: Any | None) -> None:
         """Initialize the filter list column screen.
 
         Args:
             s: The source series for the selected list column.
-            cidx: The selected column index.
+            col_name: The selected column name.
             cursor_value: The current cell value used as the default placeholder.
         """
         super().__init__(
@@ -1447,7 +1455,7 @@ class FilterListScreen(YMNScreen):
             on_yes_callback=self._get_input,
         )
         self.s = s
-        self.cidx = cidx
+        self.col_name = col_name
         self.cursor_value = cursor_value
 
     def compose(self) -> ComposeResult:
@@ -1514,14 +1522,14 @@ class FilterListScreen(YMNScreen):
 
         return parsed_value if isinstance(parsed_value, list) else value
 
-    def _get_input(self) -> tuple[pl.Expr | None, int]:
+    def _get_input(self) -> tuple[pl.Expr | None, str]:
         """Build and return a Polars filter expression from the list condition inputs.
 
         Returns:
-            A tuple of (filter_expression, cidx), where filter_expression is None
+            A tuple of (filter_expression, col_name), where filter_expression is None
             if no conditions were entered.
         """
-        col = self.s.name
+        col = self.col_name
         expr: pl.Expr | None = None
 
         eq = self.query_one("#condition-eq", Input).value.strip()
@@ -1553,7 +1561,7 @@ class FilterListScreen(YMNScreen):
                 e = ~pl.col(col).list.contains(self._convert_list_item(not_contains))
                 expr = e if expr is None else expr & e
 
-        return expr, self.cidx
+        return expr, self.col_name
 
 
 class FilterStringScreen(YMNScreen):
@@ -1600,7 +1608,7 @@ class FilterStringScreen(YMNScreen):
         }
     """
 
-    def __init__(self, s: pl.Series, cidx: int, cursor_value: int | float | None) -> None:
+    def __init__(self, s: pl.Series, col_name: str, cursor_value: int | float | None) -> None:
         """Initialize the filter string column screen."""
         super().__init__(
             yes="Filter",
@@ -1608,7 +1616,7 @@ class FilterStringScreen(YMNScreen):
             on_yes_callback=self._get_input,
         )
         self.s = s
-        self.cidx = cidx
+        self.col_name = col_name
         self.placeholder = NULL if cursor_value is None else str(cursor_value)
 
     def compose(self) -> ComposeResult:
@@ -1660,14 +1668,14 @@ class FilterStringScreen(YMNScreen):
                 yield Checkbox("Reverse", id="checkbox-reverse", tooltip="Invert the match result")
             yield from super().compose()
 
-    def _get_input(self) -> tuple[pl.Expr | None, int]:
+    def _get_input(self) -> tuple[pl.Expr | None, str]:
         """Build and return a Polars filter expression from the string condition inputs.
 
         Returns:
-            A tuple of (filter_expression, cidx), where filter_expression is None
+            A tuple of (filter_expression, col_name), where filter_expression is None
             if no conditions were entered.
         """
-        col = self.s.name
+        col = self.col_name
         expr: pl.Expr | None = None
 
         match_nocase = self.query_one("#checkbox-nocase", Checkbox).value
@@ -1730,7 +1738,7 @@ class FilterStringScreen(YMNScreen):
         if match_reverse and expr is not None:
             expr = ~expr
 
-        return expr, self.cidx
+        return expr, self.col_name
 
 
 class FilterBooleanScreen(YMNScreen):
@@ -1752,7 +1760,7 @@ class FilterBooleanScreen(YMNScreen):
         }
     """
 
-    def __init__(self, s: pl.Series, cidx: int, cursor_value: bool | None) -> None:
+    def __init__(self, s: pl.Series, col_name: str, cursor_value: bool | None) -> None:
         """Initialize the filter boolean column screen."""
         super().__init__(
             yes="Filter",
@@ -1760,7 +1768,7 @@ class FilterBooleanScreen(YMNScreen):
             on_yes_callback=self._get_input,
         )
         self.s = s
-        self.cidx = cidx
+        self.col_name = col_name
         self.cursor_value = cursor_value
 
     def compose(self) -> ComposeResult:
@@ -1776,19 +1784,19 @@ class FilterBooleanScreen(YMNScreen):
                     yield RadioButton(NULL, id="radio-null", value=self.cursor_value is None)
             yield from super().compose()
 
-    def _get_input(self) -> tuple[pl.Expr | None, int]:
+    def _get_input(self) -> tuple[pl.Expr | None, str]:
         """Build and return a Polars filter expression from the selected radio button.
 
         Returns:
-            A tuple of (filter_expression, cidx), where filter_expression is None
+            A tuple of (filter_expression, col_name), where filter_expression is None
             if no radio button is selected.
         """
-        col = self.s.name
+        col = self.col_name
         radio_set = self.query_one("#boolean-radio-set", RadioSet)
 
         pressed = radio_set.pressed_button
         if pressed is None:
-            return None, self.cidx
+            return None, self.col_name
 
         # RadioButton.value is the checked state, not a payload; map from id.
         if pressed.id == "radio-true":
@@ -1798,14 +1806,14 @@ class FilterBooleanScreen(YMNScreen):
         elif pressed.id == "radio-null":
             selected_value = NULL
         else:
-            return None, self.cidx
+            return None, self.col_name
 
         if selected_value == NULL:
             expr = pl.col(col).is_null()
         else:
             expr = pl.col(col) == selected_value
 
-        return expr, self.cidx
+        return expr, self.col_name
 
 
 class JoinTableScreen(YMNScreen):

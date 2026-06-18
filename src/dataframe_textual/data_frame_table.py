@@ -128,7 +128,7 @@ class ReplaceState:
     match_nocase: bool
     match_whole: bool
     match_literal: bool
-    cidx: int  # Column index to search in, could be None for all columns
+    cidx: int | None  # Column index to search in, or None for all columns
     rows: list[int]  # List of row indices
     cols_per_row: list[list[int]]  # List of list of column indices per row
     current_rpos: int  # Current row position index in rows
@@ -392,6 +392,61 @@ class DataFrameTable(DataTable):
 
         return wrapper
 
+    def get_row_idx(self, row_key: RowKey) -> int:
+        """Get the row index for a given table row key.
+
+        Args:
+            row_key: Row key as string.
+        """
+        return super().get_row_index(row_key)
+
+    def get_row_key(self, row_idx: int) -> RowKey | None:
+        """Get the row key for a given table row index.
+
+        Args:
+            row_idx: Row index in the table display.
+
+        Returns:
+            Corresponding row key as string.
+        """
+        return self._row_locations.get_key(row_idx)
+
+    def get_col_idx(self, col_key: ColumnKey) -> int:
+        """Get the column index for a given table column key.
+
+        Args:
+            col_key: Column key as string.
+
+        Returns:
+            Corresponding column index as int.
+        """
+        return super().get_column_index(col_key)
+
+    def get_col_key(self, col_idx: int) -> ColumnKey | None:
+        """Get the column key for a given table column index.
+
+        Args:
+            col_idx: Column index in the table display.
+
+        Returns:
+            Corresponding column key as string.
+        """
+        return self._column_locations.get_key(col_idx)
+
+    def get_cidx(self, col_name: str) -> int | None:
+        """Get the column index for a given dataframe column name.
+
+        Args:
+            col_name: Column name in the dataframe.
+
+        Returns:
+            Corresponding column index in the table display, or None if not found.
+        """
+        try:
+            return self.df.get_column_index(col_name)
+        except pl.exceptions.ColumnNotFoundError:
+            return None
+
     @property
     def cursor_key(self) -> CellKey:
         """Get the current cursor position as a CellKey.
@@ -435,7 +490,7 @@ class DataFrameTable(DataTable):
         Returns:
             pl.DataType: The Polars data type of the column containing the cursor.
         """
-        return self.df.schema[self.cursor_col_name]
+        return self.df.schema.get(self.cursor_col_name, pl.Unknown)
 
     @property
     def cursor_ridx(self) -> int:
@@ -457,14 +512,10 @@ class DataFrameTable(DataTable):
 
         Returns:
             int: The 0-based column index of the cursor position.
-
-        Raises:
-            AssertionError: If the cursor column index is out of bounds.
         """
-        try:
-            cidx = self.df.get_column_index(self.cursor_col_name)
-        except pl.exceptions.ColumnNotFoundError:
-            raise AssertionError("Cursor column index is out of bounds")
+        cidx = self.get_cidx(self.cursor_col_name)
+        if cidx is None:
+            raise ValueError(f"Cursor column name '{self.cursor_col_name}' not found in dataframe")
         return cidx
 
     @property
@@ -555,47 +606,6 @@ class DataFrameTable(DataTable):
             num: The number to round.
         """
         return round_to_nearest_hundreds(num, N=self.BATCH_SIZE)
-
-    def get_row_idx(self, row_key: RowKey) -> int:
-        """Get the row index for a given table row key.
-
-        Args:
-            row_key: Row key as string.
-        """
-        return super().get_row_index(row_key)
-
-    def get_row_key(self, row_idx: int) -> RowKey | None:
-        """Get the row key for a given table row index.
-
-        Args:
-            row_idx: Row index in the table display.
-
-        Returns:
-            Corresponding row key as string.
-        """
-        return self._row_locations.get_key(row_idx)
-
-    def get_col_idx(self, col_key: ColumnKey) -> int:
-        """Get the column index for a given table column key.
-
-        Args:
-            col_key: Column key as string.
-
-        Returns:
-            Corresponding column index as int.
-        """
-        return super().get_column_index(col_key)
-
-    def get_col_key(self, col_idx: int) -> ColumnKey | None:
-        """Get the column key for a given table column index.
-
-        Args:
-            col_idx: Column index in the table display.
-
-        Returns:
-            Corresponding column key as string.
-        """
-        return self._column_locations.get_key(col_idx)
 
     def _should_highlight(self, cursor: Coordinate, target_cell: Coordinate, type_of_cursor: CursorType) -> bool:
         """Determine if the given cell should be highlighted because of the cursor.
@@ -768,7 +778,7 @@ class DataFrameTable(DataTable):
 
             # header row
             if row_idx == -1:
-                self.cmd_rename_column(col_idx)
+                self.cmd_rename_column(self.get_col_key(col_idx).value)
             else:
                 self.cmd_edit_cell()
 
@@ -779,10 +789,6 @@ class DataFrameTable(DataTable):
     def on_mouse_scroll_down(self, event) -> None:
         """Load more rows when scrolling down with mouse."""
         self.load_rows_down()
-
-    # ─── cmd_* methods that bridge to existing logic ──────────────────────────
-    # These wrap methods that previously lived in action_* with inline logic.
-    # The bulk of cmd_* methods (navigation, editing, etc.) are defined further below.
 
     def cmd_cursor_left(self) -> None:
         """Move cursor left."""
@@ -858,15 +864,15 @@ class DataFrameTable(DataTable):
 
     def cmd_show_statistics_all(self) -> None:
         """Show statistics for entire dataframe."""
-        self.cmd_show_statistics(cidx=-1)
+        self.cmd_show_statistics(None)
 
     def cmd_expand_all_columns(self) -> None:
         """Toggle column full width for all string/list columns."""
         self.cmd_expand_column(expand_all=True)
 
-    def cmd_resize_column(self, cidx: int | None = None) -> None:
+    def cmd_resize_column(self, col_name: str | None = None) -> None:
         """Prompt for and resize the current column."""
-        col_name = self.cursor_col_name if cidx is None else self.df.columns[cidx]
+        col_name = self.cursor_col_name if col_name is None else col_name
         col_key = ColumnKey(col_name)
 
         if col_key not in self.columns:
@@ -953,7 +959,10 @@ class DataFrameTable(DataTable):
 
         if col_idx != target:
             # Move column to target position (after existing frozen columns)
-            cidx = self.df.columns.index(col_name)
+            cidx = self.get_cidx(col_name)
+            if cidx is None:
+                self.notify(f"Column [$warning]{col_name}[/] not found", title="Pin Column", severity="warning")
+                return
             cols = list(self.df.columns)
             cols.pop(cidx)
             cols.insert(target, col_name)
@@ -2026,26 +2035,20 @@ class DataFrameTable(DataTable):
             self.app.push_screen(CellDetailScreen(col_name, dtype, cell_value))
 
     @with_full_df
-    def cmd_show_frequency(self, cidx: int | list[int] | None = None) -> None:
+    def cmd_show_frequency(self, *col_names: str) -> None:
         """Show frequency distribution for one or more columns.
 
         Args:
-            cidx: Optional target column index or indices. If None and multiple columns are selected,
+            *col_names: Optional target column names. If omitted and multiple columns are selected,
                 the frequency table is computed over the selected visible columns.
         """
         if self.selected_columns:
-            self.app.push_screen(FrequencyScreen(self, [self.df.columns.index(col) for col in self.selected_columns]))
-            return
-
-        if cidx is None:
-            selected_visible = [col for col in self.df.columns if col in self.selected_columns]
-            if len(selected_visible) > 1:
-                cidx = [self.df.columns.index(col) for col in selected_visible]
-            else:
-                cidx = self.cursor_cidx
+            col_names = [col for col in self.df.columns if col in self.selected_columns]
+        elif not col_names:
+            col_names = [self.cursor_col_name]
 
         # Push the frequency modal screen
-        self.app.push_screen(FrequencyScreen(self, cidx))
+        self.app.push_screen(FrequencyScreen(self, *col_names))
 
     @with_full_df
     def cmd_show_histogram(self, default: int = 1) -> None:
@@ -2108,16 +2111,21 @@ class DataFrameTable(DataTable):
         self.notify(f"Bar chart is [$success]{status}[/] for column [$accent]{col_name}[/]", title="Show Bar Chart")
 
     @with_full_df
-    def cmd_show_statistics(self, cidx: int | None = None) -> None:
+    def cmd_show_statistics(self, col_name: str | None = "") -> None:
         """Show statistics for the current column or entire dataframe.
 
         Args:
-            cidx: Column index. Pass -1 for entire dataframe, None for current column.
+            col_name: Optional target column name.
+              - Empty string means the entire dataframe.
+              - None defaults to the current cursor column.
         """
-        if cidx == -1:
-            self.app.push_screen(StatisticsScreen(self, cidx=None))
-        else:
-            self.app.push_screen(StatisticsScreen(self, cidx=self.cursor_cidx if cidx is None else cidx))
+        if col_name is None:
+            self.app.push_screen(StatisticsScreen(self))
+            return
+
+        if not col_name:
+            col_name = self.cursor_col_name
+        self.app.push_screen(StatisticsScreen(self, col_name))
 
     def cmd_metadata_column(self) -> None:
         """Show metadata for all columns in the dataframe."""
@@ -2213,9 +2221,11 @@ class DataFrameTable(DataTable):
 
     def _expand_single_column(self, col_name: str) -> str | None:
         """Expand or unexpand a single column. Returns a status message fragment, or None on failure."""
-        cidx = self.df.columns.index(col_name)
         col_key = ColumnKey(col_name)
         if col_key not in self.columns:
+            return None
+        cidx = self.get_cidx(col_name)
+        if cidx is None:
             return None
         col: Column = self.columns[col_key]
 
@@ -2471,36 +2481,39 @@ class DataFrameTable(DataTable):
             )
 
     # Edit
-    def cmd_edit_cell(self, ridx: int | None = None, cidx: int | None = None) -> None:
+    def cmd_edit_cell(self, ridx: int | None = None, col_name: str | None = None) -> None:
         """Open modal to edit the selected cell."""
         ridx = self.cursor_ridx if ridx is None else ridx
-        cidx = self.cursor_cidx if cidx is None else cidx
+        col_name = self.cursor_col_name if col_name is None else col_name
 
         if self.for_keybindings:
-            self.capture_keybinding(ridx, cidx)
+            self.capture_keybinding(ridx, col_name)
             return
 
         # Push the edit modal screen
         self.app.push_screen(
-            EditCellScreen(ridx, cidx, self.df),
+            EditCellScreen(ridx, col_name, self.df),
             callback=self.edit_cell,
         )
 
     @with_full_df
-    def edit_cell(self, result) -> None:
+    def edit_cell(self, result: tuple[int, str, Any | None] | None) -> None:
         """Handle result from EditCellScreen."""
         if result is None:
             return
 
-        ridx, cidx, new_value = result
+        ridx, col_name, new_value = result
         if new_value is None:
             self.app.push_screen(
-                EditCellScreen(ridx, cidx, self.df),
+                EditCellScreen(ridx, col_name, self.df),
                 callback=self.edit_cell,
             )
             return
 
-        col_name = self.df.columns[cidx]
+        cidx = self.get_cidx(col_name)
+        if cidx is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="Edit Cell", severity="warning")
+            return
 
         # Add to history
         self.add_history(f"Edit cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
@@ -2563,14 +2576,13 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error updating cell ({ridx}, {col_name}): {e}")
 
-    def capture_keybinding(self, ridx: int, cidx: int) -> None:
+    def capture_keybinding(self, ridx: int, col_name: str) -> None:
         """Capture a new key binding for the current row in the Commands tab."""
         required_columns = {"Leader", "Key", "Command", "Scope"}
         if not required_columns.issubset(self.df.columns):
             self.notify("This table cannot edit key bindings", title="Key Binding", severity="warning")
             return
 
-        col_name = self.df.columns[cidx]
         if col_name not in {"Leader", "Key"}:
             self.notify("Move to the Leader or Key cell to capture a key", title="Key Binding", severity="warning")
             return
@@ -2579,21 +2591,21 @@ class DataFrameTable(DataTable):
         current_value = row.get(col_name) or ""
         self.app.push_screen(
             KeyCaptureScreen(row["Command"], col_name, current_value, row["Leader"], row["Key"], row["Scope"]),
-            callback=partial(self.update_keybinding, ridx, cidx),
+            callback=partial(self.update_keybinding, ridx, col_name),
         )
 
-    def update_keybinding(self, ridx: int, cidx: int, result: str | None) -> None:
+    def update_keybinding(self, ridx: int, col_name: str, result: str | None) -> None:
         """Update a keybinding cell from the key capture modal.
 
         Args:
             ridx: The dataframe row index to update.
-            cidx: The dataframe column index to update.
+            col_name: The dataframe column name to update.
             result: Captured key display string, or None when cancelled.
         """
         if result is None:
             return
 
-        self.edit_cell((ridx, cidx, result))
+        self.edit_cell((ridx, col_name, result))
         self.notify(
             "Save the Commands tab with [$success]Ctrl[/]+[$accent]T[/] to persist key binding changes",
             title="Key Binding",
@@ -2671,10 +2683,9 @@ class DataFrameTable(DataTable):
 
         self.notify(f"Updated column [$success]{col_name}[/] with [$accent]{expr}[/]", title="Edit Column")
 
-    def cmd_rename_column(self, col_idx: int | None = None) -> None:
+    def cmd_rename_column(self, col_name: str | None = None) -> None:
         """Open modal to rename the selected column."""
-        col_idx = self.cursor_column if col_idx is None else col_idx
-        col_name = self.get_col_key(col_idx).value
+        col_name = self.cursor_col_name if col_name is None else col_name
 
         # Push the rename column modal screen
         self.app.push_screen(
@@ -2820,12 +2831,12 @@ class DataFrameTable(DataTable):
             self.notify(f"Failed to clear column [$error]{col_name}[/]", title="Clear Column", severity="error")
             self.log(f"Error clearing column `{col_name}`: {e}")
 
-    def _get_column_name(self, colname) -> str:
+    def _get_column_name(self, col_name: str) -> str:
         """Get a unique column name based on the provided name."""
-        if colname not in self.df.columns:
-            return colname
+        if col_name not in self.df.columns:
+            return col_name
 
-        base_name = colname
+        base_name = col_name
         counter = 1
         new_col_name = f"{base_name}_{counter}"
         while new_col_name in self.df.columns:
@@ -2877,19 +2888,22 @@ class DataFrameTable(DataTable):
 
     def cmd_add_column_expr(self) -> None:
         """Open screen to add a new column with optional expression."""
-        cidx = self.cursor_cidx
         self.app.push_screen(
-            AddColumnScreen(cidx, self.df),
+            AddColumnScreen(self.cursor_col_name, self.df),
             self.add_column_expr,
         )
 
     @with_full_df
-    def add_column_expr(self, result: tuple[int, str, pl.Expr] | None) -> None:
+    def add_column_expr(self, result: tuple[str, str, pl.Expr] | None) -> None:
         """Add a new column with an expression."""
         if result is None:
             return
 
-        cidx, new_col_name, expr = result
+        col_name, new_col_name, expr = result
+        cidx = self.get_cidx(col_name)
+        if cidx is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="Add Column", severity="warning")
+            return
 
         # Add to history
         self.add_history(f"Add column [$success]{new_col_name}[/] with expression [$accent]{expr}[/].", dirty=True)
@@ -3400,7 +3414,7 @@ class DataFrameTable(DataTable):
     def cmd_add_link_column(self) -> None:
         """Open AddLinkScreen to collect a link template and add a new link column."""
         self.app.push_screen(
-            AddLinkScreen(self.cursor_cidx, self.df),
+            AddLinkScreen(self.cursor_col_name, self.df),
             callback=self.add_link_column,
         )
 
@@ -3418,11 +3432,15 @@ class DataFrameTable(DataTable):
         string concatenation. The new column is inserted after the current column.
 
         Args:
-            result: Tuple of (cidx, new_col_name, link_template) or None if cancelled.
+            result: Tuple of (col_name, new_col_name, link_template) or None if cancelled.
         """
         if result is None:
             return
-        cidx, new_col_name, link_template = result
+        col_name, new_col_name, link_template = result
+        cidx = self.get_cidx(col_name)
+        if cidx is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="Add Link", severity="warning")
+            return
 
         self.add_history(
             f"Add link column [$success]{new_col_name}[/] with template [$accent]{link_template}[/].", dirty=True
@@ -3472,14 +3490,16 @@ class DataFrameTable(DataTable):
             self.log(f"Error adding link column: {e}")
 
     @with_full_df
-    def cmd_delete_column(self, more: str | None = None, col_idx: int | None = None) -> None:
-        """Remove selected columns when present, otherwise the current column."""
-        # Get the column to remove
-        if col_idx is None:
-            col_idx = self.cursor_column
+    def cmd_delete_column(self, more: str | None = None, col_name: str | None = None) -> None:
+        """Remove selected columns when present, otherwise the current column.
 
-        col_key = self.get_col_key(col_idx)
-        col_name = col_key.value
+        Args:
+            more: Optional string indicating whether to delete "before" or "after" the current column
+            col_name: Optional name of the column to delete (defaults to current cursor column)
+        """
+        col_name = self.cursor_col_name if col_name is None else col_name
+        col_key = ColumnKey(col_name)
+        col_idx = self.get_col_idx(col_key) if col_key in self.columns else self.cursor_column
 
         col_names_to_delete = []
         col_keys_to_delete = []
@@ -3882,20 +3902,29 @@ class DataFrameTable(DataTable):
         )
 
     @with_full_df
-    def cmd_move_column(self, direction: str, col_idx: int | None = None) -> None:
+    def cmd_move_column(self, direction: str, col_name: str | None = None) -> None:
         """Move the current column left or right.
 
         Args:
             direction: "left", "right", "start", or "end".
-            col_idx: Optional column index to move; defaults to the current cursor column.
+            col_name: Optional column name to move; defaults to the current cursor column.
         """
         row_idx = self.cursor_row
-        if col_idx is None:
-            col_idx = self.cursor_column
+        col_name = self.cursor_col_name if col_name is None else col_name
+        col_key = ColumnKey(col_name)
+        if col_key not in self.columns:
+            self.notify(
+                f"Column [$warning]{col_name}[/] is not visible",
+                title="Move Column",
+                severity="warning",
+            )
+            return
 
-        col_key = self.get_col_key(col_idx)
-        col_name = col_key.value
-        cidx = self.df.columns.index(col_name)
+        col_idx = self.get_col_idx(col_key)
+        cidx = self.get_cidx(col_name)
+        if cidx is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="Move Column", severity="warning")
+            return
 
         if direction not in ("left", "right", "start", "end"):
             return
@@ -4387,12 +4416,12 @@ class DataFrameTable(DataTable):
             scope: "column" for current column, "global" for all columns.
         """
         term = NULL if self.cursor_value is None else str(self.cursor_value)
-        cidx = self.cursor_cidx
+        col_name = self.cursor_col_name
 
         self.find(
             {
                 "term": term,
-                "cidx": cidx,
+                "col_name": col_name,
                 "match_nocase": False,
                 "match_whole": True,
                 "match_literal": True,
@@ -4411,7 +4440,7 @@ class DataFrameTable(DataTable):
         """
         # Use current cell value as default search term
         term = NULL if self.cursor_value is None else str(self.cursor_value)
-        cidx = self.cursor_cidx
+        col_name = self.cursor_col_name
         if scope == "all":
             scope = "global"
         title_scope = "Global" if scope == "global" else "Column"
@@ -4419,7 +4448,7 @@ class DataFrameTable(DataTable):
 
         # Push the search modal screen
         self.app.push_screen(
-            SearchScreen(f"{title_scope} Find ({title_direction})", self.df, cidx, term),
+            SearchScreen(f"{title_scope} Find ({title_direction})", col_name, term),
             callback=partial(self.find, scope=scope, forward=forward),
         )
 
@@ -4428,20 +4457,24 @@ class DataFrameTable(DataTable):
         """Find a term in current column or globally across all columns.
 
         Args:
-            result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse".
+            result: A dictionary with keys "term", "col_name", "match_nocase", "match_whole", "match_literal", "match_reverse".
             scope: "column" to find in current column, "global" to find across all columns. Defaults to "column".
             forward: Whether to navigate to next match (True) or previous match (False) after highlighting.
         """
         if result is None:
             return
         term = result.get("term")
-        cidx = result.get("cidx", self.cursor_cidx)
+        col_name = result.get("col_name", self.cursor_col_name)
+        cidx = self.get_cidx(col_name)
+        if cidx is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="Find", severity="warning")
+            return
         match_nocase = result.get("match_nocase")
         match_whole = result.get("match_whole")
         match_literal = result.get("match_literal")
         match_reverse = result.get("match_reverse")
 
-        col_name = self.df.columns[cidx] if scope == "column" else "all columns"
+        col_name = col_name if scope == "column" else "all columns"
         title = "Find" if scope == "column" else "Global Find"
         cidx = cidx if scope == "column" else None
 
@@ -4586,14 +4619,14 @@ class DataFrameTable(DataTable):
 
     def replace(self, result, scope="column") -> None:
         """Handle replace in current column or globally across all columns."""
-        self.handle_replace(result, self.cursor_cidx if scope == "column" else None)
+        self.handle_replace(result, self.cursor_col_name if scope == "column" else None)
 
-    def handle_replace(self, result: dict, cidx) -> None:
+    def handle_replace(self, result: dict, col_name: str | None) -> None:
         """Handle replace result.
 
         Args:
             result: A dictionary containing the replace parameters.
-            cidx: Column index to perform replacement. If None, replace across all columns.
+            col_name: Column name to perform replacement. If None, replace across all columns.
         """
         if result is None:
             return
@@ -4604,10 +4637,11 @@ class DataFrameTable(DataTable):
         match_whole = result.get("match_whole")
         match_literal = result.get("match_literal")
 
-        if cidx is None:
-            col_name = "all columns"
-        else:
-            col_name = self.df.columns[cidx]
+        cidx = self.get_cidx(col_name) if col_name is not None else None
+        if col_name is not None and cidx is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="Replace", severity="warning")
+            return
+        target_name = col_name or "all columns"
 
         # Find all matches
         matches = self.find_matches(
@@ -4625,7 +4659,7 @@ class DataFrameTable(DataTable):
 
         # Add to history
         self.add_history(
-            f"Replace [$success]{term_find}[/] with [$success]{term_replace}[/] in column [$accent]{col_name}[/]"
+            f"Replace [$success]{term_find}[/] with [$success]{term_replace}[/] in column [$accent]{target_name}[/]"
         )
 
         # Update matches
@@ -4913,7 +4947,6 @@ class DataFrameTable(DataTable):
         if result is not None:
             self.filter_rows(result)
         else:
-            cidx = self.cursor_cidx
             col_name = self.cursor_col_name
             dtype = self.cursor_col_dtype
 
@@ -4934,7 +4967,7 @@ class DataFrameTable(DataTable):
             self.filter_rows(
                 {
                     "term": term,
-                    "cidx": cidx,
+                    "col_name": col_name,
                     "match_nocase": False,
                     "match_whole": True,
                     "match_literal": True,
@@ -4950,7 +4983,6 @@ class DataFrameTable(DataTable):
             with_null: When True, keep rows with null values. When False,
                 keep rows with non-null values.
         """
-        cidx = self.cursor_cidx
         col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
 
@@ -4963,7 +4995,7 @@ class DataFrameTable(DataTable):
         self.filter_rows(
             {
                 "term": term,
-                "cidx": cidx,
+                "col_name": col_name,
                 "match_nocase": False,
                 "match_whole": True,
                 "match_literal": True,
@@ -4974,34 +5006,36 @@ class DataFrameTable(DataTable):
     @with_full_df
     def cmd_filter_rows_expr(self) -> None:
         """Open the filter screen to enter an expression."""
-        cidx = self.cursor_cidx
+        col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
         value = self.cursor_value
         term = NULL if value is None else (str(value.to_list()) if isinstance(dtype, pl.List) else str(value))
 
         self.app.push_screen(
-            SearchScreen("Filter Rows", self.df, cidx, term),
+            SearchScreen("Filter Rows", col_name, term),
             callback=self.filter_rows,
         )
 
     @with_full_df
-    def filter_rows(self, result) -> None:
+    def filter_rows(self, result: dict | None) -> None:
         """Filter selected rows and hide others. Do not modify the dataframe.
 
         Args:
-            result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse"
+            result: A dictionary with keys "term", "col_name", "match_nocase", "match_whole", "match_literal", "match_reverse".
         """
         if result is None:
             return
         term = result.get("term", NULL)
-        cidx = result.get("cidx", self.cursor_cidx)
+        col_name = result.get("col_name", self.cursor_col_name)
+        if self.get_cidx(col_name) is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="View Rows", severity="warning")
+            return
         match_nocase = result.get("match_nocase", False)
         match_whole = result.get("match_whole", False)
         match_literal = result.get("match_literal", False)
         match_reverse = result.get("match_reverse", False)
 
-        col_name = self.df.columns[cidx]
-        dtype = self.df.dtypes[cidx]
+        dtype = self.df.schema[col_name]
 
         # Support for polars expression
         if isinstance(term, pl.Expr):
@@ -5132,34 +5166,33 @@ class DataFrameTable(DataTable):
         The filtered result replaces self.df; the original is saved in self.dfull.
         For other dtypes, a warning is shown.
         """
-        cidx = self.cursor_cidx
         col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
         dc = DtypeConfig(dtype)
 
         if dc.gtype in ("integer", "float"):
             self.app.push_screen(
-                FilterNumericScreen(self.df[col_name], cidx, dc, self.cursor_value),
+                FilterNumericScreen(self.df[col_name], col_name, dc, self.cursor_value),
                 callback=self.filter_row_value,
             )
         elif dc.gtype == "string":
             self.app.push_screen(
-                FilterStringScreen(self.df[col_name], cidx, self.cursor_value),
+                FilterStringScreen(self.df[col_name], col_name, self.cursor_value),
                 callback=self.filter_row_value,
             )
         elif dc.gtype == "boolean":
             self.app.push_screen(
-                FilterBooleanScreen(self.df[col_name], cidx, self.cursor_value),
+                FilterBooleanScreen(self.df[col_name], col_name, self.cursor_value),
                 callback=self.filter_row_value,
             )
         elif dc.gtype == "temporal":
             self.app.push_screen(
-                FilterTemporalScreen(self.df[col_name], cidx, dc, self.cursor_value),
+                FilterTemporalScreen(self.df[col_name], col_name, dc, self.cursor_value),
                 callback=self.filter_row_value,
             )
         elif dtype == pl.List:
             self.app.push_screen(
-                FilterListScreen(self.df[col_name], cidx, self.cursor_value),
+                FilterListScreen(self.df[col_name], col_name, self.cursor_value),
                 callback=self.filter_row_value,
             )
         else:
@@ -5170,18 +5203,23 @@ class DataFrameTable(DataTable):
             )
 
     @with_full_df
-    def filter_row_value(self, result: tuple[pl.Expr, int] | None) -> None:
+    def filter_row_value(self, result: tuple[pl.Expr | None, str] | None) -> None:
         """Apply the filter expression in the current column.
 
         Args:
-            result: A tuple containing a Polars expression to filter rows and the column index, or None if cancelled.
+            result: A tuple containing a Polars expression to filter rows and the column name, or None if cancelled.
         """
         if result is None:
             return
-        expr, cidx = result
+        expr, col_name = result
 
         if expr is None:
             self.notify("No filter expression provided.", title="Filter Rows", severity="warning")
+            return
+
+        cidx = self.get_cidx(col_name)
+        if cidx is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="Filter Rows", severity="warning")
             return
 
         try:
@@ -5195,7 +5233,6 @@ class DataFrameTable(DataTable):
             self.notify("Filter results in zero row. No changes applied.", title="Filter Rows", severity="warning")
             return
 
-        col_name = self.cursor_col_name
         self.add_history(f"Filter rows on column [$success]{col_name}[/] by expression")
 
         # Store original dataframe in dfull if not already in a view
@@ -5220,7 +5257,7 @@ class DataFrameTable(DataTable):
         )
 
     @with_full_df
-    def cmd_collect_rows(self, cidx: int | None = None, term: Any | list[Any] = None) -> None:
+    def cmd_collect_rows(self, col_name: str | None = None, term: Any | list[Any] = None) -> None:
         """Collect rows/columns to a new tab.
 
         If there are selected rows/columns, use those.
@@ -5231,9 +5268,8 @@ class DataFrameTable(DataTable):
         elif self.selected_columns:
             filter_expr = pl.lit(True)  # No row filter, just select columns later
         else:  # Search cursor value in current column
-            cidx = self.cursor_cidx if cidx is None else cidx
-            col_name = self.df.columns[cidx]
-            dtype = self.df.dtypes[cidx]
+            col_name = self.cursor_col_name if col_name is None else col_name
+            dtype = self.df.schema[col_name]
             term = self.cursor_value if term is None else term
 
             if isinstance(term, pl.Expr):
@@ -5284,7 +5320,7 @@ class DataFrameTable(DataTable):
         Args:
             scope: "column" for current column, "all" for all columns.
         """
-        cidx = self.cursor_cidx
+        col_name = self.cursor_col_name
 
         # Use existing cell matches if present
         if self.matches:
@@ -5316,7 +5352,7 @@ class DataFrameTable(DataTable):
         self.select_rows(
             {
                 "term": term,
-                "cidx": cidx,
+                "col_name": col_name,
                 "match_nocase": False,
                 "match_whole": True,
                 "match_literal": True,
@@ -5331,7 +5367,7 @@ class DataFrameTable(DataTable):
             scope: ``"column"`` to select by matches in the current column,
                 or ``"all"`` to select by matches across all columns.
         """
-        cidx = self.cursor_cidx
+        col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
         value = self.cursor_value
 
@@ -5344,7 +5380,7 @@ class DataFrameTable(DataTable):
 
         # Push the search modal screen
         self.app.push_screen(
-            SearchScreen("Select Rows (All Columns)" if scope == "all" else "Select Rows", self.df, cidx, term),
+            SearchScreen("Select Rows (All Columns)" if scope == "all" else "Select Rows", col_name, term),
             callback=partial(self.select_rows, scope=scope),
         )
 
@@ -5355,7 +5391,7 @@ class DataFrameTable(DataTable):
             scope: ``"column"`` to unselect by matches in the current column,
                 or ``"all"`` to unselect by matches across all columns.
         """
-        cidx = self.cursor_cidx
+        col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
         value = self.cursor_value
 
@@ -5367,7 +5403,7 @@ class DataFrameTable(DataTable):
         term = NULL if value is None else (str(value.to_list()) if isinstance(dtype, pl.List) else str(value))
 
         self.app.push_screen(
-            SearchScreen("Unselect Rows (All Columns)" if scope == "all" else "Unselect Rows", self.df, cidx, term),
+            SearchScreen("Unselect Rows (All Columns)" if scope == "all" else "Unselect Rows", col_name, term),
             callback=partial(self.unselect_rows, scope=scope),
         )
 
@@ -5401,14 +5437,18 @@ class DataFrameTable(DataTable):
         """Unselect rows where a term/expression matches in the selected scope.
 
         Args:
-            result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse".
+            result: A dictionary with keys "term", "col_name", "match_nocase", "match_whole", "match_literal", "match_reverse".
             scope: ``"column"`` to match in current column, or ``"all"`` to match across all columns.
         """
         if result is None:
             return
 
         term = result.get("term")
-        cidx = result.get("cidx", self.cursor_cidx)
+        col_name = result.get("col_name", self.cursor_col_name)
+        cidx = self.get_cidx(col_name)
+        if cidx is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="Unselect Rows", severity="warning")
+            return
         match_nocase = result.get("match_nocase")
         match_whole = result.get("match_whole")
         match_literal = result.get("match_literal")
@@ -5452,13 +5492,17 @@ class DataFrameTable(DataTable):
         """Select rows by value or expression.
 
         Args:
-            result: A dictionary with keys "term", "cidx", "match_nocase", "match_whole", "match_literal", "match_reverse"
+            result: A dictionary with keys "term", "col_name", "match_nocase", "match_whole", "match_literal", "match_reverse"
             scope: ``"column"`` to match in current column, or ``"all"`` to match across all columns.
         """
         if result is None:
             return
         term = result.get("term")
-        cidx = result.get("cidx", self.cursor_cidx)
+        col_name = result.get("col_name", self.cursor_col_name)
+        cidx = self.get_cidx(col_name)
+        if cidx is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="Select Rows", severity="warning")
+            return
         match_nocase = result.get("match_nocase")
         match_whole = result.get("match_whole")
         match_literal = result.get("match_literal")
@@ -5489,8 +5533,7 @@ class DataFrameTable(DataTable):
             self.setup_table()
             return
 
-        col_name = self.df.columns[cidx]
-        dtype = self.df.dtypes[cidx]
+        dtype = self.df.schema[col_name]
 
         # Already a Polars expression
         if isinstance(term, pl.Expr):

@@ -392,9 +392,7 @@ class TableScreen(TableModalScreen):
         # Override to disable sorting in TableScreen, but subclasses can still implement their own sorting if desired.
         pass
 
-    def filter_or_collect_selected_value(
-        self, cidx: int, col_name: str, values: Any | list[Any], action: str = "filter"
-    ) -> None:
+    def filter_or_collect_selected_value(self, col_name: str, values: Any | list[Any], action: str = "filter") -> None:
         """Apply filter or collect action by the selected value.
 
         Filter or collect rows in the main table based on a selected value from
@@ -402,7 +400,6 @@ class TableScreen(TableModalScreen):
         and notifies the user of the action.
 
         Args:
-            cidx: Column index.
             col_name: Column name.
             values: Selected value(s) to filter/collect by.
             action: Either "filter" to filter rows, or "collect" to collect rows. Defaults to "filter".
@@ -431,16 +428,21 @@ class TableScreen(TableModalScreen):
             )
             return
 
+        cidx = self.dftable.get_cidx(col_name)
+        if cidx is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="Filter Value", severity="warning")
+            return
+
         # Action collect
         if action == "collect":
-            self.dftable.cmd_collect_rows(cidx=cidx, term=values)
+            self.dftable.cmd_collect_rows(col_name=col_name, term=values)
 
         # Action filter
         else:
             self.dftable.cmd_filter_rows(
                 {
                     "term": expr,
-                    "cidx": cidx,
+                    "col_name": col_name,
                     "match_nocase": False,
                     "match_whole": True,
                     "match_literal": True,
@@ -455,29 +457,29 @@ class TableScreen(TableModalScreen):
 
         self.dftable.move_cursor(column=cidx)
 
-    def show_frequency(self, cidx: int | None = None) -> None:
-        """Show frequency for the selected column.
+    def show_frequency(self, *col_names: str) -> None:
+        """Show frequency for the selected columns.
 
         Args:
-            cidx: Column index.
+            *col_names: Column names.
         """
-        if cidx is None:
+        if not col_names:
             return
 
         # Show frequency screen
-        self.dftable.cmd_show_frequency(cidx)
+        self.dftable.cmd_show_frequency(*col_names)
 
-    def show_statistics(self, cidx: int | None = None) -> None:
+    def show_statistics(self, col_name: str | None = None) -> None:
         """Show statistics for the selected column.
 
         Args:
-            cidx: Column index.
+            col_name: Column name.
         """
-        if cidx is None:
+        if col_name is None:
             return
 
         # Show statistics screen
-        self.dftable.cmd_show_statistics(cidx)
+        self.dftable.cmd_show_statistics(col_name)
 
 
 class RowDetailScreen(TableScreen):
@@ -515,13 +517,13 @@ class RowDetailScreen(TableScreen):
 
     def cmd_row_detail_filter_value(self) -> None:
         """Filter the main table by the selected row-detail value."""
-        cidx, name, value = self.get_cidx_name_value()
-        self.filter_or_collect_selected_value(cidx, name, value, action="filter")
+        col_name, value = self.get_col_name_value()
+        self.filter_or_collect_selected_value(col_name, value, action="filter")
 
     def cmd_row_detail_collect_value(self) -> None:
         """Collect the selected row-detail value in the main table to a new tab."""
-        cidx, name, value = self.get_cidx_name_value()
-        self.filter_or_collect_selected_value(cidx, name, value, action="collect")
+        col_name, value = self.get_col_name_value()
+        self.filter_or_collect_selected_value(col_name, value, action="collect")
 
     def cmd_row_detail_previous_row(self) -> None:
         """Show the previous dataframe row in the row-detail screen."""
@@ -541,13 +543,13 @@ class RowDetailScreen(TableScreen):
 
     def cmd_row_detail_show_frequency(self) -> None:
         """Show frequency for the selected row-detail value."""
-        cidx, _, _ = self.get_cidx_name_value()
-        self.show_frequency(cidx)
+        col_name, _ = self.get_col_name_value()
+        self.show_frequency(col_name)
 
     def cmd_row_detail_show_statistics(self) -> None:
         """Show statistics for the selected row-detail value."""
-        cidx, _, _ = self.get_cidx_name_value()
-        self.show_statistics(cidx)
+        col_name, _ = self.get_col_name_value()
+        self.show_statistics(col_name)
 
     def cmd_row_detail_drill_down(self) -> None:
         """Show cell details for the selected row-detail value."""
@@ -594,20 +596,20 @@ class RowDetailScreen(TableScreen):
 
         self.table.cursor_type = "row"
 
-    def get_cidx_name_value(self) -> tuple[int, str, Any] | None:
+    def get_col_name_value(self) -> tuple[str, Any]:
         """Get the current column info."""
         cidx = self.table.cursor_row
         col_name = self.dftable.df.columns[cidx]
         col_value = self.dftable.df.item(self.ridx, cidx)
-        return cidx, col_name, col_value
+        return col_name, col_value
 
 
 class StatisticsScreen(TableScreen):
     """Modal screen to display statistics for a column or entire dataframe."""
 
-    def __init__(self, dftable: "DataFrameTable", cidx: int | None = None):
+    def __init__(self, dftable: "DataFrameTable", col_name: str = "") -> None:
         super().__init__(dftable)
-        self.cidx = cidx  # None for dataframe statistics, otherwise column index
+        self.col_name = col_name
 
     def on_mount(self) -> None:
         """Create the statistics table."""
@@ -664,12 +666,12 @@ class StatisticsScreen(TableScreen):
             self.table.add_row(*formatted_row, key=str(ridx), label=str(ridx + 1))
 
         # Set cursor type based on whether this is dataframe stats (column cursor) or column stats (row cursor)
-        self.table.cursor_type = "column" if self.cidx is None else "row"
+        self.table.cursor_type = "column" if not self.col_name else "row"
 
     def build_df(self) -> None:
         """Get the dataframe to use for statistics."""
         # all columns
-        if self.cidx is None:
+        if not self.col_name:
             lf = self.dftable.df.lazy().select(pl.exclude(RID))
 
             # Apply only to non-hidden columns
@@ -750,8 +752,8 @@ class StatisticsScreen(TableScreen):
 
         # single column
         else:
-            col_name = self.dftable.df.columns[self.cidx]
-            dtype = self.dftable.df.dtypes[self.cidx]
+            col_name = self.col_name
+            dtype = self.dftable.df.schema[col_name]
             this_col = self.dftable.df[col_name]
             lf = self.dftable.df.lazy()
 
@@ -769,7 +771,7 @@ class StatisticsScreen(TableScreen):
             df_n_total = pl.DataFrame({"statistic": ["n_total"], col_name: n_total}, schema=stats_df.schema)
 
             # sum
-            dc = DtypeConfig(self.dftable.df.dtypes[self.cidx])
+            dc = DtypeConfig(dtype)
             if dc.gtype in ("integer", "float"):
                 sum_value = this_col.sum()
                 df_sum = pl.DataFrame({"statistic": ["sum"], col_name: sum_value}, schema=stats_df.schema)
@@ -826,13 +828,12 @@ class StatisticsScreen(TableScreen):
 class FrequencyScreen(TableScreen):
     """Modal screen to display frequency of values in a column."""
 
-    def __init__(self, dftable: "DataFrameTable", cidx: int | list[int]) -> None:
+    def __init__(self, dftable: "DataFrameTable", *col_names: str) -> None:
         super().__init__(dftable)
-        self.cidxs = [cidx] if isinstance(cidx, int) else cidx
-        self.is_multi_column = len(self.cidxs) > 1
+        self.col_names = list(col_names)
+        self.is_multi_column = len(self.col_names) > 1
         self.sorted_columns["Count"] = True  # Count sort by default
         self.total_count = len(dftable.df)
-        self.col_names = [self.dftable.df.columns[idx] for idx in self.cidxs]
         self.columns = [(col_name, col_name) for col_name in self.col_names] + [
             ("Count", "Count"),
             ("%", "%"),
@@ -896,7 +897,7 @@ class FrequencyScreen(TableScreen):
         self.table.clear(columns=True)
 
         # Create frequency table
-        dcs = {col: DtypeConfig(self.dftable.df.dtypes[self.dftable.df.columns.index(col)]) for col in self.col_names}
+        dcs = {col: DtypeConfig(self.dftable.df.schema[col]) for col in self.col_names}
 
         for display_name, col_name in self.columns:
             # Check if this column is sorted and add indicator
@@ -1073,15 +1074,19 @@ class FrequencyScreen(TableScreen):
         if expr is None:
             return
 
-        cidx = self.cidxs[0]
+        col_name = self.col_names[0]
+        cidx = self.dftable.get_cidx(col_name)
+        if cidx is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="Frequency", severity="warning")
+            return
 
         if action == "collect":
-            self.dftable.cmd_collect_rows(cidx=cidx, term=expr)
+            self.dftable.cmd_collect_rows(col_name=col_name, term=expr)
         else:
             self.dftable.cmd_filter_rows(
                 {
                     "term": expr,
-                    "cidx": cidx,
+                    "col_name": col_name,
                     "match_nocase": False,
                     "match_whole": True,
                     "match_literal": True,
@@ -1229,11 +1234,13 @@ class MetaColumnScreen(TableScreen):
 
     def cmd_meta_column_show_frequency(self) -> None:
         """Show frequency for the selected column."""
-        self.show_frequency(self.get_cidx())
+        col_name = self.dftable.df.columns[self.get_cidx()]
+        self.show_frequency(col_name)
 
     def cmd_meta_column_show_statistics(self) -> None:
         """Show statistics for the selected column."""
-        self.show_statistics(self.get_cidx())
+        col_name = self.dftable.df.columns[self.get_cidx()]
+        self.show_statistics(col_name)
 
     def cmd_meta_column_move_right(self) -> None:
         """Move the selected column right."""
@@ -1246,12 +1253,13 @@ class MetaColumnScreen(TableScreen):
     def move_selected_column(self, direction: str) -> None:
         """Move the selected column and refresh metadata."""
         row_idx, col_idx = self.table.cursor_coordinate
+        col_name = self.dftable.df.columns[row_idx]
 
         if direction == "right":
-            self.dftable.cmd_move_column("right", col_idx=row_idx)
+            self.dftable.cmd_move_column("right", col_name=col_name)
             new_row_idx = min(row_idx + 1, len(self.dftable.df.columns) - 1)
         else:
-            self.dftable.cmd_move_column("left", col_idx=row_idx)
+            self.dftable.cmd_move_column("left", col_name=col_name)
             new_row_idx = max(row_idx - 1, 0)
 
         self.build_table()
@@ -1265,19 +1273,22 @@ class MetaColumnScreen(TableScreen):
         self._resume_col_idx = col_idx
 
         if col_idx == 0:
-            self.dftable.cmd_rename_column(col_idx=row_idx)
+            col_name = self.dftable.df.columns[row_idx]
+            self.dftable.cmd_rename_column(col_name=col_name)
         elif col_idx == 1:
             col_name = self.dftable.df.columns[row_idx]
             self.dftable.cmd_cast_column_dtype(col_name=col_name)
         elif col_idx == 2:
-            self.dftable.cmd_resize_column(cidx=row_idx)
+            col_name = self.dftable.df.columns[row_idx]
+            self.dftable.cmd_resize_column(col_name=col_name)
 
     def cmd_meta_column_delete(self) -> None:
         """Delete the selected column and refresh metadata."""
         row_idx = self.table.cursor_row
 
         self.dftable.move_cursor(column=row_idx)
-        self.dftable.cmd_delete_column(col_idx=row_idx)
+        col_name = self.dftable.df.columns[row_idx]
+        self.dftable.cmd_delete_column(col_name=col_name)
 
         if not self.dftable.visible_columns:
             self.app.pop_screen()
