@@ -5759,15 +5759,16 @@ class DataFrameTable(DataTable):
 
     def cmd_clear_selections(self) -> None:
         """Clear all selected rows/columns and matches without changing the dataframe."""
+        row_count = len(self.selected_rows | set(self.matches.keys()))
+        col_count = len(self.selected_columns)
+
         # Check if any selected rows or matches
-        if not self.selected_rows and not self.selected_columns and not self.matches:
-            self.notify("No selections to clear", title="Clear Selections and Matches", severity="warning")
+        if not row_count and not col_count:
+            self.notify("No selections to clear", title="Clear Selections/Matches", severity="warning")
             return
 
         # Add to history
         self.add_history("Clear all selections and matches")
-
-        row_count = len(self.selected_rows | set(self.matches.keys()))
 
         # Clear all selections
         self.selected_rows = set()
@@ -5777,7 +5778,15 @@ class DataFrameTable(DataTable):
         # Recreate table for display
         self.setup_table()
 
-        self.notify(f"Cleared selections for [$success]{row_count}[/] rows", title="Clear Selections and Matches")
+        message = ""
+        if row_count and col_count:
+            message = f"Cleared selections for [$success]{row_count}[/] rows and [$accent]{col_count}[/] columns"
+        elif row_count:
+            message = f"Cleared selections for [$success]{row_count}[/] rows"
+        else:
+            message = f"Cleared selections for [$accent]{col_count}[/] columns"
+
+        self.notify(message, title="Clear Selections/Matches")
 
     # Copy
     def cmd_copy_to_clipboard(self, content: str, message: str) -> None:
