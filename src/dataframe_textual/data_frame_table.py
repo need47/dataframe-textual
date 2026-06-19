@@ -4314,6 +4314,161 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error stripping whitespace in column `{col_name}`: {e}")
 
+    @with_full_df
+    def cmd_fill_null(self) -> None:
+        """Prompt for a value and fill nulls in the current column."""
+        col_name = self.cursor_col_name
+        dtype = self.cursor_col_dtype
+        dc = DtypeConfig(dtype)
+        null_count = self.df[col_name].null_count()
+
+        if null_count == 0:
+            self.notify(
+                f"Column [$warning]{col_name}[/] has no null values",
+                title="Fill Null",
+                severity="warning",
+            )
+            return
+
+        self.app.push_screen(
+            ConfirmScreen(
+                "Fill Null",
+                label=f"Enter value to fill [$accent]{null_count}[/] null(s) in [$success]{col_name}[/] ([$accent]{dtype}[/])",
+                input={"value": "", "type": dc.itype},
+                yes="Fill",
+                no="Cancel",
+            ),
+            callback=partial(self._fill_null, scope="column"),
+        )
+
+    @with_full_df
+    def cmd_fill_null_all(self) -> None:
+        """Prompt for a value and fill nulls in all columns."""
+        total_nulls = self.df.null_count().sum_horizontal().item()
+
+        if total_nulls == 0:
+            self.notify(
+                "No null values found in any column",
+                title="Fill Null (Global)",
+                severity="warning",
+            )
+            return
+
+        self.app.push_screen(
+            ConfirmScreen(
+                "Fill Null (Global)",
+                label=f"Enter value to fill [$accent]{total_nulls}[/] null(s) across all columns",
+                input="",
+                yes="Fill",
+                no="Cancel",
+            ),
+            callback=partial(self._fill_null, scope="global"),
+        )
+
+    @with_full_df
+    def _fill_null(self, result: str | None, scope: str = "column") -> None:
+        """Fill null values with the user-provided value.
+
+        Args:
+            result: The fill value entered by the user, or None if cancelled.
+            scope: "column" for current column only, "global" for all columns.
+        """
+        if result is None:
+            return
+
+        fill_value = result
+        title = "Fill Null" if scope == "column" else "Fill Null (Global)"
+
+        if scope == "column":
+            col_name = self.cursor_col_name
+            dtype = self.cursor_col_dtype
+            dc = DtypeConfig(dtype)
+
+            try:
+                typed_value = dc.convert(fill_value)
+            except (ValueError, TypeError):
+                self.notify(
+                    f"Cannot convert [$error]{fill_value!r}[/] to [$accent]{dtype}[/]",
+                    title=title,
+                    severity="error",
+                )
+                return
+
+            self.add_history(
+                f"Fill nulls in [$success]{col_name}[/] with [$accent]{fill_value}[/]",
+                dirty=True,
+            )
+
+            try:
+                fill_expr = pl.col(col_name).fill_null(pl.lit(typed_value))
+                self.df = self.df.with_columns(fill_expr)
+
+                if self.in_view:
+                    self.dfull = self.dfull.with_columns(fill_expr)
+
+                filled = col_name
+            except Exception as e:
+                if self.histories_undo:
+                    self.histories_undo.pop()
+                self.notify(
+                    f"Failed to fill nulls in column [$error]{col_name}[/]",
+                    title=title,
+                    severity="error",
+                )
+                self.log(f"Error filling nulls in column `{col_name}`: {e}")
+                return
+        else:
+            self.add_history(
+                f"Fill nulls in all columns with [$accent]{fill_value!r}[/]",
+                dirty=True,
+            )
+
+            try:
+                # Fill each column with value converted to its own dtype
+                fill_exprs = []
+                for col in self.df.columns:
+                    if col == RID or self.df[col].null_count() == 0:
+                        continue
+                    dc = DtypeConfig(self.df.schema[col])
+                    try:
+                        typed_val = dc.convert(fill_value)
+                    except (ValueError, TypeError):
+                        continue  # Skip columns where conversion fails
+                    fill_exprs.append(pl.col(col).fill_null(pl.lit(typed_val)))
+
+                if not fill_exprs:
+                    if self.histories_undo:
+                        self.histories_undo.pop()
+                    self.notify(
+                        f"Value [$warning]{fill_value!r}[/] could not be converted for any column",
+                        title=title,
+                        severity="warning",
+                    )
+                    return
+
+                self.df = self.df.with_columns(fill_exprs)
+
+                if self.in_view:
+                    self.dfull = self.dfull.with_columns(fill_exprs)
+
+                filled = f"{len(fill_exprs)} column(s)"
+            except Exception as e:
+                if self.histories_undo:
+                    self.histories_undo.pop()
+                self.notify(
+                    "Failed to fill nulls across columns",
+                    title=title,
+                    severity="error",
+                )
+                self.log(f"Error filling nulls across columns: {e}")
+                return
+
+        self.setup_table()
+        self.notify(
+            f"Filled nulls in [$success]{filled}[/] with [$accent]{fill_value!r}[/]",
+            title=title,
+        )
+
     # Find & Replace
     @with_full_df
     def find_matches(

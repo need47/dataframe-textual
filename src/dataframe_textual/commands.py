@@ -277,6 +277,8 @@ _reg("glue-list-column",     "Glue list column values with separator",          
 _reg("upper-case-column",    "Convert current or selected column(s) to uppercase",       Scope.MAIN_TABLE, Category.EDITING, "🔠").bind("ctrl+u")
 _reg("lower-case-column",    "Convert current or selected column(s) to lowercase",       Scope.MAIN_TABLE, Category.EDITING, "🔡").bind("ctrl+l")
 _reg("strip-whitespace",     "Strip leading and trailing whitespaces in current column", Scope.MAIN_TABLE, Category.EDITING, "🧼").bind("B", leader="z")
+_reg("fill-null",            "Fill null values in current column",                       Scope.MAIN_TABLE, Category.EDITING, "🩹").bind("f", leader="z")
+_reg("fill-null-all",        "Fill null values in all columns",                          Scope.MAIN_TABLE, Category.EDITING, "🩹").bind("f", leader="g")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Row/Column Selection (MainTable scope)

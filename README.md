@@ -396,6 +396,8 @@ Useful examples from current bindings:
 | `Ctrl+U`       | Convert current or selected string column(s) to uppercase                 |
 | `Ctrl+L`       | Convert current or selected string column(s) to lowercase                 |
 | `zB`           | Strip leading and trailing whitespaces in current string column           |
+| `zf`           | Fill null values in current column with a value                           |
+| `gf`           | Fill null values in all columns with a value                              |
 | `(`            | Expand current list column into indexed columns (e.g. `col[1]`, `col[2]`) |
 | `)`            | Contract indexed sibling columns (`col[N]`) back into a list column       |
 | `z(`           | Explode current list column into multiple rows                            |
