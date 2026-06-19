@@ -435,6 +435,7 @@ Useful examples from current bindings:
 | `?`  | Search backward in current column with expression               |
 | `g?` | Search backward in all columns with expression                  |
 | `z?` | Search backward in current column with cursor value             |
+| `;`  | Search cursor value in all columns and go to first match        |
 | `n`  | Go to next matching cell                                        |
 | `N`  | Go to previous matching cell                                    |
 | `r`  | Find and replace in current column (interactive or replace all) |
@@ -724,6 +725,7 @@ Find by value/expression and highlight matching cells:
 - `?` - Search backward in current column with expression
 - `g?` - Search backward in all columns with expression
 - `z?` - Search backward in current column with cursor value
+- `;` - Search cursor value in all columns and go to first match
 - `n` - Go to next matching cell
 - `N` - Go to previous matching cell
 

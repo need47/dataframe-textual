@@ -4423,6 +4423,15 @@ class DataFrameTable(DataTable):
             forward=forward,
         )
 
+    def cmd_find_cursor_all(self) -> None:
+        """Search the entire dataframe for the current cursor value, highlight all matches, and go to the first."""
+        self._find_cursor_direct(forward=True, scope="global")
+
+        # Move to the very first match in the dataframe
+        if self.matches and self.ordered_matches:
+            first_ridx, first_cidx = self.ordered_matches[0]
+            self.move_cursor_to(first_ridx, first_cidx)
+
     def cmd_find_backward(self, forward: bool = False, scope: str = "column") -> None:
         """Open expression search screen.
 

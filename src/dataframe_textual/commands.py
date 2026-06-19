@@ -311,6 +311,7 @@ _reg("find-forward-cursor",  "Search forward in current column with cursor value
 _reg("find-backward",        "Search backward in current column with expression",   Scope.MAIN_TABLE, Category.FIND_REPLACE, "🔎").bind("?")
 _reg("find-backward-all",    "Search backward in all columns with expression",      Scope.MAIN_TABLE, Category.FIND_REPLACE, "🌐").bind("?", leader="g")
 _reg("find-backward-cursor", "Search backward in current column with cursor value", Scope.MAIN_TABLE, Category.FIND_REPLACE, "🔎").bind("?", leader="z")
+_reg("find-cursor-all",      "Search in all columns with cursor value",             Scope.MAIN_TABLE, Category.FIND_REPLACE, "🔎").bind(";")
 _reg("next-match",           "Go to next match",                                    Scope.MAIN_TABLE, Category.FIND_REPLACE, "⬇️").bind("n")
 _reg("prev-match",           "Go to previous match",                                Scope.MAIN_TABLE, Category.FIND_REPLACE, "⬆️").bind("N")
 _reg("replace-column",       "Replace in current column (interactive or all)",      Scope.MAIN_TABLE, Category.FIND_REPLACE, "🔄").bind("r")
