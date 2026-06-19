@@ -185,7 +185,7 @@ _reg("new-tab",                 "Create new tab from Polars expression",        
 
 _reg("show-sheets",           "Show all open sheets/tabs",          Scope.APP, Category.VIEW_SETTINGS, "📋").bind("S")
 _reg("toggle-help-panel",     "Toggle help panel",                  Scope.APP, Category.VIEW_SETTINGS, "❓").bind("F1")
-_reg("toggle-python-console", "Toggle Python console",              Scope.APP, Category.VIEW_SETTINGS, "🐍").bind("`")
+_reg("toggle-python-console", "Toggle Python console",              Scope.APP, Category.VIEW_SETTINGS, "🐍").bind("Space")
 _reg("select-theme",          "Select theme",                       Scope.APP, Category.VIEW_SETTINGS, "🎨").bind("T", leader="g")
 _reg("show-commands",         "Show all commands and key bindings", Scope.APP, Category.VIEW_SETTINGS, "⌨️").bind("Backspace", leader="z").bind("ctrl+h", leader="z")
 
@@ -376,7 +376,7 @@ _reg("copy-row",    "Copy row to clipboard (tab-separated)", Scope.MAIN_TABLE, C
 
 _reg("sql-advanced", "Open advanced SQL interface (full SQL queries)",            Scope.MAIN_TABLE, Category.SQL,           "🔎").bind("Q")
 _reg("sql-simple",   "Open simple SQL interface (select columns & where clause)", Scope.MAIN_TABLE, Category.SQL,           "💬").bind("Q", leader="z")
-_reg("run-command",  "Run a command by name with optional arguments",             Scope.MAIN_TABLE, Category.VIEW_SETTINGS, "▶️").bind("Space")
+_reg("run-command",  "Run a command by name with optional arguments",             Scope.MAIN_TABLE, Category.VIEW_SETTINGS, "▶️").bind("Space", leader="z")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Table Modal Screen

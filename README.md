@@ -297,8 +297,8 @@ Useful examples from current bindings:
 | ------------------------- | --------------------------------------------- |
 | `F1`                      | Toggle help panel                             |
 | `S`                       | Show information for all open tabs            |
-| `` ` `` (backtick)        | Toggle Python console                         |
-| `Space`                   | Run a command by name with optional arguments |
+| `Space`                   | Toggle Python console                         |
+| `zSpace`                  | Run a command by name with optional arguments |
 | `z Ctrl+H` / `zBackspace` | Show all commands and key bindings            |
 | `Ctrl+P` -> `Screenshot`  | Capture terminal view as a SVG image          |
 | `gT`                      | Select theme                                  |
@@ -1033,7 +1033,7 @@ WHERE `product id` = 7
 
 Use the built-in Python console for quick interactive transformations without leaving the TUI.
 
-- Open/close console: `` ` ``
+- Open/close console: `Space`
 - Run shell commands: prefix with `!` (example: `!ls`)
 - In console: `clear` or `cls` clears console output
 - In console: `Esc` closes the console panel
