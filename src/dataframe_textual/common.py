@@ -559,8 +559,6 @@ def handle_compute_error(err_msg: str) -> None:
 
     Args:
         err_msg: The error message from the ComputeError exception.
-        file_format: The file format being loaded (tsv, csv, etc.).
-        infer_schema: Whether schema inference is currently enabled.
 
     Raises:
         SystemExit: If the error is unrecoverable.
@@ -679,6 +677,7 @@ def round_to_nearest_hundreds(num: int, N: int = 100) -> tuple[int, int]:
 
     Args:
         num: The number to round.
+        N: The rounding interval. Defaults to 100.
 
     Returns:
         A tuple (lower_hundred, upper_hundred) where:
@@ -947,7 +946,6 @@ def load_file(
         quote_char: Quote character for reading CSV/TSV files. Defaults to '"'.
         skip_lines: Number of lines to skip when reading CSV/TSV files. The header will be parsed at this offset. Defaults to 0.
         skip_rows_after_header: Number of rows to skip after header when reading CSV/TSV files. Defaults to 0.
-        infer_schema_length: Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100.
         null_values: List of values to interpret as null when reading CSV/TSV files. Defaults to None.
         ignore_errors: Whether to ignore errors when reading CSV/TSV files.
         truncate_ragged_lines: Whether to truncate ragged lines when reading CSV/TSV files. Defaults to False.

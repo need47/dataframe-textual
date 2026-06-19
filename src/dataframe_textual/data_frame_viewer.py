@@ -29,7 +29,7 @@ from .console_panel import ConsolePanel
 from .data_frame_table import DataFrameTable
 from .file_picker_screen import OpenFileScreen, SaveFileScreen
 from .help_panel import DataFrameHelpPanel
-from .keybindings import KeyBindingConflict, key_registry
+from .keybindings import key_registry
 from .status_bar import StatusBar
 from .table_screen import SheetScreen
 from .yes_no_screen import ConfirmScreen, JoinTableScreen, NewTabScreen, RenameTabScreen
@@ -434,7 +434,7 @@ class DataFrameViewer(App):
         if table := self.active_table:
             table.for_keybindings = True
 
-        self.notify(f"Showing [$accent]{len(rows):{THOUSAND_SEPARATOR}}[/] commands", title="Commands List")
+        self.notify(f"Showing [$accent]{len(rows):{THOUSAND_SEPARATOR}}[/] commands", title="List Commands")
 
     def cmd_toggle_help_panel(self) -> None:
         """Toggle the help panel on or off.
@@ -641,35 +641,6 @@ class DataFrameViewer(App):
 
         self.console_panel.display = True
         self.console_panel.focus_input()
-
-    def bind_key(
-        self, key: str, command_id: str, leader: str = "", scope: str = "MainTable", force: bool = False
-    ) -> None:
-        """Bind a key to a command, with conflict notification.
-
-        Convenience wrapper for use in the Python console.
-
-        Args:
-            key: The Textual key name (e.g. "q", "ctrl+g", "slash").
-            command_id: The command ID to bind to.
-            leader: Optional leader key prefix ("g" or "z").
-            scope: "App" or "MainTable".
-            force: If True, replace existing binding silently.
-        """
-        scope_enum = Scope(scope)
-        try:
-            old = self.key_registry.bind(key, command_id, leader=leader, scope=scope_enum, force=force)
-        except KeyBindingConflict as e:
-            self.notify(f"Key binding conflict: {e}", title="Bind Key", severity="error", timeout=5)
-            return
-        except ValueError as e:
-            self.notify(f"Invalid key binding: {e}", title="Bind Key", severity="error", timeout=5)
-            return
-
-        if old:
-            self.notify(f"Replaced [$success]{old.command_id}[/] with [$accent]{command_id}[/]", title="Bind Key")
-        else:
-            self.notify(f"Bound [$success]{leader}{key}[/] → [$accent]{command_id}[/]", title="Bind Key")
 
     def _get_console_context(self) -> dict[str, Any]:
         """Build the execution context for the Python console.
@@ -1285,6 +1256,7 @@ class DataFrameViewer(App):
 
         Args:
             filepath: The filepath to save to.
+            all_tabs: Whether to save all tabs (True) or just the current tab (False). Defaults to True.
             use_view: Whether to save the current view (True) or main table (False).
             use_df: Optional DataFrame to save instead of the current table/view.
         """

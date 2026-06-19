@@ -411,7 +411,7 @@ class DataFrameTable(DataTable):
         """
         return self._row_locations.get_key(row_idx)
 
-    def get_col_idx(self, col_key: ColumnKey) -> int:
+    def get_col_idx(self, col_key: ColumnKey | str) -> int:
         """Get the column index for a given table column key.
 
         Args:
@@ -445,6 +445,22 @@ class DataFrameTable(DataTable):
         try:
             return self.df.get_column_index(col_name)
         except pl.exceptions.ColumnNotFoundError:
+            return None
+
+    def get_dtype(self, col: str | int) -> pl.DataType | None:
+        """Get the dtype of a given column.
+
+        Args:
+            col: Column name or index in the dataframe.
+
+        Returns:
+            The dtype of the column, or None if not found.
+        """
+        try:
+            if isinstance(col, int):
+                return self.df.dtypes[col]
+            return self.df.schema[col]
+        except KeyError:
             return None
 
     @property
@@ -484,13 +500,13 @@ class DataFrameTable(DataTable):
         return self.cursor_col_key.value
 
     @property
-    def cursor_col_dtype(self) -> pl.DataType:
+    def cursor_col_dtype(self) -> pl.DataType | None:
         """Get the current cursor column dtype.
 
         Returns:
             pl.DataType: The Polars data type of the column containing the cursor.
         """
-        return self.df.schema.get(self.cursor_col_name, pl.Unknown)
+        return self.get_dtype(self.cursor_col_name)
 
     @property
     def cursor_ridx(self) -> int:
@@ -556,16 +572,6 @@ class DataFrameTable(DataTable):
         return {col for col, width in self.column_widths.items() if width == -1}
 
     @property
-    def leader_key(self) -> bool:
-        """The current leader-mode key (``'g'``, ``'z'``, or ``''`` when inactive)."""
-        return self.app.leader_key
-
-    @leader_key.setter
-    def leader_key(self, value: bool) -> None:
-        """Set the leader-mode key on the app."""
-        self.app.leader_key = value
-
-    @property
     def ordered_selected_rows(self) -> list[int]:
         """Get the list of selected row indices in order.
 
@@ -604,6 +610,9 @@ class DataFrameTable(DataTable):
 
         Args:
             num: The number to round.
+
+        Returns:
+            A tuple (lower, upper) of the nearest batch-size boundaries.
         """
         return round_to_nearest_hundreds(num, N=self.BATCH_SIZE)
 
@@ -745,7 +754,7 @@ class DataFrameTable(DataTable):
         Args:
             event: The key event object.
         """
-        leader = self.leader_key
+        leader = self.app.leader_key
         registry: "KeyBindingRegistry" = self.app.key_registry
 
         # Try to dispatch via the registry (MAIN_TABLE scope only)
@@ -1513,6 +1522,9 @@ class DataFrameTable(DataTable):
         Args:
             segment_start: Start loading rows from this index (0-based).
             segment_stop: Stop loading rows when this index is reached (0-based, exclusive).
+
+        Returns:
+            The number of rows loaded in this segment.
         """
         # Record this range before loading
         self.loaded_ranges.append((segment_start, segment_stop))
@@ -1586,6 +1598,9 @@ class DataFrameTable(DataTable):
         Args:
             start: Start loading rows from this index (0-based).
             stop: Stop loading rows when this index is reached (0-based, exclusive).
+
+        Returns:
+            The total number of rows loaded.
         """
         start = max(0, start)  # Clamp to non-negative
         stop = min(stop, len(self.df))  # Clamp to dataframe length
@@ -2010,9 +2025,8 @@ class DataFrameTable(DataTable):
 
     def cmd_view_cell_detail(self) -> None:
         """Open a modal screen to view the selected cell's details."""
-        cidx = self.cursor_cidx
-        col_name = self.df.columns[cidx]
-        dtype = self.df.dtypes[cidx]
+        col_name = self.cursor_col_name
+        dtype = self.cursor_col_dtype
         cell_value = self.cursor_value
 
         if dtype == pl.String and cell_value:
@@ -2232,7 +2246,7 @@ class DataFrameTable(DataTable):
         label_width = len(self._build_column_label(col_name)) + 2
 
         # If already expanded, shrink back
-        if self.column_widths.get(col_name) == -1:
+        if col_name in self.expanded_columns:
             col.width = max(label_width, COLUMN_WIDTH_CAP)
             self.column_widths.pop(col_name, None)
             return f"[$success]{col_name}[/] shrunk to [$accent]{col.width}[/]"
@@ -2501,8 +2515,8 @@ class DataFrameTable(DataTable):
         """Handle result from EditCellScreen."""
         if result is None:
             return
-
         ridx, col_name, new_value = result
+
         if new_value is None:
             self.app.push_screen(
                 EditCellScreen(ridx, col_name, self.df),
@@ -2510,17 +2524,12 @@ class DataFrameTable(DataTable):
             )
             return
 
-        cidx = self.get_cidx(col_name)
-        if cidx is None:
-            self.notify(f"Column [$warning]{col_name}[/] not found", title="Edit Cell", severity="warning")
-            return
-
         # Add to history
         self.add_history(f"Edit cell [$success]({ridx + 1}, {col_name})[/]", dirty=True)
 
         # Update the cell in the dataframe
         try:
-            dtype = self.df.dtypes[cidx]
+            dtype = self.get_dtype(col_name)
             if isinstance(dtype, pl.List):
                 # pl.lit() cannot represent a list scalar inside when/then;
                 # rebuild the column as a Series with the updated value instead.
@@ -2542,8 +2551,7 @@ class DataFrameTable(DataTable):
                 self.dfull = self.dfull.lazy().update(lf_updated, on=RID, include_nulls=True).collect()
 
             # Update the display
-            cell_value = self.df.item(ridx, cidx)
-            dtype = self.df.dtypes[cidx]
+            cell_value = self.df.item(ridx, col_name)
             dc = DtypeConfig(dtype)
 
             if cell_value is None:
@@ -2643,7 +2651,7 @@ class DataFrameTable(DataTable):
 
         # Otherwise, treat term as a literal value
         else:
-            dtype = self.df.schema[col_name]
+            dtype = self.get_dtype(col_name)
             try:
                 value = DtypeConfig(dtype).convert(term)
                 expr = pl.lit(value)
@@ -2700,6 +2708,7 @@ class DataFrameTable(DataTable):
             return
 
         col_name, new_name = result
+        col_idx = self.get_col_idx(col_name)
         if new_name is None:
             self.app.push_screen(
                 RenameColumnScreen(col_name, self.df.columns),
@@ -2740,7 +2749,6 @@ class DataFrameTable(DataTable):
         self.call_later(self.setup_table)
 
         # Move cursor to the renamed column
-        col_idx = self.df.columns.index(new_name)
         self.move_cursor(column=col_idx)
 
         self.notify(f"Renamed column [$success]{col_name}[/] to [$accent]{new_name}[/]", title="Rename Column")
@@ -2770,7 +2778,7 @@ class DataFrameTable(DataTable):
 
             # Also update the full datafram if applicable
             if self.in_view:
-                ridx_view = self.df.item(ridx, self.df.columns.index(RID))
+                ridx_view = self.df.item(ridx, self.get_cidx(RID))
                 self.dfull = (
                     self.dfull.lazy()
                     .with_columns(
@@ -3366,7 +3374,7 @@ class DataFrameTable(DataTable):
         sibling_names = [s[1] for s in siblings]
 
         # Insertion position: where the first sibling sits in the dataframe
-        insert_cidx = self.df.columns.index(sibling_names[0])
+        insert_cidx = self.get_cidx(sibling_names[0])
 
         # Ensure the new column name is unique (the base_name might already exist)
         new_col_name = base_name
@@ -3652,7 +3660,7 @@ class DataFrameTable(DataTable):
         """Explode a column based on a delimiter (if provided) or as a list column."""
         self.add_history(f"Explode column [$success]{col_name}[/]", dirty=True)
 
-        dtype = self.df.schema[col_name]
+        dtype = self.get_dtype(col_name)
         cols = list(self.df.columns)
 
         try:
@@ -3962,7 +3970,7 @@ class DataFrameTable(DataTable):
             # Get column to swap.
             _, swap_key = self.coordinate_to_cell_key(Coordinate(row_idx, swap_idx))
             swap_name = swap_key.value
-            swap_cidx = self.df.columns.index(swap_name)
+            swap_cidx = self.get_cidx(swap_name)
 
             self.add_history(
                 f"Move column [$success]{col_name}[/] [$accent]{direction}[/] (swapped with [$success]{swap_name}[/])",
@@ -4190,7 +4198,7 @@ class DataFrameTable(DataTable):
 
         from .common import FFINAME_TO_DTYPE
 
-        current_dtype = self.df.schema[col_name]
+        current_dtype = self.get_dtype(col_name)
 
         target_dtype = FFINAME_TO_DTYPE.get(ffiname)
         if target_dtype is None:
@@ -4358,17 +4366,17 @@ class DataFrameTable(DataTable):
 
         # Determine which columns to search: single column or all columns
         if cidx is None:
-            columns_to_search = list(enumerate(self.df.columns))
+            columns_to_search = list(self.df.columns)
         else:
-            columns_to_search = [(cidx, self.df.columns[cidx])]
+            columns_to_search = [self.df.columns[cidx]]
 
         # Handle each column consistently
-        for col_idx, col_name in columns_to_search:
+        for col_name in columns_to_search:
             # Build expression based on term type
             if term == NULL:
                 expr = pl.col(col_name).is_null()
             elif term == "":
-                if self.df.dtypes[col_idx] == pl.String:
+                if self.get_dtype(col_name) == pl.String:
                     expr = pl.col(col_name) == ""
                 else:
                     expr = pl.col(col_name).is_null()
@@ -5032,7 +5040,7 @@ class DataFrameTable(DataTable):
         match_literal = result.get("match_literal", False)
         match_reverse = result.get("match_reverse", False)
 
-        dtype = self.df.schema[col_name]
+        dtype = self.get_dtype(col_name)
 
         # Support for polars expression
         if isinstance(term, pl.Expr):
@@ -5265,7 +5273,8 @@ class DataFrameTable(DataTable):
             filter_expr = pl.lit(True)  # No row filter, just select columns later
         else:  # Search cursor value in current column
             col_name = self.cursor_col_name if col_name is None else col_name
-            dtype = self.df.schema[col_name]
+            dtype = self.get_dtype(col_name)
+
             term = self.cursor_value if term is None else term
 
             if isinstance(term, pl.Expr):
@@ -5529,7 +5538,7 @@ class DataFrameTable(DataTable):
             self.setup_table()
             return
 
-        dtype = self.df.schema[col_name]
+        dtype = self.get_dtype(col_name)
 
         # Already a Polars expression
         if isinstance(term, pl.Expr):
@@ -5668,7 +5677,7 @@ class DataFrameTable(DataTable):
         is_selected = rid in self.selected_rows
         match_cols = self.matches.get(rid, set())
 
-        for col_idx, col in enumerate(self.ordered_columns):
+        for col in self.ordered_columns:
             col_key = col.key
             col_name = col_key.value
             cell_text: Text = self.get_cell(row_key, col_key)
@@ -5677,7 +5686,7 @@ class DataFrameTable(DataTable):
                 cell_text.style = HIGHLIGHT_COLOR
             else:
                 # Reset to default style based on dtype
-                dtype = self.df.dtypes[col_idx]
+                dtype = self.get_dtype(col_name)
                 dc = DtypeConfig(dtype)
                 cell_text.style = dc.style
 

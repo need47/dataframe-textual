@@ -178,6 +178,9 @@ class FilePickerScreen(ModalScreen):
     def _try_set_directory_from_input(self, dirname_input: Input) -> bool:
         """Try to navigate to the directory entered in the dirname input.
 
+        Args:
+            dirname_input: The Input widget containing the directory path.
+
         Returns:
             True when navigation succeeds, otherwise False.
         """

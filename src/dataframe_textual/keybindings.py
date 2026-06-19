@@ -46,20 +46,6 @@ def get_config_dir() -> Path:
     return config_base / APP_NAME
 
 
-class KeyBindingConflict(Exception):
-    """Raised when a new binding conflicts with an existing one.
-
-    Attributes:
-        existing: The existing binding that conflicts.
-        attempted: The binding that was attempted.
-    """
-
-    def __init__(self, existing: "KeyBinding", attempted: "KeyBinding") -> None:
-        super().__init__(
-            f"Key '{attempted.display_key}' (scope={attempted.scope.value}) is already bound to '{existing.command_id}'"
-        )
-
-
 @dataclass(frozen=True, eq=False)
 class KeyBinding:
     """A key binding that maps a key (with optional leader prefix) to a command.
@@ -272,12 +258,7 @@ class KeyBindingRegistry:
     """
 
     def __init__(self) -> None:
-        """Initialize the registry with a set of bindings.
-
-        Args:
-            bindings: Initial mapping from binding slot to command.
-                Uses DEFAULT_BINDINGS if None.
-        """
+        """Initialize the registry with default bindings."""
         self._bindings: dict[KeyBinding, Command] = {}
 
     def lookup(self, key: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE) -> KeyBinding | None:
@@ -330,79 +311,9 @@ class KeyBindingRegistry:
         method()
         return True
 
-    def get_bindings_for_command(self, command_id: str) -> list[KeyBinding]:
-        """Get all bindings that trigger a given command."""
-        return [binding for binding, command in self._bindings.items() if command.cmd == command_id]
-
     def get_bindings_for_scope(self, scope: Scope) -> list[KeyBinding]:
         """Get all bindings active in a given scope."""
         return [binding for binding in self._bindings if binding.scope == scope]
-
-    def set_binding(self, binding: KeyBinding) -> None:
-        """Add or replace a binding (no conflict check).
-
-        If a binding already exists for the same key+leader+scope, it is replaced.
-        For conflict-aware binding, use ``bind()`` instead.
-        """
-        self._bindings[binding] = COMMANDS[binding.command_id]
-
-    def bind(
-        self, key: str, command_id: str, leader: str = "", scope: Scope = Scope.MAIN_TABLE, force: bool = False
-    ) -> KeyBinding | None:
-        """Bind a key to a command, with conflict detection.
-
-        Args:
-            key: The Textual key name (e.g. "q", "ctrl+g", "slash").
-            command_id: The command ID to bind to (must exist in COMMANDS).
-            leader: Optional leader key prefix ("g" or "z"). Empty for no leader.
-            scope: The scope where this binding is active.
-            force: If True, silently replace any existing binding. If False,
-                raise KeyBindingConflict when the slot is already occupied.
-
-        Returns:
-            The replaced KeyBinding if force=True and a conflict existed, else None.
-
-        Raises:
-            KeyBindingConflict: If force=False and the key+leader+scope is already bound.
-            ValueError: If command_id does not exist in the command registry.
-        """
-        if command_id not in COMMANDS:
-            raise ValueError(f"Unknown command ID: {command_id!r}")
-
-        new_binding = KeyBinding(leader=leader, key=key, scope=scope, command_id=command_id)
-        existing_cmd = self._bindings.get(new_binding)
-        existing = (
-            None
-            if existing_cmd is None
-            else KeyBinding(leader=leader, key=key, scope=scope, command_id=existing_cmd.cmd)
-        )
-
-        if existing_cmd is not None:
-            if not force:
-                raise KeyBindingConflict(existing, new_binding)
-
-        self._bindings[new_binding] = COMMANDS[command_id]
-        return existing
-
-    def reset_to_defaults(self) -> None:
-        """Reset all bindings to the defaults."""
-        self._bindings = dict(DEFAULT_BINDINGS)
-
-    def remove_binding(self, binding: KeyBinding) -> bool:
-        """Remove a binding by slot. Returns True if found."""
-        if binding in self._bindings:
-            del self._bindings[binding]
-            return True
-        return False
-
-    @property
-    def bindings(self) -> list[KeyBinding]:
-        """Get all registered bindings."""
-        return list(self._bindings.keys())
-
-    def get_all_with_commands(self) -> list[tuple[KeyBinding, Command]]:
-        """Get all bindings paired with their associated commands."""
-        return list(self._bindings.items())
 
     def generate_help_text(self, scope: Scope) -> str:
         """Generate Markdown help text for all bindings in a given scope.

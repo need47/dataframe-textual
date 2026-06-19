@@ -250,6 +250,7 @@ class YesNoScreen(YMNScreen):
             input: Optional input widget or value to pre-fill. If None, no Input is shown. Defaults to None.
             label2: Optional second label widget. Defaults to None.
             input2: Optional second input widget or value. Defaults to None.
+            label3: Optional third label widget. Defaults to None.
             checkbox: Optional checkbox widget or label. Defaults to None.
             checkbox2: Optional second checkbox widget or label. Defaults to None.
             checkbox3: Optional third checkbox widget or label. Defaults to None.
@@ -554,13 +555,12 @@ class EditCellScreen(YesNoScreen):
         self.ridx = ridx
         self.col_name = col_name
         self.dtype = df.schema[col_name]
-        cidx = df.columns.index(col_name)
 
         # Label
         content = f"[$success]{col_name}[/] ([$accent]{self.dtype}[/])"
 
         # Input
-        df_value = df.item(ridx, cidx)
+        df_value = df.item(ridx, col_name)
         if df_value is None:
             self.input_value = NULL
         elif isinstance(self.dtype, pl.List) and isinstance(df_value, pl.Series):
