@@ -837,11 +837,11 @@ class DataFrameTable(DataTable):
 
     def cmd_sort_ascending(self) -> None:
         """Sort by current column in ascending order."""
-        self.cmd_sort_by_column(descending=False)
+        self._sort_by_column(descending=False)
 
     def cmd_sort_descending(self) -> None:
         """Sort by current column in descending order."""
-        self.cmd_sort_by_column(descending=True)
+        self._sort_by_column(descending=True)
 
     def cmd_hide_column_before(self) -> None:
         """Hide current column and those before."""
@@ -926,7 +926,7 @@ class DataFrameTable(DataTable):
 
     def cmd_find_forward_cursor(self) -> None:
         """Search forward in current column with cursor value."""
-        self.cmd_find_cursor_direct(forward=True, scope="column")
+        self._find_cursor_direct(forward=True, scope="column")
 
     def cmd_find_backward_all(self) -> None:
         """Search backward in all columns with expression."""
@@ -934,31 +934,31 @@ class DataFrameTable(DataTable):
 
     def cmd_find_backward_cursor(self) -> None:
         """Search backward in current column with cursor value."""
-        self.cmd_find_cursor_direct(forward=False, scope="column")
+        self._find_cursor_direct(forward=False, scope="column")
 
     def cmd_replace_column(self) -> None:
         """Replace in current column."""
-        self.cmd_replace(scope="column")
+        self._replace(scope="column")
 
     def cmd_replace_all_columns(self) -> None:
         """Replace across all columns."""
-        self.cmd_replace(scope="global")
+        self._replace(scope="global")
 
     def cmd_move_column_left(self) -> None:
         """Move column left."""
-        self.cmd_move_column("left")
+        self._move_column("left")
 
     def cmd_move_column_right(self) -> None:
         """Move column right."""
-        self.cmd_move_column("right")
+        self._move_column("right")
 
     def cmd_move_column_start(self) -> None:
         """Move column to start."""
-        self.cmd_move_column("start")
+        self._move_column("start")
 
     def cmd_move_column_end(self) -> None:
         """Move column to end."""
-        self.cmd_move_column("end")
+        self._move_column("end")
 
     def cmd_pin_column(self) -> None:
         """Pin the current column to the left and freeze it."""
@@ -987,47 +987,47 @@ class DataFrameTable(DataTable):
 
     def cmd_move_row_up(self) -> None:
         """Move row up."""
-        self.cmd_move_row("up")
+        self._move_row("up")
 
     def cmd_move_row_down(self) -> None:
         """Move row down."""
-        self.cmd_move_row("down")
+        self._move_row("down")
 
     def cmd_move_row_top(self) -> None:
         """Move row to top."""
-        self.cmd_move_row("top")
+        self._move_row("top")
 
     def cmd_move_row_bottom(self) -> None:
         """Move row to bottom."""
-        self.cmd_move_row("bottom")
+        self._move_row("bottom")
 
     def cmd_cast_integer(self) -> None:
         """Cast column to integer."""
-        self.cmd_cast_column_dtype("i64")
+        self._cast_column_dtype("i64")
 
     def cmd_cast_float(self) -> None:
         """Cast column to float."""
-        self.cmd_cast_column_dtype("f64")
+        self._cast_column_dtype("f64")
 
     def cmd_cast_boolean(self) -> None:
         """Cast column to boolean."""
-        self.cmd_cast_column_dtype("bool")
+        self._cast_column_dtype("bool")
 
     def cmd_cast_string(self) -> None:
         """Cast column to string."""
-        self.cmd_cast_column_dtype("str")
+        self._cast_column_dtype("str")
 
     def cmd_cast_date(self) -> None:
         """Cast column to date."""
-        self.cmd_cast_column_dtype("date")
+        self._cast_column_dtype("date")
 
     def cmd_upper_case_column(self) -> None:
         """Convert column(s) to uppercase."""
-        self.cmd_case_column("upper")
+        self._case_column("upper")
 
     def cmd_lower_case_column(self) -> None:
         """Convert column(s) to lowercase."""
-        self.cmd_case_column("lower")
+        self._case_column("lower")
 
     def cmd_copy_cell(self) -> None:
         """Copy the current cell to clipboard."""
@@ -1035,7 +1035,7 @@ class DataFrameTable(DataTable):
         cidx = self.cursor_cidx
         try:
             cell_str = str(self.df.item(ridx, cidx))
-            self.cmd_copy_to_clipboard(cell_str, f"Copied: [$success]{cell_str[:50]}[/]")
+            self._copy_to_clipboard(cell_str, f"Copied: [$success]{cell_str[:50]}[/]")
         except IndexError:
             self.notify(
                 f"Failed to copy cell ([$error]{ridx}[/], [$accent]{cidx}[/]) to clipboard",
@@ -1050,7 +1050,7 @@ class DataFrameTable(DataTable):
         try:
             col_values = [str(val) for val in self.df[col_name].to_list()]
             col_str = "\n".join(col_values)
-            self.cmd_copy_to_clipboard(
+            self._copy_to_clipboard(
                 col_str,
                 f"Copied [$success]{len(col_values)}[/] values from column [$accent]{col_name}[/]",
             )
@@ -1065,7 +1065,7 @@ class DataFrameTable(DataTable):
         try:
             row_values = [str(val) for val in self.df.row(ridx)]
             row_str = "\t".join(row_values)
-            self.cmd_copy_to_clipboard(
+            self._copy_to_clipboard(
                 row_str,
                 f"Copied row [$success]{ridx + 1}[/] with [$accent]{len(row_values)}[/] values",
             )
@@ -2425,7 +2425,7 @@ class DataFrameTable(DataTable):
 
     # Sort
     @with_full_df
-    def cmd_sort_by_column(self, descending: bool = False) -> None:
+    def _sort_by_column(self, descending: bool = False) -> None:
         """Sort by the currently selected column.
 
         Supports multi-column sorting:
@@ -3791,17 +3791,6 @@ class DataFrameTable(DataTable):
         if deleted_count > 0:
             self.notify(f"Deleted [$success]{deleted_count}[/] row(s)", title="Delete Row(s)")
 
-    def cmd_duplicate_row_column(self, target: str = "row") -> None:
-        """Duplicate the currently selected row or column.
-
-        Args:
-            target: "row" or "column"
-        """
-        if target == "column":
-            self.cmd_duplicate_column()
-        else:
-            self.cmd_duplicate_row()
-
     @with_full_df
     def cmd_duplicate_row(self) -> None:
         """Duplicate the currently selected row, inserting it right after the current row."""
@@ -3910,7 +3899,7 @@ class DataFrameTable(DataTable):
         )
 
     @with_full_df
-    def cmd_move_column(self, direction: str, col_name: str | None = None) -> None:
+    def _move_column(self, direction: str, col_name: str | None = None) -> None:
         """Move the current column left or right.
 
         Args:
@@ -3995,7 +3984,7 @@ class DataFrameTable(DataTable):
         self.notify(f"Moved column [$success]{col_name}[/] {direction}", title="Move Column")
 
     @with_full_df
-    def cmd_move_row(self, direction: str) -> None:
+    def _move_row(self, direction: str) -> None:
         """Move the current row.
 
         Args:
@@ -4167,7 +4156,7 @@ class DataFrameTable(DataTable):
 
     # Type casting
     @with_full_df
-    def cmd_cast_column_dtype(self, ffiname: str = "", col_name: str = "") -> None:
+    def _cast_column_dtype(self, ffiname: str = "", col_name: str = "") -> None:
         """Cast the current column to a different data type.
 
         Args:
@@ -4248,7 +4237,7 @@ class DataFrameTable(DataTable):
             self.log(f"Error casting column `{col_name}`: {e}")
 
     @with_full_df
-    def cmd_case_column(self, case: str) -> None:
+    def _case_column(self, case: str) -> None:
         """Convert string column(s) to uppercase or lowercase.
 
         Applies the transformation to all selected string columns when a column
@@ -4416,7 +4405,7 @@ class DataFrameTable(DataTable):
         """
         self.cmd_find_backward(forward=forward, scope=scope)
 
-    def cmd_find_cursor_direct(self, forward: bool = True, scope: str = "column") -> None:
+    def _find_cursor_direct(self, forward: bool = True, scope: str = "column") -> None:
         """Search immediately using the cursor value without opening SearchScreen.
 
         Args:
@@ -4616,7 +4605,7 @@ class DataFrameTable(DataTable):
         last_ridx = selected_row_indices[-1]
         self.move_cursor_to(last_ridx, self.cursor_cidx)
 
-    def cmd_replace(self, scope="column") -> None:
+    def _replace(self, scope="column") -> None:
         """Open replace screen for current column or globally across all columns."""
         # Push the replace modal screen
         title = "Find and Replace" if scope == "column" else "Global Find and Replace"
@@ -5798,7 +5787,7 @@ class DataFrameTable(DataTable):
         self.notify(message, title="Clear Selections/Matches")
 
     # Copy
-    def cmd_copy_to_clipboard(self, content: str, message: str) -> None:
+    def _copy_to_clipboard(self, content: str, message: str) -> None:
         """Copy content to clipboard using pbcopy (macOS) or xclip (Linux).
 
         Args:

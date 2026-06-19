@@ -1256,10 +1256,10 @@ class MetaColumnScreen(TableScreen):
         col_name = self.dftable.df.columns[row_idx]
 
         if direction == "right":
-            self.dftable.cmd_move_column("right", col_name=col_name)
+            self.dftable._move_column("right", col_name=col_name)
             new_row_idx = min(row_idx + 1, len(self.dftable.df.columns) - 1)
         else:
-            self.dftable.cmd_move_column("left", col_name=col_name)
+            self.dftable._move_column("left", col_name=col_name)
             new_row_idx = max(row_idx - 1, 0)
 
         self.build_table()
@@ -1277,7 +1277,7 @@ class MetaColumnScreen(TableScreen):
             self.dftable.cmd_rename_column(col_name=col_name)
         elif col_idx == 1:
             col_name = self.dftable.df.columns[row_idx]
-            self.dftable.cmd_cast_column_dtype(col_name=col_name)
+            self.dftable._cast_column_dtype(col_name=col_name)
         elif col_idx == 2:
             col_name = self.dftable.df.columns[row_idx]
             self.dftable.cmd_resize_column(col_name=col_name)
