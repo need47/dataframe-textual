@@ -1719,7 +1719,7 @@ class DataFrameTable(DataTable):
 
         row_key = RowKey(key)
         if row_key in self._row_locations:
-            raise DuplicateKey(f"The row key {row_key!r} already exists.")
+            raise DuplicateKey(f"The row key {row_key} already exists.")
 
         if len(cells) > len(self.ordered_columns):
             raise ValueError("More values provided than there are columns.")
@@ -4388,7 +4388,7 @@ class DataFrameTable(DataTable):
                 typed_value = dc.convert(fill_value)
             except (ValueError, TypeError):
                 self.notify(
-                    f"Cannot convert [$error]{fill_value!r}[/] to [$accent]{dtype}[/]",
+                    f"Cannot convert [$error]{fill_value}[/] to [$accent]{dtype}[/]",
                     title=title,
                     severity="error",
                 )
@@ -4419,7 +4419,7 @@ class DataFrameTable(DataTable):
                 return
         else:
             self.add_history(
-                f"Fill nulls in all columns with [$accent]{fill_value!r}[/]",
+                f"Fill nulls in all columns with [$accent]{fill_value}[/]",
                 dirty=True,
             )
 
@@ -4440,7 +4440,7 @@ class DataFrameTable(DataTable):
                     if self.histories_undo:
                         self.histories_undo.pop()
                     self.notify(
-                        f"Value [$warning]{fill_value!r}[/] could not be converted for any column",
+                        f"Value [$warning]{fill_value}[/] could not be converted for any column",
                         title=title,
                         severity="warning",
                     )
@@ -4465,7 +4465,7 @@ class DataFrameTable(DataTable):
 
         self.setup_table()
         self.notify(
-            f"Filled nulls in [$success]{filled}[/] with [$accent]{fill_value!r}[/]",
+            f"Filled nulls in [$success]{filled}[/] with [$accent]{fill_value}[/]",
             title=title,
         )
 
