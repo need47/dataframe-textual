@@ -3131,17 +3131,12 @@ class DataFrameTable(DataTable):
         new_col_name = self._get_column_name(base_name)
 
         self.add_history(
-            f"Join [$accent]{len(ordered_selected)}[/] columns into [$success]{new_col_name}[/] with delimiter [$accent]{delimiter!r}[/]",
+            f"Join [$accent]{len(ordered_selected)}[/] columns into [$success]{new_col_name}[/] with delimiter [$accent]{delimiter}[/]",
             dirty=True,
         )
 
         try:
-            # Cast every selected column to String, then concatenate with the delimiter
-            str_exprs = [pl.col(c).cast(pl.String) for c in ordered_selected]
-            if delimiter:
-                join_expr = pl.concat_str(str_exprs, separator=delimiter).alias(new_col_name)
-            else:
-                join_expr = pl.concat_str(str_exprs).alias(new_col_name)
+            join_expr = pl.concat_str(ordered_selected, separator=delimiter).alias(new_col_name)
 
             # Insert after current cursor column
             cols = self.df.columns
@@ -3216,7 +3211,7 @@ class DataFrameTable(DataTable):
         new_col_name = self._get_column_name(f"{col_name}_glued")
 
         self.add_history(
-            f"Glue list column [$success]{col_name}[/] into [$success]{new_col_name}[/] with delimiter [$accent]{delimiter!r}[/]",
+            f"Glue list column [$success]{col_name}[/] into [$success]{new_col_name}[/] with delimiter [$accent]{delimiter}[/]",
             dirty=True,
         )
 
