@@ -274,6 +274,7 @@ Useful examples from current bindings:
 | `Ctrl+Q`       | Force quit app (discards unsaved changes)                  |
 | `gB`           | Toggle tab bar visibility                                  |
 | `B`            | Previous tab                                               |
+| `zB`           | Jump to last focused tab                                   |
 | `b`            | Next tab                                                   |
 | `gb`           | Move current tab left (wrap to last)                       |
 | `zb`           | Move current tab right (wrap to first)                     |
@@ -293,15 +294,13 @@ Useful examples from current bindings:
 
 #### View & Settings
 
-| Key                       | Action                                        |
-| ------------------------- | --------------------------------------------- |
-| `F1`                      | Toggle help panel                             |
-| `S`                       | Show information for all open tabs            |
-| `Space`                   | Toggle Python console                         |
-| `zSpace`                  | Run a command by name with optional arguments |
-| `z Ctrl+H` / `zBackspace` | Show all commands and key bindings            |
-| `Ctrl+P` -> `Screenshot`  | Capture terminal view as a SVG image          |
-| `gT`                      | Select theme                                  |
+| Key                       | Action                               |
+| ------------------------- | ------------------------------------ |
+| `F1`                      | Toggle help panel                    |
+| `S`                       | Show information for all open tabs   |
+| `z Ctrl+H` / `zBackspace` | Show all commands and key bindings   |
+| `Ctrl+P` -> `Screenshot`  | Capture terminal view as a SVG image |
+| `gT`                      | Select theme                         |
 
 #### Join Tables
 
@@ -395,7 +394,7 @@ Useful examples from current bindings:
 | `z:`           | Join all selected columns into a new string column by delimiter           |
 | `Ctrl+U`       | Convert current or selected string column(s) to uppercase                 |
 | `Ctrl+L`       | Convert current or selected string column(s) to lowercase                 |
-| `zB`           | Strip leading and trailing whitespaces in current string column           |
+| `zSpace`       | Strip leading and trailing whitespaces in current string column           |
 | `zf`           | Fill null values in current column with a value                           |
 | `gf`           | Fill null values in all columns with a value                              |
 | `(`            | Expand current list column into indexed columns (e.g. `col[1]`, `col[2]`) |
@@ -477,12 +476,13 @@ Useful examples from current bindings:
 
 #### Type Casting
 
-| Key | Action                         |
-| --- | ------------------------------ |
-| `~` | Cast current column to string  |
-| `@` | Cast current column to date    |
-| `#` | Cast current column to integer |
-| `%` | Cast current column to float   |
+| Key  | Action                         |
+| ---- | ------------------------------ |
+| `~`  | Cast current column to string  |
+| `@`  | Cast current column to date    |
+| `#`  | Cast current column to integer |
+| `%`  | Cast current column to float   |
+| `z#` | Cast current column to boolean |
 
 #### Copy
 
@@ -492,12 +492,14 @@ Useful examples from current bindings:
 | `Ctrl+C` | Copy column to clipboard              |
 | `Ctrl+R` | Copy row to clipboard (tab-separated) |
 
-#### SQL Interface
+#### SQL & Advanced
 
-| Key  | Action                                                     |
-| ---- | ---------------------------------------------------------- |
-| `Q`  | SQL query interface (full SQL query with syntax highlight) |
-| `zQ` | SQL query interface (select columns & where clause)        |
+| Key      | Action                                                     |
+| -------- | ---------------------------------------------------------- |
+| `Q`      | SQL query interface (full SQL query with syntax highlight) |
+| `zQ`     | SQL query interface (select columns & where clause)        |
+| `Space`  | Toggle Python console                                      |
+| `gSpace` | Run a command by name with optional arguments              |
 
 ## Features in Detail
 
@@ -836,7 +838,7 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 - `)`: Contract those indexed sibling columns back into a single list column. Position the cursor on any sibling (e.g. `colname[2]`) and press `)` to merge all `colname[N]` columns back into `colname`.
 - `Ctrl+U`: Convert the current column, or all selected columns that are string type, to uppercase.
 - `Ctrl+L`: Convert the current column, or all selected columns that are string type, to lowercase.
-- `zB`: Strip leading and trailing whitespaces in the current string column.
+- `zSpace`: Strip leading and trailing whitespaces in the current string column.
 
 ### 15. Column & Row Reordering
 

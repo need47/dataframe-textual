@@ -57,10 +57,9 @@ class Category(str, Enum):
     REORDER = "Reorder"
     TYPE_CASTING = "Type Casting"
     COPY = "Copy"
-    SQL = "SQL Interface"
+    ADVANCED = "Advanced Interfaces"
     VIEW_SETTINGS = "View & Settings"
     JOIN_TABLE = "Join Tables"
-    MISC = "Miscellaneous"
 
 
 @dataclass(frozen=False, eq=False)
@@ -168,6 +167,7 @@ _reg("close-all",               "Quit all tabs (prompts to save unsaved changes)
 _reg("force-quit",              "Force quit app (discards unsaved changes)",           Scope.APP, Category.FILE_TAB, "⚠️").bind("ctrl+q")
 _reg("toggle-tab-bar",          "Toggle tab bar visibility",                           Scope.APP, Category.FILE_TAB, "👁️").bind("B", leader="g")
 _reg("prev-tab",                "Previous Tab",                                        Scope.APP, Category.FILE_TAB, "⏮️").bind("B")
+_reg("last-tab",                "Jump to last focused tab",                            Scope.APP, Category.FILE_TAB, "🔙").bind("B", leader="z")
 _reg("next-tab",                "Next Tab",                                            Scope.APP, Category.FILE_TAB, "⏭️").bind("b")
 _reg("move-tab-left",           "Move current tab left (wrap to last)",                Scope.APP, Category.FILE_TAB, "◀️").bind("b", leader="g")
 _reg("move-tab-right",          "Move current tab right (wrap to first)",              Scope.APP, Category.FILE_TAB, "▶️").bind("b", leader="z")
@@ -185,7 +185,6 @@ _reg("new-tab",                 "Create new tab from Polars expression",        
 
 _reg("show-sheets",           "Show all open sheets/tabs",          Scope.APP, Category.VIEW_SETTINGS, "📋").bind("S")
 _reg("toggle-help-panel",     "Toggle help panel",                  Scope.APP, Category.VIEW_SETTINGS, "❓").bind("F1")
-_reg("toggle-python-console", "Toggle Python console",              Scope.APP, Category.VIEW_SETTINGS, "🐍").bind("Space")
 _reg("select-theme",          "Select theme",                       Scope.APP, Category.VIEW_SETTINGS, "🎨").bind("T", leader="g")
 _reg("show-commands",         "Show all commands and key bindings", Scope.APP, Category.VIEW_SETTINGS, "⌨️").bind("Backspace", leader="z").bind("ctrl+h", leader="z")
 
@@ -194,8 +193,8 @@ _reg("show-commands",         "Show all commands and key bindings", Scope.APP, C
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _reg("cursor-left",   "Move cursor left",           Scope.MAIN_TABLE, Category.NAVIGATION, "🎯").bind("h")
-_reg("cursor-down",   "Move cursor down",           Scope.MAIN_TABLE, Category.NAVIGATION, "🎯").bind("j")
-_reg("cursor-up",     "Move cursor up",             Scope.MAIN_TABLE, Category.NAVIGATION, "🎯").bind("k")
+_reg("cursor-down",   "Move cursor down",           Scope.MAIN_TABLE, Category.NAVIGATION, "🎯").bind("j").bind("down")
+_reg("cursor-up",     "Move cursor up",             Scope.MAIN_TABLE, Category.NAVIGATION, "🎯").bind("k").bind("up")
 _reg("cursor-right",  "Move cursor right",          Scope.MAIN_TABLE, Category.NAVIGATION, "🎯").bind("l")
 _reg("go-top",        "Go to first row",            Scope.MAIN_TABLE, Category.NAVIGATION, "⬆️").bind("g", leader="g")
 _reg("go-bottom",     "Go to last row",             Scope.MAIN_TABLE, Category.NAVIGATION, "⬇️").bind("G")
@@ -276,7 +275,7 @@ _reg("join-columns",         "Join all selected columns into a new column",     
 _reg("glue-list-column",     "Glue list column values with separator",                   Scope.MAIN_TABLE, Category.EDITING, "🔗").bind(":", leader="g")
 _reg("upper-case-column",    "Convert current or selected column(s) to uppercase",       Scope.MAIN_TABLE, Category.EDITING, "🔠").bind("ctrl+u")
 _reg("lower-case-column",    "Convert current or selected column(s) to lowercase",       Scope.MAIN_TABLE, Category.EDITING, "🔡").bind("ctrl+l")
-_reg("strip-whitespace",     "Strip leading and trailing whitespaces in current column", Scope.MAIN_TABLE, Category.EDITING, "🧼").bind("B", leader="z")
+_reg("strip-whitespace",     "Strip leading and trailing whitespaces in current column", Scope.MAIN_TABLE, Category.EDITING, "🧼").bind("Space", leader="z")
 _reg("fill-null",            "Fill null values in current column",                       Scope.MAIN_TABLE, Category.EDITING, "🩹").bind("f", leader="z")
 _reg("fill-null-all",        "Fill null values in all columns",                          Scope.MAIN_TABLE, Category.EDITING, "🩹").bind("f", leader="g")
 
@@ -371,12 +370,13 @@ _reg("copy-column", "Copy column to clipboard",              Scope.MAIN_TABLE, C
 _reg("copy-row",    "Copy row to clipboard (tab-separated)", Scope.MAIN_TABLE, Category.COPY, "📝").bind("ctrl+r")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# SQL Interface (MainTable scope)
+# Advanced Interfaces (MainTable scope)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_reg("sql-advanced", "Open advanced SQL interface (full SQL queries)",            Scope.MAIN_TABLE, Category.SQL,           "🔎").bind("Q")
-_reg("sql-simple",   "Open simple SQL interface (select columns & where clause)", Scope.MAIN_TABLE, Category.SQL,           "💬").bind("Q", leader="z")
-_reg("run-command",  "Run a command by name with optional arguments",             Scope.MAIN_TABLE, Category.VIEW_SETTINGS, "▶️").bind("Space", leader="z")
+_reg("sql-advanced", "Open advanced SQL interface (full SQL queries)",            Scope.MAIN_TABLE, Category.ADVANCED, "🔎").bind("Q")
+_reg("sql-simple",   "Open simple SQL interface (select columns & where clause)", Scope.MAIN_TABLE, Category.ADVANCED, "💬").bind("Q", leader="z")
+_reg("toggle-python-console", "Toggle Python console",                            Scope.MAIN_TABLE, Category.ADVANCED, "🐍").bind("Space")
+_reg("run-command",  "Run a command by name with optional arguments",             Scope.MAIN_TABLE, Category.ADVANCED, "▶️").bind("Space", leader="g")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Table Modal Screen

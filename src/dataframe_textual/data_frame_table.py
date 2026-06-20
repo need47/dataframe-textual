@@ -764,12 +764,6 @@ class DataFrameTable(DataTable):
             self.app.reset_leader()
             return
 
-        # Arrow keys always trigger row loading for lazy-loaded dataframes
-        if event.key == "up":
-            self.load_rows_up()
-        elif event.key == "down":
-            self.load_rows_down()
-
     def on_click(self, event: Click) -> None:
         """Handle mouse click events on the table.
 
@@ -809,10 +803,12 @@ class DataFrameTable(DataTable):
 
     def cmd_cursor_up(self) -> None:
         """Move cursor up."""
+        self.load_rows_up()
         self.action_cursor_up()
 
     def cmd_cursor_down(self) -> None:
         """Move cursor down."""
+        self.load_rows_down()
         self.action_cursor_down()
 
     def cmd_scroll_home(self) -> None:
@@ -4291,7 +4287,7 @@ class DataFrameTable(DataTable):
             )
             return
 
-        descr = f"Strip leading/trailing whitespaces in column [$success]{col_name}[/]"
+        descr = f"Stripped leading/trailing whitespaces in column [$success]{col_name}[/]"
         self.add_history(descr, dirty=True)
 
         try:

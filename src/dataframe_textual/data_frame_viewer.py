@@ -105,6 +105,11 @@ class DataFrameViewer(App):
         self.tabs: dict[TabPane, DataFrameTable] = {}
         self.help_panel: DataFrameHelpPanel | None = None
 
+        self.this_tab: TabPane | None = None
+        self.last_tab: TabPane | None = None
+
+        self.notified = False
+
         # Key binding registry
         self.key_registry = key_registry
 
@@ -150,25 +155,31 @@ class DataFrameViewer(App):
             event.prevent_default()
             self.leader_key = event.key
             self.notify(
-                f"Leader mode activated with [$success]{event.key}[/], waiting for next key in 3 seconds",
+                f"Leader mode activated with [$success]{event.key}[/], waiting for next key in [$accent]3[/] seconds",
                 title="Leader Mode",
             )
+            self.notified = False
             self.leader_timer = self.set_timer(3, callback=lambda: self.reset_leader("Leader mode timed out"))
             return
 
         # No relevant key binding, allow event to propagate normally
         else:
+            self.notify("Ready", title="Key Binding")
             return
 
     def reset_leader(self, message: str = "") -> None:
         """Cancel leader mode and reset the timeout timer."""
-        self.leader_key = ""
-        if message:
-            self.notify(message, title="Leader Mode")
-
         if self.leader_timer:
             self.leader_timer.stop()
             self.leader_timer = None
+
+        if message:
+            self.notify(message, title="Leader Mode")
+        elif not self.notified:
+            self.notify("Ready", title="Leader Mode")
+
+        self.leader_key = ""
+        self.notified = False
 
     @property
     def active_table(self) -> DataFrameTable | None:
@@ -282,6 +293,11 @@ class DataFrameViewer(App):
         Args:
             event: The tab activated event containing the activated tab pane.
         """
+        # Track last focused tab for zB jump-back
+        if event.pane != self.this_tab:
+            self.last_tab = self.this_tab
+            self.this_tab = event.pane
+
         if table := self.active_table:
             if table.loaded_rows == 0:
                 table.init_table()
@@ -316,15 +332,16 @@ class DataFrameViewer(App):
             table: Optional active table to render context from.
         """
         table = table or self.active_table
+        if table is None:
+            return
 
         row_count, column_count = 0, 0
-        if table is not None:
-            if table.df is not None:
-                row_count = len(table.df)
-                column_count = len(table.df.columns) - 1  # Exclude the hidden RID column
-            else:
-                row_count = table.loaded_rows
-                column_count = len(table.lf.collect_schema().names())
+        if table.df is not None:
+            row_count = len(table.df)
+            column_count = len(table.df.columns) - 1  # Exclude the hidden RID column
+        else:
+            row_count = table.loaded_rows
+            column_count = len(table.lf.collect_schema().names())
 
         filename = Path(table.filename).name if table else "No file"
         view_or_main = "View" if table.in_view else "Main"
@@ -373,7 +390,8 @@ class DataFrameViewer(App):
             timeout: Optional notification timeout in seconds.
             markup: Whether the message should be interpreted as Rich markup.
         """
-        self._set_status(message, title=title, severity=severity, markup=markup)
+        self._set_status(message, title=None, severity=severity, markup=markup)
+        self.notified = True
 
         # if severity in {"warning", "error"}:
         #     super().notify(
@@ -693,6 +711,15 @@ class DataFrameViewer(App):
     def cmd_prev_tab(self) -> None:
         """Switch to the previous tab."""
         self.do_next_tab(-1)
+
+    def cmd_last_tab(self) -> None:
+        """Jump to the last focused tab."""
+        if self.last_tab is None:
+            self.notify("No last tab to jump to", title="Last Tab", severity="warning")
+            return
+
+        self.tabbed.active = self.last_tab.id
+        self.notify("Jumped to last tab", title="Last Tab")
 
     def cmd_move_tab_left(self) -> None:
         """Move current tab to the left."""
