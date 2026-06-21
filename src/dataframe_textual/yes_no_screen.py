@@ -390,7 +390,9 @@ class ConfirmScreen(YesNoScreen):
         }
     """
 
-    def __init__(self, title: str | None = None, label=None, input=None, yes="Yes", maybe: str | None = None, no="No"):
+    def __init__(
+        self, title: str | None = None, label=None, input=None, yes="Confirm", maybe: str | None = None, no="Cancel"
+    ):
         super().__init__(
             title=title,
             label=label,
@@ -575,6 +577,8 @@ class EditCellScreen(YesNoScreen):
                 "value": self.input_value,
                 "type": DtypeConfig(self.dtype).itype,
             },
+            yes="Apply",
+            no="Cancel",
             on_yes_callback=self._validate_input,
         )
 
@@ -642,6 +646,8 @@ class SearchScreen(YesNoScreen):
             checkbox2=Checkbox("Whole", id="checkbox-whole", tooltip="Match whole words only"),
             checkbox3=Checkbox("Literal", id="checkbox-literal", tooltip="Treat input as plain text instead of regex"),
             checkbox4=Checkbox("Reverse", id="checkbox-reverse", tooltip="Invert the match result"),
+            yes="Search",
+            no="Cancel",
             on_yes_callback=self._get_input,
         )
 
@@ -676,6 +682,8 @@ class FreezeScreen(YesNoScreen):
             input={"value": "0", "type": "number"},
             label2="Enter number of fixed columns",
             input2={"value": "0", "type": "number"},
+            yes="Apply",
+            no="Cancel",
             on_yes_callback=self._get_input,
         )
 
@@ -709,6 +717,8 @@ class RenameColumnScreen(YesNoScreen):
             title="Rename Column",
             label=content,
             input={"value": col_name},
+            yes="Rename",
+            no="Cancel",
             on_yes_callback=self._validate_input,
         )
 
@@ -748,6 +758,8 @@ class EditColumnScreen(YesNoScreen):
             title="Edit Column",
             label=f"By value or Polars expression, e.g., abc, pl.lit(7), {NULL}, $_ * 2, $1 + $2, $_.str.to_uppercase(), pl.arange(0, pl.len())",
             input="$_",
+            yes="Apply",
+            no="Cancel",
             on_yes_callback=self._get_input,
         )
 
@@ -778,6 +790,8 @@ class AddColumnScreen(YesNoScreen):
             input="Link" if link else "New column",
             label2=label2,
             input2="Link template" if link else "Value or Polars expression",
+            yes="Add",
+            no="Cancel",
             on_yes_callback=self._get_input,
         )
 
@@ -894,6 +908,8 @@ class RenameTabScreen(YesNoScreen):
             title="Rename Tab",
             label="New tab name",
             input={"value": tab_name},
+            yes="Rename",
+            no="Cancel",
             on_yes_callback=self._validate_input,
         )
 
@@ -930,6 +946,8 @@ class CustomBinScreen(YesNoScreen):
             title="Custom Bins",
             label="Enter number of bins or bin breakpoints (e.g., 5 or 0 10 20 30)",
             input={"value": "10"},
+            yes="Apply",
+            no="Cancel",
             on_yes_callback=self._get_input,
         )
 

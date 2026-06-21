@@ -696,7 +696,7 @@ class DataFrameViewer(App):
 
     def cmd_last_tab(self) -> None:
         """Jump to the last focused tab."""
-        if self.last_tab is None:
+        if self.last_tab not in self.tabs:
             self.notify("No last tab to jump to", title="Last Tab", severity="warning")
             return
 

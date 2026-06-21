@@ -2303,7 +2303,7 @@ class DataFrameTable(DataTable):
             self.refresh(layout=True)
 
             self.notify(
-                f"Toggled {len(results)} column(s)",
+                f"Toggled [$success]{len(results)}[/] column(s)",
                 title="Expand Columns",
             )
         else:
@@ -3609,6 +3609,12 @@ class DataFrameTable(DataTable):
             else:
                 lf = lf.select(pl.col(col_name).implode())
 
+            # Reorder columns to place col_name in its original position
+            col_idx = columns.index(col_name)
+            result_cols = [c for c in lf.collect_schema().names() if c != col_name]
+            result_cols.insert(min(col_idx, len(result_cols)), col_name)
+            lf = lf.select(result_cols)
+
             self.df = add_rid_column(lf).collect()
             self.dfull = None
 
@@ -4535,9 +4541,9 @@ class DataFrameTable(DataTable):
             try:
                 matched_ridxs = lf.filter(expr).collect()[RID]
             except Exception as e:
-                self.notify(f"Failed to apply filter [$error]{expr}[/]", title="Find", severity="error")
+                # self.notify(f"Failed to apply filter [$error]{expr}[/]", title="Find", severity="error")
                 self.log(f"Error applying filter: {e}")
-                return matches
+                continue  # Skip filter for this column
 
             for ridx in matched_ridxs:
                 matches[ridx].add(col_name)
@@ -5128,7 +5134,7 @@ class DataFrameTable(DataTable):
                 }
             )
 
-    def cmd_filter_rows_null(self, with_null: bool = False) -> None:
+    def cmd_filter_rows_null(self, with_null: bool = True) -> None:
         """Filter rows by nullness in the current column.
 
         Args:
