@@ -5996,6 +5996,20 @@ class DataFrameTable(DataTable):
             callback=self.advanced_sql,
         )
 
+    def cmd_toggle_python_console(self) -> None:
+        """Toggle the embedded Python console for the current tab."""
+        console = self.app.console_panel
+        if not console:
+            return
+
+        if console.display:
+            console.display = False
+            self.focus()
+            return
+
+        console.display = True
+        console.focus_input()
+
     def cmd_run_command(self) -> None:
         """Open a modal screen to run a cmd_* method by name.
 

@@ -642,24 +642,6 @@ class DataFrameViewer(App):
         """Open the theme selection screen."""
         self.push_screen(ThemeScreen())
 
-    def cmd_toggle_python_console(self) -> None:
-        """Toggle the embedded Python console for the current tab."""
-        if not self.console_panel:
-            return
-
-        if self.console_panel.display:
-            self.console_panel.display = False
-            if table := self.active_table:
-                table.focus()
-            return
-
-        if not self.active_table:
-            self.notify("No active table found", title="Python Console", severity="error")
-            return
-
-        self.console_panel.display = True
-        self.console_panel.focus_input()
-
     def _get_console_context(self) -> dict[str, Any]:
         """Build the execution context for the Python console.
 
