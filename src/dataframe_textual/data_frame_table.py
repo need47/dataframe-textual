@@ -1204,8 +1204,10 @@ class DataFrameTable(DataTable):
         self.load_rows_range(0, self.BATCH_SIZE)  # Load initial rows
 
         # Restore cursor position
-        if row_idx < len(self.rows) and col_idx < len(self.columns):
-            self.move_cursor(row=row_idx, column=col_idx)
+        self.move_cursor(
+            row=row_idx if row_idx < len(self.rows) else None,
+            column=col_idx if col_idx < len(self.columns) else None,
+        )
 
         # # Use the app's set_status_context method to set the current context for status messages
         # self.app._set_status_context(self)
