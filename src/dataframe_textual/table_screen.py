@@ -1499,7 +1499,7 @@ class SheetScreen(TableModalScreen):
         panes = list(self.tabs.keys())
         if 0 <= row_idx < len(panes):
             target_pane = panes[row_idx]
-            self.app.close_current(target_pane)
+            self.app.close_tab(target_pane)
             self.build_table()
 
     def _rename_cursor_tab(self) -> None:
