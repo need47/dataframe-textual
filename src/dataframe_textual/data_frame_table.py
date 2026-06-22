@@ -509,7 +509,7 @@ class DataFrameTable(DataTable):
         return self.get_dtype(self.cursor_col_name)
 
     @property
-    def cursor_ridx(self) -> int:
+    def cursor_ridx(self) -> int | None:
         """Get the current cursor row index (0-based) as in dataframe.
 
         Returns:
@@ -518,20 +518,23 @@ class DataFrameTable(DataTable):
         Raises:
             AssertionError: If the cursor row index is out of bounds.
         """
-        ridx = int(self.cursor_row_key.value)
-        assert 0 <= ridx < len(self.df), "Cursor row index is out of bounds"
+        try:
+            ridx = int(self.cursor_row_key.value)
+        except CellDoesNotExist:
+            ridx = None
         return ridx
 
     @property
-    def cursor_cidx(self) -> int:
+    def cursor_cidx(self) -> int | None:
         """Get the current cursor column index (0-based) as in dataframe.
 
         Returns:
             int: The 0-based column index of the cursor position.
         """
-        cidx = self.get_cidx(self.cursor_col_name)
-        if cidx is None:
-            raise ValueError(f"Cursor column name '{self.cursor_col_name}' not found in dataframe")
+        try:
+            cidx = self.get_cidx(self.cursor_col_name)
+        except CellDoesNotExist:
+            cidx = None
         return cidx
 
     @property
@@ -730,7 +733,10 @@ class DataFrameTable(DataTable):
 
         row_key = self.cursor_row_key if ridx is None else str(ridx)
         col_key = self.cursor_col_key if cidx is None else self.df.columns[cidx]
-        row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
+        try:
+            row_idx, col_idx = self.get_cell_coordinate(row_key, col_key)
+        except CellDoesNotExist:
+            row_idx, col_idx = None, None
         self.move_cursor(row=row_idx, column=col_idx)
 
     def on_mount(self) -> None:
