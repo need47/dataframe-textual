@@ -725,7 +725,7 @@ class DataFrameTable(DataTable):
             cidx: Column index (0-based) in the dataframe.
         """
         # Ensure the target row is loaded
-        start, stop = self._round_to_nearest_hundreds(ridx)
+        start, stop = self._round_to_nearest_hundreds(0 if ridx is None else ridx)
         self.load_rows_range(start, stop)
 
         row_key = self.cursor_row_key if ridx is None else str(ridx)
