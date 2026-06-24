@@ -117,18 +117,18 @@ class ConsolePanel(Vertical):
         Args:
             event: Key event instance.
         """
-        if not self.input.has_focus:
-            return
-
-        if event.key == "up":
-            event.stop()
-            self._navigate_history(-1)
-        elif event.key == "down":
-            event.stop()
-            self._navigate_history(1)
-        elif event.key == "escape":
+        if event.key == "escape":
             event.stop()
             self.close_console()
+            return
+
+        if self.input.has_focus:
+            if event.key == "up":
+                event.stop()
+                self._navigate_history(-1)
+            elif event.key == "down":
+                event.stop()
+                self._navigate_history(1)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Reset history cursor if the user edits text after navigating history.
