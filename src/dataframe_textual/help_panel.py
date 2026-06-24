@@ -5,6 +5,7 @@ from textwrap import dedent
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.css.query import NoMatches
+from textual.events import Key
 from textual.widget import Widget
 from textual.widgets import Markdown
 
@@ -69,6 +70,22 @@ class DataFrameHelpPanel(Widget):
 
     DEFAULT_CLASSES = "-textual-system"
 
+    def __init__(self) -> None:
+        """Initialize the help panel widget."""
+        super().__init__()
+        self.can_focus = True
+
+    def compose(self) -> ComposeResult:
+        """Compose the help panel widget structure.
+
+        Creates and returns the widget hierarchy for the help panel,
+        including a VerticalScroll container with a Markdown display area.
+
+        Yields:
+            VerticalScroll: The main container with Markdown widget for help text.
+        """
+        yield VerticalScroll(Markdown(id="widget-help"))
+
     def on_mount(self) -> None:
         """Set up help panel when mounted.
 
@@ -82,6 +99,18 @@ class DataFrameHelpPanel(Widget):
         # self.watch(self.screen, "focused", update_help)
 
         self.update_help(self.screen.focused)
+        self.focus()
+
+    def on_key(self, event: Key) -> None:
+        """Handle key events.
+
+        Args:
+            event: Key event instance.
+        """
+        if event.key == "escape":
+            event.stop()
+            self.close_panel()
+            return
 
     def update_help(self, focused_widget: Widget | None) -> None:
         """Update the help for the focused widget.
@@ -103,13 +132,8 @@ class DataFrameHelpPanel(Widget):
             except NoMatches:
                 pass
 
-    def compose(self) -> ComposeResult:
-        """Compose the help panel widget structure.
-
-        Creates and returns the widget hierarchy for the help panel,
-        including a VerticalScroll container with a Markdown display area.
-
-        Yields:
-            VerticalScroll: The main container with Markdown widget for help text.
-        """
-        yield VerticalScroll(Markdown(id="widget-help"))
+    def close_panel(self) -> None:
+        """Hide the console panel when escape is pressed."""
+        self.display = False
+        if table := self.app.active_table:
+            table.focus()
