@@ -6064,22 +6064,22 @@ class DataFrameTable(DataTable):
         optionally followed by space-separated arguments.
         """
 
-        self.app.push_screen(RunCommandScreen(), callback=self._dispatch_command_string)
+        self.app.push_screen(RunCommandScreen(), callback=self._run_command)
 
-    def _dispatch_command_string(self, text: str | None) -> None:
+    def _run_command(self, cmd: str | None) -> None:
         """Parse and dispatch a command string like 'show-frequency arg1 arg2'.
 
         Tries both the table (self) and the app as dispatch targets.
 
         Args:
-            text: The command string entered by the user, or None if cancelled.
+            cmd: The command string entered by the user, or None if cancelled.
         """
-        if not text:
+        if not cmd:
             return
 
         from .commands import COMMANDS
 
-        parts = text.split()
+        parts = cmd.split()
         cmd_name = parts[0]
         args = parts[1:]
 
