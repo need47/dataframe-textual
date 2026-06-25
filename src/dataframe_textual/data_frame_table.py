@@ -392,6 +392,29 @@ class DataFrameTable(DataTable):
 
         return wrapper
 
+    def with_busy_screen(func: Callable) -> Callable:
+        """Decorator that shows a BusyScreen and runs the function in a background thread.
+
+        Handles the full lifecycle: sets ``task_done=False``, pushes
+        :class:`BusyScreen`, runs the function via ``@work(thread=True)``,
+        and guarantees ``task_done=True`` on completion.
+        """
+
+        @work(thread=True)
+        def _worker(self, *args, **kwargs):
+            """Execute the wrapped function in a background thread."""
+            try:
+                func(self, *args, **kwargs)
+            finally:
+                self.task_done = True
+
+        def wrapper(self, *args, **kwargs):
+            """Set up BusyScreen and dispatch work to a background thread."""
+            self.task_done = False
+            self.app.push_screen(BusyScreen(self, task=partial(_worker, self, *args, **kwargs)))
+
+        return wrapper
+
     def get_row_idx(self, row_key: RowKey) -> int:
         """Get the row index for a given table row key.
 
@@ -2429,6 +2452,7 @@ class DataFrameTable(DataTable):
 
     # Sort
     @with_full_df
+    @with_busy_screen
     def _sort_by_column(self, descending: bool = False) -> None:
         """Sort by the currently selected column.
 
@@ -2634,6 +2658,7 @@ class DataFrameTable(DataTable):
         )
 
     @with_full_df
+    @with_busy_screen
     def edit_column(self, result) -> None:
         """Edit a column."""
         if result is None:
@@ -2906,6 +2931,7 @@ class DataFrameTable(DataTable):
         )
 
     @with_full_df
+    @with_busy_screen
     def add_column_expr(self, result: tuple[str, str, pl.Expr] | None) -> None:
         """Add a new column with an expression."""
         if result is None:
@@ -3027,6 +3053,7 @@ class DataFrameTable(DataTable):
         )
 
     @with_full_df
+    @with_busy_screen
     def split_column(self, result: str | None) -> None:
         """Split the current string column into a new list column.
 
@@ -3080,7 +3107,6 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error splitting column `{col_name}` with delimiter `{delimiter}`: {e}")
 
-    @with_full_df
     def cmd_join_columns(self) -> None:
         """Prompt for a delimiter and join all selected columns into a new string column.
 
@@ -3106,6 +3132,7 @@ class DataFrameTable(DataTable):
         )
 
     @with_full_df
+    @with_busy_screen
     def join_columns(self, result: str | None) -> None:
         """Create a new column by joining all selected columns with *result* as delimiter.
 
@@ -3172,7 +3199,6 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error joining columns into `{new_col_name}`: {e}")
 
-    @with_full_df
     def cmd_glue_list_column(self) -> None:
         """Prompt for a delimiter and glue the items of the current list column into a string column.
 
@@ -3200,6 +3226,7 @@ class DataFrameTable(DataTable):
         )
 
     @with_full_df
+    @with_busy_screen
     def glue_columns(self, result: str | None) -> None:
         """Glue list items of the current column into a single string per row.
 
@@ -3426,6 +3453,7 @@ class DataFrameTable(DataTable):
         )
 
     @with_full_df
+    @with_busy_screen
     def add_link_column(self, result: tuple[str, str, str] | None) -> None:
         """Handle result from AddLinkScreen.
 
@@ -3582,14 +3610,12 @@ class DataFrameTable(DataTable):
 
         self.notify(message, title="Delete Column")
 
-    @with_full_df
     def cmd_implode_column(self) -> None:
         """Implode the current column into list values grouped by other columns."""
-        col_name = self.cursor_col_name
-        self.task_done = False
-        self.app.push_screen(BusyScreen(self, task=partial(self.implode_column, col_name)))
+        self.implode_column(self.cursor_col_name)
 
-    @work(thread=True)
+    @with_full_df
+    @with_busy_screen
     def implode_column(self, col_name: str) -> None:
         """Collapse rows by grouping columns and aggregating the current column as a list.
 
@@ -3632,7 +3658,6 @@ class DataFrameTable(DataTable):
             self.selected_rows.clear()
             self.matches = defaultdict(set)
 
-            self.task_done = True
             self.setup_table()
 
             self.notify(descr, title="Implode Column")
@@ -3645,9 +3670,7 @@ class DataFrameTable(DataTable):
                 severity="error",
             )
             self.log(f"Error imploding column `{col_name}`: {e}")
-            self.task_done = True
 
-    @with_full_df
     def cmd_explode_column(self) -> None:
         """Explode the current list column into multiple rows."""
         col_name = self.cursor_col_name
@@ -3657,10 +3680,10 @@ class DataFrameTable(DataTable):
         if dtype not in (pl.List, pl.String):
             return
 
-        self.task_done = False
-        self.app.push_screen(BusyScreen(self, task=partial(self.explode_column, col_name)))
+        self.explode_column(col_name)
 
-    @work(thread=True)
+    @with_full_df
+    @with_busy_screen
     def explode_column(self, col_name: str, delimiter: str | None = "|") -> None:
         """Explode a column based on a delimiter (if provided) or as a list column."""
         self.add_history(f"Explode column [$success]{col_name}[/]", dirty=True)
@@ -3712,7 +3735,6 @@ class DataFrameTable(DataTable):
             self.selected_rows.clear()
             self.matches = defaultdict(set)
 
-            self.task_done = True
             self.setup_table()
 
             self.notify(f"Exploded column [$success]{col_name}[/]", title="Explode Column")
@@ -4160,7 +4182,6 @@ class DataFrameTable(DataTable):
             self.log(f"Error transposing table: {e}")
 
     # Type casting
-    @with_full_df
     def _cast_column_dtype(self, ffiname: str = "", col_name: str = "") -> None:
         """Cast the current column to a different data type.
 
@@ -4172,7 +4193,7 @@ class DataFrameTable(DataTable):
             col_name = self.cursor_col_name
 
         if ffiname:
-            self.cast_column_dtype(ffiname, col_name)
+            self.cast_to_dtype(ffiname, col_name)
         else:
             self.app.push_screen(
                 ConfirmScreen(
@@ -4182,12 +4203,14 @@ class DataFrameTable(DataTable):
                     yes="Cast",
                     no="Cancel",
                 ),
-                callback=partial(self.cast_column_dtype, col_name=col_name),
+                callback=partial(self.cast_to_dtype, col_name=col_name),
             )
 
-    def cast_column_dtype(self, ffiname: str, col_name: str) -> None:
+    @with_full_df
+    @with_busy_screen
+    def cast_to_dtype(self, ffiname: str, col_name: str) -> None:
         """Cast a column to a specific data type."""
-        if not ffiname:
+        if not ffiname or not col_name:
             return
 
         from .common import FFINAME_TO_DTYPE
@@ -4242,6 +4265,7 @@ class DataFrameTable(DataTable):
             self.log(f"Error casting column `{col_name}`: {e}")
 
     @with_full_df
+    @with_busy_screen
     def _case_column(self, case: str) -> None:
         """Convert string column(s) to uppercase or lowercase.
 
@@ -4287,7 +4311,6 @@ class DataFrameTable(DataTable):
         self.setup_table()
         self.notify(descr, title=f"Convert to {label.capitalize()}")
 
-    @with_full_df
     def cmd_strip_whitespace(self) -> None:
         """Strip leading and trailing whitespace in the current string column."""
         col_name = self.cursor_col_name
@@ -4301,6 +4324,11 @@ class DataFrameTable(DataTable):
             )
             return
 
+        self._strip_whitespace(cidx, col_name)
+
+    @with_full_df
+    @with_busy_screen
+    def _strip_whitespace(self, cidx: int, col_name: str) -> None:
         descr = f"Stripped leading/trailing whitespaces in column [$success]{col_name}[/]"
         self.add_history(descr, dirty=True)
 
@@ -4324,7 +4352,6 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error stripping whitespace in column `{col_name}`: {e}")
 
-    @with_full_df
     def cmd_fill_null(self) -> None:
         """Prompt for a value and fill nulls in the current column."""
         col_name = self.cursor_col_name
@@ -4351,7 +4378,6 @@ class DataFrameTable(DataTable):
             callback=partial(self._fill_null, scope="column"),
         )
 
-    @with_full_df
     def cmd_fill_null_all(self) -> None:
         """Prompt for a value and fill nulls in all columns."""
         total_nulls = self.df.null_count().sum_horizontal().item()
@@ -4376,6 +4402,7 @@ class DataFrameTable(DataTable):
         )
 
     @with_full_df
+    @with_busy_screen
     def _fill_null(self, result: str | None, scope: str = "column") -> None:
         """Fill null values with the user-provided value.
 
@@ -5180,6 +5207,7 @@ class DataFrameTable(DataTable):
         )
 
     @with_full_df
+    @with_busy_screen
     def filter_rows(self, result: dict | None) -> None:
         """Filter selected rows and hide others. Do not modify the dataframe.
 
@@ -5365,6 +5393,7 @@ class DataFrameTable(DataTable):
             )
 
     @with_full_df
+    @with_busy_screen
     def filter_row_value(self, result: tuple[pl.Expr | None, str] | None) -> None:
         """Apply the filter expression in the current column.
 
@@ -5547,110 +5576,8 @@ class DataFrameTable(DataTable):
             callback=partial(self.select_rows, scope=scope),
         )
 
-    def cmd_unselect_rows_expr(self, scope: str = "column") -> None:
-        """Open screen to unselect rows by expression in the requested scope.
-
-        Args:
-            scope: ``"column"`` to unselect by matches in the current column,
-                or ``"all"`` to unselect by matches across all columns.
-        """
-        col_name = self.cursor_col_name
-        dtype = self.cursor_col_dtype
-        value = self.cursor_value
-
-        if scope not in ("column", "all"):
-            self.notify(f"Invalid unselect scope: [$error]{scope}[/]", title="Unselect Rows", severity="error")
-            return
-
-        # Use current cell value as default search term
-        term = NULL if value is None else (str(value.to_list()) if isinstance(dtype, pl.List) else str(value))
-
-        self.app.push_screen(
-            SearchScreen("Unselect Rows (All Columns)" if scope == "all" else "Unselect Rows", col_name, term),
-            callback=partial(self.unselect_rows, scope=scope),
-        )
-
-    def cmd_unselect_current_row(self) -> None:
-        """Unselect the current row."""
-        ridx = self.cursor_ridx
-        rid = self.df[RID][ridx]
-
-        if rid not in self.selected_rows:
-            self.notify("Current row is not selected.", title="Unselect Row", severity="warning")
-            return
-
-        self.add_history("Unselect current row")
-        self.selected_rows.remove(rid)
-        self.setup_table()
-        self.notify("Current row has been unselected.", title="Unselect Row")
-
-    def cmd_unselect_all_rows(self) -> None:
-        """Unselect all rows."""
-        if not self.selected_rows:
-            self.notify("No rows are currently selected.", title="Unselect All Rows", severity="warning")
-            return
-
-        self.add_history("Unselect all rows")
-        self.selected_rows.clear()
-        self.setup_table()
-        self.notify("All rows have been unselected.", title="Unselect All Rows")
-
     @with_full_df
-    def unselect_rows(self, result: dict, scope: str = "column") -> None:
-        """Unselect rows where a term/expression matches in the selected scope.
-
-        Args:
-            result: A dictionary with keys "term", "col_name", "match_nocase", "match_whole", "match_literal", "match_reverse".
-            scope: ``"column"`` to match in current column, or ``"all"`` to match across all columns.
-        """
-        if result is None:
-            return
-
-        term = result.get("term")
-        col_name = result.get("col_name", self.cursor_col_name)
-        cidx = self.get_cidx(col_name)
-        if cidx is None:
-            self.notify(f"Column [$warning]{col_name}[/] not found", title="Unselect Rows", severity="warning")
-            return
-        match_nocase = result.get("match_nocase")
-        match_whole = result.get("match_whole")
-        match_literal = result.get("match_literal")
-        match_reverse = result.get("match_reverse")
-
-        matches = self.find_matches(
-            term=term,
-            cidx=cidx if scope == "column" else None,
-            match_nocase=match_nocase,
-            match_whole=match_whole,
-            match_literal=match_literal,
-            match_reverse=match_reverse,
-        )
-        ok_rids = set(matches.keys())
-
-        if not ok_rids:
-            self.notify(
-                f"No matches found for [$warning]{term}[/]. Try other search options.",
-                title="Unselect Rows",
-                severity="warning",
-            )
-            return
-
-        removed_rids = self.selected_rows.intersection(ok_rids)
-        if not removed_rids:
-            self.notify(
-                "No currently selected rows matched the expression.",
-                title="Unselect Rows",
-                severity="warning",
-            )
-            return
-
-        self.add_history("Unselect rows by expression")
-        self.selected_rows.difference_update(removed_rids)
-
-        self.notify(f"Unselected [$success]{len(removed_rids)}[/] row(s)", title="Unselect Rows")
-        self.setup_table()
-
-    @with_full_df
+    @with_busy_screen
     def select_rows(self, result: dict, scope: str = "column") -> None:
         """Select rows by value or expression.
 
@@ -5799,6 +5726,114 @@ class DataFrameTable(DataTable):
         self.notify(f"Found [$success]{match_count}[/] matching row(s)", title="Select Rows")
 
         # Recreate table for display
+        self.setup_table()
+
+    def cmd_unselect_rows_expr(self, scope: str = "column") -> None:
+        """Open screen to unselect rows by expression in the requested scope.
+
+        Args:
+            scope: ``"column"`` to unselect by matches in the current column,
+                or ``"all"`` to unselect by matches across all columns.
+        """
+        if not self.selected_rows:
+            self.notify("No rows are currently selected.", title="Unselect Rows", severity="warning")
+            return
+
+        col_name = self.cursor_col_name
+        dtype = self.cursor_col_dtype
+        value = self.cursor_value
+
+        if scope not in ("column", "all"):
+            self.notify(f"Invalid unselect scope: [$error]{scope}[/]", title="Unselect Rows", severity="error")
+            return
+
+        # Use current cell value as default search term
+        term = NULL if value is None else (str(value.to_list()) if isinstance(dtype, pl.List) else str(value))
+
+        self.app.push_screen(
+            SearchScreen("Unselect Rows (All Columns)" if scope == "all" else "Unselect Rows", col_name, term),
+            callback=partial(self.unselect_rows, scope=scope),
+        )
+
+    def cmd_unselect_current_row(self) -> None:
+        """Unselect the current row."""
+        ridx = self.cursor_ridx
+        rid = self.df[RID][ridx]
+
+        if rid not in self.selected_rows:
+            self.notify("Current row is not selected.", title="Unselect Row", severity="warning")
+            return
+
+        self.add_history("Unselect current row")
+        self.selected_rows.remove(rid)
+        self.setup_table()
+        self.notify("Current row has been unselected.", title="Unselect Row")
+
+    def cmd_unselect_all_rows(self) -> None:
+        """Unselect all rows."""
+        if not self.selected_rows:
+            self.notify("No rows are currently selected.", title="Unselect All Rows", severity="warning")
+            return
+
+        self.add_history("Unselect all rows")
+        self.selected_rows.clear()
+        self.setup_table()
+        self.notify("All rows have been unselected.", title="Unselect All Rows")
+
+    @with_full_df
+    @with_busy_screen
+    def unselect_rows(self, result: dict, scope: str = "column") -> None:
+        """Unselect rows where a term/expression matches in the selected scope.
+
+        Args:
+            result: A dictionary with keys "term", "col_name", "match_nocase", "match_whole", "match_literal", "match_reverse".
+            scope: ``"column"`` to match in current column, or ``"all"`` to match across all columns.
+        """
+        if result is None:
+            return
+
+        term = result.get("term")
+        col_name = result.get("col_name", self.cursor_col_name)
+        cidx = self.get_cidx(col_name)
+        if cidx is None:
+            self.notify(f"Column [$warning]{col_name}[/] not found", title="Unselect Rows", severity="warning")
+            return
+        match_nocase = result.get("match_nocase")
+        match_whole = result.get("match_whole")
+        match_literal = result.get("match_literal")
+        match_reverse = result.get("match_reverse")
+
+        matches = self.find_matches(
+            term=term,
+            cidx=cidx if scope == "column" else None,
+            match_nocase=match_nocase,
+            match_whole=match_whole,
+            match_literal=match_literal,
+            match_reverse=match_reverse,
+        )
+        ok_rids = set(matches.keys())
+
+        if not ok_rids:
+            self.notify(
+                f"No matches found for [$warning]{term}[/]. Try other search options.",
+                title="Unselect Rows",
+                severity="warning",
+            )
+            return
+
+        removed_rids = self.selected_rows.intersection(ok_rids)
+        if not removed_rids:
+            self.notify(
+                "No currently selected rows matched the expression.",
+                title="Unselect Rows",
+                severity="warning",
+            )
+            return
+
+        self.add_history("Unselect rows by expression")
+        self.selected_rows.difference_update(removed_rids)
+
+        self.notify(f"Unselected [$success]{len(removed_rids)}[/] row(s)", title="Unselect Rows")
         self.setup_table()
 
     @with_full_df
