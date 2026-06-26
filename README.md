@@ -316,8 +316,8 @@ Useful examples from current bindings:
 
 | Key  | Action                  |
 | ---- | ----------------------- |
-| `U`  | Undo last action        |
-| `R`  | Redo last undone action |
+| `u` / `U` | Undo last action        |
+| `R`       | Redo last undone action |
 | `gU` | Reset to initial state  |
 
 #### Navigation
@@ -418,7 +418,6 @@ Useful examples from current bindings:
 | `s`              | Select/deselect current row                                                    |
 | `gs`             | Select current row and all rows above                                          |
 | `zs`             | Select current row and all rows below                                          |
-| `u`              | Unselect the current row                                                       |
 | `gu`             | Unselect all rows                                                              |
 | `'` (apostrophe) | Select/deselect current column                                                 |
 | `g'`             | Select current column and all columns to the left                              |

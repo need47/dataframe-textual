@@ -210,7 +210,7 @@ _reg("scroll-bottom", "Scroll to last row",         Scope.MAIN_TABLE, Category.N
 # Undo/Redo/Reset (MainTable scope)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_reg("undo",  "Undo last action",       Scope.MAIN_TABLE, Category.UNDO_REDO, "↩️").bind("U")
+_reg("undo",  "Undo last action",       Scope.MAIN_TABLE, Category.UNDO_REDO, "↩️").bind("U").bind("u")
 _reg("redo",  "Redo last undone action", Scope.MAIN_TABLE, Category.UNDO_REDO, "🔄").bind("R")
 _reg("reset", "Reset to initial state",  Scope.MAIN_TABLE, Category.UNDO_REDO, "🔁").bind("U", leader="g")
 
@@ -299,7 +299,7 @@ _reg("toggle-selections",       "Toggle row selection (invert all)",            
 _reg("clear-selections",        "Clear all row/column selections and cell matches",         Scope.MAIN_TABLE, Category.SELECTION, "🧹").bind("T")
 _reg("prev-selected-row",       "Go to previous selected row",                              Scope.MAIN_TABLE, Category.SELECTION, "⬆️").bind("{")
 _reg("next-selected-row",       "Go to next selected row",                                  Scope.MAIN_TABLE, Category.SELECTION, "⬇️").bind("}")
-_reg("unselect-current-row",    "Unselect the current row",                                 Scope.MAIN_TABLE, Category.SELECTION, "➖").bind("u")
+_reg("unselect-current-row",    "Unselect the current row",                                 Scope.MAIN_TABLE, Category.SELECTION, "➖")
 _reg("unselect-all-rows",       "Unselect all rows",                                        Scope.MAIN_TABLE, Category.SELECTION, "➖").bind("u", leader="g")
 
 # ═══════════════════════════════════════════════════════════════════════════════
