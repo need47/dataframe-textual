@@ -81,16 +81,18 @@ class BusyScreen(ModalScreen):
         }
     """
 
-    def __init__(self, dftable: "DataFrameTable", task: Callable) -> None:
+    def __init__(self, dftable: "DataFrameTable", task: Callable, on_done: Callable | None = None) -> None:
         """Initialize the busy screen.
 
         Args:
             dftable: The DataFrameTable associated with the running task.
             task: Callable to invoke on mount that starts the background work.
+            on_done: Optional callback invoked on the main thread after the modal is dismissed.
         """
         super().__init__()
         self.dftable = dftable
         self.run_task = task
+        self.on_done = on_done
 
     def compose(self) -> ComposeResult:
         """Compose the loading indicator widget."""
@@ -105,6 +107,8 @@ class BusyScreen(ModalScreen):
         """Check the loading progress of the dataframe."""
         if self.dftable.task_done:
             self.dismiss()
+            if self.on_done:
+                self.call_later(self.on_done)
 
     def action_cancel(self) -> None:
         self.dismiss()

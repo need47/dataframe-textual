@@ -3,11 +3,12 @@
 import io
 import sys
 from collections import defaultdict, deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 from itertools import zip_longest
 from pathlib import Path
 from threading import Event
+from types import MethodType
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
@@ -393,25 +394,101 @@ class DataFrameTable(DataTable):
         return wrapper
 
     def with_busy_screen(func: Callable) -> Callable:
-        """Decorator that shows a BusyScreen and runs the function in a background thread.
+        """Decorator that runs expensive work in a thread while showing BusyScreen.
 
-        Handles the full lifecycle: sets ``task_done=False``, pushes
-        :class:`BusyScreen`, runs the function via ``@work(thread=True)``,
-        and guarantees ``task_done=True`` on completion.
+        The wrapped function executes on a worker thread. UI-affecting calls that
+        commonly follow data mutations (``setup_table``, ``move_cursor``, and
+        ``notify``) are deferred and replayed on the main thread after the busy
+        modal closes.
         """
 
+        @dataclass
+        class _BusyState:
+            """Deferred UI actions collected during worker execution."""
+
+            needs_setup_table: bool = False
+            pending_move_cursor: tuple[tuple, dict] | None = None
+            pending_notifies: list[tuple[tuple, dict]] = field(default_factory=list)
+
+        def _patch_ui_methods(self, state: _BusyState) -> tuple[Callable, Callable, Callable]:
+            """Patch UI-affecting methods to defer execution while worker thread is running."""
+            original_setup_table = self.setup_table
+            original_move_cursor = self.move_cursor
+            original_notify = self.notify
+
+            def defer_setup_table(_self, *setup_args, **setup_kwargs) -> None:
+                """Record table rebuild request for replay on the main thread."""
+                state.needs_setup_table = True
+
+            def defer_move_cursor(_self, *move_args, **move_kwargs) -> None:
+                """Keep only the latest cursor move request for replay."""
+                state.pending_move_cursor = (move_args, move_kwargs)
+
+            def defer_notify(_self, *notify_args, **notify_kwargs) -> None:
+                """Queue notifications to preserve order when replayed."""
+                state.pending_notifies.append((notify_args, notify_kwargs))
+
+            self.setup_table = MethodType(defer_setup_table, self)
+            self.move_cursor = MethodType(defer_move_cursor, self)
+            self.notify = MethodType(defer_notify, self)
+
+            return (original_setup_table, original_move_cursor, original_notify)
+
+        def _apply_deferred_ui(
+            self,
+            state: _BusyState,
+            original_setup_table: Callable,
+            original_move_cursor: Callable,
+            original_notify: Callable,
+        ) -> None:
+            """Apply deferred UI actions on the main thread after the worker completes."""
+            if state.needs_setup_table:
+                original_setup_table()
+
+            if state.pending_move_cursor is not None:
+                move_args, move_kwargs = state.pending_move_cursor
+                original_move_cursor(*move_args, **move_kwargs)
+
+            for notify_args, notify_kwargs in state.pending_notifies:
+                original_notify(*notify_args, **notify_kwargs)
+
         @work(thread=True)
-        def _worker(self, *args, **kwargs):
+        def _worker(self, state: _BusyState, *args, **kwargs):
             """Execute the wrapped function in a background thread."""
+            original_setup_table, original_move_cursor, original_notify = _patch_ui_methods(self, state)
+
             try:
                 func(self, *args, **kwargs)
             finally:
                 self.task_done = True
+                # Restore original methods after the worker completes
+                self.setup_table = original_setup_table
+                self.move_cursor = original_move_cursor
+                self.notify = original_notify
 
         def wrapper(self, *args, **kwargs):
             """Set up BusyScreen and dispatch work to a background thread."""
+            state = _BusyState()
+            original_setup_table = self.setup_table
+            original_move_cursor = self.move_cursor
+            original_notify = self.notify
+            on_done = partial(
+                _apply_deferred_ui,
+                self,
+                state,
+                original_setup_table,
+                original_move_cursor,
+                original_notify,
+            )
+
             self.task_done = False
-            self.app.push_screen(BusyScreen(self, task=partial(_worker, self, *args, **kwargs)))
+            self.app.push_screen(
+                BusyScreen(
+                    self,
+                    task=partial(_worker, self, state, *args, **kwargs),
+                    on_done=on_done,
+                )
+            )
 
         return wrapper
 
