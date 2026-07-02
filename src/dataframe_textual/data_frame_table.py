@@ -1208,7 +1208,11 @@ class DataFrameTable(DataTable):
         self._adjust_float_precision(1)
 
     def _adjust_float_precision(self, delta: int) -> None:
-        """Adjust float precision for the current cursor column."""
+        """Adjust float precision for the current cursor column.
+
+        Args:
+            delta: The change in precision (positive to increase, negative to decrease).
+        """
         col_name = self.cursor_col_name
         dtype = self.cursor_col_dtype
         dc = DtypeConfig(dtype)
@@ -1219,17 +1223,24 @@ class DataFrameTable(DataTable):
                 severity="warning",
             )
             return
-        current = self.float_precision_columns.get(col_name, 0)
-        new_precision = max(0, current + delta)
-        if new_precision == 0:
+
+        self.add_history(f"Adjust float precision for column [$success]{col_name}[/] by [$accent]{delta}[/]")
+
+        # Start from the current precision (default: 2), apply delta,
+        # and clamp at -1 where -1 means precision formatting is turned off.
+        current = self.float_precision_columns.get(col_name, 2)
+        new_precision = max(-1, current + delta)
+        if new_precision == -1:
             self.float_precision_columns.pop(col_name, None)
         else:
             self.float_precision_columns[col_name] = new_precision
+
         if new_precision != current:
             self.setup_table()
+
         message = (
             f"Float precision turned [$success]off[/] for column [$accent]{col_name}[/]"
-            if new_precision == 0
+            if new_precision == -1
             else f"Float precision for column [$success]{col_name}[/] set to [$accent]{new_precision}[/] decimal place(s)"
         )
         self.notify(message, title="Set Float Precision")
@@ -1679,7 +1690,7 @@ class DataFrameTable(DataTable):
         # Load the dataframe slice
         df_slice = self.df.slice(segment_start, segment_stop - segment_start)
         thousand_separator = [col in self.thousand_separator_columns for col in visible_columns]
-        float_precision = [self.float_precision_columns.get(col, 0) for col in visible_columns]
+        float_precision = [self.float_precision_columns.get(col, -1) for col in visible_columns]
 
         # Load each row at the correct position
         for (ridx, row), rid in zip(enumerate(df_slice.iter_rows(), segment_start), df_slice[RID]):
@@ -2254,6 +2265,8 @@ class DataFrameTable(DataTable):
                 severity="warning",
             )
             return
+
+        self.add_history(f"Toggle bar chart for column [$accent]{col_name}[/]", dirty=False)
 
         # Toggle bar display
         if col_name in self.bar_columns:

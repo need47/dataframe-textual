@@ -60,22 +60,22 @@ BAR_COLUMN_WIDTH = 10
 THOUSAND_SEPARATOR = ","
 
 
-def format_float(value: float, thousand_separator: bool = False, precision: int = 2) -> str:
+def format_float(value: float, thousand_separator: bool = False, precision: int = -1) -> str:
     """Format a float value, keeping integers without decimal point.
 
     Args:
         value: The float value to format.
         thousand_separator: Whether to include thousand separators. Defaults to False.
-        precision: The number of decimal places to display. Defaults to 2.
+        precision: The number of decimal places to display. Defaults to -1 (no rounding).
 
     Returns:
         The formatted float as a string.
     """
 
-    if precision == 0 and (value_int := int(value)) == value:
+    if precision == -1 and (value_int := int(value)) == value:
         return f"{value_int:{THOUSAND_SEPARATOR}}" if thousand_separator else str(value_int)
     else:
-        if precision > 0:
+        if precision > -1:
             return f"{value:{THOUSAND_SEPARATOR}.{precision}f}" if thousand_separator else f"{value:.{precision}f}"
         else:
             return f"{value:{THOUSAND_SEPARATOR}f}" if thousand_separator else str(value)
@@ -274,7 +274,7 @@ def format_row(
     style: str | list[str] | None = None,
     justify: str | list[str] | None = None,
     thousand_separator: bool | list[bool] = False,
-    float_precision: int | list[int] = 2,
+    float_precision: int | list[int] = -1,
 ) -> list[Text]:
     """Format a single row with proper styling and justification.
 
@@ -289,7 +289,7 @@ def format_row(
         thousand_separator: Whether to include thousand separators for numeric values.
             Can be a single bool (applied to all) or a list of bools per column. Defaults to False.
         float_precision: Number of decimal places for float values.
-            Can be a single int (applied to all) or a list of ints per column. Defaults to 2.
+            Can be a single int (applied to all) or a list of ints per column. Defaults to -1 (no rounding).
 
     Returns:
         A list of Rich Text objects with proper formatting applied.
