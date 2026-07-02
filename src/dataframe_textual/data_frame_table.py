@@ -1319,50 +1319,86 @@ class DataFrameTable(DataTable):
         # self.app._set_status_context(self)
 
     def determine_column_widths(self) -> dict[str, int]:
-        """Determine optimal width for each column based on data type and content.
+        """Determine optimal width for each visible column based on data type and sampled content.
 
-        For String columns:
-        - Minimum width: length of column label
-        - Ideal width: maximum width of all cells in the column
-        - If space constrained: find appropriate width smaller than maximum
+        Algorithm (two phases):
 
-        For non-String columns:
-        - Return None to let Textual auto-determine width
+        **Phase 1 - initial widths:**
+        - The column label width is always the floor (label is never clipped).
+        - Bar columns are fixed to BAR_COLUMN_WIDTH.
+        - User-overridden columns (positive width) are fixed to ``max(label, override)``.
+        - URL-only string columns are skipped (let Textual auto-size so they stay clickable).
+        - String columns whose sampled max exceeds COLUMN_WIDTH_CAP are capped at
+          ``max(label_width, COLUMN_WIDTH_CAP)`` and queued for phase 2.
+        - All other columns (numeric, bool, temporal, short strings, expanded columns)
+          use their natural sampled max width.
+
+        **Phase 2 - expand capped columns with leftover space:**
+        - Columns are processed in visible order.
+        - If a column's ideal width fits in the remaining available space, expand it
+          exactly to that width and move on.
+        - If a column needs more than the remaining available space (it is "too wide"),
+          distribute the remaining available space **evenly** among it and all
+          subsequent capped columns, then stop.
 
         Returns:
-            dict[str, int]: Mapping of column name to width (None for auto-sizing columns).
+            dict[str, int]: Mapping of column name to display width.
         """
-        col_widths, col_label_widths = {}, {}
+        col_widths: dict[str, int] = {}
+        col_label_widths: dict[str, int] = {}
+        col_ideal_widths: dict[str, int] = {}  # uncapped natural max from sampled data
+        capped_cols: list[str] = []  # string cols capped in phase 1, in visible order
 
+        # Pre-set bar columns
         for col in self.bar_columns:
             col_widths[col] = BAR_COLUMN_WIDTH
 
-        # Get available width for the table (with some padding for borders/scrollbar)
+        # Available terminal width
         init_available_width = self.scrollable_content_region.width or self.app.size.width
-        available_width = init_available_width
 
-        # Sample a reasonable number of rows to calculate widths (don't scan entire dataframe)
+        # Sample rows for width estimation
         sample_size = min(self.BATCH_SIZE, len(self.df))
         sample_lf = self.df.lazy().head(sample_size)
 
-        # Determine widths for each visible column
+        # ── Phase 1: initial width for every visible column ───────────────────
         for col_idx, (col, dtype) in enumerate(self.visible_columns.items(), 1):
-            # Get column label width
+            # Label width is the hard minimum
             label_text = self._build_column_label(col, col_idx)
-            label_width = measure(self.app.console, label_text, 1) + 2
+            label_width = measure(self.app.console, label_text, 1)
             col_label_widths[col] = label_width
 
-            if label_width > col_widths.get(col, 0):
-                col_widths[col] = label_width
+            # Bar columns: already fixed
+            if col in self.bar_columns:
+                col_ideal_widths[col] = col_widths[col]
+                continue
+
+            # User-set fixed width: respect it
+            if col in self.column_widths:
+                override = self.column_widths[col]
+                if override > 0:
+                    col_widths[col] = max(label_width, override)
+                    col_ideal_widths[col] = col_widths[col]
+                    continue
+                # override == -1 means "expanded": fall through and skip the cap below
+                # override == 0 means hidden: excluded from visible_columns already
+
+            dc = DtypeConfig(dtype)
+            is_string = dc.gtype == "string"
+            is_expanded = self.column_widths.get(col) == -1
 
             try:
-                # Get sample values from the column
                 sample_values = sample_lf.select(col).collect().get_column(col).drop_nulls().to_list()
-                if dtype == pl.String and any(val.startswith(("https://", "http://")) for val in sample_values):
-                    continue  # Skip link columns so they can auto-size and be clickable
 
-                # Find maximum width in sample
-                # For list columns, measure the string representation of the first three items to avoid extremely long widths
+                # URL columns: leave for Textual auto-sizing so links stay clickable
+                if (
+                    is_string
+                    and sample_values
+                    and any(val.startswith(("https://", "http://")) for val in sample_values)
+                ):
+                    col_widths[col] = label_width
+                    col_ideal_widths[col] = label_width
+                    continue
+
                 max_cell_width = max(
                     (
                         measure(self.app.console, str(val[:3]) if isinstance(val, list) else str(val), 1)
@@ -1370,46 +1406,50 @@ class DataFrameTable(DataTable):
                     ),
                     default=label_width,
                 )
-
-                # Set column width to max of label and sampled data (capped at reasonable max)
-                max_width = max(label_width, max_cell_width)
             except Exception as e:
-                # If any error, let Textual auto-size
-                max_width = label_width
                 self.log(f"Error determining width for column `{col}`: {e}")
+                max_cell_width = label_width
 
-            col_widths[col] = max_width
-            available_width -= max_width
+            ideal_width = max(label_width, max_cell_width)
+            col_ideal_widths[col] = ideal_width
 
-        for col, width in self.column_widths.items():
-            if width > 0 and col in col_widths:
-                old_width = col_widths[col]
-                col_widths[col] = max(col_label_widths[col], width)
-                available_width -= col_widths[col] - old_width
+            if is_string and not is_expanded and ideal_width > COLUMN_WIDTH_CAP:
+                # Cap and queue for phase 2
+                col_widths[col] = max(label_width, COLUMN_WIDTH_CAP)
+                capped_cols.append(col)
+            else:
+                # Numeric / bool / temporal / short string / expanded: natural width
+                col_widths[col] = ideal_width
 
-        # If there's no more available width, auto-size remaining columns
-        if available_width < 0:
-            # Recalculate available width after capping wide columns
-            available_width = init_available_width
-            for col in col_widths:
-                if col in self.column_widths and self.column_widths[col] != 0:
-                    available_width -= col_widths[col]
-                    continue
-                if col_widths[col] > COLUMN_WIDTH_CAP and col_label_widths[col] < COLUMN_WIDTH_CAP:
-                    col_widths[col] = COLUMN_WIDTH_CAP  # Cap width to prevent extremely wide columns
-                available_width -= col_widths[col]
+        # ── Phase 2: expand capped columns sequentially with leftover space ──
+        available_width = init_available_width - sum(col_widths.values())
 
-        # If there's still available width, distribute it proportionally to columns that are above the cap
-        if available_width > BUFFER_SIZE:
-            flexible_cols = [
-                col for col in col_widths if col not in self.column_widths and col_widths[col] >= COLUMN_WIDTH_CAP
+        if available_width > 0 and capped_cols:
+            # Only columns that can still grow
+            expandable = [
+                (col, col_ideal_widths[col] - col_widths[col])
+                for col in capped_cols
+                if col_ideal_widths.get(col, 0) > col_widths.get(col, 0)
             ]
-            # Only distribute if there's more than one flexible column to avoid giving all extra space to a single column
-            if len(flexible_cols) > 1:
-                extra_width_per_col = (available_width - BUFFER_SIZE) // len(flexible_cols)
-                for col in flexible_cols:
-                    new_width = col_widths[col] + extra_width_per_col
-                    col_widths[col] = max(new_width, COLUMN_WIDTH_CAP)
+
+            i = 0
+            while i < len(expandable) and available_width > 0:
+                col, needed = expandable[i]
+
+                if needed <= available_width:
+                    # Enough room: give the column exactly what it needs
+                    col_widths[col] += needed
+                    available_width -= needed
+                    i += 1
+                else:
+                    # Column is too wide for remaining space: distribute
+                    # available_width evenly among this and all remaining capped columns
+                    remaining = expandable[i:]
+                    share = available_width // len(remaining)
+                    for rcol, _ in remaining:
+                        col_widths[rcol] += share
+                    available_width = 0
+                    break
 
         return col_widths
 
