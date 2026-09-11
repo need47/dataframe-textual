@@ -693,6 +693,11 @@ class StatisticsScreen(TableScreen):
             df_n_unique.insert_column(0, pl.Series("statistic", ["n_unique"]))
             df_n_unique = df_n_unique.cast(stats_df.schema)
 
+            # duplicate count for each column (entries whose value is not unique)
+            df_n_duplicate = lf.select(pl.all().is_duplicated().sum()).collect()
+            df_n_duplicate.insert_column(0, pl.Series("statistic", ["n_duplicate"]))
+            df_n_duplicate = df_n_duplicate.cast(stats_df.schema)
+
             # sum
             sum_exprs: list[pl.Expr] = [pl.lit("sum").alias("statistic")]
             for col_name, dtype in source_schema.items():
@@ -741,6 +746,7 @@ class StatisticsScreen(TableScreen):
             self.df = pl.concat(
                 [
                     df_n_unique,
+                    df_n_duplicate,
                     df_n_total,
                     stats_df,
                     df_sum,
@@ -765,6 +771,10 @@ class StatisticsScreen(TableScreen):
             # unique count
             n_unique = this_col.n_unique()
             df_n_unique = pl.DataFrame({"statistic": ["n_unique"], col_name: n_unique}, schema=stats_df.schema)
+
+            # duplicate count (entries whose value is not unique)
+            n_duplicate = this_col.is_duplicated().sum()
+            df_n_duplicate = pl.DataFrame({"statistic": ["n_duplicate"], col_name: n_duplicate}, schema=stats_df.schema)
 
             # total count
             n_total = len(this_col)
@@ -809,6 +819,7 @@ class StatisticsScreen(TableScreen):
             self.df = pl.concat(
                 [
                     df_n_unique,
+                    df_n_duplicate,
                     df_n_total,
                     stats_df,
                     df_sum,
