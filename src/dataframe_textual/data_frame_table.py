@@ -5587,9 +5587,10 @@ class DataFrameTable(DataTable):
         # Apply filter to dataframe with row indices
         lf_filtered = self.df.lazy().filter(filter_expr)
 
-        # Apply column selection if any
+        # Apply column selection if any, preserving original column order
         if self.selected_columns:
-            lf_filtered = lf_filtered.select(self.selected_columns.copy().union({RID}))
+            selected = [col for col in self.df.columns if col in self.selected_columns or col == RID]
+            lf_filtered = lf_filtered.select(selected)
 
         # Collect the filtered dataframe
         df_filtered = lf_filtered.collect()
