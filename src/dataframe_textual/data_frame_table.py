@@ -3063,7 +3063,12 @@ class DataFrameTable(DataTable):
                 # Get updated column from df for rows that exist in dfull
                 lf_updated = self.df.lazy().select(RID, pl.col(new_col_name))
                 # Join and use coalesce to prefer updated value or keep original
-                self.dfull = self.dfull.lazy().join(lf_updated, on=RID, how="left").select(select_cols).collect()
+                self.dfull = (
+                    self.dfull.lazy()
+                    .join(lf_updated, on=RID, how="left", maintain_order="left")
+                    .select(select_cols)
+                    .collect()
+                )
 
             # Recreate table for display
             self.setup_table()
@@ -3612,7 +3617,12 @@ class DataFrameTable(DataTable):
                 # Get updated column from df for rows that exist in dfull
                 lf_updated = self.df.lazy().select(RID, pl.col(new_col_name))
                 # Join and use coalesce to prefer updated value or keep original
-                self.dfull = self.dfull.lazy().join(lf_updated, on=RID, how="left").select(select_cols).collect()
+                self.dfull = (
+                    self.dfull.lazy()
+                    .join(lf_updated, on=RID, how="left", maintain_order="left")
+                    .select(select_cols)
+                    .collect()
+                )
 
             # Recreate table for display
             self.setup_table()
@@ -3800,14 +3810,14 @@ class DataFrameTable(DataTable):
 
                 # If it's already a list column, just explode it
                 if dtype == pl.List:
-                    lf_view = self.dfull.lazy().rename({RID: RID_OLD}).explode(col_name)
+                    lf_view = self.dfull.lazy().rename({RID: RID_OLD}).explode(col_name, empty_as_null=True)
                 # If a delimiter is provided, split the string column by the delimiter
                 elif dtype == pl.String and delimiter:
                     lf_view = (
                         self.dfull.lazy()
                         .rename({RID: RID_OLD})
                         .with_columns(pl.col(col_name).str.split(delimiter))
-                        .explode(col_name)
+                        .explode(col_name, empty_as_null=True)
                     )
 
                 else:
@@ -3824,9 +3834,14 @@ class DataFrameTable(DataTable):
                 self.dfull = add_rid_column(lfull).collect()
             else:
                 if dtype == pl.List:
-                    lf = self.df.lazy().drop(RID).explode(col_name)
+                    lf = self.df.lazy().drop(RID).explode(col_name, empty_as_null=True)
                 elif dtype == pl.String and delimiter:
-                    lf = self.df.lazy().drop(RID).with_columns(pl.col(col_name).str.split(delimiter)).explode(col_name)
+                    lf = (
+                        self.df.lazy()
+                        .drop(RID)
+                        .with_columns(pl.col(col_name).str.split(delimiter))
+                        .explode(col_name, empty_as_null=True)
+                    )
                 else:
                     return
 
@@ -4347,19 +4362,25 @@ class DataFrameTable(DataTable):
 
         try:
             # Cast the column using Polars
-            if target_dtype == pl.Date:
-                if current_dtype == pl.String:
-                    self.df = self.df.with_columns(pl.col(col_name).str.to_date())
-                elif current_dtype == pl.Datetime:
-                    self.df = self.df.with_columns(pl.col(col_name).dt.date())
-                else:
-                    self.df = self.df.with_columns(pl.col(col_name).cast(target_dtype))
+            column = pl.col(col_name)
+            if current_dtype == pl.String and target_dtype == pl.Date:
+                conversion = column.str.to_date()
+            elif current_dtype == pl.String and target_dtype == pl.Datetime:
+                conversion = column.str.to_datetime()
+            elif current_dtype == pl.String and target_dtype == pl.Time:
+                conversion = column.str.to_time()
+            elif current_dtype == pl.Datetime and target_dtype == pl.Date:
+                conversion = column.dt.date()
             else:
-                self.df = self.df.with_columns(pl.col(col_name).cast(target_dtype))
+                conversion = column.cast(target_dtype)
+
+            converted_df = self.df.with_columns(conversion)
+            converted_full = self.dfull.with_columns(conversion) if self.in_view else None
+            self.df = converted_df
 
             # Also update the full datafram if applicable
             if self.in_view:
-                self.dfull = self.dfull.with_columns(pl.col(col_name).cast(target_dtype))
+                self.dfull = converted_full
 
             # Recreate table for display
             self.setup_table()

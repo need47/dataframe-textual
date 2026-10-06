@@ -277,7 +277,8 @@ def main() -> None:
             ctx = pl.SQLContext(frames={"self": source.lf})
             try:
                 source.lf = ctx.execute(args.sql)
-            except pl.exceptions.SQLInterfaceError as e:
+                source.lf.collect_schema()
+            except pl.exceptions.PolarsError as e:
                 print(f"SQL error: {e}", file=sys.stderr)
                 sys.exit(1)
 
