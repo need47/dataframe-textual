@@ -20,3 +20,4 @@ test.py
 *.jsonl
 *.vortex
 .DS_Store
+*.zst

@@ -797,7 +797,7 @@ def guess_file_format(filename: str | Path) -> str | None:
         return None
 
     ext = Path(filename).suffix.lower()
-    if ext == ".gz":  # Handle .csv.gz, .tsv.gz, etc.
+    if ext in (".gz", ".zst"):  # Handle .csv.gz, .tsv.zst, etc.
         ext = Path(filename).with_suffix("").suffix.lower()
 
     fmt = ext.removeprefix(".")
@@ -1079,7 +1079,7 @@ def write_file(sources: list[Source], filename: str) -> None:
     for source in sources:
         source.lf = source.lf.select(pl.exclude(RID))
 
-    compression = "gzip" if filename.endswith(".gz") else "uncompressed"
+    compression = "gzip" if filename.endswith(".gz") else "zstd" if filename.endswith(".zst") else "uncompressed"
 
     try:
         if fmt == "csv":

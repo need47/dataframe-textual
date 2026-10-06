@@ -1287,7 +1287,7 @@ class DataFrameViewer(App):
             lf = (table.df if use_view else (table.dfull if table.in_view else table.df)).lazy()
 
         df: pl.DataFrame = lf.select(pl.exclude(RID)).collect()
-        compression = "gzip" if filename.endswith(".gz") else "uncompressed"
+        compression = "gzip" if filename.endswith(".gz") else "zstd" if filename.endswith(".zst") else "uncompressed"
 
         try:
             if fmt == "csv":
