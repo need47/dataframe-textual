@@ -1427,6 +1427,7 @@ class DataFrameTable(DataTable):
             dc = DtypeConfig(dtype)
             is_string = dc.gtype == "string"
             is_expanded = self.column_widths.get(col) == -1
+            is_list = isinstance(self.df.schema[col], pl.List)
 
             try:
                 sample_values = sample_lf.select(col).collect().get_column(col).drop_nulls().to_list()
@@ -1448,6 +1449,10 @@ class DataFrameTable(DataTable):
             )
 
             if is_string and not is_expanded and not is_url and ideal_width > COLUMN_WIDTH_CAP:
+                # Cap and queue for phase 2
+                col_widths[col] = max(label_width, COLUMN_WIDTH_CAP)
+                capped_cols.append(col)
+            elif is_list and not is_expanded and ideal_width > COLUMN_WIDTH_CAP:
                 # Cap and queue for phase 2
                 col_widths[col] = max(label_width, COLUMN_WIDTH_CAP)
                 capped_cols.append(col)
