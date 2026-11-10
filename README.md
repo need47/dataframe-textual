@@ -314,29 +314,31 @@ Useful examples from current bindings:
 
 #### Undo/Redo/Reset
 
-| Key  | Action                  |
-| ---- | ----------------------- |
+| Key       | Action                  |
+| --------- | ----------------------- |
 | `u` / `U` | Undo last action        |
 | `R`       | Redo last undone action |
-| `gU` | Reset to initial state  |
+| `gU`      | Reset to initial state  |
 
 #### Navigation
 
-| Key                      | Action                              |
-| ------------------------ | ----------------------------------- |
-| `gg`                     | Go to first row                     |
-| `G`                      | Go to last row                      |
-| `Ctrl+G`                 | Go to specific row                  |
-| `←` / `↓` / `↑` / `→`    | Move left/down/up/right             |
-| `h` / `j` / `k` / `l`    | Move left/down/up/right (Vim-style) |
-| `gh` / `g←`              | Scroll to leftmost column           |
-| `gj` / `g↓`              | Scroll to last row                  |
-| `gk` / `g↑`              | Scroll to first row                 |
-| `gl` / `g→`              | Scroll to rightmost column          |
-| `Home` / `End`           | Go to first/last column             |
-| `Ctrl+Home` / `Ctrl+End` | Go to page top/bottom               |
-| `PageUp` / `Ctrl+B`      | Page backward                       |
-| `PageDown` / `Ctrl+F`    | Page forward                        |
+| Key                                               | Action                              |
+| ------------------------------------------------- | ----------------------------------- |
+| `gg`                                              | Go to first row                     |
+| `G`                                               | Go to last row                      |
+| `Ctrl+G`                                          | Go to specific row                  |
+| `←` / `↓` / `↑` / `→`                             | Move left/down/up/right             |
+| `h` / `j` / `k` / `l`                             | Move left/down/up/right (Vim-style) |
+| `gh` / `g←`                                       | Scroll to leftmost column           |
+| `gj` / `g↓`                                       | Scroll to last row                  |
+| `gk` / `g↑`                                       | Scroll to first row                 |
+| `gl` / `g→`                                       | Scroll to rightmost column          |
+| `Home` / `End`                                    | Go to first/last column             |
+| `Ctrl+Home` / `Ctrl+End`                          | Go to page top/bottom               |
+| `PageUp` / `Ctrl+B`                               | Page backward                       |
+| `PageDown` / `Ctrl+F`                             | Page forward                        |
+| `MouseScrollUp` / `MouseScrollDown`               | Scroll vertically                   |
+| `Ctrl + MouseScrollUp` / `Ctrl + MouseScrollDown` | Scroll horizontally                 |
 
 #### Display
 

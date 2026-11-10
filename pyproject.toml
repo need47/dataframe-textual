@@ -36,7 +36,7 @@ dependencies = [
     "fastexcel>=0.16.0",
     "xlsxwriter>=3.2.9",
     "textual[syntax]>=8.0.2",
-    "polars>=2.0.0",
+    "polars>=2.1.0",
 ]
 
 [project.urls]
@@ -52,6 +52,9 @@ dev = [
 vortex = [
     "vortex-data>=0.75.0",
 ]
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dataframe_textual"]

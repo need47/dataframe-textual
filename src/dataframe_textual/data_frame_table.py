@@ -19,7 +19,7 @@ from rich.text import Text, TextType
 from textual import work
 from textual._two_way_dict import TwoWayDict
 from textual.coordinate import Coordinate
-from textual.events import Click, Key
+from textual.events import Click, Key, MouseScrollDown, MouseScrollUp
 from textual.reactive import reactive
 from textual.render import measure
 from textual.renderables.bar import Bar
@@ -894,11 +894,11 @@ class DataFrameTable(DataTable):
             else:
                 self.cmd_edit_cell()
 
-    def on_mouse_scroll_up(self, event) -> None:
+    def on_mouse_scroll_up(self, event: MouseScrollUp) -> None:
         """Load more rows when scrolling up with mouse."""
         self.load_rows_up()
 
-    def on_mouse_scroll_down(self, event) -> None:
+    def on_mouse_scroll_down(self, event: MouseScrollDown) -> None:
         """Load more rows when scrolling down with mouse."""
         self.load_rows_down()
 
