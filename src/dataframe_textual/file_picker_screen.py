@@ -1,7 +1,7 @@
 """Modal screens for file picking dialogs."""
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from rich.text import Text
 from textual import on

@@ -314,21 +314,19 @@ def validate_args(args: argparse.Namespace) -> None:
         print("Cannot specify both delimiter and format.", file=sys.stderr)
         sys.exit(1)
 
-    if args.output:
-        if not guess_file_format(args.output):
-            print(
-                f"Unsupported output file format for `{args.output}`. Supported formats: {', '.join(SUPPORTED_FORMATS)}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+    if args.output and not guess_file_format(args.output):
+        print(
+            f"Unsupported output file format for `{args.output}`. Supported formats: {', '.join(SUPPORTED_FORMATS)}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
-    if args.expr:
-        if not tentative_expr(args.expr):
-            print(
-                f"Invalid expression: `{args.expr}`. Did you forget the `$` prefix for column references?",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+    if args.expr and not tentative_expr(args.expr):
+        print(
+            f"Invalid expression: `{args.expr}`. Did you forget the `$` prefix for column references?",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":

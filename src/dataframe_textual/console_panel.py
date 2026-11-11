@@ -6,8 +6,9 @@ import code
 import io
 import subprocess
 import traceback
+from collections.abc import Callable
 from contextlib import redirect_stderr, redirect_stdout
-from typing import Any, Callable
+from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical

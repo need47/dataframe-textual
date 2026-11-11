@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dataframe-textual"
-version = "3.4.0"
+version = "3.4.1"
 description = "Interactive terminal viewer/editor (TUI) for CSV/TSV, Excel, Parquet, JSONL, etc."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -35,7 +35,7 @@ classifiers = [
 dependencies = [
     "fastexcel>=0.16.0",
     "xlsxwriter>=3.2.9",
-    "textual[syntax]>=8.0.2",
+    "textual[syntax]>=8.2.8",
     "polars>=2.1.0",
 ]
 

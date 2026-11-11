@@ -1,5 +1,7 @@
 """A theme screen to select theme from a list of available themes."""
 
+from typing import ClassVar
+
 from textual.app import ComposeResult
 from textual.containers import Container
 from textual.events import Key
@@ -11,7 +13,7 @@ from textual.widgets import OptionList
 class ThemeScreen(ModalScreen):
     """Modal screen to preview and select a Textual built-in theme."""
 
-    BINDINGS = [
+    BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("q,escape", "cancel", "Cancel"),
     ]
 
@@ -36,7 +38,7 @@ class ThemeScreen(ModalScreen):
     def __init__(self) -> None:
         """Initialize the theme screen and store the current theme so it can be restored on cancel."""
         super().__init__()
-        self.themes = sorted(list(BUILTIN_THEMES.keys()))
+        self.themes = sorted(BUILTIN_THEMES.keys())
         self.original_theme = self.app.theme
 
     def compose(self) -> ComposeResult:

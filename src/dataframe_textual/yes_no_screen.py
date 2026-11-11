@@ -1,7 +1,7 @@
 """Modal screens with Yes/No buttons and their specialized variants."""
 
 from functools import partial
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     from .data_frame_table import DataFrameTable
@@ -979,8 +979,8 @@ class CustomBinScreen(YesNoScreen):
                     # 0:100:10 -> 0, 10, 20, ..., 100
                     if ":" in b:
                         toks = [float(t) for t in b.split(":")]
-                        start = self.min_value if toks[0] < self.min_value else toks[0]
-                        end = self.max_value if toks[1] > self.max_value else toks[1]
+                        start = max(toks[0], self.min_value)
+                        end = min(toks[1], self.max_value)
                         step = 1 if len(toks) == 2 else toks[2]
 
                         while start <= end:
@@ -1637,7 +1637,7 @@ class FilterStringScreen(YMNScreen):
         }
     """
 
-    def __init__(self, s: pl.Series, col_name: str, cursor_value: int | float | None) -> None:
+    def __init__(self, s: pl.Series, col_name: str, cursor_value: str | None) -> None:
         """Initialize the filter string column screen."""
         super().__init__(
             yes="Filter",
@@ -1646,7 +1646,7 @@ class FilterStringScreen(YMNScreen):
         )
         self.s = s
         self.col_name = col_name
-        self.placeholder = NULL if cursor_value is None else str(cursor_value)
+        self.placeholder = NULL if cursor_value is None else cursor_value
 
     def compose(self) -> ComposeResult:
         """Compose the filter string column screen widget structure."""
@@ -1853,7 +1853,7 @@ class JoinTableScreen(YMNScreen):
     based on the selected table. Also includes a join type selector.
     """
 
-    JOIN_TYPES = {
+    JOIN_TYPES: ClassVar[dict[str, str]] = {
         "join-inner": "inner",
         "join-left": "left",
         "join-right": "right",
@@ -1940,15 +1940,15 @@ class JoinTableScreen(YMNScreen):
         )
 
         # Build table name -> DataFrameTable mapping from app tabs
-        self.dftables: dict[str, "DataFrameTable"] = {}
+        self.dftables: dict[str, DataFrameTable] = {}
         for dftable in self.app.tabs.values():
             self.dftables[dftable.tabname] = dftable
 
         # Store left/right DataFrameTable selections
-        self.left: "DataFrameTable" = left if left is not None else self.app.active_table
+        self.left: DataFrameTable = left if left is not None else self.app.active_table
 
         if right is not None:
-            self.right: "DataFrameTable" | None = right
+            self.right: DataFrameTable | None = right
         else:
             self.right = None
             for dftable in self.app.tabs.values():

@@ -79,7 +79,7 @@ class TableModalScreen(ModalScreen):
         self.col_justify = None
         self.filename: str | None = None
 
-        self.registry: "KeyBindingRegistry" = self.app.key_registry
+        self.registry: KeyBindingRegistry = self.app.key_registry
         self.leader = ""  # For command leader key sequences, if needed
         self.leader_timer = None
 
@@ -1532,7 +1532,7 @@ class SheetScreen(TableModalScreen):
     def build_table(self) -> None:
         """Build the sheets overview table."""
         rows = []
-        for pane, dftable in self.tabs.items():
+        for dftable in self.tabs.values():
             # Collect the dataframe if it hasn't been loaded yet
             if dftable.df is None:
                 dftable.df = dftable.lf.collect()

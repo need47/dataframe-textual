@@ -50,6 +50,5 @@ __all__ = [
     "SearchScreen",
     "StatisticsScreen",
     "TableScreen",
-    "SearchScreen",
     "YesNoScreen",
 ]

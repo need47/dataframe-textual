@@ -1,6 +1,7 @@
 """Loading and busy indicator modal screens."""
 
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, ClassVar
 
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
 class LoadingScreen(ModalScreen):
     """Modal overlay that polls for dataframe load completion and auto-dismisses."""
 
-    BINDINGS = [
+    BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("q,escape", "cancel", "Cancel"),
     ]
 
@@ -65,7 +66,7 @@ class LoadingScreen(ModalScreen):
 class BusyScreen(ModalScreen):
     """Modal overlay shown while a background task runs, polling for task completion."""
 
-    BINDINGS = [
+    BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("q,escape", "cancel", "Cancel"),
     ]
 

@@ -28,7 +28,6 @@ SUPPORTED_FORMATS = {
     "vortex": None,
 }
 
-
 # Boolean string mappings
 BOOLS = {
     "true": True,
@@ -41,6 +40,10 @@ BOOLS = {
     "no": False,
     "n": False,
     "0": False,
+}
+
+MODIFIER_KEYS = {
+    f"{side}_{mod}" for side in ("left", "right") for mod in ("shift", "control", "alt", "super", "hyper", "meta")
 }
 
 # Special string to represent null value
@@ -355,9 +358,7 @@ def tentative_expr(expr: str) -> bool:
         return True
     if "pl." in expr:
         return True
-    if "self" in expr:
-        return True
-    return False
+    return "self" in expr
 
 
 def validate_expr(
@@ -390,7 +391,7 @@ def validate_expr(
         try:
             expr_pl = eval(expr_str, {"pl": pl, "self": df, "RID": RID})
             if not isinstance(expr_pl, (pl.Expr, pl.DataFrame, pl.Series)):
-                raise ValueError(
+                raise TypeError(
                     f"Expression evaluated to `{type(expr_pl).__name__}` instead of a Polars expression, DataFrame, or Series"
                 )
 
@@ -864,8 +865,8 @@ def load_dataframe(
 
             # Reopen stdin to /dev/tty for proper terminal interaction
             try:
-                tty = open("/dev/tty")
-                os.dup2(tty.fileno(), sys.stdin.fileno())
+                with open("/dev/tty") as tty:
+                    os.dup2(tty.fileno(), sys.stdin.fileno())
             except (OSError, FileNotFoundError):
                 pass
         else:
@@ -1122,9 +1123,9 @@ def add_rid_column(frame: pl.DataFrame | pl.LazyFrame, offset: int = 0) -> pl.Da
     Returns:
         The modified DataFrame or LazyFrame with the internal row index column added.
     """
-    if isinstance(frame, pl.DataFrame) and RID not in frame.columns:
-        frame = frame.with_columns(pl.int_range(offset, pl.len() + offset).alias(RID))
-    elif isinstance(frame, pl.LazyFrame) and RID not in frame.collect_schema():
+    if (isinstance(frame, pl.DataFrame) and RID not in frame.columns) or (
+        isinstance(frame, pl.LazyFrame) and RID not in frame.collect_schema()
+    ):
         frame = frame.with_columns(pl.int_range(offset, pl.len() + offset).alias(RID))
 
     return frame

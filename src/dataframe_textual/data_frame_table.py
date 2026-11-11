@@ -3,13 +3,14 @@
 import io
 import sys
 from collections import defaultdict, deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
 from itertools import zip_longest
 from pathlib import Path
 from threading import Event
 from types import MethodType
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .keybindings import KeyBindingRegistry
@@ -42,6 +43,7 @@ from .common import (
     COLUMN_WIDTH_CAP,
     CURSOR_TYPES,
     HIGHLIGHT_COLOR,
+    MODIFIER_KEYS,
     NULL,
     NULL_DISPLAY,
     RID,
@@ -849,7 +851,6 @@ class DataFrameTable(DataTable):
         Currently a placeholder as table setup is deferred until first use.
         """
         # self.setup_table()
-        pass
 
     def on_key(self, event: Key) -> None:
         """Handle table-scoped key dispatch and row loading.
@@ -863,11 +864,15 @@ class DataFrameTable(DataTable):
         Args:
             event: The key event object.
         """
+        # Ignore modifier keys
+        if event.key in MODIFIER_KEYS:
+            return
+
         leader = self.app.leader_key
-        registry: "KeyBindingRegistry" = self.app.key_registry
+        key_registry: KeyBindingRegistry = self.app.key_registry
 
         # Try to dispatch via the registry (MAIN_TABLE scope only)
-        if registry.dispatch(event.key, leader, Scope.MAIN_TABLE, self):
+        if key_registry.dispatch(event.key, leader, Scope.MAIN_TABLE, self):
             event.stop()
             event.prevent_default()
             self.app.reset_leader()
@@ -1448,11 +1453,7 @@ class DataFrameTable(DataTable):
                 is_string and sample_values and any(val.startswith(("https://", "http://")) for val in sample_values)
             )
 
-            if is_string and not is_expanded and not is_url and ideal_width > COLUMN_WIDTH_CAP:
-                # Cap and queue for phase 2
-                col_widths[col] = max(label_width, COLUMN_WIDTH_CAP)
-                capped_cols.append(col)
-            elif is_list and not is_expanded and ideal_width > COLUMN_WIDTH_CAP:
+            if ((is_string and not is_url) or is_list) and not is_expanded and ideal_width > COLUMN_WIDTH_CAP:
                 # Cap and queue for phase 2
                 col_widths[col] = max(label_width, COLUMN_WIDTH_CAP)
                 capped_cols.append(col)
@@ -5363,12 +5364,8 @@ class DataFrameTable(DataTable):
 
         dtype = self.get_dtype(col_name)
 
-        # Support for polars expression
-        if isinstance(term, pl.Expr):
-            expr = term
-
-        # Support for list of booleans (selected rows)
-        elif isinstance(term, (list, pl.Series)):
+        # Support for Polars expressions or a list or series of boolean values (selected rows)
+        if isinstance(term, (pl.Expr, list, pl.Series)):
             expr = term
 
         # Null case
@@ -5382,7 +5379,7 @@ class DataFrameTable(DataTable):
             else:
                 expr = pl.col(col_name).is_null()
 
-        # Support for polars expression in string form
+        # Support for Polars expression in string form
         elif tentative_expr(term):
             try:
                 expr = validate_expr(term, self.df.columns, col_name, self.df)
@@ -5761,12 +5758,8 @@ class DataFrameTable(DataTable):
 
         dtype = self.get_dtype(col_name)
 
-        # Already a Polars expression
-        if isinstance(term, pl.Expr):
-            expr = term
-
-        # bool list or Series
-        elif isinstance(term, (list, pl.Series)):
+        # Already a Polars expression or a list or series of boolean values
+        if isinstance(term, (pl.Expr, list, pl.Series)):
             expr = term
 
         # Null case
@@ -6147,6 +6140,7 @@ class DataFrameTable(DataTable):
                 ],
                 input=content,
                 text=True,
+                check=False,
             )
             self.notify(message, title="Copy to Clipboard")
         except FileNotFoundError:

@@ -16,6 +16,7 @@ from dataframe_textual.theme_screen import ThemeScreen
 
 from .commands import Scope
 from .common import (
+    MODIFIER_KEYS,
     RID,
     SUPPORTED_FORMATS,
     THOUSAND_SEPARATOR,
@@ -130,6 +131,10 @@ class DataFrameViewer(App):
         Args:
             event: The key event object.
         """
+        # Ignore modifier keys
+        if event.key in MODIFIER_KEYS:
+            return
+
         # Try dispatching as an app-scope command
         if key_registry.dispatch(event.key, leader=self.leader_key, scope=Scope.APP, target=self):
             event.stop()
@@ -985,8 +990,8 @@ class DataFrameViewer(App):
             else:
                 # No unsaved changes - close immediately
                 self.close_tab()
-        except Exception:
-            pass
+        except Exception as e:
+            self.log(f"Error closing current tab: {e}")
 
     def close_tab(self, pane: TabPane | None = None) -> None:
         """Actually close the tab."""
@@ -1004,8 +1009,8 @@ class DataFrameViewer(App):
                 self.exit()
             elif len(self.tabs) == 1:
                 self.query_one(ContentTabs).display = False
-        except Exception:
-            pass
+        except Exception as e:
+            self.log(f"Error in close_tab: {e}")
 
     def close_all(self) -> None:
         """Close all tabs and quit the app.
