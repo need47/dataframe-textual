@@ -772,7 +772,14 @@ def scan_vortex(source: str | list[str], n_rows: int | None = None) -> pl.LazyFr
     Returns:
         A Polars LazyFrame representing the scanned Vortex data.
     """
-    import vortex as vx
+    try:
+        import vortex as vx
+    except ModuleNotFoundError as e:
+        if e.name != "vortex":
+            raise
+        raise ModuleNotFoundError(
+            "Vortex support requires the optional Vortex dependency. Install it with `pip install vortex`."
+        ) from e
 
     if isinstance(source, list):
         lf = pl.concat([vx.open(src).to_polars() for src in source])

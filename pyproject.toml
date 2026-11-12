@@ -48,8 +48,9 @@ Documentation = "https://github.com/need47/dataframe-textual#readme"
 dev = [
     "textual-dev>=1.8.0",
 ]
-vortex = [
-    "vortex-data>=0.75.0",
+extra = [
+    "plotext>=6.1.0",
+    "vortex-data>=0.93.0",
 ]
 
 [[tool.uv.index]]

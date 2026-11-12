@@ -64,8 +64,8 @@ uvx dataframe-textual <csvfile>
 git clone https://github.com/need47/dataframe-textual.git
 cd dataframe-textual
 
-# Install from local source with development dependencies
-pip install -e ".[dev]"
+# Install from local source with development and extra dependencies
+pip install -e ".[dev,extra]"
 ```
 
 ## Usage

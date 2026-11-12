@@ -60,6 +60,7 @@ from .common import (
     validate_expr,
 )
 from .loading_screen import BusyScreen, LoadingScreen
+from .plot_screen import BarPlotScreen, BoxPlotScreen, HistogramPlotScreen, LinePlotScreen, ScatterPlotScreen
 from .run_command_screen import RunCommandScreen
 from .table_screen import (
     CellDetailScreen,
@@ -107,7 +108,7 @@ class History:
     dfull: pl.DataFrame | None
     filename: str
     selected_rows: set[int]
-    selected_columns: set[str]
+    selected_columns: dict[str, bool]
     sorted_columns: dict[str, bool]  # col_name -> descending
     matches: dict[int, set[str]]  # RID -> set of col names
     fixed_rows: int
@@ -242,7 +243,7 @@ class DataFrameTable(DataTable):
 
         # State tracking (all 0-based indexing)
         self.selected_rows: set[int] = set()  # Track selected rows by RID
-        self.selected_columns: set[str] = set()  # Track selected columns by name
+        self.selected_columns: dict[str, bool] = {}  # Track selected columns by name and selection order
         self.sorted_columns: dict[str, bool] = {}  # col_name -> descending
         self.matches: dict[int, set[str]] = defaultdict(set)  # Track search matches: RID -> set of col_names
 
@@ -2215,7 +2216,7 @@ class DataFrameTable(DataTable):
                 the frequency table is computed over the selected visible columns.
         """
         if self.selected_columns:
-            col_names = [col for col in self.df.columns if col in self.selected_columns]
+            col_names = [col for col in self.selected_columns if col in self.df.columns]
         elif not col_names:
             col_names = [self.cursor_col_name]
 
@@ -2363,7 +2364,7 @@ class DataFrameTable(DataTable):
             target_columns = [self.get_col_key(i).value for i in range(col_idx, len(self.columns))]
             descr = f"Hide column [$success]{col_name}[/] and all columns after"
         else:
-            target_columns = [col for col in self.visible_columns if col in self.selected_columns]
+            target_columns = [col for col in self.selected_columns if col in self.visible_columns]
             if not target_columns:
                 target_columns = [self.cursor_col_name]
             descr = (
@@ -2381,7 +2382,7 @@ class DataFrameTable(DataTable):
                 continue
             self.remove_column(col_key)
             self.column_widths[col_name] = 0
-            self.selected_columns.discard(col_name)
+            self.selected_columns.pop(col_name, None)
 
         # Recompute labels for remaining visible columns when prefixes are shown.
         if self.show_column_index:
@@ -3232,7 +3233,7 @@ class DataFrameTable(DataTable):
             )
             return
 
-        col_list = ", ".join(f"[$accent]{c}[/]" for c in self.df.columns if c in self.selected_columns)
+        col_list = ", ".join(f"[$accent]{col}[/]" for col in self.selected_columns if col in self.df.columns)
         self.app.push_screen(
             ConfirmScreen(
                 "Join Columns",
@@ -3258,8 +3259,7 @@ class DataFrameTable(DataTable):
 
         delimiter = result  # empty string is a valid delimiter (no separator)
 
-        # Preserve the order columns appear in the dataframe
-        ordered_selected = [c for c in self.df.columns if c in self.selected_columns]
+        ordered_selected = [col for col in self.selected_columns if col in self.df.columns]
         if len(ordered_selected) < 2:
             self.notify(
                 "Need at least [$warning]2[/] selected columns to join",
@@ -3678,7 +3678,7 @@ class DataFrameTable(DataTable):
 
         # Remove selected visible columns, or fall back to the current column.
         else:
-            selected_visible_columns = [col for col in self.visible_columns if col in self.selected_columns]
+            selected_visible_columns = [col for col in self.selected_columns if col in self.visible_columns]
             if selected_visible_columns:
                 col_names_to_delete.extend(selected_visible_columns)
                 col_keys_to_delete.extend(ColumnKey(col) for col in selected_visible_columns)
@@ -3703,7 +3703,7 @@ class DataFrameTable(DataTable):
         # Remove from tracking if present
         for col_name in col_names_to_delete:
             self.column_widths.pop(col_name, None)
-            self.selected_columns.discard(col_name)
+            self.selected_columns.pop(col_name, None)
 
         # Remove from matches
         for rid in list(self.matches.keys()):
@@ -3744,7 +3744,7 @@ class DataFrameTable(DataTable):
         """
         columns = list(self.df.columns)
         if self.selected_columns:
-            group_cols = [c for c in columns if c in self.selected_columns and c not in (col_name, RID)]
+            group_cols = [col for col in self.selected_columns if col in columns and col not in (col_name, RID)]
         else:
             group_cols = [c for c in columns if c not in (col_name, RID)]
 
@@ -3771,8 +3771,9 @@ class DataFrameTable(DataTable):
 
             remaining_cols = set(self.df.columns)
             self.column_widths = {col: width for col, width in self.column_widths.items() if col in remaining_cols}
-            self.selected_columns.intersection_update(remaining_cols)
-            self.selected_columns.discard(RID)
+            self.selected_columns = {
+                col: selected for col, selected in self.selected_columns.items() if col in remaining_cols and col != RID
+            }
             self.sorted_columns = {col: desc for col, desc in self.sorted_columns.items() if col in remaining_cols}
             self.selected_rows.clear()
             self.matches = defaultdict(set)
@@ -3809,6 +3810,9 @@ class DataFrameTable(DataTable):
 
         dtype = self.get_dtype(col_name)
         cols = list(self.df.columns)
+        selected_cols = [col for col in self.selected_columns if col in cols]
+        if col_name not in selected_cols:
+            selected_cols.append(col_name)
 
         try:
             if self.in_view:
@@ -3833,8 +3837,8 @@ class DataFrameTable(DataTable):
                 lfull = lf_view.drop(RID_OLD)
 
                 if self.selected_columns:
-                    lf = lf.select([c for c in cols if c in self.selected_columns or c == col_name])
-                    lfull = lfull.select([c for c in cols if c in self.selected_columns or c == col_name])
+                    lf = lf.select(selected_cols)
+                    lfull = lfull.select(selected_cols)
 
                 self.df = add_rid_column(lf).collect()
                 self.dfull = add_rid_column(lfull).collect()
@@ -3852,7 +3856,7 @@ class DataFrameTable(DataTable):
                     return
 
                 if self.selected_columns:
-                    lf = lf.select([c for c in cols if c in self.selected_columns or c == col_name])
+                    lf = lf.select(selected_cols)
 
                 self.df = add_rid_column(lf).collect()
 
@@ -4415,7 +4419,9 @@ class DataFrameTable(DataTable):
 
         # Resolve target columns: selected string columns or current column.
         target_cols = [
-            col for col, dtype in self.visible_columns.items() if col in self.selected_columns and dtype == pl.String
+            col
+            for col in self.selected_columns
+            if col in self.visible_columns and self.visible_columns[col] == pl.String
         ]
         if not target_cols:
             col_name = self.cursor_col_name
@@ -5610,9 +5616,11 @@ class DataFrameTable(DataTable):
         # Apply filter to dataframe with row indices
         lf_filtered = self.df.lazy().filter(filter_expr)
 
-        # Apply column selection if any, preserving original column order
+        # Apply selected columns in selection order and keep the internal row ID.
         if self.selected_columns:
-            selected = [col for col in self.df.columns if col in self.selected_columns or col == RID]
+            selected = [col for col in self.selected_columns if col in self.df.columns]
+            if RID in self.df.columns and RID not in selected:
+                selected.append(RID)
             lf_filtered = lf_filtered.select(selected)
 
         # Collect the filtered dataframe
@@ -6043,9 +6051,9 @@ class DataFrameTable(DataTable):
         col_name = self.cursor_col_name
 
         if col_name in self.selected_columns:
-            self.selected_columns.discard(col_name)
+            self.selected_columns.pop(col_name)
         else:
-            self.selected_columns.add(col_name)
+            self.selected_columns[col_name] = True
 
         # Recreate table for display
         self.setup_table()
@@ -6075,7 +6083,7 @@ class DataFrameTable(DataTable):
             dirty=False,
         )
 
-        self.selected_columns.update(columns)
+        self.selected_columns.update(dict.fromkeys(columns, True))
         self.setup_table()
         self.notify(
             f"Selected column [$success]{col_name}[/] and [$accent]{len(columns) - 1}[/] other column(s) to the {side}",
@@ -6105,7 +6113,7 @@ class DataFrameTable(DataTable):
 
         # Clear all selections
         self.selected_rows = set()
-        self.selected_columns = set()
+        self.selected_columns = {}
         self.matches = defaultdict(set)
 
         # Recreate table for display
@@ -6304,3 +6312,118 @@ class DataFrameTable(DataTable):
             self.notify(f"Error calling {cmd_name}: {e}", title="Run Command", severity="error")
         except Exception as e:
             self.notify(f"{cmd_name} failed: {e}", title="Run Command", severity="error")
+
+    def cmd_plot_scatterplot(self) -> None:
+        """Plot selected columns, or the cursor column when none are selected."""
+        selected_columns = [col for col in self.selected_columns if col in self.df.columns]
+
+        if len(selected_columns) >= 2:
+            col_x, col_y = selected_columns[:2]
+        elif selected_columns:
+            col_x, col_y = None, selected_columns[0]
+        else:
+            col_x, col_y = None, self.cursor_col_name
+
+        if col_y is None:
+            return
+
+        plot_columns = [col_y] if col_x is None else [col_x, col_y]
+        non_numeric = [col for col in plot_columns if not self.df.schema[col].is_numeric()]
+        if non_numeric:
+            self.notify(
+                f"Scatter plots require numeric columns: {', '.join(non_numeric)}",
+                title="Scatter Plot",
+                severity="warning",
+            )
+            return
+
+        self.app.push_screen(ScatterPlotScreen(self.df, col_y=col_y, col_x=col_x))
+
+    def cmd_plot_lineplot(self) -> None:
+        """Plot one or two selected numeric columns, or the cursor column, as a line."""
+        selected_columns = [col for col in self.selected_columns if col in self.df.columns]
+        if len(selected_columns) >= 2:
+            col_x, col_y = selected_columns[:2]
+        elif selected_columns:
+            col_x, col_y = None, selected_columns[0]
+        else:
+            col_x, col_y = None, self.cursor_col_name
+
+        if col_y is None:
+            return
+
+        plot_columns = [col_y] if col_x is None else [col_x, col_y]
+        non_numeric = [col for col in plot_columns if not self.df.schema[col].is_numeric()]
+        if non_numeric:
+            self.notify(
+                f"Line plots require numeric columns: {', '.join(non_numeric)}",
+                title="Line Plot",
+                severity="warning",
+            )
+            return
+
+        self.app.push_screen(LinePlotScreen(self.df, col_y=col_y, col_x=col_x))
+
+    def cmd_plot_boxplot(self) -> None:
+        """Plot selected numeric columns as box plots."""
+        selected_columns = [col for col in self.selected_columns if col in self.df.columns]
+
+        y_columns = selected_columns or ([self.cursor_col_name] if self.cursor_col_name is not None else [])
+
+        if not y_columns:
+            return
+
+        non_numeric = [col for col in y_columns if not self.df.schema[col].is_numeric()]
+        if non_numeric:
+            self.notify(
+                f"Box plots require numeric y columns: {', '.join(non_numeric)}",
+                title="Box Plot",
+                severity="warning",
+            )
+            return
+
+        self.app.push_screen(BoxPlotScreen(self.df, y_columns=y_columns))
+
+    def cmd_plot_histogram(self) -> None:
+        """Plot selected numeric columns, or the cursor column, as histograms."""
+        selected_columns = [col for col in self.selected_columns if col in self.df.columns]
+        y_columns = selected_columns or ([self.cursor_col_name] if self.cursor_col_name is not None else [])
+
+        if not y_columns:
+            return
+
+        non_numeric = [col for col in y_columns if not self.df.schema[col].is_numeric()]
+        if non_numeric:
+            self.notify(
+                f"Histograms require numeric columns: {', '.join(non_numeric)}",
+                title="Histogram",
+                severity="warning",
+            )
+            return
+
+        self.app.push_screen(HistogramPlotScreen(self.df, y_columns=y_columns))
+
+    def cmd_plot_barplot(self) -> None:
+        """Plot selected columns as grouped bars, or the cursor column alone."""
+        selected_columns = [col for col in self.selected_columns if col in self.df.columns]
+        if not selected_columns:
+            selected_columns = [self.cursor_col_name] if self.cursor_col_name is not None else []
+        if not selected_columns:
+            return
+
+        x_column = selected_columns[0] if self.df.schema[selected_columns[0]] == pl.String else None
+        y_columns = selected_columns[1:] if x_column is not None else selected_columns
+        if not y_columns:
+            self.notify("Select at least one numeric y column", title="Bar Plot", severity="warning")
+            return
+
+        non_numeric = [col for col in y_columns if not self.df.schema[col].is_numeric()]
+        if non_numeric:
+            self.notify(
+                f"Bar plots require numeric y columns: {', '.join(non_numeric)}",
+                title="Bar Plot",
+                severity="warning",
+            )
+            return
+
+        self.app.push_screen(BarPlotScreen(self.df, y_columns=y_columns, x_column=x_column))

@@ -121,7 +121,7 @@ class DataFrameViewer(App):
     def on_key(self, event: Key) -> None:
         """Handle leader-mode activation and app-scope command dispatch.
 
-        Intercepts ``g`` and ``z`` keystrokes to enter leader mode, which allows
+        Intercepts ``g``, ``z``, and ``p`` keystrokes to enter leader mode, which allows
         two-key sequences (e.g., ``gq``, ``gw``, ``z^``) to be dispatched.
 
         Attempts to dispatch app-scope bindings via the registry. If leader mode
@@ -154,8 +154,8 @@ class DataFrameViewer(App):
             self.reset_leader()
             return
 
-        # Enter leader mode on `g` or `z` key
-        elif event.key in ("g", "z"):
+        # Enter leader mode on `g`, `z`, or `p` key
+        elif event.key in ("g", "z", "p"):
             event.stop()
             event.prevent_default()
             self.leader_key = event.key

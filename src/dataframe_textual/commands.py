@@ -36,6 +36,9 @@ class Scope(str, Enum):
     CELL_DETAIL_SCREEN = "CellDetailScreen"
     TABLE_SCREEN = "TableScreen"
     SHEET_SCREEN = "SheetScreen"
+    PLOT_SCREEN = "PlotScreen"
+    BAR_PLOT_SCREEN = "BarPlotScreen"
+    HISTOGRAM_PLOT_SCREEN = "HistogramPlotScreen"
 
 
 class Category(str, Enum):
@@ -56,6 +59,7 @@ class Category(str, Enum):
     ADVANCED = "Advanced Interfaces"
     VIEW_SETTINGS = "View & Settings"
     JOIN_TABLE = "Join Tables"
+    PLOT = "Plot"
 
 
 @dataclass(frozen=False, eq=False)
@@ -412,13 +416,14 @@ _reg("frequency-toggle-selection",  "Select or deselect current frequency row", 
 # Meta Column Screen
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_reg("meta-column-jump",            "Jump to selected column in main table",   Scope.META_COLUMN_SCREEN, Category.NAVIGATION, "🎯").bind("Enter")
-_reg("meta-column-show-frequency",  "Show frequency for selected column",      Scope.META_COLUMN_SCREEN, Category.DISPLAY,    "📊").bind("F")
-_reg("meta-column-show-statistics", "Show statistics for selected column",     Scope.META_COLUMN_SCREEN, Category.DISPLAY,    "📈").bind("I")
-_reg("meta-column-move-right",      "Move selected column right",              Scope.META_COLUMN_SCREEN, Category.REORDER,    "➡️").bind("J").bind("Shift+Down")
-_reg("meta-column-move-left",       "Move selected column left",               Scope.META_COLUMN_SCREEN, Category.REORDER,    "⬅️").bind("K").bind("Shift+Up")
-_reg("meta-column-edit",            "Rename, resize, or cast selected column", Scope.META_COLUMN_SCREEN, Category.EDITING,    "✏️").bind("e")
-_reg("meta-column-delete",          "Delete selected column",                  Scope.META_COLUMN_SCREEN, Category.EDITING,    "🗑️").bind("d")
+_reg("meta-column-jump",             "Jump to selected column in main table",   Scope.META_COLUMN_SCREEN, Category.NAVIGATION, "🎯").bind("Enter")
+_reg("meta-column-show-frequency",   "Show frequency for selected column",      Scope.META_COLUMN_SCREEN, Category.DISPLAY,    "📊").bind("F")
+_reg("meta-column-show-statistics",  "Show statistics for selected column",     Scope.META_COLUMN_SCREEN, Category.DISPLAY,    "📈").bind("I")
+_reg("meta-column-move-right",       "Move selected column right",              Scope.META_COLUMN_SCREEN, Category.REORDER,    "➡️").bind("J").bind("Shift+Down")
+_reg("meta-column-move-left",        "Move selected column left",               Scope.META_COLUMN_SCREEN, Category.REORDER,    "⬅️").bind("K").bind("Shift+Up")
+_reg("meta-column-edit",             "Rename, resize, or cast selected column", Scope.META_COLUMN_SCREEN, Category.EDITING,    "✏️").bind("e")
+_reg("meta-column-delete",           "Delete selected column",                  Scope.META_COLUMN_SCREEN, Category.EDITING,    "🗑️").bind("d")
+_reg("meta-column-toggle-selection", "Select or deselect current column",       Scope.META_COLUMN_SCREEN, Category.SELECTION,  "✅").bind("s")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Cell Detail Screen
@@ -435,6 +440,24 @@ _reg("sheet-close-tab",             "Close selected tab",                       
 _reg("sheet-rename-tab",            "Rename selected tab",                                  Scope.SHEET_SCREEN, Category.FILE_TAB,           "✏️").bind("e")
 _reg("sheet-toggle-selection",      "Select or deselect current sheet row",                 Scope.SHEET_SCREEN, Category.SELECTION,          "✅").bind("s")
 _reg("sheet-join-selected-tabs",    "Join the two selected tabs",                           Scope.SHEET_SCREEN, Category.JOIN_TABLE,         "🔗").bind("&")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Plot (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+_reg("plot-lineplot",    "Create a line plot from selected data",    Scope.MAIN_TABLE, Category.PLOT, "📊").bind("l", leader="p")
+_reg("plot-scatterplot", "Create a scatter plot from selected data", Scope.MAIN_TABLE, Category.PLOT, "📊").bind("s", leader="p")
+_reg("plot-boxplot",     "Create a box plot from selected data",     Scope.MAIN_TABLE, Category.PLOT, "📊").bind("x", leader="p")
+_reg("plot-barplot",     "Create a bar plot from selected data",     Scope.MAIN_TABLE, Category.PLOT, "📊").bind("b", leader="p")
+_reg("plot-histogram",   "Create a histogram from selected data",    Scope.MAIN_TABLE, Category.PLOT, "📊").bind("h", leader="p")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Plot Screen (MainTable scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+_reg("close-plot",                   "Close the plot modal",         Scope.PLOT_SCREEN, Category.PLOT, "📊").bind("q").bind("Escape")
+_reg("barplot-toggle-orientation",   "Toggle bar plot orientation",  Scope.BAR_PLOT_SCREEN, Category.PLOT, "📊").bind("o")
+_reg("barplot-toggle-stacked",       "Toggle stacked bars",          Scope.BAR_PLOT_SCREEN, Category.PLOT, "📊").bind("s")
+_reg("histogram-toggle-orientation", "Toggle histogram orientation", Scope.HISTOGRAM_PLOT_SCREEN, Category.PLOT, "📊").bind("o")
+_reg("histogram-set-bins",           "Set the number of bins",       Scope.HISTOGRAM_PLOT_SCREEN, Category.PLOT, "📊").bind("n")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Join Tables (MainTable scope)

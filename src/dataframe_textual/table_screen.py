@@ -5,10 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 from textual.widgets.data_table import ColumnKey
 
-if TYPE_CHECKING:
-    from .data_frame_table import DataFrameTable
-    from .keybindings import KeyBindingRegistry
-
 from functools import partial
 
 import polars as pl
@@ -36,6 +32,10 @@ from .common import (
 from .file_picker_screen import SaveFileScreen
 from .text_screen import TextScreen
 from .yes_no_screen import JoinTableScreen
+
+if TYPE_CHECKING:
+    from .data_frame_table import DataFrameTable
+    from .keybindings import KeyBindingRegistry
 
 
 class TableModalScreen(ModalScreen):
@@ -353,7 +353,7 @@ class TableModalScreen(ModalScreen):
         # Move cursor back to the same column and approximate row position after sorting
         self.table.move_cursor(row=ridx, column=cidx)
 
-    def toggele_row_selection(self) -> None:
+    def toggle_row_selection(self) -> None:
         """Toggle selection of the currently focused row."""
         ridx, _ = self.table.cursor_coordinate
         if ridx in self.selected_rows:
@@ -897,7 +897,7 @@ class FrequencyScreen(TableScreen):
 
     def cmd_frequency_toggle_selection(self) -> None:
         """Select or deselect the current frequency row."""
-        self.toggele_row_selection()
+        self.toggle_row_selection()
         self.build_table()
 
     def build_table(self) -> None:
@@ -1253,6 +1253,23 @@ class MetaColumnScreen(TableScreen):
         col_name = self.dftable.df.columns[self.get_cidx()]
         self.show_statistics(col_name)
 
+    def cmd_meta_column_toggle_selection(self) -> None:
+        """Select or deselect the current column in the main table."""
+        col_idx = self.get_cidx()
+        if not 0 <= col_idx < len(self.dftable.df.columns):
+            return
+
+        col_name = self.dftable.df.columns[col_idx]
+        self.dftable.add_history(f"Toggle column selection for [$success]{col_name}[/]")
+        if col_name in self.dftable.selected_columns:
+            self.dftable.selected_columns.pop(col_name)
+        else:
+            self.dftable.selected_columns[col_name] = True
+
+        self.toggle_row_selection()
+        self.build_table()
+        self.dftable.setup_table()
+
     def cmd_meta_column_move_right(self) -> None:
         """Move the selected column right."""
         self.move_selected_column("right")
@@ -1333,7 +1350,6 @@ class MetaColumnScreen(TableScreen):
         )
 
         col2style = defaultdict(list)
-        col2style["Column"] = ""  # No specific style for the "Column" header
         for dtype in self.dftable.df.dtypes:
             col2style["Type"].append(DtypeConfig(dtype).style)
 
@@ -1467,7 +1483,7 @@ class SheetScreen(TableModalScreen):
 
     def cmd_sheet_toggle_selection(self) -> None:
         """Select or deselect the current sheet row."""
-        self.toggele_row_selection()
+        self.toggle_row_selection()
         self.build_table()
 
     def cmd_sheet_join_selected_tabs(self) -> None:
