@@ -377,9 +377,9 @@ Useful examples from current bindings:
 | `Shift+Delete` | Clear current column (set matching cells to NULL)                         |
 | `e`            | Edit current cell (respects data type)                                    |
 | `E`            | Edit entire column with value/expression                                  |
-| `a`            | Add empty column after current                                            |
-| `A`            | Add column with name and value/expression                                 |
-| `i`            | Add index column after current                                            |
+| `a`            | Add an empty column after current                                         |
+| `A`            | Add a column with name and value/expression                               |
+| `i`            | Add an index column after current                                         |
 | `za`           | Add a link column from URL template                                       |
 | `^`            | Rename current column                                                     |
 | `*`            | Delete selected columns or current column                                 |
@@ -413,14 +413,14 @@ Useful examples from current bindings:
 | `g,`             | Select rows with cell matches or those matching cursor value in all columns    |
 | `\|` (pipe)      | Select rows where expression matches in current column                         |
 | `g\|`            | Select rows where expression matches in all columns                            |
-| `\`              | Unselect selected rows where expression matches in current column              |
-| `g\`             | Unselect selected rows where expression matches in all columns                 |
+| `\`              | Deselect selected rows where expression matches in current column              |
+| `g\`             | Deselect selected rows where expression matches in all columns                 |
 | `{`              | Go to previous selected row                                                    |
 | `}`              | Go to next selected row                                                        |
 | `s`              | Select/deselect current row                                                    |
 | `gs`             | Select current row and all rows above                                          |
 | `zs`             | Select current row and all rows below                                          |
-| `gu`             | Unselect all rows                                                              |
+| `gu`             | Deselect all rows                                                              |
 | `'` (apostrophe) | Select/deselect current column                                                 |
 | `g'`             | Select current column and all columns to the left                              |
 | `z'`             | Select current column and all columns to the right                             |
@@ -508,7 +508,7 @@ Useful examples from current bindings:
 
 These actions are the fastest way to get out of trouble after a mistaken edit, delete, sort, filter, or other table change.
 
-- `U`: Undo the last action and restore the previous state.
+- `u` / `U`: Undo the last action and restore the previous state.
 - `R`: Redo the last undone action.
 - `gU`: Reset the table to its original loaded state if you want to start over.
 
@@ -688,13 +688,12 @@ The application provides multiple ways to select rows (for filtering or collecti
 - `g,` - Select rows with cell matches or those matching cursor value in all columns
 - `|` - Select rows where expression matches in the current column
 - `g|` - Select rows where expression matches in all columns
-- `\` - Unselect currently selected rows where expression matches in the current column
-- `g\` - Unselect currently selected rows where expression matches in all columns
+- `\` - Deselect currently selected rows where expression matches in the current column
+- `g\` - Deselect currently selected rows where expression matches in all columns
 - `s` - Select/deselect current row
 - `gs` - Select current row and all rows above
 - `zs` - Select current row and all rows below
-- `u` - Unselect the current row
-- `gu` - Unselect all rows
+- `gu` - Deselect all rows
 - `'` (apostrophe) - Select/deselect current column
 - `g'` - Select current column and all columns to the left
 - `z'` - Select current column and all columns to the right
@@ -797,7 +796,7 @@ Both actions work on a subset of the original dataframe, but they serve differen
 
 **Collect** (`"`):
 
-- Creates a separate tab containing only the chosen rows/columns
+- Creates a separate tab containing only the chosen rows and/or columns
 - The collected tab is independent from the source dataframe
 - Edits in the collected tab do not modify the original table
 
@@ -822,15 +821,16 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 
 - `e` or **Double-click**: Edit the current cell with type-aware validation.
 - `^` or **Double-click** column header: Rename the current column.
-- `d`: Delete the selected rows, or the current row if nothing is selected.
+- `d`: Delete the selected rows, or the current row if none is selected.
 - `gd`: Delete the current row and all rows above it.
 - `zd`: Delete the current row and all rows below it.
-- `*`: Delete selected columns, or the current column if nothing is selected.
+- `*`: Delete selected columns, or the current column if none is selected.
 - `g*`: Delete the current column and all columns to its left.
 - `z*`: Delete the current column and all columns to its right.
 - `a`: Add an empty column after the current column.
 - `A`: Add a column after the current column using a value or expression such as `$age * 2`.
-- `i`: Insert an index column after the current column.
+- `i`: Add an index column after the current column.
+- `za`: Add a link column from URL template
 - `D`: Duplicate the current row.
 - `zD`: Duplicate the current column using a `_copy` suffix.
 - `zU`: Remove duplicate rows while keeping the first occurrence, based on visible-column values.
@@ -862,7 +862,7 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 **Pin Column**: `!`
 
 - Moves the current column to the leftmost unfrozen position and freezes it
-- If columns are already frozen, appends to the frozen set (increments `fixed_columns`)
+- If columns are already frozen, appends to the frozen set
 
 ### 16. Save File
 
@@ -947,12 +947,31 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - `$email.str.ends_with("@company.com")` - Email ends with domain
 - `$code.str.starts_with("ABC")` - Code starts with "ABC"
 - `$name.str.len_chars() < 7` - Length of name shorter than 7
+- `$name.str.to_lowercase() == "alice"` - Match regardless of letter case
+- `$name.str.strip_chars() == "Alice"` - Ignore leading and trailing whitespace
+- `$description.str.replace("old", "new") == "new value"` - Replace the first occurrence
+- `$description.str.replace_all("old", "new").str.contains("new")` - Replace all occurrences, then check the result
+- `$code.str.slice(0, 3) == "ABC"` - First three characters match "ABC"
+- `$path.str.split("/").list.last() == "report.csv"` - Last slash-separated part is "report.csv"
+- `$text.str.contains(r"\d+")` - Text contains one or more digits (regex)
 
 **Number Operations:**
 
 - `$age * 2 > 100` - Double age greater than 100
 - `($salary + $bonus) > 150000` - Total compensation over 150,000
 - `$percentage >= 50` - Percentage at least 50%
+
+**List Operations:** ([Polars list API reference](https://docs.pola.rs/api/python/stable/reference/series/list.html))
+
+- `$tags.list.contains("python")` - List column contains the value "python"
+- `$scores.list.len() > 3` - List has more than 3 elements
+- `$scores.list.max() >= 90` - Largest element at least 90
+- `$scores.list.min() < 10` - Smallest element less than 10
+- `$scores.list.sum() > 100` - Sum of elements greater than 100
+- `$scores.list.mean() >= 75` - Average of elements at least 75
+- `$items.list.first() == 'A'` - First element is 'A'
+- `$items.list.last() != 'Z'` - Last element is not 'Z'
+- `$items.list.get(1) == 'B'` - Second element (0-based index) is 'B'
 
 **Null Handling:**
 
@@ -1113,7 +1132,7 @@ dv partially_broken.csv -E
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.13+
 - POSIX-compatible terminal (macOS, Linux, WSL)
 - Terminal supporting ANSI escape sequences and mouse events
 
