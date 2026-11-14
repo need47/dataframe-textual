@@ -1093,10 +1093,11 @@ Plot commands open a plot modal. Most plots require numeric data columns; confus
 
 **Plot modal controls:**
 
-- `q` / `Escape`: Close the plot.
-- `x` / `y`: Independently toggle the corresponding axis between linear (default) and logarithmic scales. Logarithmic axes require strictly positive plotted coordinates, including baselines and cell edges.
-- Bar plot: `o` toggles vertical/horizontal orientation, `s` toggles grouped/stacked bars, and `c` cycles data labels through none, counts, percentages, and counts plus percentages. Percentages are calculated within each series.
-- Histogram: `o` toggles orientation, `#` sets the bin count (default `10`), and `n` toggles normalization of bin counts to proportions.
+- `q` / `Escape`: Closes the plot.
+- `x` / `y`: Independently toggles the corresponding axis between linear (default) and logarithmic scales. Logarithmic axes require strictly positive plotted coordinates, including baselines and cell edges.
+- `o`: Toggles vertical/horizontal orientation for bar, box and histgram plots
+- Bar plot: `s` toggles grouped/stacked bars, and `c` cycles data labels through none, counts, percentages, and counts plus percentages. Percentages are calculated within each series.
+- Histogram: `#` sets the bin count (default `10`), and `n` toggles normalization of bin counts to proportions.
 - Confusion matrix: `n` toggles between raw counts (default) and normalized percentages.
 
 ## Handling Loading Errors

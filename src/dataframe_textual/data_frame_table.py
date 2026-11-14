@@ -1290,7 +1290,7 @@ class DataFrameTable(DataTable):
 
         for idx, c in enumerate(self.selected_columns, 1):
             if c == col_name:
-                check_indicator = f" 🗸{SUBSCRIPT_DIGITS.get(idx, '')}"
+                check_indicator = f" ✓{SUBSCRIPT_DIGITS.get(idx, '')}"
                 label += check_indicator
                 break
 

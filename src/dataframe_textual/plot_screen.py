@@ -77,6 +77,7 @@ class PlotScreen(ModalScreen):
         self.registry: KeyBindingRegistry = self.app.key_registry
         self.scale_x = False
         self.scale_y = False
+        self.orientation = "vertical"
 
     def compose(self) -> ComposeResult:
         self.plot = PlotextPlot(id="plot")
@@ -112,6 +113,15 @@ class PlotScreen(ModalScreen):
         self.scale_y = not self.scale_y
         self.draw()
 
+    def cmd_toggle_orientation(self) -> None:
+        """Toggle plot orientation between vertical and horizontal, then redraw."""
+        self.orientation = "horizontal" if self.orientation == "vertical" else "vertical"
+        self.draw()
+
+    def draw(self) -> None:
+        """Update the plot with the current data."""
+        raise NotImplementedError("Subclasses must implement the draw method.")
+
     def _apply_axis_scales(self, axis: str = "xy") -> None:
         """Apply and validate each requested axis scale before refreshing the plot."""
         fig = self.plot.plt.figure
@@ -121,9 +131,27 @@ class PlotScreen(ModalScreen):
         if "y" in axis:
             fig.ruler("y", side="both").scale("log" if self.scale_y else "linear")
 
-    def draw(self) -> None:
-        """Update the plot with the current data."""
-        raise NotImplementedError("Subclasses must implement the draw method.")
+    def _series_markers_and_labels(
+        self, y_columns: list[str], plt: ModuleType
+    ) -> tuple[list[Any] | None, list[Any] | None]:
+        """Build series markers and a matching label, using Plotext defaults for one series."""
+        if not y_columns:
+            return None, None
+        if len(y_columns) == 1:
+            return [None], [y_columns[0]]
+
+        # Generate a unique marker for each series and remove it from the figure's cycler to avoid reuse.
+        markers = []
+        for _ in y_columns:
+            marker = plt.figure._next_marker()
+            plt.figure._cycler.remove_pixel(marker.pixel())
+            markers.append(plt.marker("full").fill(marker.pixel()))
+
+        labels = [
+            plt.colorize(col_name).fill(marker.pixel()) for col_name, marker in zip(y_columns, markers, strict=True)
+        ]
+
+        return markers, labels
 
 
 class ScatterPlotScreen(PlotScreen):
@@ -262,9 +290,16 @@ class BoxPlotScreen(PlotScreen):
         plt = self.plot.plt
         fig = plt.figure
         fig.clear()
-        fig.draw(fig.box(labels, y_values))
+        series_markers, series_labels = self._series_markers_and_labels(self.y_columns, plt)
+        positions = list(range(1, len(labels) + 1))
+
+        for position, values, marker in zip(positions, y_values, series_markers, strict=True):
+            box = fig.box([position], [values.to_list()], marker=marker, orientation=self.orientation)
+            fig.draw(box)
+
+        fig.ruler("x" if self.orientation == "vertical" else "y").ticks(positions, labels=series_labels)
         # fig.title("Box Plot")
-        self._apply_axis_scales("y")
+        self._apply_axis_scales("y" if self.orientation == "vertical" else "x")
         self.plot.refresh()
 
 
@@ -279,7 +314,6 @@ class BarPlotScreen(PlotScreen):
         self.df = df
         self.x_column = x_column
         self.y_columns = y_columns
-        self.orientation = "vertical"
         self.stacked = False
         self.label_mode: bool | str = False
 
@@ -289,38 +323,10 @@ class BarPlotScreen(PlotScreen):
         self.label_mode = label_modes[(label_modes.index(self.label_mode) + 1) % len(label_modes)]
         self.draw()
 
-    def cmd_barplot_toggle_orientation(self) -> None:
-        """Toggle the bar plot between horizontal and vertical, then redraw."""
-        self.orientation = "horizontal" if self.orientation == "vertical" else "vertical"
-        self.draw()
-
     def cmd_barplot_toggle_stacked(self) -> None:
         """Toggle stacked bars and redraw the plot."""
         self.stacked = not self.stacked
         self.draw()
-
-    def _series_markers_and_label(self, y_columns: list[str], plt: ModuleType) -> tuple[list[Any] | None, Any | None]:
-        """Build series markers and a matching label, using Plotext defaults for one series."""
-        if not y_columns:
-            return None, None
-        if len(y_columns) == 1:
-            return None, y_columns[0]
-
-        # Generate a unique marker for each series and remove it from the figure's cycler to avoid reuse.
-        markers = []
-        for _ in y_columns:
-            marker = plt.figure._next_marker()
-            markers.append(marker)
-            plt.figure._cycler.remove_pixel(marker.pixel())
-
-        labels = [
-            plt.colorize(col_name).fill(marker.pixel()) for col_name, marker in zip(y_columns, markers, strict=True)
-        ]
-        label_matrix = labels[0].matrix()
-        for label in labels[1:]:
-            label_matrix = label_matrix.hstack(", ").hstack(label)
-
-        return markers, label_matrix
 
     def _build_with_positive_baseline(
         self, builder: Callable[[], Any], minimum: float | None = None, omit_empty: bool = False
@@ -381,7 +387,12 @@ class BarPlotScreen(PlotScreen):
             plot_data[self.x_column] if self.x_column is not None else pl.Series("x", range(1, plot_data.height + 1))
         )
         y_values = [plot_data[col_name] for col_name in self.y_columns]
-        series_markers, series_label = self._series_markers_and_label(self.y_columns, plt)
+        series_markers, series_labels = self._series_markers_and_labels(self.y_columns, plt)
+        series_label = series_labels[0] if series_labels else None
+        if len(series_labels or []) > 1:
+            series_label = series_labels[0].matrix()
+            for label in series_labels[1:]:
+                series_label = series_label.hstack(", ").hstack(label)
 
         labeled: bool | list[list[str]] = self.label_mode is True
         if self.label_mode in ("%", "both"):
@@ -426,11 +437,6 @@ class HistogramPlotScreen(BarPlotScreen):
         super().__init__(df, y_columns)
         self.bins = 10
         self.norm = False
-
-    def cmd_histogram_toggle_orientation(self) -> None:
-        """Toggle the histogram between horizontal and vertical, then redraw."""
-        self.orientation = "horizontal" if self.orientation == "vertical" else "vertical"
-        self.draw()
 
     def cmd_histogram_set_bins(self) -> None:
         """Prompt for a positive bin count and redraw the histogram."""
