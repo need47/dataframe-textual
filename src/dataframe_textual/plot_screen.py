@@ -72,12 +72,18 @@ class PlotScreen(ModalScreen):
         }
     """
 
-    def __init__(self) -> None:
+    def __init__(self, df: pl.DataFrame) -> None:
         super().__init__()
+        self.df = df
         self.registry: KeyBindingRegistry = self.app.key_registry
         self.scale_x = False
         self.scale_y = False
         self.orientation = "vertical"
+
+    @property
+    def vertical(self) -> bool:
+        """Return True if the plot orientation is vertical."""
+        return self.orientation == "vertical"
 
     def compose(self) -> ComposeResult:
         self.plot = PlotextPlot(id="plot")
@@ -99,28 +105,35 @@ class PlotScreen(ModalScreen):
         event.stop()
         event.prevent_default()
 
+    def draw(self) -> None:
+        """Update the plot with the current data."""
+        raise NotImplementedError("Subclasses must implement the draw method.")
+
     def cmd_close_plot(self) -> None:
         """Close the plot modal."""
         self.app.pop_screen()
 
     def cmd_toggle_scale_x(self) -> None:
         """Toggle the x-axis scale between linear and logarithmic."""
-        self.scale_x = not self.scale_x
-        self.draw()
+        if isinstance(self.screen, (ScatterPlotScreen, LinePlotScreen)) or (
+            not self.vertical and isinstance(self.screen, (BarPlotScreen, BoxPlotScreen, HistogramPlotScreen))
+        ):
+            self.scale_x = not self.scale_x
+            self.draw()
 
     def cmd_toggle_scale_y(self) -> None:
         """Toggle the y-axis scale between linear and logarithmic."""
-        self.scale_y = not self.scale_y
-        self.draw()
+        if isinstance(self.screen, (ScatterPlotScreen, LinePlotScreen)) or (
+            self.vertical and isinstance(self.screen, (BarPlotScreen, BoxPlotScreen, HistogramPlotScreen))
+        ):
+            self.scale_y = not self.scale_y
+            self.draw()
 
     def cmd_toggle_orientation(self) -> None:
         """Toggle plot orientation between vertical and horizontal, then redraw."""
-        self.orientation = "horizontal" if self.orientation == "vertical" else "vertical"
-        self.draw()
-
-    def draw(self) -> None:
-        """Update the plot with the current data."""
-        raise NotImplementedError("Subclasses must implement the draw method.")
+        if isinstance(self.screen, (BarPlotScreen, BoxPlotScreen, HistogramPlotScreen)):
+            self.orientation = "horizontal" if self.vertical else "vertical"
+            self.draw()
 
     def _apply_axis_scales(self, axis: str = "xy") -> None:
         """Apply and validate each requested axis scale before refreshing the plot."""
@@ -131,14 +144,14 @@ class PlotScreen(ModalScreen):
         if "y" in axis:
             fig.ruler("y", side="both").scale("log" if self.scale_y else "linear")
 
-    def _series_markers_and_labels(
-        self, y_columns: list[str], plt: ModuleType
-    ) -> tuple[list[Any] | None, list[Any] | None]:
-        """Build series markers and a matching label, using Plotext defaults for one series."""
+    def _series_markers_and_labels(self, y_columns: list[str]) -> tuple[list[Any] | None, list[Any] | None]:
+        """Build series markers and corresponding labels for each y column."""
         if not y_columns:
             return None, None
         if len(y_columns) == 1:
             return [None], [y_columns[0]]
+
+        plt = self.plot.plt
 
         # Generate a unique marker for each series and remove it from the figure's cycler to avoid reuse.
         markers = []
@@ -160,8 +173,7 @@ class ScatterPlotScreen(PlotScreen):
     CSS = PlotScreen.DEFAULT_CSS.replace("PlotScreen", "ScatterPlotScreen")
 
     def __init__(self, df: pl.DataFrame, col_y: str, col_x: str | None = None):
-        super().__init__()
-        self.df = df
+        super().__init__(df)
         self.col_x = col_x
         self.col_y = col_y
 
@@ -214,14 +226,12 @@ class LinePlotScreen(PlotScreen):
     CSS = PlotScreen.DEFAULT_CSS.replace("PlotScreen", "LinePlotScreen")
 
     def __init__(self, df: pl.DataFrame, col_y: str, col_x: str | None = None) -> None:
-        super().__init__()
-        self.df = df
+        super().__init__(df)
         self.col_x = col_x
         self.col_y = col_y
 
     def draw(self) -> None:
         """Draw the selected y column against row positions or the selected x column."""
-
         y_values = self.df[self.col_y]
         if self.col_x is None:
             valid_rows = y_values.is_not_null()
@@ -270,8 +280,7 @@ class BoxPlotScreen(PlotScreen):
     CSS = PlotScreen.DEFAULT_CSS.replace("PlotScreen", "BoxPlotScreen")
 
     def __init__(self, df: pl.DataFrame, y_columns: list[str]):
-        super().__init__()
-        self.df = df
+        super().__init__(df)
         self.y_columns = y_columns
 
     def draw(self) -> None:
@@ -290,16 +299,16 @@ class BoxPlotScreen(PlotScreen):
         plt = self.plot.plt
         fig = plt.figure
         fig.clear()
-        series_markers, series_labels = self._series_markers_and_labels(self.y_columns, plt)
+        series_markers, series_labels = self._series_markers_and_labels(self.y_columns)
         positions = list(range(1, len(labels) + 1))
 
         for position, values, marker in zip(positions, y_values, series_markers, strict=True):
             box = fig.box([position], [values.to_list()], marker=marker, orientation=self.orientation)
             fig.draw(box)
 
-        fig.ruler("x" if self.orientation == "vertical" else "y").ticks(positions, labels=series_labels)
+        fig.ruler("x" if self.vertical else "y").ticks(positions, labels=series_labels)
         # fig.title("Box Plot")
-        self._apply_axis_scales("y" if self.orientation == "vertical" else "x")
+        self._apply_axis_scales("y" if self.vertical else "x")
         self.plot.refresh()
 
 
@@ -310,8 +319,7 @@ class BarPlotScreen(PlotScreen):
     CSS = PlotScreen.DEFAULT_CSS.replace("PlotScreen", "BarPlotScreen")
 
     def __init__(self, df: pl.DataFrame, y_columns: list[str], x_column: str | None = None):
-        super().__init__()
-        self.df = df
+        super().__init__(df)
         self.x_column = x_column
         self.y_columns = y_columns
         self.stacked = False
@@ -341,7 +349,7 @@ class BarPlotScreen(PlotScreen):
         Returns:
             The constructed Plotext signal.
         """
-        value_axis = "y" if self.orientation == "vertical" else "x"
+        value_axis = "y" if self.vertical else "x"
         if not getattr(self, f"scale_{value_axis}"):
             return builder()
         if minimum is not None and minimum / 10 <= 0:
@@ -387,7 +395,7 @@ class BarPlotScreen(PlotScreen):
             plot_data[self.x_column] if self.x_column is not None else pl.Series("x", range(1, plot_data.height + 1))
         )
         y_values = [plot_data[col_name] for col_name in self.y_columns]
-        series_markers, series_labels = self._series_markers_and_labels(self.y_columns, plt)
+        series_markers, series_labels = self._series_markers_and_labels(self.y_columns)
         series_label = series_labels[0] if series_labels else None
         if len(series_labels or []) > 1:
             series_label = series_labels[0].matrix()
@@ -423,7 +431,7 @@ class BarPlotScreen(PlotScreen):
         # fig.title("Bar Plot")
         fig.label(self.x_column, axis="x")
         fig.label(series_label, axis="y")
-        self._apply_axis_scales("y" if self.orientation == "vertical" else "x")
+        self._apply_axis_scales("y" if self.vertical else "x")
         self.plot.refresh()
 
 
@@ -505,7 +513,7 @@ class HistogramPlotScreen(BarPlotScreen):
             return
 
         # fig.title("Histogram")
-        self._apply_axis_scales("y" if self.orientation == "vertical" else "x")
+        self._apply_axis_scales("y" if self.vertical else "x")
         self.plot.refresh()
 
 
@@ -516,8 +524,7 @@ class ConfusionMatrixScreen(PlotScreen):
     CSS = PlotScreen.DEFAULT_CSS.replace("PlotScreen", "ConfusionMatrixScreen")
 
     def __init__(self, df: pl.DataFrame, actual_column: str, predicted_column: str) -> None:
-        super().__init__()
-        self.df = df
+        super().__init__(df)
         self.actual_column = actual_column
         self.predicted_column = predicted_column
         self.norm = False
@@ -532,17 +539,15 @@ class ConfusionMatrixScreen(PlotScreen):
         fig = self.plot.plt.figure
         fig.clear()
 
-        if self.df.is_empty():
-            self.app.notify("No rows available for a confusion matrix", title="Confusion Matrix", severity="warning")
-            return
-
         actual = self.df[self.actual_column]
         predicted = self.df[self.predicted_column]
         labels = sorted(set(actual.to_list()) | set(predicted.to_list()))
+        _, colored_labels = self._series_markers_and_labels(labels)
+        colored_labels = colored_labels or labels
         fig.draw(fig.cmatrix(actual, predicted, labels=labels, map="viridis", norm=self.norm))
         positions = list(range(len(labels)))
-        fig.ruler("x", side="both").ticks(positions, labels=labels)
-        fig.ruler("y", side="both").ticks(positions, labels=labels[::-1])
+        fig.ruler("x", side="both").lim(-0.5, len(labels) - 0.5).ticks(positions, labels=colored_labels)
+        fig.ruler("y", side="both").lim(-0.5, len(labels) - 0.5).ticks(positions, labels=colored_labels[::-1])
         fig.label(self.predicted_column, axis="x", side="both")
         fig.label(self.actual_column, axis="y", side="both")
         self.plot.refresh()
