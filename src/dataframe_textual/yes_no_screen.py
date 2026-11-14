@@ -157,7 +157,7 @@ class YMNScreen(ModalScreen):
         elif event.button.id == "no":
             self.dismiss(None)
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: Key) -> None:
         """Handle key press events in the modal screen."""
         if event.key in ("q", "escape"):
             event.stop()

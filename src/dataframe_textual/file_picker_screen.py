@@ -7,7 +7,7 @@ from rich.text import Text
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.events import Click
+from textual.events import Click, Key
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, OptionList, Select
 from textual.widgets.option_list import Option
@@ -150,7 +150,7 @@ class FilePickerScreen(ModalScreen):
     def on_mount(self) -> None:
         self._refresh_file_list(self.dirname)
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: Key) -> None:
         """Handle global key events for the dialog.
 
         Args:

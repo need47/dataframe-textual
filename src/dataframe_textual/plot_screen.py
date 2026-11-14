@@ -95,13 +95,14 @@ class PlotScreen(ModalScreen):
 
     def on_key(self, event: Key) -> None:
         """Dispatch screen-specific commands, then common plot-screen commands."""
+        # Try dispatching scoped commands
         for scope in (self.COMMAND_SCOPE, Scope.PLOT_SCREEN):
             if self.registry.dispatch(event.key, "", scope, self):
                 event.stop()
                 event.prevent_default()
                 return
 
-        # Unhandled key event will bubble up to the viewer/app level
+        # Unhandled key event will be stopped and prevented from default behavior
         event.stop()
         event.prevent_default()
 

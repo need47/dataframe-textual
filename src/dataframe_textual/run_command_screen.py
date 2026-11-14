@@ -1,6 +1,7 @@
 """Modal screen for running commands by name."""
 
 from textual.app import ComposeResult
+from textual.events import Key
 from textual.screen import ModalScreen
 from textual.widgets import Input
 
@@ -45,7 +46,7 @@ class RunCommandScreen(ModalScreen):
         value = event.value  # Don't strip
         self.dismiss(value if value else None)
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: Key) -> None:
         """Handle Escape key."""
         if event.key == "escape":
             event.stop()

@@ -1,11 +1,8 @@
 """Modal screens for displaying data in tables (row details and frequency)."""
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any
-
-from textual.widgets.data_table import ColumnKey
-
 from functools import partial
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 from rich.text import Text
@@ -15,6 +12,7 @@ from textual.events import Key
 from textual.renderables.bar import Bar
 from textual.screen import ModalScreen
 from textual.widgets import DataTable
+from textual.widgets.data_table import ColumnKey
 
 from .commands import Scope
 from .common import (
@@ -45,6 +43,7 @@ class TableModalScreen(ModalScreen):
     keyboard shortcuts and styling.
     """
 
+    COMMAND_SCOPE = Scope.TABLE_SCREEN
     DEFAULT_CSS = """
         TableModalScreen {
             align: center middle;
@@ -106,12 +105,13 @@ class TableModalScreen(ModalScreen):
         Args:
             event: The key event object.
         """
-        # Try dispatching table-screen-scoped commands
-        if self.registry.dispatch(event.key, self.leader, Scope.TABLE_SCREEN, self):
-            event.stop()
-            event.prevent_default()
-            self.reset_leader()
-            return
+        # Try dispatching scoped commands
+        for scope in (self.COMMAND_SCOPE, Scope.TABLE_SCREEN):
+            if self.registry.dispatch(event.key, self.leader, scope, self):
+                event.stop()
+                event.prevent_default()
+                self.reset_leader()
+                return
 
         # Already in leader mode, no matching command found
         if self.leader:
@@ -485,6 +485,8 @@ class TableScreen(TableModalScreen):
 class RowDetailScreen(TableScreen):
     """Modal screen to display a single row's details."""
 
+    COMMAND_SCOPE = Scope.ROW_DETAIL_SCREEN
+
     def __init__(self, dftable: "DataFrameTable", ridx: int) -> None:
         super().__init__(dftable)
         self.ridx = ridx
@@ -497,23 +499,6 @@ class RowDetailScreen(TableScreen):
         """
         super().on_mount()
         self.build_table()
-
-    def on_key(self, event: Key) -> None:
-        """Handle key press events on the row detail screen.
-
-        Dispatches row-detail commands through the key binding registry, then
-        falls back to the common modal table shortcuts.
-
-        Args:
-            event: The key event object.
-        """
-        if self.registry.dispatch(event.key, self.leader, Scope.ROW_DETAIL_SCREEN, self):
-            event.stop()
-            event.prevent_default()
-            self.reset_leader()
-            return
-
-        super().on_key(event)
 
     def cmd_row_detail_filter_value(self) -> None:
         """Filter the main table by the selected row-detail value."""
@@ -839,6 +824,8 @@ class StatisticsScreen(TableScreen):
 class FrequencyScreen(TableScreen):
     """Modal screen to display frequency of values in a column."""
 
+    COMMAND_SCOPE = Scope.FREQUENCY_SCREEN
+
     def __init__(self, dftable: "DataFrameTable", *col_names: str) -> None:
         super().__init__(dftable)
         self.col_names = list(col_names)
@@ -846,9 +833,9 @@ class FrequencyScreen(TableScreen):
         self.sorted_columns["Count"] = True  # Count sort by default
         self.total_count = len(dftable.df)
         self.columns = [(col_name, col_name) for col_name in self.col_names] + [
-            ("Count", "Count"),
+            ("Count", "count"),
             ("%", "%"),
-            ("Histogram", "Histogram"),
+            ("Histogram", "histogram"),
         ]
 
     def on_mount(self) -> None:
@@ -876,16 +863,6 @@ class FrequencyScreen(TableScreen):
         self.df = self.df.with_columns((pl.col("count") / self.total_count * 100).round(3).alias("%"))
 
         self.app.call_from_thread(self._on_calc_ready)
-
-    def on_key(self, event: Key) -> None:
-        """Handle key press events on the frequency screen."""
-        if self.registry.dispatch(event.key, self.leader, Scope.FREQUENCY_SCREEN, self):
-            event.stop()
-            event.prevent_default()
-            self.reset_leader()
-            return
-
-        super().on_key(event)
 
     def cmd_frequency_filter_value(self) -> None:
         """Filter the main table by selected frequency value(s)."""
@@ -990,8 +967,8 @@ class FrequencyScreen(TableScreen):
         self.sorted_columns[col_sort] = descending
 
         # Count/%/Histogram sort by Count; value columns sort by their own column.
-        if col_sort in {"Count", "%", "Histogram"}:
-            col_name = "Count"
+        if col_sort in {"count", "%", "histogram"}:
+            col_name = "count"
         else:
             col_name = col_sort
 
@@ -1212,6 +1189,8 @@ class HistogramScreen(TableScreen):
 class MetaColumnScreen(TableScreen):
     """Modal screen to display metadata about the columns in the dataframe."""
 
+    COMMAND_SCOPE = Scope.META_COLUMN_SCREEN
+
     def on_ready(self) -> None:
         """Initialize the column metadata screen.
 
@@ -1219,23 +1198,6 @@ class MetaColumnScreen(TableScreen):
         including ID (1-based index), Name, and Type.
         """
         self.build_table()
-
-    def on_key(self, event: Key) -> None:
-        """Handle key press events on the column metadata screen.
-
-        Dispatches metadata commands through the key binding registry, then
-        falls back to the common modal table shortcuts.
-
-        Args:
-            event: The key event object.
-        """
-        if self.registry.dispatch(event.key, self.leader, Scope.META_COLUMN_SCREEN, self):
-            event.stop()
-            event.prevent_default()
-            self.reset_leader()
-            return
-
-        super().on_key(event)
 
     def cmd_meta_column_jump(self) -> None:
         """Jump to the selected column in the main table and close metadata."""
@@ -1364,6 +1326,8 @@ class MetaColumnScreen(TableScreen):
 class CellDetailScreen(TableModalScreen):
     """Modal screen to display details of a cell value, including support for nested structures like lists and dicts."""
 
+    COMMAND_SCOPE = Scope.CELL_DETAIL_SCREEN
+
     def __init__(self, col_name: str, dtype: pl.DataType, cell_value: Any, delimiter: str | None = "|") -> None:
         super().__init__()
         self.col_name = col_name
@@ -1375,20 +1339,6 @@ class CellDetailScreen(TableModalScreen):
         """Initialize the cell detail screen."""
         super().on_mount()
         self.build_table()
-
-    def on_key(self, event: Key) -> None:
-        """Handle key press events on the column metadata screen.
-
-        Args:
-            event: The key event object.
-        """
-        if self.registry.dispatch(event.key, self.leader, Scope.CELL_DETAIL_SCREEN, self):
-            event.stop()
-            event.prevent_default()
-            self.reset_leader()
-            return
-
-        super().on_key(event)
 
     def cmd_cell_detail_drill_down(self) -> None:
         """Drill into the selected cell-detail value."""
@@ -1446,6 +1396,8 @@ class CellDetailScreen(TableModalScreen):
 class SheetScreen(TableModalScreen):
     """Modal screen displaying information about all currently opened tabs."""
 
+    COMMAND_SCOPE = Scope.SHEET_SCREEN
+
     def __init__(self, tabs: dict) -> None:
         """Initialize the SheetScreen.
 
@@ -1458,16 +1410,6 @@ class SheetScreen(TableModalScreen):
     def on_ready(self) -> None:
         """Build the table after initial layout."""
         self.build_table()
-
-    def on_key(self, event) -> None:
-        """Handle key events."""
-        if self.registry.dispatch(event.key, self.leader, Scope.SHEET_SCREEN, self):
-            event.stop()
-            event.prevent_default()
-            self.reset_leader()
-            return
-
-        super().on_key(event)
 
     def cmd_sheet_switch_tab(self) -> None:
         """Switch to the tab under the cursor."""

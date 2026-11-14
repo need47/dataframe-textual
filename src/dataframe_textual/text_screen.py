@@ -1,6 +1,7 @@
 """A screen to display long text in a TextArea widget."""
 
 from textual.app import ComposeResult
+from textual.events import Key
 from textual.screen import ModalScreen
 from textual.widgets import TextArea
 
@@ -35,7 +36,7 @@ class TextScreen(ModalScreen):
         """Compose the read-only TextArea widget."""
         yield TextArea(self.text, id="text-area", read_only=True, show_cursor=False)
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: Key) -> None:
         """Close the screen on q or Escape."""
         if event.key in ("q", "escape"):
             self.dismiss()
