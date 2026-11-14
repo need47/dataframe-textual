@@ -39,6 +39,7 @@ class Scope(str, Enum):
     PLOT_SCREEN = "PlotScreen"
     BAR_PLOT_SCREEN = "BarPlotScreen"
     HISTOGRAM_PLOT_SCREEN = "HistogramPlotScreen"
+    CONFUSION_MATRIX_SCREEN = "ConfusionMatrixScreen"
 
 
 class Category(str, Enum):
@@ -435,32 +436,38 @@ _reg("cell-detail-drill-down", "Drill into selected cell-detail value", Scope.CE
 # Sheet Screen
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_reg("sheet-switch-tab",            "Switch to selected tab",                               Scope.SHEET_SCREEN, Category.NAVIGATION,         "🎯").bind("Enter")
-_reg("sheet-close-tab",             "Close selected tab",                                   Scope.SHEET_SCREEN, Category.FILE_TAB,           "✖️").bind("d")
-_reg("sheet-rename-tab",            "Rename selected tab",                                  Scope.SHEET_SCREEN, Category.FILE_TAB,           "✏️").bind("e")
-_reg("sheet-toggle-selection",      "Select or deselect current sheet row",                 Scope.SHEET_SCREEN, Category.SELECTION,          "✅").bind("s")
-_reg("sheet-join-selected-tabs",    "Join the two selected tabs",                           Scope.SHEET_SCREEN, Category.JOIN_TABLE,         "🔗").bind("&")
+_reg("sheet-switch-tab",            "Switch to selected tab",                               Scope.SHEET_SCREEN, Category.NAVIGATION, "🎯").bind("Enter")
+_reg("sheet-close-tab",             "Close selected tab",                                   Scope.SHEET_SCREEN, Category.FILE_TAB,   "✖️").bind("d")
+_reg("sheet-rename-tab",            "Rename selected tab",                                  Scope.SHEET_SCREEN, Category.FILE_TAB,   "✏️").bind("e")
+_reg("sheet-toggle-selection",      "Select or deselect current sheet row",                 Scope.SHEET_SCREEN, Category.SELECTION,  "✅").bind("s")
+_reg("sheet-join-selected-tabs",    "Join the two selected tabs",                           Scope.SHEET_SCREEN, Category.JOIN_TABLE, "🔗").bind("&")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Plot (MainTable scope)
 # ═══════════════════════════════════════════════════════════════════════════════
-_reg("plot-lineplot",    "Create a line plot from selected data",    Scope.MAIN_TABLE, Category.PLOT, "📊").bind("l", leader="p")
-_reg("plot-scatterplot", "Create a scatter plot from selected data", Scope.MAIN_TABLE, Category.PLOT, "📊").bind("s", leader="p")
-_reg("plot-boxplot",     "Create a box plot from selected data",     Scope.MAIN_TABLE, Category.PLOT, "📊").bind("x", leader="p")
-_reg("plot-barplot",     "Create a bar plot from selected data",     Scope.MAIN_TABLE, Category.PLOT, "📊").bind("b", leader="p")
-_reg("plot-histogram",   "Create a histogram from selected data",    Scope.MAIN_TABLE, Category.PLOT, "📊").bind("h", leader="p")
+_reg("plot-lineplot",    "Plot one numeric column or two selected columns as x/y",                Scope.MAIN_TABLE, Category.PLOT, "📊").bind("l", leader="p")
+_reg("plot-scatterplot", "Scatter one numeric column or two selected columns as x/y",             Scope.MAIN_TABLE, Category.PLOT, "📊").bind("s", leader="p")
+_reg("plot-boxplot",     "Box plot selected numeric columns, or the cursor column",               Scope.MAIN_TABLE, Category.PLOT, "📊").bind("o", leader="p")
+_reg("plot-barplot",     "Bar plot numeric columns with an optional first column for categories", Scope.MAIN_TABLE, Category.PLOT, "📊").bind("b", leader="p")
+_reg("plot-histogram",   "Histogram selected numeric columns, or the cursor column",              Scope.MAIN_TABLE, Category.PLOT, "📊").bind("h", leader="p")
+_reg("plot-cmatrix",     "Confusion matrix for two selected string columns (actual, predicted)",  Scope.MAIN_TABLE, Category.PLOT, "📊").bind("c", leader="p")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Plot Screen (MainTable scope)
+# Plot Screen
 # ═══════════════════════════════════════════════════════════════════════════════
-_reg("close-plot",                   "Close the plot modal",         Scope.PLOT_SCREEN, Category.PLOT, "📊").bind("q").bind("Escape")
-_reg("barplot-toggle-orientation",   "Toggle bar plot orientation",  Scope.BAR_PLOT_SCREEN, Category.PLOT, "📊").bind("o")
-_reg("barplot-toggle-stacked",       "Toggle stacked bars",          Scope.BAR_PLOT_SCREEN, Category.PLOT, "📊").bind("s")
-_reg("histogram-toggle-orientation", "Toggle histogram orientation", Scope.HISTOGRAM_PLOT_SCREEN, Category.PLOT, "📊").bind("o")
-_reg("histogram-set-bins",           "Set the number of bins",       Scope.HISTOGRAM_PLOT_SCREEN, Category.PLOT, "📊").bind("n")
+_reg("close-plot",                   "Close the plot modal",                                   Scope.PLOT_SCREEN,             Category.PLOT, "📊").bind("q").bind("Escape")
+_reg("toggle-scale-x",               "Toggle the x-axis scale between linear and logarithmic", Scope.PLOT_SCREEN,             Category.PLOT, "📊").bind("x")
+_reg("toggle-scale-y",               "Toggle the y-axis scale between linear and logarithmic", Scope.PLOT_SCREEN,             Category.PLOT, "📊").bind("y")
+_reg("barplot-cycle-label",          "Cycle labels: none, count, percent, count and percent",  Scope.BAR_PLOT_SCREEN,         Category.PLOT, "📊").bind("c")
+_reg("barplot-toggle-orientation",   "Toggle between vertical and horizontal bars",            Scope.BAR_PLOT_SCREEN,         Category.PLOT, "📊").bind("o")
+_reg("barplot-toggle-stacked",       "Toggle between grouped and stacked bars",                Scope.BAR_PLOT_SCREEN,         Category.PLOT, "📊").bind("s")
+_reg("histogram-toggle-orientation", "Toggle histogram orientation",                           Scope.HISTOGRAM_PLOT_SCREEN,   Category.PLOT, "📊").bind("o")
+_reg("histogram-set-bins",           "Set the histogram bin count (default: 10)",              Scope.HISTOGRAM_PLOT_SCREEN,   Category.PLOT, "📊").bind("#")
+_reg("histogram-toggle-norm",        "Toggle normalization to proportions",                    Scope.HISTOGRAM_PLOT_SCREEN,   Category.PLOT, "📊").bind("n")
+_reg("cmatrix-toggle-norm",          "Toggle normalization of the confusion matrix",           Scope.CONFUSION_MATRIX_SCREEN, Category.PLOT, "📊").bind("n")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Join Tables (MainTable scope)
+# Join Tables (App scope)
 # ═══════════════════════════════════════════════════════════════════════════════
 _reg("join-table",  "Join two tables", Scope.APP, Category.JOIN_TABLE, "🔗").bind("&")
 # fmt: on

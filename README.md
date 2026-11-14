@@ -1,6 +1,6 @@
 # DataFrame Textual
 
-A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet](https://parquet.apache.org/)/[Vortex](https://vortex.dev/)/JSON/[NDJSON](https://jsonlines.org/) built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring and analyzing tabular data directly in terminal with multi-tab support for multiple files!
+A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet](https://parquet.apache.org/)/JSON/[NDJSON](https://jsonlines.org/)/[Vortex](https://vortex.dev/) built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring and analyzing tabular data directly in terminal with multi-tab support for multiple files!
 
 ![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/main-table.png)
 
@@ -21,6 +21,7 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
 - ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts
 - 📈 **Sorting & Statistics** - Multi-column sorting, frequency distribution, and histogram analysis
+- 📊 **Plotting** - Draw line, scatter, box, bar, histogram, and confusion matrix plots via [plotext](https://github.com/piccolomo/plotext)
 - 💾 **Save & Undo** - Save edits back to file with full undo/redo support
 
 ### Advanced Features
@@ -368,6 +369,19 @@ Useful examples from current bindings:
 | `g^`              | Set current row as the new header row                          |
 | `Shift+Tab`       | Cycle cursor type (cell -> row -> column)                      |
 
+#### Plotting
+
+| Key  | Action                                                                  |
+| ---- | ----------------------------------------------------------------------- |
+| `pl` | Line plot: one numeric column against row position, or selected x/y     |
+| `ps` | Scatter plot: one numeric column against row position, or selected x/y  |
+| `po` | Box plot for selected numeric columns, or the current column            |
+| `pb` | Bar plot for selected numeric columns; a selected string column is x    |
+| `ph` | Histogram for selected numeric columns, or the current column           |
+| `pc` | Confusion matrix from two selected string columns                       |
+
+Plot keys are leader sequences: press `p`, then the second key. They require the optional `plotext` package; install it with `pip install plotext`.
+
 #### Editing
 
 | Key            | Action                                                                    |
@@ -426,6 +440,8 @@ Useful examples from current bindings:
 | `z'`             | Select current column and all columns to the right                             |
 | `t`              | Toggle row selections (invert)                                                 |
 | `T`              | Clear all row/column selections and cell matches                               |
+
+Column selections retain the order in which columns are selected, not their left-to-right table order. Each selected column header shows a check mark with a subscript number indicating its position in the selection. Deselecting and reselecting a column moves it to the end of selection. Selection order may affect subsequent operations. For example, scatter plot uses the first two selected columns as x and y.
 
 #### Find & Replace
 
@@ -1064,6 +1080,25 @@ Use the built-in Python console for quick interactive transformations without le
 
 ![Python Console](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/python-console.png)
 
+### 23. Plotting
+
+Plot commands open a plot modal. Most plots require numeric data columns; confusion matrices use string labels, and bar plots can use string category labels. Install the optional dependency with `pip install plotext` if plotting is unavailable.
+
+- `pl`: Line plot. With one selected numeric column, row position is used for x; with two selected numeric columns, the first is x and the second is y. With no selection, the cursor column is plotted against row position.
+- `ps`: Scatter plot with the same one-column or x/y selection behavior as line plots.
+- `po`: Box plots for selected numeric columns, or the cursor column if none are selected.
+- `pb`: Bar plot for selected numeric columns. When the first selected column is a string, it supplies category labels and the remaining selected columns are numeric series. Otherwise, selected numeric columns are plotted against row positions.
+- `ph`: Histograms for selected numeric columns, or the cursor column if none are selected.
+- `pc`: Confusion matrix from exactly two selected string columns. Select the actual/true-label column first and the predicted-label column second. Rows represent actual labels; columns represent predicted labels. Each cell shows the count for that label pair.
+
+**Plot modal controls:**
+
+- `q` / `Escape`: Close the plot.
+- `x` / `y`: Independently toggle the corresponding axis between linear (default) and logarithmic scales. Logarithmic axes require strictly positive plotted coordinates, including baselines and cell edges.
+- Bar plot: `o` toggles vertical/horizontal orientation, `s` toggles grouped/stacked bars, and `c` cycles data labels through none, counts, percentages, and counts plus percentages. Percentages are calculated within each series.
+- Histogram: `o` toggles orientation, `#` sets the bin count (default `10`), and `n` toggles normalization of bin counts to proportions.
+- Confusion matrix: `n` toggles between raw counts (default) and normalized percentages.
+
 ## Handling Loading Errors
 
 Most loading failures come from malformed CSV/TSV input, quoting issues, or mixed column types. When this happens, the application prints a hint with a suggested retry option.
@@ -1128,6 +1163,7 @@ dv partially_broken.csv -E
 - **textual**: Terminal UI framework
 - **fastexcel**: Read Excel files
 - **xlsxwriter**: Write Excel files
+- **plotext**: Render interactive terminal plots (optional)
 - **vortex-data**: Read/Write Vortex files (optional)
 
 ## Requirements

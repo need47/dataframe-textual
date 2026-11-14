@@ -60,7 +60,14 @@ from .common import (
     validate_expr,
 )
 from .loading_screen import BusyScreen, LoadingScreen
-from .plot_screen import BarPlotScreen, BoxPlotScreen, HistogramPlotScreen, LinePlotScreen, ScatterPlotScreen
+from .plot_screen import (
+    BarPlotScreen,
+    BoxPlotScreen,
+    ConfusionMatrixScreen,
+    HistogramPlotScreen,
+    LinePlotScreen,
+    ScatterPlotScreen,
+)
 from .run_command_screen import RunCommandScreen
 from .table_screen import (
     CellDetailScreen,
@@ -1278,7 +1285,13 @@ class DataFrameTable(DataTable):
                 sort_indicator = (
                     f" ▼{SUBSCRIPT_DIGITS.get(idx, '')}" if descending else f" ▲{SUBSCRIPT_DIGITS.get(idx, '')}"
                 )
-                label = col_name + sort_indicator
+                label += sort_indicator
+                break
+
+        for idx, c in enumerate(self.selected_columns, 1):
+            if c == col_name:
+                check_indicator = f" 🗸{SUBSCRIPT_DIGITS.get(idx, '')}"
+                label += check_indicator
                 break
 
         return label
@@ -6004,7 +6017,7 @@ class DataFrameTable(DataTable):
             self.selected_rows.add(rid)
 
         row_key = self.cursor_row_key
-        is_selected = rid in self.selected_rows
+        is_row_selected = rid in self.selected_rows
         match_cols = self.matches.get(rid, set())
 
         for col in self.ordered_columns:
@@ -6012,7 +6025,7 @@ class DataFrameTable(DataTable):
             col_name = col_key.value
             cell_text: Text = self.get_cell(row_key, col_key)
 
-            if is_selected or (col_name in match_cols):
+            if is_row_selected or (col_name in self.selected_columns) or (col_name in match_cols):
                 cell_text.style = HIGHLIGHT_COLOR
             else:
                 # Reset to default style based on dtype
@@ -6315,12 +6328,11 @@ class DataFrameTable(DataTable):
 
     def cmd_plot_scatterplot(self) -> None:
         """Plot selected columns, or the cursor column when none are selected."""
-        selected_columns = [col for col in self.selected_columns if col in self.df.columns]
-
-        if len(selected_columns) >= 2:
-            col_x, col_y = selected_columns[:2]
-        elif selected_columns:
-            col_x, col_y = None, selected_columns[0]
+        columns = list(self.selected_columns)
+        if len(columns) >= 2:
+            col_x, col_y = columns[:2]
+        elif columns:
+            col_x, col_y = None, columns[0]
         else:
             col_x, col_y = None, self.cursor_col_name
 
@@ -6328,10 +6340,9 @@ class DataFrameTable(DataTable):
             return
 
         plot_columns = [col_y] if col_x is None else [col_x, col_y]
-        non_numeric = [col for col in plot_columns if not self.df.schema[col].is_numeric()]
-        if non_numeric:
+        if any(not self.df.schema[col].is_numeric() for col in plot_columns):
             self.notify(
-                f"Scatter plots require numeric columns: {', '.join(non_numeric)}",
+                "Scatter plots require numeric columns",
                 title="Scatter Plot",
                 severity="warning",
             )
@@ -6341,11 +6352,11 @@ class DataFrameTable(DataTable):
 
     def cmd_plot_lineplot(self) -> None:
         """Plot one or two selected numeric columns, or the cursor column, as a line."""
-        selected_columns = [col for col in self.selected_columns if col in self.df.columns]
-        if len(selected_columns) >= 2:
-            col_x, col_y = selected_columns[:2]
-        elif selected_columns:
-            col_x, col_y = None, selected_columns[0]
+        columns = list(self.selected_columns)
+        if len(columns) >= 2:
+            col_x, col_y = columns[:2]
+        elif columns:
+            col_x, col_y = None, columns[0]
         else:
             col_x, col_y = None, self.cursor_col_name
 
@@ -6353,10 +6364,9 @@ class DataFrameTable(DataTable):
             return
 
         plot_columns = [col_y] if col_x is None else [col_x, col_y]
-        non_numeric = [col for col in plot_columns if not self.df.schema[col].is_numeric()]
-        if non_numeric:
+        if any(not self.df.schema[col].is_numeric() for col in plot_columns):
             self.notify(
-                f"Line plots require numeric columns: {', '.join(non_numeric)}",
+                "Line plots require numeric columns",
                 title="Line Plot",
                 severity="warning",
             )
@@ -6366,17 +6376,13 @@ class DataFrameTable(DataTable):
 
     def cmd_plot_boxplot(self) -> None:
         """Plot selected numeric columns as box plots."""
-        selected_columns = [col for col in self.selected_columns if col in self.df.columns]
-
-        y_columns = selected_columns or ([self.cursor_col_name] if self.cursor_col_name is not None else [])
-
+        y_columns = list(self.selected_columns) or [self.cursor_col_name]
         if not y_columns:
             return
 
-        non_numeric = [col for col in y_columns if not self.df.schema[col].is_numeric()]
-        if non_numeric:
+        if any(not self.df.schema[col].is_numeric() for col in y_columns):
             self.notify(
-                f"Box plots require numeric y columns: {', '.join(non_numeric)}",
+                "Box plots require numeric y columns",
                 title="Box Plot",
                 severity="warning",
             )
@@ -6384,18 +6390,37 @@ class DataFrameTable(DataTable):
 
         self.app.push_screen(BoxPlotScreen(self.df, y_columns=y_columns))
 
+    def cmd_plot_cmatrix(self) -> None:
+        """Plot a confusion matrix from exactly two selected string columns."""
+        columns = [col for col in self.selected_columns if col in self.df.columns]
+        if len(columns) != 2:
+            self.notify(
+                "Select exactly two string columns for a confusion matrix",
+                title="Confusion Matrix",
+                severity="warning",
+            )
+            return
+
+        non_string = [col for col in columns if self.df.schema[col] != pl.String]
+        if non_string:
+            self.notify(
+                "Confusion matrices require two string columns",
+                title="Confusion Matrix",
+                severity="warning",
+            )
+            return
+
+        self.app.push_screen(ConfusionMatrixScreen(self.df, actual_column=columns[0], predicted_column=columns[1]))
+
     def cmd_plot_histogram(self) -> None:
         """Plot selected numeric columns, or the cursor column, as histograms."""
-        selected_columns = [col for col in self.selected_columns if col in self.df.columns]
-        y_columns = selected_columns or ([self.cursor_col_name] if self.cursor_col_name is not None else [])
-
+        y_columns = list(self.selected_columns) or [self.cursor_col_name]
         if not y_columns:
             return
 
-        non_numeric = [col for col in y_columns if not self.df.schema[col].is_numeric()]
-        if non_numeric:
+        if any(not self.df.schema[col].is_numeric() for col in y_columns):
             self.notify(
-                f"Histograms require numeric columns: {', '.join(non_numeric)}",
+                "Histograms require numeric columns",
                 title="Histogram",
                 severity="warning",
             )
@@ -6405,22 +6430,19 @@ class DataFrameTable(DataTable):
 
     def cmd_plot_barplot(self) -> None:
         """Plot selected columns as grouped bars, or the cursor column alone."""
-        selected_columns = [col for col in self.selected_columns if col in self.df.columns]
-        if not selected_columns:
-            selected_columns = [self.cursor_col_name] if self.cursor_col_name is not None else []
-        if not selected_columns:
+        columns = list(self.selected_columns) or [self.cursor_col_name]
+        if not columns:
             return
 
-        x_column = selected_columns[0] if self.df.schema[selected_columns[0]] == pl.String else None
-        y_columns = selected_columns[1:] if x_column is not None else selected_columns
+        x_column = columns[0] if self.df.schema[columns[0]] == pl.String else None
+        y_columns = columns[1:] if x_column is not None else columns
         if not y_columns:
             self.notify("Select at least one numeric y column", title="Bar Plot", severity="warning")
             return
 
-        non_numeric = [col for col in y_columns if not self.df.schema[col].is_numeric()]
-        if non_numeric:
+        if any(not self.df.schema[col].is_numeric() for col in y_columns):
             self.notify(
-                f"Bar plots require numeric y columns: {', '.join(non_numeric)}",
+                "Bar plots require numeric y columns",
                 title="Bar Plot",
                 severity="warning",
             )
