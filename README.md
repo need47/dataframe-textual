@@ -371,14 +371,15 @@ Useful examples from current bindings:
 
 #### Plotting
 
-| Key  | Action                                                                  |
-| ---- | ----------------------------------------------------------------------- |
-| `pl` | Line plot: one numeric column against row position, or selected x/y     |
-| `ps` | Scatter plot: one numeric column against row position, or selected x/y  |
-| `po` | Box plot for selected numeric columns, or the current column            |
-| `pb` | Bar plot for selected numeric columns; a selected string column is x    |
-| `ph` | Histogram for selected numeric columns, or the current column           |
-| `pc` | Confusion matrix from two selected string columns                       |
+| Key  | Action                                                                 |
+| ---- | ---------------------------------------------------------------------- |
+| `pl` | Line plot: one numeric column against row position, or selected x/y    |
+| `ps` | Scatter plot: one numeric column against row position, or selected x/y |
+| `po` | Box plot for selected numeric columns, or the current column           |
+| `pb` | Bar plot for selected numeric columns; a selected string column is x   |
+| `ph` | Histogram for selected numeric columns, or the current column          |
+| `pc` | Confusion matrix from two selected string columns                      |
+| `pm` | Heatmap for selected numeric columns, or all visible columns           |
 
 Plot keys are leader sequences: press `p`, then the second key. They require the optional `plotext` package; install it with `pip install plotext`.
 

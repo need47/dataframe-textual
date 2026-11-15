@@ -451,6 +451,7 @@ _reg("plot-boxplot",     "Box plot selected numeric columns, or the cursor colum
 _reg("plot-barplot",     "Bar plot numeric columns with an optional first column for categories", Scope.MAIN_TABLE, Category.PLOT, "📊").bind("b", leader="p")
 _reg("plot-histogram",   "Histogram selected numeric columns, or the cursor column",              Scope.MAIN_TABLE, Category.PLOT, "📊").bind("h", leader="p")
 _reg("plot-cmatrix",     "Confusion matrix for two selected string columns (actual, predicted)",  Scope.MAIN_TABLE, Category.PLOT, "📊").bind("c", leader="p")
+_reg("plot-heatmap",     "Heatmap for selected numeric columns",                                  Scope.MAIN_TABLE, Category.PLOT, "📊").bind("m", leader="p")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Plot Screen

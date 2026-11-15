@@ -210,14 +210,13 @@ class ScatterPlotScreen(PlotScreen):
             )
             return
 
-        plt = self.plot.plt
-        fig = plt.figure
+        fig = self.plot.plt.figure
         fig.clear()
         fig.draw(fig.signal(x_values, y_values))
-        # fig.title("Scatter Plot")
         fig.label(self.col_x or self.col_y, axis="x")
         fig.label(self.col_y, axis="y")
         self._apply_axis_scales("xy")
+        # fig.title("Scatter Plot")
         self.plot.refresh()
 
 
@@ -272,6 +271,7 @@ class LinePlotScreen(PlotScreen):
         fig.label(self.col_x or self.col_y, axis="x")
         fig.label(self.col_y, axis="y")
         self._apply_axis_scales("xy")
+        # fig.title("Line Plot")
         self.plot.refresh()
 
 
@@ -297,8 +297,7 @@ class BoxPlotScreen(PlotScreen):
             )
             return
 
-        plt = self.plot.plt
-        fig = plt.figure
+        fig = self.plot.plt.figure
         fig.clear()
         series_markers, series_labels = self._series_markers_and_labels(self.y_columns)
         positions = list(range(1, len(labels) + 1))
@@ -308,8 +307,8 @@ class BoxPlotScreen(PlotScreen):
             fig.draw(box)
 
         fig.ruler("x" if self.vertical else "y").ticks(positions, labels=series_labels)
-        # fig.title("Box Plot")
         self._apply_axis_scales("y" if self.vertical else "x")
+        # fig.title("Box Plot")
         self.plot.refresh()
 
 
@@ -382,8 +381,7 @@ class BarPlotScreen(PlotScreen):
 
     def draw(self) -> None:
         """Draw one bar series per selected y column."""
-        plt = self.plot.plt
-        fig = plt.figure
+        fig = self.plot.plt.figure
         fig.clear()
 
         columns = ([self.x_column] if self.x_column is not None else []) + self.y_columns
@@ -429,10 +427,10 @@ class BarPlotScreen(PlotScreen):
             minimum=min(values.min() for values in y_values),
         )
         fig.draw(chart)
-        # fig.title("Bar Plot")
         fig.label(self.x_column, axis="x")
         fig.label(series_label, axis="y")
         self._apply_axis_scales("y" if self.vertical else "x")
+        # fig.title("Bar Plot")
         self.plot.refresh()
 
 
@@ -485,8 +483,7 @@ class HistogramPlotScreen(BarPlotScreen):
 
     def draw(self) -> None:
         """Draw one labeled histogram for each y column."""
-        plt = self.plot.plt
-        fig = plt.figure
+        fig = self.plot.plt.figure
         fig.clear()
 
         plotted_columns = 0
@@ -513,8 +510,37 @@ class HistogramPlotScreen(BarPlotScreen):
             self.app.notify("No values available for a histogram", title="Histogram", severity="warning")
             return
 
-        # fig.title("Histogram")
         self._apply_axis_scales("y" if self.vertical else "x")
+        # fig.title("Histogram")
+        self.plot.refresh()
+
+
+class HeatmapPlotScreen(PlotScreen):
+    """Display selected numeric columns as a color-scaled matrix."""
+
+    CSS = PlotScreen.DEFAULT_CSS.replace("PlotScreen", "HeatmapPlotScreen")
+
+    def __init__(self, df: pl.DataFrame, columns: list[str]) -> None:
+        super().__init__(df)
+        self.columns = columns
+
+    def draw(self) -> None:
+        """Draw the selected columns as a filled Viridis heatmap."""
+        frame = self.df.select(self.columns)
+        row_count = frame.height
+        column_count = len(self.columns)
+        if not row_count or not column_count:
+            self.app.notify("No values available for a heatmap", title="Heatmap", severity="warning")
+            return
+
+        values = [list(row) for row in frame.iter_rows()]
+        fig = self.plot.plt.figure
+        fig.clear()
+        fig.axes(0)
+        fig.ruler("x").frequency(0)
+        fig.ruler("y").frequency(0)
+        fig.draw(fig.heatmap(values, map="viridis", fill=1))
+        # fig.title("Heatmap")
         self.plot.refresh()
 
 
@@ -551,4 +577,5 @@ class ConfusionMatrixScreen(PlotScreen):
         fig.ruler("y", side="both").lim(-0.5, len(labels) - 0.5).ticks(positions, labels=colored_labels[::-1])
         fig.label(self.predicted_column, axis="x", side="both")
         fig.label(self.actual_column, axis="y", side="both")
+        # fig.title("Confusion Matrix")
         self.plot.refresh()

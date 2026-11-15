@@ -64,6 +64,7 @@ from .plot_screen import (
     BarPlotScreen,
     BoxPlotScreen,
     ConfusionMatrixScreen,
+    HeatmapPlotScreen,
     HistogramPlotScreen,
     LinePlotScreen,
     ScatterPlotScreen,
@@ -6427,6 +6428,31 @@ class DataFrameTable(DataTable):
             return
 
         self.app.push_screen(HistogramPlotScreen(self.df, y_columns=y_columns))
+
+    def cmd_plot_heatmap(self) -> None:
+        """Plot selected numeric columns, or all numeric columns, as a heatmap."""
+        columns = list(self.selected_columns) or list(self.visible_columns)
+        if not columns or columns[0] is None:
+            return
+        self.log(f"Selected columns for heatmap: {columns}")
+
+        if any(not self.df.schema[col].is_numeric() for col in columns):
+            self.notify(
+                "Heatmaps require numeric columns",
+                title="Heatmap",
+                severity="warning",
+            )
+            return
+
+        if any(self.df[col].has_nulls() for col in columns):
+            self.notify(
+                "Heatmaps cannot display null values; fill or filter them first",
+                title="Heatmap",
+                severity="warning",
+            )
+            return
+
+        self.app.push_screen(HeatmapPlotScreen(self.df, columns=columns))
 
     def cmd_plot_barplot(self) -> None:
         """Plot selected columns as grouped bars, or the cursor column alone."""
