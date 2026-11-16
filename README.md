@@ -1,6 +1,6 @@
 # DataFrame Textual
 
-A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet](https://parquet.apache.org/)/JSON/[NDJSON](https://jsonlines.org/)/[Vortex](https://vortex.dev/) built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring and analyzing tabular data directly in terminal with multi-tab support for multiple files!
+A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet](https://parquet.apache.org/)/JSON/[NDJSON](https://jsonlines.org/)/[Vortex](https://vortex.dev/) built with Python, [Polars](https://pola.rs/), and [Textual](https://textual.textualize.io/). Inspired by [VisiData](https://www.visidata.org/), this tool provides smooth keyboard navigation, data manipulation, and a clean interface for exploring, analyzing, and plotting tabular data directly in terminal with multi-tab support for multiple files!
 
 ![Screenshot](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/main-table.png)
 
