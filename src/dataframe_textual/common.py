@@ -224,8 +224,8 @@ SUBSCRIPT_DIGITS = {
     9: "₉",
 }
 
-# Cursor types ("none" removed)
-CURSOR_TYPES = ["row", "column", "cell"]
+# Cursor types
+CURSOR_TYPES = ["cell", "row", "column", "none"]
 
 # Row index mapping between filtered and original dataframe
 RID = "^_RID_^"
