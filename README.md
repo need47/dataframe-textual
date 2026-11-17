@@ -152,8 +152,9 @@ options:
 # Open a file
 dv data.csv
 
-# Gzipped files are supported
+# Compressed files are supported
 dv data.csv.gz
+dv data.csv.zst
 
 # Read from stdin (defaults to TSV)
 cat data.tsv | dv
