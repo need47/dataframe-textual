@@ -1295,12 +1295,8 @@ class DataFrameViewer(App):
         compression = "gzip" if filename.endswith(".gz") else "zstd" if filename.endswith(".zst") else "uncompressed"
 
         try:
-            if fmt == "csv":
-                df.write_csv(filename, compression=compression)
-            elif fmt == "tsv":
-                df.write_csv(filename, separator="\t", compression=compression)
-            elif fmt == "psv":
-                df.write_csv(filename, separator="|", compression=compression)
+            if sep := SUPPORTED_FORMATS.get(fmt):
+                df.write_csv(filename, separator=sep, compression=compression)
             elif fmt == "parquet":
                 df.write_parquet(filename)
             elif fmt in ("jsonl", "ndjson"):

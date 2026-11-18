@@ -132,8 +132,10 @@ class FilePickerScreen(ModalScreen):
                 yield Select(
                     [
                         ("All Files (*)", "*"),
-                        ("CSV (*.csv)", "csv"),
                         ("TSV (*.tsv)", "tsv"),
+                        ("CSV (*.csv)", "csv"),
+                        ("PSV (*.psv)", "psv"),
+                        ("SSV (*.ssv)", "ssv"),
                         ("Excel (*.xlsx)", "xlsx"),
                         ("Parquet (*.parquet)", "parquet"),
                         ("NDJSON (*.ndjson, *.jsonl)", "ndjson,jsonl"),

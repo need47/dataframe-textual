@@ -20,6 +20,7 @@ SUPPORTED_FORMATS = {
     "tsv": "\t",
     "csv": ",",
     "psv": "|",
+    "ssv": ";",
     "xlsx": None,
     "parquet": None,
     "ndjson": None,
@@ -1090,12 +1091,8 @@ def write_file(sources: list[Source], filename: str) -> None:
     compression = "gzip" if filename.endswith(".gz") else "zstd" if filename.endswith(".zst") else "uncompressed"
 
     try:
-        if fmt == "csv":
-            sources[0].lf.sink_csv(filename, compression=compression)
-        elif fmt == "tsv":
-            sources[0].lf.sink_csv(filename, separator="\t", compression=compression)
-        elif fmt == "psv":
-            sources[0].lf.sink_csv(filename, separator="|", compression=compression)
+        if sep := SUPPORTED_FORMATS.get(fmt):
+            sources[0].lf.sink_csv(filename, separator=sep, compression=compression)
         elif fmt == "parquet":
             sources[0].lf.sink_parquet(filename)
         elif fmt in ("jsonl", "ndjson"):
