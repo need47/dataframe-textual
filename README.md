@@ -1049,16 +1049,6 @@ Execute complete SQL queries for advanced data manipulation:
 
 ![SQL Interface](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/sql-query.png)
 
-#### Simple SQL Interface (`zQ`)
-
-SELECT specific columns and apply WHERE conditions without writing full SQL:
-
-- Choose which columns to include in results
-- Specify WHERE clause for filtering
-- Ideal for quick filtering and column selection
-
-![SQL Interface](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/sql-simple.png)
-
 **Examples:**
 
 ```sql
@@ -1072,6 +1062,16 @@ SELECT *
 FROM self
 WHERE `product id` = 7
 ```
+
+#### Simple SQL Interface (`zQ`)
+
+SELECT specific columns and apply WHERE conditions without writing full SQL:
+
+- Choose which columns to include in results
+- Specify WHERE clause for filtering
+- Ideal for quick filtering and column selection
+
+![SQL Interface](https://raw.githubusercontent.com/need47/dataframe-textual/refs/heads/main/screenshots/sql-simple.png)
 
 ### 22. Python Console
 
