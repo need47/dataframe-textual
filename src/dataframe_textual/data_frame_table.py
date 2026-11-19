@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from .keybindings import KeyBindingRegistry
 
 import polars as pl
+from rich.style import Style
 from rich.text import Text, TextType
 from textual import work
 from textual._two_way_dict import TwoWayDict
@@ -81,7 +82,6 @@ from .table_screen import (
 from .text_screen import TextScreen
 from .yes_no_screen import (
     AddColumnScreen,
-    AddLinkScreen,
     AdvancedSqlScreen,
     ConfirmScreen,
     CustomBinScreen,
@@ -106,6 +106,9 @@ BUFFER_SIZE = 5
 # Threshold for number of rows loaded before showing a warning to the user
 WARN_ROWS_THRESHOLD = 1_000_000
 
+# Hyperlink column alias
+HYPERLINK = "^_hyperlink_^"
+
 
 @dataclass
 class History:
@@ -126,6 +129,7 @@ class History:
     float_precision_columns: dict[str, int]
     column_widths: dict[str, int]
     bar_columns: set[str]
+    hyperlink_columns: dict[str, tuple[str | pl.Expr, ...]]
     show_rid: bool
     show_column_index: bool
     dirty: bool = False  # Whether this history state has unsaved changes
@@ -275,6 +279,8 @@ class DataFrameTable(DataTable):
 
         # Columns displaying as inline bar charts
         self.bar_columns: set[str] = set()
+
+        self.hyperlink_columns: dict[str, tuple[str | pl.Expr, ...]] = {}
 
         # Whether to show internal row index column
         self.show_rid = False
@@ -1685,6 +1691,18 @@ class DataFrameTable(DataTable):
                 # If conversion fails, keep the original formatted value
                 pass
 
+    def _hyperlink_urls(self, dataframe: pl.DataFrame) -> dict[str, pl.Series]:
+        urls = {}
+        for col_name, parts in self.hyperlink_columns.items():
+            if col_name not in self.visible_columns:
+                continue
+            try:
+                expression = pl.concat_str([part if isinstance(part, pl.Expr) else pl.lit(part) for part in parts])
+                urls[col_name] = dataframe.select(pl.col(RID), expression.alias(HYPERLINK))[HYPERLINK]
+            except pl.exceptions.PolarsError as error:
+                self.log(f"Error rendering hyperlinks for {col_name}: {error}")
+        return urls
+
     def load_rows_segment(self, segment_start: int, segment_stop: int) -> int:
         """Load a single contiguous segment of rows into the table.
 
@@ -1707,6 +1725,7 @@ class DataFrameTable(DataTable):
 
         # Load the dataframe slice
         df_slice = self.df.slice(segment_start, segment_stop - segment_start)
+        hyperlink_urls = self._hyperlink_urls(df_slice)
         thousand_separator = [col in self.thousand_separator_columns for col in visible_columns]
         float_precision = [self.float_precision_columns.get(col, -1) for col in visible_columns]
 
@@ -1743,6 +1762,12 @@ class DataFrameTable(DataTable):
 
             # Replace cells in bar columns with Bar widgets
             self._apply_bar_widgets_to_row(formatted_row, bar_col_indices, vals, visible_col_list)
+
+            for cell, col_name in zip(formatted_row, visible_col_list, strict=True):
+                if col_name in hyperlink_urls and (url := hyperlink_urls[col_name][ridx - segment_start]):
+                    link_style = Style(underline=True, link=url)
+                    if isinstance(cell, Text):
+                        cell.stylize(link_style)
 
             # Find correct insertion position and insert
             insert_pos = self._find_insert_position_for_row(ridx)
@@ -2050,6 +2075,7 @@ class DataFrameTable(DataTable):
             float_precision_columns=self.float_precision_columns.copy(),
             column_widths=self.column_widths.copy(),
             bar_columns=self.bar_columns.copy(),
+            hyperlink_columns=self.hyperlink_columns.copy(),
             show_rid=self.show_rid,
             show_column_index=self.show_column_index,
             dirty=self.dirty,
@@ -2075,6 +2101,7 @@ class DataFrameTable(DataTable):
         self.float_precision_columns = history.float_precision_columns.copy()
         self.column_widths = history.column_widths.copy()
         self.bar_columns = history.bar_columns.copy()
+        self.hyperlink_columns = history.hyperlink_columns.copy()
         self.show_rid = history.show_rid
         self.show_column_index = history.show_column_index
         self.dirty = history.dirty
@@ -2170,6 +2197,7 @@ class DataFrameTable(DataTable):
         self.float_precision_columns = {}
         self.column_widths = {}
         self.bar_columns.clear()
+        self.hyperlink_columns.clear()
         self.df_done = True
         self.dirty = dirty
         self.show_rid = False
@@ -2338,6 +2366,7 @@ class DataFrameTable(DataTable):
         """
         if result is None:
             return
+
         fixed_rows, fixed_columns = result
 
         if fixed_rows > 0 and fixed_columns > 0:
@@ -2697,6 +2726,7 @@ class DataFrameTable(DataTable):
         """Handle result from EditCellScreen."""
         if result is None:
             return
+
         ridx, col_name, new_value = result
 
         if new_value is None:
@@ -2750,6 +2780,17 @@ class DataFrameTable(DataTable):
             row_key = str(ridx)
             col_key = col_name
             self.update_cell(row_key, col_key, formatted_value, update_width=True)
+
+            for link_column, urls in self._hyperlink_urls(self.df.slice(ridx, 1)).items():
+                cell = self.get_cell(row_key, link_column)
+                if isinstance(cell, Text):
+                    cell = cell.copy()
+                    cell.spans[:] = [
+                        span for span in cell.spans if not isinstance(span.style, Style) or not span.style.link
+                    ]
+                    if url := urls[0]:
+                        cell.stylize(Style(underline=True, link=url))
+                    self.update_cell(row_key, link_column, cell)
 
             # Expand column width if new content is wider than the explicit width set during setup
             col = self.columns[col_key]
@@ -2817,6 +2858,7 @@ class DataFrameTable(DataTable):
         """Edit a column."""
         if result is None:
             return
+
         term, col_name = result
 
         # Null case
@@ -2898,6 +2940,17 @@ class DataFrameTable(DataTable):
 
         # Rename the column in the dataframe
         self.df = self.df.rename({col_name: new_name})
+
+        if col_name in self.hyperlink_columns:
+            self.hyperlink_columns[new_name] = self.hyperlink_columns.pop(col_name)
+
+        self.hyperlink_columns = {
+            target: tuple(
+                pl.col(new_name) if isinstance(part, pl.Expr) and part.meta.root_names() == [col_name] else part
+                for part in parts
+            )
+            for target, parts in self.hyperlink_columns.items()
+        }
 
         # Also update the full datafram if applicable
         if self.in_view:
@@ -3034,14 +3087,12 @@ class DataFrameTable(DataTable):
         return new_col_name
 
     def cmd_add_column(self, col_name: str | None = None) -> None:
-        """Add acolumn after the current column."""
-        # Generate a unique column name
-        if not col_name:
-            new_col_name = self._new_column_name("new_col")
-        else:
-            new_col_name = self._new_column_name(col_name)
-
-        self.add_column_expr((self.cursor_col_name, new_col_name, pl.lit(None)))
+        """Open a dialog to add a column from a string template."""
+        new_col_name = self._new_column_name(col_name or "new_col")
+        self.app.push_screen(
+            AddColumnScreen(self.cursor_col_name, self.df, template=True, new_col_name=new_col_name),
+            self.add_column_expr,
+        )
 
     def cmd_add_column_expr(self) -> None:
         """Open screen to add a new column with optional expression."""
@@ -3572,89 +3623,50 @@ class DataFrameTable(DataTable):
             )
             self.log(f"Error contracting list column `{base_name}`: {e}")
 
-    def cmd_add_link_column(self) -> None:
-        """Open AddLinkScreen to collect a link template and add a new link column."""
+    def cmd_add_column_hyperlink(self) -> None:
+        """Toggle hyperlinks for the current column or collect a link template."""
+        col_name = self.cursor_col_name
+        if col_name in self.hyperlink_columns:
+            self.add_history(f"Clear hyperlink from column [$success]{col_name}[/]")
+            del self.hyperlink_columns[col_name]
+            self.setup_table()
+            self.notify(f"Cleared hyperlink from [$success]{col_name}[/]", title="Add Link")
+            return
+
         self.app.push_screen(
-            AddLinkScreen(self.cursor_col_name, self.df),
-            callback=self.add_link_column,
+            AddColumnScreen(col_name, self.df, link=True),
+            callback=self.add_column_hyperlink,
         )
 
     @with_full_df
-    @with_busy_screen
-    def add_link_column(self, result: tuple[str, str, str] | None) -> None:
-        """Handle result from AddLinkScreen.
-
-        Creates a new link column in the dataframe based on a user-provided template.
-        Supports multiple placeholder types:
-        - `$_` - Current column (based on cursor position)
-        - `$1`, `$2`, etc. - Column by index (1-based)
-        - `$name` - Column by name (e.g., `$id`, `$product_name`)
-
-        The template is evaluated for each row using Polars expressions with vectorized
-        string concatenation. The new column is inserted after the current column.
-
-        Args:
-            result: Tuple of (col_name, new_col_name, link_template) or None if cancelled.
-        """
+    def add_column_hyperlink(self, result: tuple[str, str] | None) -> None:
+        """Attach template-generated hyperlink to the current column."""
         if result is None:
             return
-        col_name, new_col_name, link_template = result
+
+        col_name, link_template = result
         cidx = self.get_cidx(col_name)
         if cidx is None:
             self.notify(f"Column [$warning]{col_name}[/] not found", title="Add Link", severity="warning")
             return
 
-        self.add_history(
-            f"Add link column [$success]{new_col_name}[/] with template [$accent]{link_template}[/].", dirty=True
-        )
-
         try:
-            # Hack to support PubChem link
-            link_template = link_template.replace("PC", "pubchem.ncbi.nlm.nih.gov")
-
-            # Ensure link starts with http:// or https://
-            if not link_template.startswith(("https://", "http://")):
+            link_template = link_template.replace("PUBCHEM", "pubchem.ncbi.nlm.nih.gov")
+            if not link_template.startswith(("https://", "http://", "ftp://")):
                 link_template = "https://" + link_template
-
-            # Parse template placeholders into Polars expressions
             parts = parse_placeholders(link_template, self.df.columns, self.df.columns[cidx])
-
-            # Build the concatenation expression
             exprs = [part if isinstance(part, pl.Expr) else pl.lit(part) for part in parts]
-            new_col = pl.concat_str(exprs).alias(new_col_name)
-
-            # Get columns up to current, the new column, then remaining columns
-            cols = self.df.columns
-            cols_before = cols[: cidx + 1]
-            cols_after = cols[cidx + 1 :]
-
-            # Build the new dataframe with columns reordered
-            select_cols = cols_before + [new_col_name] + cols_after
-            self.df = self.df.lazy().with_columns(new_col).select(select_cols).collect()
-
-            # Also update the full datafram if applicable
-            if self.in_view:
-                # Get updated column from df for rows that exist in dfull
-                lf_updated = self.df.lazy().select(RID, pl.col(new_col_name))
-                # Join and use coalesce to prefer updated value or keep original
-                self.dfull = (
-                    self.dfull.lazy()
-                    .join(lf_updated, on=RID, how="left", maintain_order="left")
-                    .select(select_cols)
-                    .collect()
-                )
-
-            # Recreate table for display
-            self.setup_table()
-
-            # Move cursor to the new column
-            self.move_cursor(column=cidx + 1)
-
-            self.notify(f"Added link column [$success]{new_col_name}[/]. Use Ctrl/Cmd click to open.", title="Add Link")
-
+            expression = pl.concat_str(exprs)
+            self.df.head(1).select(pl.col(RID), expression.alias(HYPERLINK))
         except Exception as e:
-            self.notify(f"Failed to add link column [$error]{new_col_name}[/]", title="Add Link", severity="error")
+            self.notify(f"Failed to add hyperlinks to [$error]{col_name}[/]: {e}", title="Add Link", severity="error")
             self.log(f"Error adding link column: {e}")
+            return
+
+        self.add_history(f"Add hyperlinks to column [$success]{col_name}[/]")
+        self.hyperlink_columns[col_name] = tuple(parts)
+        self.setup_table()
+        self.notify(f"Added hyperlinks to [$success]{col_name}[/]. Use Ctrl/Cmd click to open.", title="Add Link")
 
     @with_full_df
     @with_busy_screen
@@ -3718,6 +3730,7 @@ class DataFrameTable(DataTable):
         for col_name in col_names_to_delete:
             self.column_widths.pop(col_name, None)
             self.selected_columns.pop(col_name, None)
+            self.hyperlink_columns.pop(col_name, None)
 
         # Remove from matches
         for rid in list(self.matches.keys()):
@@ -3782,6 +3795,7 @@ class DataFrameTable(DataTable):
 
             self.df = add_rid_column(lf).collect()
             self.dfull = None
+            self.hyperlink_columns.clear()
 
             remaining_cols = set(self.df.columns)
             self.column_widths = {col: width for col, width in self.column_widths.items() if col in remaining_cols}
@@ -3876,6 +3890,7 @@ class DataFrameTable(DataTable):
 
             self.selected_rows.clear()
             self.matches = defaultdict(set)
+            self.hyperlink_columns.clear()
 
             self.setup_table()
 
@@ -3989,6 +4004,8 @@ class DataFrameTable(DataTable):
             lf_view_before = lf_view.slice(0, rid + 1)
             lf_view_after = lf_view.slice(rid + 1).with_columns(pl.col(RID) + 1)
             self.dfull = pl.concat([lf_view_before, row_to_duplicate, lf_view_after]).collect()
+
+        self.hyperlink_columns.clear()
 
         # Recreate table for display
         self.setup_table()
@@ -4812,6 +4829,7 @@ class DataFrameTable(DataTable):
         """
         if result is None:
             return
+
         term = result.get("term")
         col_name = result.get("col_name", self.cursor_col_name)
         cidx = self.get_cidx(col_name)
@@ -4979,6 +4997,7 @@ class DataFrameTable(DataTable):
         """
         if result is None:
             return
+
         replace_all = result.get("replace_all")
         term_find = result.get("term_find")
         term_replace = result.get("term_replace")
@@ -5372,6 +5391,7 @@ class DataFrameTable(DataTable):
         """
         if result is None:
             return
+
         term = result.get("term", NULL)
         col_name = result.get("col_name", self.cursor_col_name)
         if self.get_cidx(col_name) is None:
@@ -5554,6 +5574,7 @@ class DataFrameTable(DataTable):
         """
         if result is None:
             return
+
         expr, col_name = result
 
         if expr is None:
@@ -5742,6 +5763,7 @@ class DataFrameTable(DataTable):
         """
         if result is None:
             return
+
         term = result.get("term")
         col_name = result.get("col_name", self.cursor_col_name)
         cidx = self.get_cidx(col_name)
@@ -6180,6 +6202,7 @@ class DataFrameTable(DataTable):
         """Handle SQL result result from SimpleSqlScreen."""
         if result is None:
             return
+
         columns, where, new_tab = result
 
         sql = f"SELECT {columns} FROM self"
@@ -6199,8 +6222,8 @@ class DataFrameTable(DataTable):
         """Handle SQL result result from AdvancedSqlScreen."""
         if result is None:
             return
-        sql, new_tab = result
 
+        sql, new_tab = result
         self.run_sql(sql, new_tab)
 
     @with_full_df
@@ -6244,6 +6267,8 @@ class DataFrameTable(DataTable):
 
         # Update dataframe
         self.df = df_filtered
+
+        self.hyperlink_columns.clear()
 
         # Recreate table for display
         self.setup_table()

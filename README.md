@@ -261,7 +261,7 @@ Useful examples from current bindings:
   - `z/` and `z?` search with cursor value (specialized variant).
   - `z:` joins selected columns.
   - `zT` transposes rows/columns.
-  - `za` adds a link column from a URL template.
+  - `z@` adds a hyperlink from a URL template to the current column or clears an existing one.
 
 **Tip**: Learn the base key first, then its `g` and `z` variants as a small family.
 
@@ -393,10 +393,10 @@ Plot keys are leader sequences: press `p`, then the second key. They require the
 | `Shift+Delete` | Clear current column (set matching cells to NULL)                         |
 | `e`            | Edit current cell (respects data type)                                    |
 | `E`            | Edit entire column with value/expression                                  |
-| `a`            | Add an empty column after current                                         |
+| `a`            | Add a column from a string template after current                         |
 | `A`            | Add a column with name and value/expression                               |
 | `i`            | Add an index column after current                                         |
-| `za`           | Add a link column from URL template                                       |
+| `z@`           | Add hyperlink from a URL template or clear an existing one                |
 | `^`            | Rename current column                                                     |
 | `*`            | Delete selected columns or current column                                 |
 | `g*`           | Delete current column and all columns before it                           |
@@ -845,10 +845,10 @@ Editing covers cell updates, structural table changes, and quick cleanup.
 - `*`: Delete selected columns, or the current column if none is selected.
 - `g*`: Delete the current column and all columns to its left.
 - `z*`: Delete the current column and all columns to its right.
-- `a`: Add an empty column after the current column.
+- `a`: Add a column after the current column using a string template. The dialog defaults to a selected `NULL` value, creating an empty column if left unchanged. For example, `prefix-$_-$name` combines literal text with the current column and the `name` column. Templates also support `$1`, `$2`, and other 1-based column indices.
 - `A`: Add a column after the current column using a value or expression such as `$age * 2`.
 - `i`: Add an index column after the current column.
-- `za`: Add a link column from URL template
+- `z@`: Add a hyperlink from a URL template to the current column or clear an existing one.
 - `D`: Duplicate the current row.
 - `zD`: Duplicate the current column using a `_copy` suffix.
 - `zU`: Remove duplicate rows while keeping the first occurrence, based on visible-column values.
@@ -1003,9 +1003,11 @@ Complex values, filters, and advanced operations can be specified via Polars exp
 - Use column names that match exactly (case-sensitive)
 - Use parentheses to clarify complex expressions: `($a & $b) | ($c & $d)`
 
-### 19. Link Column Creation
+### 19. Column Hyperlinks
 
-Press `za` to create a new column containing dynamically generated URLs using template. Links are typically clickable in a terminal emulator using Ctrl+Click.
+Press `z@` to add a hyperlink from a URL template to the current column or clear an existing one. To replace a template, clear it with `z@`, then press `z@` again to enter the new template. The displayed cell values and underlying dataframe remain unchanged. Ctrl/Cmd-click a cell to open its link in a terminal that supports hyperlinks.
+
+The template applies to the whole column, even when it is added in a filtered view. Links are generated from current values as rows are displayed; a null placeholder produces no link. Hyperlinks are display state and are not saved to exported files. Some operations that rebuild the dataframe clear the links; undo and redo restore hyperlink changes, including clearing a template.
 
 **Template Placeholders:**
 
@@ -1014,11 +1016,13 @@ The link template supports multiple placeholder types for maximum flexibility:
 - **`$_`** - Current column, e.g., `https://example.com/search/$_` - Uses values from the current column
 - **`$1`, `$2`, `$3`, etc.** - Column by 1-based position index, e.g., `https://example.com/product/$1/details/$2` - Uses 1st and 2nd columns
 - **`$name`** - Column by name (use actual column names), e.g., `https://example.com/$region/$city/data` - Uses `region` and `city` columns
+- **Backtick-quoted name** - Use ``$`column name` `` to reference a column with spaces or punctuation, e.g., ``https://example.com/$`product id` ``.
+- **`$#`** - The row's internal ID (zero-based in link templates and preserved when filtering). In Polars expressions, `$#` is converted to a 1-based row number.
 
 **Features:**
 
 - **Multiple Placeholders**: Mix and match placeholders in a single template
-- **URL Prefix**: Automatically prepends `https://` if URL doesn't start with `http://` or `https://`
+- **URL Prefix**: Automatically prepends `https://` if URL doesn't start with `https://`, `http://`, or `ftp://`
 
 ### 20. Join Tables
 

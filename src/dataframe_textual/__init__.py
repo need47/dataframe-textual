@@ -16,7 +16,6 @@ from .table_screen import (
 )
 from .yes_no_screen import (
     AddColumnScreen,
-    AddLinkScreen,
     ConfirmScreen,
     EditCellScreen,
     EditColumnScreen,
@@ -30,7 +29,6 @@ from .yes_no_screen import (
 
 __all__ = [
     "AddColumnScreen",
-    "AddLinkScreen",
     "ConfirmScreen",
     "DataFrameHelpPanel",
     "DataFrameTable",

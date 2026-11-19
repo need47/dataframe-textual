@@ -21,3 +21,4 @@ test.py
 *.vortex
 .DS_Store
 *.zst
+tests/*

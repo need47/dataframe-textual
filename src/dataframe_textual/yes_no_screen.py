@@ -30,7 +30,7 @@ from textual.widgets.selection_list import Selection
 from textual.widgets.tabbed_content import ContentTab
 
 from .commands import Scope
-from .common import NULL, RID, DtypeClass, DtypeConfig, tentative_expr, validate_expr
+from .common import NULL, RID, DtypeClass, DtypeConfig, parse_placeholders, tentative_expr, validate_expr
 from .keybindings import KeyBinding, format_key_display, parse_key_display
 
 
@@ -783,31 +783,53 @@ class EditColumnScreen(YesNoScreen):
 class AddColumnScreen(YesNoScreen):
     """Modal screen to add a new column with an expression."""
 
-    def __init__(self, col_name: str, df: pl.DataFrame, link: bool = False):
+    def __init__(
+        self,
+        col_name: str,
+        df: pl.DataFrame,
+        link: bool = False,
+        template: bool = False,
+        new_col_name: str = "new_col",
+    ):
         self.col_name = col_name
         self.df = df
         self.link = link
+        self.template = template
         self.existing_columns = set(df.columns)
 
         label2 = (
-            "Link template, e.g., https://example.com/$1/id/$_, PC/compound/$cid"
+            "Link template, e.g., example.com/$1/id/$_"
             if link
+            else "String template, e.g., prefix-$_, $1-$name, or NULL"
+            if template
             else f"Value or Polars expression, e.g., abc, pl.lit(123), {NULL}, $_ * 2, $1 + $total, $_ + '_suffix', $_.str.to_uppercase()"
         )
 
         super().__init__(
-            title="Add Column",
-            label="Column name",
-            input="Link" if link else "New column",
-            label2=label2,
-            input2=Input(placeholder="Link template" if link else "Value or Polars expression"),
+            title="Add Hyperlink" if link else "Add Column",
+            label=label2 if link else "Column name",
+            input=Input(placeholder="Link template") if link else new_col_name,
+            label2=None if link else label2,
+            input2=None
+            if link
+            else Input(
+                value=NULL if template else "",
+                placeholder="String template" if template else "Value or Polars expression",
+            ),
             yes="Add",
             no="Cancel",
             on_yes_callback=self._get_input,
         )
 
-    def _get_input(self) -> tuple[str, str, Any] | None:
+    def _get_input(self) -> tuple[str, str] | tuple[str, str, Any] | None:
         """Validate and return the new column configuration."""
+        if self.link:
+            term = self.input.value
+            if not term.strip():
+                self.notify("Link template cannot be empty", title="Add Hyperlink", severity="error")
+                return None
+            return self.col_name, term
+
         new_col_name = self.input.value.strip()
         term = self.input2.value  # Do not strip to preserve spaces
 
@@ -826,9 +848,14 @@ class AddColumnScreen(YesNoScreen):
 
         if term == NULL:
             return self.col_name, new_col_name, pl.lit(None)
-        elif self.link:
-            # Treat as link template
-            return self.col_name, new_col_name, term
+        elif self.template:
+            try:
+                parts = parse_placeholders(term, self.df.columns, self.col_name)
+                expr = pl.concat_str([part if isinstance(part, pl.Expr) else pl.lit(part) for part in parts])
+                return self.col_name, new_col_name, expr
+            except ValueError as e:
+                self.notify(f"Invalid template [$error]{term}[/]: {e}", title="Add Column", severity="error")
+                return None
         elif tentative_expr(term):
             try:
                 expr = validate_expr(term, self.df.columns, self.col_name, self.df)
@@ -849,18 +876,6 @@ class AddColumnScreen(YesNoScreen):
                     severity="warning",
                 )
                 return self.col_name, new_col_name, pl.lit(term)
-
-
-class AddLinkScreen(AddColumnScreen):
-    """Modal screen to add a new link column with user-provided expressions.
-
-    Allows user to specify a column name and a value or Polars expression that will be
-    evaluated to create links. A new column is created with the resulting link values.
-    Inherits column name and expression validation from AddColumnScreen.
-    """
-
-    def __init__(self, col_name: str, df: pl.DataFrame):
-        super().__init__(col_name, df, link=True)
 
 
 class FindReplaceScreen(YesNoScreen):
