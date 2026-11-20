@@ -619,6 +619,15 @@ def handle_compute_error(err_msg: str) -> None:
             "No data could be read from the input. Check if the file is empty or if the format/delimiter is correct.\n"
         )
 
+    # invalid utf-8 sequence
+    elif "invalid utf-8 sequence" in err_msg:
+        console.rule("Error", style="red")
+        console.print(err_msg)
+        console.rule("Troubleshooting", style="green")
+        console.print(
+            "The input contains invalid utf-8 sequences. Try again with `[yellow bold]--encoding utf8-lossy[/yellow bold]`.\n"
+        )
+
     # Other errors
     else:
         console.rule("Error", style="red")
@@ -831,6 +840,7 @@ def load_dataframe(
     n_rows: int | None = None,
     use_columns: list[str] | None = None,
     all_in_one: bool = False,
+    encoding: str = "utf8",
 ) -> list[Source]:
     """Load DataFrames from file specifications.
 
@@ -854,6 +864,7 @@ def load_dataframe(
         n_rows: Number of rows to read from CSV/TSV files. Defaults to None (read all rows).
         use_columns: List of columns to read from CSV/TSV files. Defaults to None (read all columns).
         all_in_one: Whether to read all files (must be of the same structure) into a single DataFrame. Defaults to False.
+        encoding: Encoding to use when reading CSV/TSV files. Defaults to "utf8".
     Returns:
         List of `Source` objects.
     """
@@ -900,6 +911,7 @@ def load_dataframe(
             truncate_ragged_lines=truncate_ragged_lines,
             n_rows=n_rows,
             use_columns=use_columns,
+            encoding=encoding,
         )
 
         if all_in_one:
@@ -933,6 +945,7 @@ def load_file(
     truncate_ragged_lines: bool = False,
     n_rows: int | None = None,
     use_columns: list[str] | None = None,
+    encoding: str = "utf8",
 ) -> list[Source]:
     """Load a single file.
 
@@ -961,6 +974,7 @@ def load_file(
         truncate_ragged_lines: Whether to truncate ragged lines when reading CSV/TSV files. Defaults to False.
         n_rows: Number of rows to read from CSV/TSV files. Defaults to None (read all rows).
         use_columns: List of columns to read from CSV/TSV files. Defaults to None (read all columns).
+        encoding: Encoding to use when reading CSV/TSV files. Defaults to "utf8".
 
     Returns:
         List of `Source` objects.
@@ -1002,6 +1016,7 @@ def load_file(
             truncate_ragged_lines=truncate_ragged_lines,
             n_rows=n_rows,
             new_columns=new_columns,
+            encoding=encoding,
         )
         data.append(Source(lf, filename, filepath.stem))
     elif fmt == "xlsx":

@@ -57,7 +57,7 @@ def cli() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         prog="dv",
-        description="TUI viewer/editor for tabular data (e.g., CSV/Excel).",
+        description="TUI viewer/editor for tabular data (e.g., CSV/Excel)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Examples:\n"
         "  %(prog)s data.csv\n"
@@ -75,12 +75,12 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "-d",
         "--delimiter",
-        help="Specify the delimiter of the input files (must be a single character, e.g., `|` or `;`). By default, the delimiter is inferred from the file extension. If reading from stdin, the delimiter must be specified unless it is tab delimited.",
+        help="Specify the delimiter of the input files (must be a single character, e.g., `|` or `;`). By default, the delimiter is inferred from the file extension. If reading from stdin, the delimiter must be specified unless it is tab delimited",
     )
     parser.add_argument(
         "-f",
         "--format",
-        help="Specify the format of the input files (e.g., `csv`). By default, the format is inferred from the file extension. If reading from stdin, the format must be specified unless it is tab delimited.",
+        help="Specify the format of the input files (e.g., `csv`). By default, the format is inferred from the file extension. If reading from stdin, the format must be specified unless it is tab delimited",
     )
     parser.add_argument(
         "-F",
@@ -88,7 +88,7 @@ def cli() -> argparse.Namespace:
         nargs="*",
         action=ConstWithMultiArgs,
         const="list",
-        help="When used without values, list available fields. Otherwise, read only specified fields.",
+        help="When used without values, list available fields. Otherwise, read only specified fields",
     )
     parser.add_argument(
         "-H",
@@ -96,7 +96,7 @@ def cli() -> argparse.Namespace:
         nargs="*",
         action=ConstWithMultiArgs,
         const=False,
-        help="Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column header (e.g., `-H col1 col2 col3`).",
+        help="Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column header (e.g., `-H col1 col2 col3`)",
     )
     parser.add_argument(
         "-L",
@@ -106,13 +106,13 @@ def cli() -> argparse.Namespace:
         type=int,
         default=100,
         const=None,
-        help="Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100. When used without value, uses all rows for schema inference (can be slow for large files).",
+        help="Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100. When used without value, uses all rows for schema inference (can be slow for large files)",
     )
     parser.add_argument(
         "-I",
         "--no-inference",
         action="store_true",
-        help="Do not infer data types when reading CSV/TSV. All values will be of string type.",
+        help="Do not infer data types when reading CSV/TSV. All values will be of string type",
     )
     parser.add_argument(
         "-T", "--truncate-ragged-lines", action="store_true", help="Truncate ragged lines when reading CSV/TSV"
@@ -133,7 +133,7 @@ def cli() -> argparse.Namespace:
         nargs="?",
         const=None,
         default='"',
-        help="Use `C` as quote character for reading CSV/TSV. When used without value, disables special handling of quote characters.",
+        help="Use `C` as quote character for reading CSV/TSV. When used without value, disables special handling of quote characters",
     )
     parser.add_argument(
         "-K", "--skip-lines", metavar="N", type=int, default=0, help="Skip first N lines when reading CSV/TSV"
@@ -154,33 +154,33 @@ def cli() -> argparse.Namespace:
         default=["IsNULL", "NULL"],
         help="Values to interpret as null values when reading CSV/TSV",
     )
-
+    parser.add_argument(
+        "--encoding",
+        default="utf8",
+        choices=["utf8", "utf8-lossy"],
+        help="Specify the encoding of the input files (only applicable to delimited files). Defaults to utf8",
+    )
     parser.add_argument(
         "--theme",
         nargs="?",
         default="textual-dark",
         const="list",
-        help="Set the theme for the application. If used without value, show available themes.",
+        help="Set the theme for the application. If used without value, show available themes",
     )
-
     parser.add_argument(
         "--all-in-one",
-        "--aio",
         "--one",
         action="store_true",
-        help="Read all files (must be of same format and same structure) into one single table.",
+        help="Read all files (must be of same format and same structure) into one single table",
     )
-
     parser.add_argument("--expr", help="Specify a Polars expression to filter data (e.g., $age > 30)")
-
     parser.add_argument(
         "--sql", help="Specify a SQL query to execute on the input file (e.g., to select and filter data)"
     )
-
     parser.add_argument(
         "-o",
         "--output",
-        help="Output file (optionally modified) with specified format, which is inferred from file extension (e.g., .csv, .xlsx).",
+        help="Output file (optionally modified) with specified format, which is inferred from file extension (e.g., .csv, .xlsx)",
     )
 
     args = parser.parse_args()
@@ -247,6 +247,7 @@ def main() -> None:
         n_rows=20 if args.fields == "list" else args.n_rows,
         use_columns=args.fields if args.fields and args.fields != "list" else None,
         all_in_one=args.all_in_one,
+        encoding=args.encoding,
     )
 
     # List available fields and exit

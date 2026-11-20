@@ -102,11 +102,11 @@ dv *.parquet --all-in-one
 ## Command Line Options
 
 ```
-usage: dv [-h] [-V] [-d DELIMITER] [-f FORMAT] [-F [FIELDS ...]] [-H [HEADER ...]] [-L [N]] [-I] [-T] [-E] [-C [C]] [-Q [C]] [-K N] [-A N] [-M [N]] [-N NULL [NULL ...]] [--theme [THEME]] [--all-in-one]
-          [--expr EXPR] [--sql SQL] [-o OUTPUT]
+usage: dv [-h] [-V] [-d DELIMITER] [-f FORMAT] [-F [FIELDS ...]] [-H [HEADER ...]] [-L [N]] [-I] [-T] [-E] [-C [C]] [-Q [C]] [-K N] [-A N] [-M [N]] [-N NULL [NULL ...]]
+          [--encoding ENCODING] [--theme [THEME]] [--all-in-one] [--expr EXPR] [--sql SQL] [-o OUTPUT]
           [files ...]
 
-TUI viewer/editor for tabular data (e.g., CSV/Excel).
+TUI viewer/editor for tabular data (e.g., CSV/Excel)
 
 positional arguments:
   files                 Files to view (or read from stdin)
@@ -115,35 +115,38 @@ options:
   -h, --help            show this help message and exit
   -V, --version         show program's version number and exit
   -d, --delimiter DELIMITER
-                        Specify the delimiter of the input files (must be a single character, e.g., `|` or `;`). By default, the delimiter is inferred from the file extension. If reading from stdin, the
-                        delimiter must be specified unless it is tab delimited.
-  -f, --format FORMAT   Specify the format of the input files (e.g., `csv`). By default, the format is inferred from the file extension. If reading from stdin, the format must be specified
-                        unless it is tab delimited.
+                        Specify the delimiter of the input files (must be a single character, e.g., | or ;). By default, the delimiter is inferred from the file
+                        extension. If reading from stdin, the delimiter must be specified unless it is tab delimited
+  -f, --format FORMAT   Specify the format of the input files (e.g., csv). By default, the format is inferred from the file extension. If reading from stdin, the format
+                        must be specified unless it is tab delimited
   -F, --fields [FIELDS ...]
-                        When used without values, list available fields. Otherwise, read only specified fields.
+                        When used without values, list available fields. Otherwise, read only specified fields
   -H, --header [HEADER ...]
-                        Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column header (e.g., `-H col1 col2 col3`).
+                        Specify header info. When reading CSV/TSV. If used without values, assumes no header. Otherwise, use provided values as column header (e.g., -H
+                        col1 col2 col3)
   -L, --infer_schema_length [N]
-                        Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100. When used without value, uses all rows for schema inference (can be slow for large files).
-  -I, --no-inference    Do not infer data types when reading CSV/TSV. All values will be of string type.
+                        Number of rows to use for inferring schema when reading CSV/TSV. Defaults to 100. When used without value, uses all rows for schema inference
+                        (can be slow for large files)
+  -I, --no-inference    Do not infer data types when reading CSV/TSV. All values will be of string type
   -T, --truncate-ragged-lines
                         Truncate ragged lines when reading CSV/TSV
   -E, --ignore-errors   Ignore errors when reading CSV/TSV
   -C, --comment-prefix [C]
-                        Skip comment lines starting with `C` when reading CSV/TSV
-  -Q, --quote-char [C]  Use `C` as quote character for reading CSV/TSV. When used without value, disables special handling of quote characters.
+                        Skip comment lines starting with C when reading CSV/TSV
+  -Q, --quote-char [C]  Use C as quote character for reading CSV/TSV. When used without value, disables special handling of quote characters
   -K, --skip-lines N    Skip first N lines when reading CSV/TSV
   -A, --skip-rows-after-header N
                         Skip N rows after header when reading CSV/TSV
   -M, --n-rows [N]      Read maximum rows
   -N, --null NULL [NULL ...]
                         Values to interpret as null values when reading CSV/TSV
-  --theme [THEME]       Set the theme for the application. If used without value, show available themes.
-  --all-in-one, --aio, --one
-                        Read all files (must be of same format and same structure) into one single table.
+  --encoding {utf8,utf8-lossy}
+                        Specify the encoding of the input files (only applicable to delimited files). Defaults to utf8
+  --theme [THEME]       Set the theme for the application. If used without value, show available themes
+  --all-in-one, --one   Read all files (must be of same format and same structure) into one single table
   --expr EXPR           Specify a Polars expression to filter data (e.g., $age > 30)
   --sql SQL             Specify a SQL query to execute on the input file (e.g., to select and filter data)
-  -o, --output OUTPUT   Output file (optionally modified) with specified format, which is inferred from file extension (e.g., .csv, .xlsx).
+  -o, --output OUTPUT   Output file (optionally modified) with specified format, which is inferred from file extension (e.g., .csv, .xlsx)
 ```
 
 ### CLI Examples
