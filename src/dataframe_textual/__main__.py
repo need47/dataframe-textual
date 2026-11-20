@@ -80,7 +80,7 @@ def cli() -> argparse.Namespace:
     parser.add_argument(
         "-f",
         "--format",
-        help="Specify the format of the input files (e.g., `csv` or `excel`). By default, the format is inferred from the file extension. If reading from stdin, the format must be specified unless it is tab delimited.",
+        help="Specify the format of the input files (e.g., `csv`). By default, the format is inferred from the file extension. If reading from stdin, the format must be specified unless it is tab delimited.",
     )
     parser.add_argument(
         "-F",

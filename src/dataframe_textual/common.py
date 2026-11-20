@@ -18,6 +18,7 @@ from rich.text import Text
 # Supported file formats
 SUPPORTED_FORMATS = {
     "tsv": "\t",
+    "tab": "\t",
     "csv": ",",
     "psv": "|",
     "ssv": ";",

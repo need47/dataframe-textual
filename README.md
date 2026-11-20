@@ -8,20 +8,21 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 
 ### Data Viewing
 
-- 🚀 **Fast Loading** - Powered by Polars for efficient batch data handling
+- 🚀 **Fast Loading** - Powered by [Polars](https://pola.rs) for efficient batch data handling
 - 🎨 **Rich Terminal UI** - Beautiful, color-coded columns with auto-detected data types (e.g., integer, float, string)
-- ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls with fully customizable key bindings (mostly VisiData compatible)
-- 📊 **Flexible Input** - Read from files and/or stdin (pipes/redirects) in various formats
+- ⌨️ **Comprehensive Keyboard Navigation** - Intuitive controls with fully customizable key bindings (mostly [VisiData](https://www.visidata.org/) compatible)
+- 📄 **Flexible Input** - Read from files and/or stdin (pipes/redirects) in various formats
 - 🔄 **Smart Pagination** - Lazy load rows on demand for handling large datasets
+- 📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
+- 📊 **Plotting** - Draw line, scatter, box, bar, histogram, and confusion matrix plots via [plotext](https://github.com/piccolomo/plotext)
 
 ### Data Manipulation
 
 - 📝 **Data Editing** - Edit cells, delete rows, reorder columns, and beyond
-- 🧹 **Duplicate Removal** - Remove duplicate rows
+- 🧹 **Data Cleaning** - Handle nulls, clean values, cast types, and remove duplicate rows
 - 🔍 **Search & Filter** - Find values, highlight matches, and filter selected rows
 - ↔️ **Column/Row Reordering** - Move columns and rows with simple keyboard shortcuts
 - 📈 **Sorting & Statistics** - Multi-column sorting, frequency distribution, and histogram analysis
-- 📊 **Plotting** - Draw line, scatter, box, bar, histogram, and confusion matrix plots via [plotext](https://github.com/piccolomo/plotext)
 - 💾 **Save & Undo** - Save edits back to file with full undo/redo support
 
 ### Advanced Features
@@ -31,7 +32,6 @@ A powerful, interactive terminal-based viewer/editor for CSV/TSV/Excel/[Parquet]
 - 🔗 **Table Joins** - Join two tables into a new tab
 - 📑 **Duplicate Tab** - Create a copy of the current tab with the same data
 - 🐍 **Embedded Python Console** - Inspect and transform the active table directly in app
-- 📌 **Freeze Rows/Columns** - Keep important rows and columns visible while scrolling
 - 📸 **Take Screenshot** - Capture terminal view as a SVG image
 
 ## Installation
@@ -117,7 +117,7 @@ options:
   -d, --delimiter DELIMITER
                         Specify the delimiter of the input files (must be a single character, e.g., `|` or `;`). By default, the delimiter is inferred from the file extension. If reading from stdin, the
                         delimiter must be specified unless it is tab delimited.
-  -f, --format FORMAT   Specify the format of the input files (e.g., `csv` or `excel`). By default, the format is inferred from the file extension. If reading from stdin, the format must be specified
+  -f, --format FORMAT   Specify the format of the input files (e.g., `csv`). By default, the format is inferred from the file extension. If reading from stdin, the format must be specified
                         unless it is tab delimited.
   -F, --fields [FIELDS ...]
                         When used without values, list available fields. Otherwise, read only specified fields.
@@ -156,7 +156,7 @@ dv data.csv
 dv data.csv.gz
 dv data.csv.zst
 
-# Read from stdin (defaults to TSV)
+# Read from stdin (default to TSV)
 cat data.tsv | dv
 dv < data.tsv
 
@@ -1100,7 +1100,7 @@ Plot commands open a plot modal. Most plots require numeric data columns; confus
 **Plot modal controls:**
 
 - `q` / `Escape`: Closes the plot.
-- `x` / `y`: Independently toggles the corresponding axis between linear (default) and logarithmic scales. Logarithmic axes require strictly positive plotted coordinates, including baselines and cell edges.
+- `x` / `y`: Independently toggles the corresponding axis between linear (default) and logarithmic scales for applicable plot types. Logarithmic axes require strictly positive plotted coordinates, including baselines and cell edges.
 - `o`: Toggles vertical/horizontal orientation for bar, box and histgram plots
 - Bar plot: `s` toggles grouped/stacked bars, and `c` cycles data labels through none, counts, percentages, and counts plus percentages. Percentages are calculated within each series.
 - Histogram: `#` sets the bin count (default `10`), and `n` toggles normalization of bin counts to proportions.
