@@ -6173,6 +6173,9 @@ class DataFrameTable(DataTable):
             content: The text content to copy to clipboard.
             message: The notification message to display on success.
         """
+        # Copy content to Textual's internal clipboard
+        self.app.copy_to_clipboard(content)
+
         import subprocess
 
         try:
